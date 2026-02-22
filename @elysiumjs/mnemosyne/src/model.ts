@@ -12,50 +12,42 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { BuildExtraConfigColumns } from 'drizzle-orm';
-import type {
-	PgColumn,
-	PgColumnBuilderBase,
-	PgTable,
-	PgTableExtraConfigValue
-} from 'drizzle-orm/pg-core';
 import type { TSchema } from 'elysia';
+import type { ColumnMetadata, ModelAdapter } from './interfaces';
 
 import { Application } from '@elysiumjs/core';
-import { getTableConfig, pgTable } from 'drizzle-orm/pg-core';
 import { t } from 'elysia';
 
-import { getCurrentTenant, wrapTenantSchema } from './tenancy';
+import { getCurrentTenant, getTenancyStrategy } from './tenancy';
 
 /**
- * Creates a validation schema from a Drizzle table.
+ * Creates a validation schema from normalized column metadata.
  * @author Axel Nana <axel.nana@workbud.com>
- * @param table The table to create the schema from.
+ * @param columns The column metadata to create the schema from.
  * @param options The schema generation options.
- * @returns A bew validation schema based on the given table.
+ * @returns A validation schema based on the given columns.
  */
-export const createSchemaFromDrizzle = (
-	table: PgTable,
+export const createSchemaFromModel = (
+	columns: ColumnMetadata[],
 	{ mode = 'select' }: { mode?: 'create' | 'update' | 'select' } = {}
 ) => {
-	const { columns } = getTableConfig(table);
-	if (columns === undefined) return t.Object({});
+	if (columns === undefined || columns.length === 0) return t.Object({});
 
 	const properties: { [key: string]: TSchema } = {};
 
-	for (const element of columns) {
-		if (['create', 'update'].includes(mode) && element.primary) {
+	for (const column of columns) {
+		if (['create', 'update'].includes(mode) && column.isPrimaryKey) {
 			continue;
 		}
 
-		properties[element.name] = parseTypes(element);
+		properties[column.name] = parseColumnType(column);
 
-		if (!element.notNull) {
-			properties[element.name] = t.Nullable(properties[element.name]);
+		if (column.nullable) {
+			properties[column.name] = t.Nullable(properties[column.name]);
 		}
 
-		if (mode === 'update' || element.hasDefault || !element.notNull) {
-			properties[element.name] = t.Optional(properties[element.name]);
+		if (mode === 'update' || column.hasDefault || column.nullable) {
+			properties[column.name] = t.Optional(properties[column.name]);
 		}
 	}
 
@@ -63,18 +55,18 @@ export const createSchemaFromDrizzle = (
 };
 
 /**
- * Creates a validation schema from a Drizzle column.
+ * Creates a validation schema from a column's metadata.
  * @author Axel Nana <axel.nana@workbud.com>
- * @param element The Drizzle column.
+ * @param column The column metadata.
  * @returns A validation schema based on the given column.
  */
-const parseTypes = (element: PgColumn) => {
+const parseColumnType = (column: ColumnMetadata) => {
 	let type = (() => {
-		switch (element.dataType) {
+		switch (column.dataType) {
 			case 'string':
-				return t.String({
-					format: element.columnType === 'PgUUID' ? 'uuid' : undefined
-				});
+				return t.String();
+			case 'uuid':
+				return t.String({ format: 'uuid' });
 			case 'number':
 				return t.Number();
 			case 'boolean':
@@ -84,14 +76,13 @@ const parseTypes = (element: PgColumn) => {
 			case 'json':
 				return t.Object({});
 			case 'date':
-			case 'localDate':
-			case 'localDateTime':
 				return t
-					.Transform(
-						t.String({
-							format: element.dataType === 'date' ? 'date' : 'date-time'
-						})
-					)
+					.Transform(t.String({ format: 'date' }))
+					.Decode((date) => new Date(date))
+					.Encode((date) => date.toISOString());
+			case 'datetime':
+				return t
+					.Transform(t.String({ format: 'date-time' }))
 					.Decode((date) => new Date(date))
 					.Encode((date) => date.toISOString());
 			case 'bigint':
@@ -103,7 +94,7 @@ const parseTypes = (element: PgColumn) => {
 		}
 	})();
 
-	if (!element.notNull) {
+	if (column.nullable) {
 		type = t.Optional(type);
 	} else {
 		type = t.Required(type);
@@ -113,139 +104,61 @@ const parseTypes = (element: PgColumn) => {
 };
 
 /**
- * Type of a repository class.
+ * Mixin used to create a new abstract model class.
  * @author Axel Nana <axel.nana@workbud.com>
- * @template TColumnsMap The table columns config.
- * @template TTable The drizzle's table schema wrapped by the repository.
- */
-export type ModelClass<
-	TTableName extends string,
-	TColumnsMap extends Record<string, PgColumnBuilderBase>,
-	TTable extends PgTable = ReturnType<typeof pgTable<TTableName, TColumnsMap>>
-> = {
-	/**
-	 * The data type returned by the select queries.
-	 */
-	readonly $inferSelect: TTable['$inferSelect'];
-
-	/**
-	 * The data type needed by the insert queries.
-	 */
-	readonly $inferInsert: TTable['$inferInsert'];
-
-	/**
-	 * The data type needed by the update queries.
-	 */
-	readonly $inferUpdate: Partial<TTable['$inferSelect']>;
-
-	/**
-	 * The drizzle's table schema wrapped by this model.
-	 * Will be automatically wrapped by the `Tenancy.withTenant()` function when the current tenant is not `public`.
-	 */
-	readonly table: TTable;
-
-	/**
-	 * The name of the table wrapped by the model.
-	 */
-	readonly tableName: TTableName;
-
-	/**
-	 * The table columns configuration.
-	 */
-	readonly columns: TColumnsMap;
-
-	/**
-	 * The extra configuration for the table.
-	 */
-	readonly extraConfig?: (
-		self: BuildExtraConfigColumns<TTableName, TColumnsMap, 'pg'>
-	) => PgTableExtraConfigValue[];
-
-	/**
-	 * The validation schema for creating records.
-	 */
-	readonly insertSchema: TSchema;
-
-	/**
-	 * The validation schema for updating records.
-	 */
-	readonly updateSchema: TSchema;
-
-	/**
-	 * The validation schema for selecting records.
-	 */
-	readonly selectSchema: TSchema;
-
-	/**
-	 * Whether the model supports tenancy.
-	 *
-	 * Set it to `true` if the model supports tenancy. This means that the model will be
-	 * wrapped by the `Tenancy.withTenant()` function when the current tenant is not `public`.
-	 */
-	readonly supportTenancy: boolean;
-
-	/**
-	 * Creates a new instance of the model.
-	 * @param args The arguments to pass to the constructor.
-	 * @returns A new instance of the model.
-	 */
-	new (...args: unknown[]): unknown;
-};
-
-/**
- * Mixin used to create a new model class.
- * @author Axel Nana <axel.nana@workbud.com>
- * @template TColumnsMap The table columns config.
+ * @template TTable The ORM-specific table type.
+ * @template TColumns The table columns configuration type.
  * @param tableName The name of the table.
  * @param columns The table columns configuration.
+ * @param adapter The model adapter for the ORM.
+ * @param baseTable The base ORM table instance.
  */
-export const Model = <
-	TTableName extends string,
-	TColumnsMap extends Record<string, PgColumnBuilderBase>
->(
-	tableName: TTableName,
-	columns: TColumnsMap,
-	extraConfig?: (
-		self: BuildExtraConfigColumns<TTableName, TColumnsMap, 'pg'>
-	) => PgTableExtraConfigValue[]
+export const AbstractModel = <TTable, TColumns extends Record<string, unknown>>(
+	tableName: string,
+	columns: TColumns,
+	adapter: ModelAdapter<TTable>,
+	baseTable: TTable
 ) => {
-	const table = pgTable(tableName, columns, extraConfig);
+	const columnMetadata = adapter.getColumns(baseTable);
 
 	class M {
 		/**
 		 * The data type returned by the select queries.
 		 */
-		public static readonly $inferSelect = table.$inferSelect;
+		public static readonly $inferSelect: unknown = undefined;
 
 		/**
 		 * The data type needed by the insert queries.
 		 */
-		public static readonly $inferInsert = table.$inferInsert;
+		public static readonly $inferInsert: unknown = undefined;
 
 		/**
 		 * The data type needed by the update queries.
 		 */
-		public static readonly $inferUpdate: Partial<typeof table.$inferInsert> = table.$inferInsert;
+		public static readonly $inferUpdate: unknown = undefined;
 
 		/**
-		 * The drizzle's table schema wrapped by this model.
+		 * The ORM-specific table schema wrapped by this model.
+		 * Will be automatically resolved to a tenant-scoped table when tenancy is active.
 		 */
-		public static get table(): ReturnType<typeof pgTable<TTableName, TColumnsMap>> {
+		public static get table(): TTable {
 			// If we are not inside an Application context, we can't use the tenancy system
 			if (!Application.instance || !Application.context.getStore) {
-				return table;
+				return baseTable;
 			}
 
 			if (this.supportTenancy) {
 				const tenant = getCurrentTenant() ?? 'public';
-				return wrapTenantSchema(
-					tenant,
-					this.tableName as TTableName,
-					this.columns as TColumnsMap
-				) as ReturnType<typeof pgTable<TTableName, TColumnsMap>>;
+				if (tenant !== 'public') {
+					const strategy = getTenancyStrategy();
+					if (strategy) {
+						return strategy.resolveTable(baseTable, tenant) as TTable;
+					}
+					return adapter.createTenantTable(baseTable, tenant);
+				}
 			}
 
-			return table;
+			return baseTable;
 		}
 
 		/**
@@ -256,33 +169,28 @@ export const Model = <
 		/**
 		 * The table columns configuration.
 		 */
-		public static readonly columns: TColumnsMap = columns;
-
-		/**
-		 * The extra configuration for the table.
-		 */
-		public static readonly extraConfig = extraConfig;
+		public static readonly columns: TColumns = columns;
 
 		/**
 		 * The validation schema for creating records.
 		 */
-		public static readonly insertSchema = createSchemaFromDrizzle(table, { mode: 'create' });
+		public static readonly insertSchema = createSchemaFromModel(columnMetadata, { mode: 'create' });
 
 		/**
 		 * The validation schema for updating records.
 		 */
-		public static readonly updateSchema = createSchemaFromDrizzle(table, { mode: 'update' });
+		public static readonly updateSchema = createSchemaFromModel(columnMetadata, { mode: 'update' });
 
 		/**
 		 * The validation schema for selecting records.
 		 */
-		public static readonly selectSchema = createSchemaFromDrizzle(table, { mode: 'select' });
+		public static readonly selectSchema = createSchemaFromModel(columnMetadata, { mode: 'select' });
 
 		/**
 		 * Whether the model supports tenancy.
 		 *
 		 * Set it to `true` if the model supports tenancy. This means that the model will be
-		 * wrapped by the `Tenancy.withTenant()` function when the current tenant is not `public`.
+		 * wrapped by the tenancy strategy when the current tenant is not `public`.
 		 */
 		public static readonly supportTenancy: boolean = false;
 	}
