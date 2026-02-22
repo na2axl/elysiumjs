@@ -1,7 +1,7 @@
-import { Model } from '@elysiumjs/mnemosyne';
+import { DrizzleModel } from '@elysiumjs/mnemosyne-drizzle';
 import { uuid } from 'drizzle-orm/pg-core';
 
-export class {name} extends Model('{table}', {
+export class {name} extends DrizzleModel('{table}', {
 	id: uuid().primaryKey().defaultRandom(),
 }) {
 	public static readonly supportTenancy = {supportTenancy};
