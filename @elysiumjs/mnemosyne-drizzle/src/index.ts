@@ -12,4 +12,41 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export {};
+import type { DrizzleConnectionProps } from './database';
+import type { MnemosyneConfig } from '@elysiumjs/mnemosyne';
+
+import { Application, Event } from '@elysiumjs/core';
+
+import { Database } from './database';
+
+// Re-exports
+export { Database, DrizzleDatabaseCache } from './database';
+export type { DrizzleConnectionProps, DrizzleConnection } from './database';
+export { DrizzleModel, createSchemaFromDrizzle, drizzleAdapter } from './model';
+export { DrizzleRepository } from './repository';
+export {
+	DrizzleSchemaTenancy,
+	DrizzleRLSTenancy,
+	wrapTenantSchema,
+	registerTenantSchema,
+	getTenantSchema,
+	withRLS,
+	setConnectionTenant,
+	getSessionTenant,
+	createRLSPolicy,
+} from './tenancy';
+
+// Auto-initialize on app launch
+Event.once('elysium:app:launched', () => {
+	const app = Application.instance;
+	const config = app.getConfig<MnemosyneConfig<DrizzleConnectionProps>>('elysium:mnemosyne' as any);
+
+	if (config?.database) {
+		for (const [name, props] of Object.entries(config.database.connections)) {
+			Database.registerConnection(name, props);
+		}
+		if (Database.connectionExists(config.database.default)) {
+			Database.setDefaultConnection(config.database.default);
+		}
+	}
+});
