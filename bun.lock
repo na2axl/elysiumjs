@@ -112,7 +112,6 @@
       "dependencies": {
         "cache-manager": "^7.2.3",
         "cacheable": "^2.0.3",
-        "drizzle-orm": "^0.44.6",
         "keyv": "^5.0.0",
         "radash": "catalog:",
         "reflect-metadata": "catalog:",
@@ -160,6 +159,7 @@
         "@elysiumjs/core": "workspace:*",
         "@elysiumjs/heracles": "workspace:*",
         "@elysiumjs/mnemosyne": "workspace:*",
+        "@elysiumjs/mnemosyne-drizzle": "workspace:*",
         "@types/prompts": "^2.4.9",
         "@types/string-template": "^1.0.7",
         "prompts": "^2.4.2",
@@ -170,6 +170,7 @@
         "@elysiumjs/core": "workspace:^",
         "@elysiumjs/heracles": "workspace:^",
         "@elysiumjs/mnemosyne": "workspace:^",
+        "@elysiumjs/mnemosyne-drizzle": "workspace:^",
       },
     },
     "create-elysium": {
@@ -192,6 +193,7 @@
       "dependencies": {
         "@elysiumjs/core": "workspace:^",
         "@elysiumjs/hermes": "workspace:^",
+        "@elysiumjs/mnemosyne-drizzle": "workspace:*",
         "@elysiumjs/styx": "workspace:^",
         "radash": "catalog:",
       },

@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { CacheInterface, DatabaseCacheConfig, DatabaseDriver } from '@elysiumjs/mnemosyne';
 import type { DrizzleConfig } from 'drizzle-orm';
 import type { BunSQLDatabase } from 'drizzle-orm/bun-sql';
 import type { CacheConfig } from 'drizzle-orm/cache/core/types';
-import type { CacheInterface, DatabaseCacheConfig, DatabaseDriver } from '@elysiumjs/mnemosyne';
 
+import { AbstractDatabase, createDatabaseCacheStorage } from '@elysiumjs/mnemosyne';
 import { getTableName, is, Table } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { Cache as DrizzleCache } from 'drizzle-orm/cache/core';
-import { AbstractDatabase, createDatabaseCacheStorage } from '@elysiumjs/mnemosyne';
 
 // ============================================================================
 // Types
@@ -34,12 +34,10 @@ import { AbstractDatabase, createDatabaseCacheStorage } from '@elysiumjs/mnemosy
  * @author Axel Nana <axel.nana@workbud.com>
  * @template TSchema The Drizzle schema type.
  */
-export type DrizzleConnectionProps<TSchema extends Record<string, unknown> = Record<string, never>> =
-	Omit<DrizzleConfig<TSchema>, 'cache'> &
-	(
-		| { connection: string | ({ url?: string } & Bun.SQLOptions) }
-		| { client: Bun.SQL }
-	) & {
+export type DrizzleConnectionProps<
+	TSchema extends Record<string, unknown> = Record<string, never>
+> = Omit<DrizzleConfig<TSchema>, 'cache'> &
+	({ connection: string | ({ url?: string } & Bun.SQLOptions) } | { client: Bun.SQL }) & {
 		cache?: true | DatabaseCacheConfig;
 	};
 
@@ -105,11 +103,11 @@ export class DrizzleDatabaseCache extends DrizzleCache {
 		tags?: string | string[];
 		tables?: string | string[] | Table<any> | Table<any>[];
 	}): Promise<void> {
-		const tagsArray = params.tags
-			? (Array.isArray(params.tags) ? params.tags : [params.tags])
-			: [];
+		const tagsArray = params.tags ? (Array.isArray(params.tags) ? params.tags : [params.tags]) : [];
 		const tablesArray = params.tables
-			? (Array.isArray(params.tables) ? params.tables : [params.tables])
+			? Array.isArray(params.tables)
+				? params.tables
+				: [params.tables]
 			: [];
 		const keysToDelete = new Set<string>();
 
@@ -145,13 +143,18 @@ export class DrizzleDatabaseCache extends DrizzleCache {
 class DrizzleDatabase extends AbstractDatabase<DrizzleConnection, DrizzleConnectionProps> {
 	protected driver: DatabaseDriver<DrizzleConnection, DrizzleConnectionProps> = {
 		createConnection(config) {
-			const cache = config.cache === undefined
-				? undefined
-				: config.cache === true
-					? new DrizzleDatabaseCache()
-					: config.cache.enabled !== false
-						? new DrizzleDatabaseCache(config.cache.strategy, config.cache.ttl, config.cache.storage)
-						: undefined;
+			const cache =
+				config.cache === undefined
+					? undefined
+					: config.cache === true
+						? new DrizzleDatabaseCache()
+						: config.cache.enabled !== false
+							? new DrizzleDatabaseCache(
+									config.cache.strategy,
+									config.cache.ttl,
+									config.cache.storage
+								)
+							: undefined;
 			return drizzle({ ...config, cache }) as DrizzleConnection;
 		},
 

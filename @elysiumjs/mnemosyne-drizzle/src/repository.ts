@@ -12,13 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { PgTableWithColumns } from 'drizzle-orm/pg-core';
 import type { IdType, ModelClass } from '@elysiumjs/mnemosyne';
-
-import { eq } from 'drizzle-orm';
-import { AbstractRepository } from '@elysiumjs/mnemosyne';
-
+import type { PgTableWithColumns } from 'drizzle-orm/pg-core';
 import type { DrizzleConnection } from './database';
+
+import { AbstractRepository } from '@elysiumjs/mnemosyne';
+import { eq } from 'drizzle-orm';
 
 import { Database } from './database';
 

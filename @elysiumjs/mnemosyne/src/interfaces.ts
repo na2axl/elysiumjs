@@ -42,7 +42,10 @@ export interface DatabaseDriver<TConnection, TConnectionConfig> {
 	 * @param callback The function to execute within the transaction.
 	 * @returns The return value of the callback.
 	 */
-	withTransaction<T>(connection: TConnection, callback: (tx: TConnection) => Promise<T>): Promise<T>;
+	withTransaction<T>(
+		connection: TConnection,
+		callback: (tx: TConnection) => Promise<T>
+	): Promise<T>;
 
 	/**
 	 * Returns the raw underlying client from a connection.
@@ -73,7 +76,17 @@ export interface ColumnMetadata {
 	/**
 	 * The normalized data type of the column.
 	 */
-	dataType: 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'json' | 'array' | 'bigint' | 'buffer' | 'uuid';
+	dataType:
+		| 'string'
+		| 'number'
+		| 'boolean'
+		| 'date'
+		| 'datetime'
+		| 'json'
+		| 'array'
+		| 'bigint'
+		| 'buffer'
+		| 'uuid';
 
 	/**
 	 * Whether the column allows `NULL` values.
@@ -333,7 +346,7 @@ export type ModelClass<
 	TSelect = unknown,
 	TInsert = unknown,
 	TUpdate = unknown,
-	TTable = unknown,
+	TTable = unknown
 > = {
 	/**
 	 * The data type returned by select queries.
@@ -422,9 +435,7 @@ export type RepositoryClass<TModel extends ModelClass = ModelClass> = {
 	 * @param args The arguments to pass to the constructor.
 	 * @returns A new repository instance.
 	 */
-	new (...args: unknown[]): RepositoryInterface<
-		TModel['$inferSelect'],
-		TModel['$inferInsert'],
-		TModel['$inferUpdate']
-	>;
+	new (
+		...args: unknown[]
+	): RepositoryInterface<TModel['$inferSelect'], TModel['$inferInsert'], TModel['$inferUpdate']>;
 };

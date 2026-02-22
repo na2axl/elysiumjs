@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { PgColumn, PgTableWithColumns } from 'drizzle-orm/pg-core';
 import type { ColumnMetadata, ModelAdapter } from '@elysiumjs/mnemosyne';
+import type { PgColumn, PgTableWithColumns } from 'drizzle-orm/pg-core';
 
-import { getTableConfig, pgTable } from 'drizzle-orm/pg-core';
 import { AbstractModel, createSchemaFromModel } from '@elysiumjs/mnemosyne';
+import { getTableConfig, pgTable } from 'drizzle-orm/pg-core';
 
 import { wrapTenantSchema } from './tenancy';
 
@@ -64,15 +64,24 @@ export const getTableColumnBuilders = (table: object): Record<string, any> | und
 const mapDrizzleDataType = (col: PgColumn): ColumnMetadata['dataType'] => {
 	if (col.columnType === 'PgUUID') return 'uuid';
 	switch (col.dataType) {
-		case 'string': return 'string';
-		case 'number': return 'number';
-		case 'boolean': return 'boolean';
-		case 'array': return 'array';
-		case 'json': return 'json';
-		case 'date': return 'date';
-		case 'bigint': return 'bigint';
-		case 'buffer': return 'buffer';
-		default: return 'string';
+		case 'string':
+			return 'string';
+		case 'number':
+			return 'number';
+		case 'boolean':
+			return 'boolean';
+		case 'array':
+			return 'array';
+		case 'json':
+			return 'json';
+		case 'date':
+			return 'date';
+		case 'bigint':
+			return 'bigint';
+		case 'buffer':
+			return 'buffer';
+		default:
+			return 'string';
 	}
 };
 
@@ -100,7 +109,8 @@ export const drizzleAdapter: ModelAdapter<PgTableWithColumns<any>> = {
 			dataType: mapDrizzleDataType(col),
 			nullable: !col.notNull,
 			hasDefault: col.hasDefault,
-			isPrimaryKey: col.primary || config.primaryKeys.some(pk => pk.columns.some(c => c.name === col.name))
+			isPrimaryKey:
+				col.primary || config.primaryKeys.some((pk) => pk.columns.some((c) => c.name === col.name))
 		}));
 	},
 
@@ -109,7 +119,7 @@ export const drizzleAdapter: ModelAdapter<PgTableWithColumns<any>> = {
 		if (!builders) {
 			throw new Error(
 				`No column builders registered for table. ` +
-				`Use DrizzleModel() to create models with tenant support.`
+					`Use DrizzleModel() to create models with tenant support.`
 			);
 		}
 		const config = getTableConfig(table);

@@ -26,7 +26,9 @@ import { Cache } from './cache';
  * @param config The database cache configuration.
  * @returns A cache interface tagged with 'database'.
  */
-export const createDatabaseCacheStorage = (config: DatabaseCacheConfig): Omit<CacheInterface, 'tags'> => {
+export const createDatabaseCacheStorage = (
+	config: DatabaseCacheConfig
+): Omit<CacheInterface, 'tags'> => {
 	return Cache[config.storage ?? 'redis'].tags('database');
 };
 

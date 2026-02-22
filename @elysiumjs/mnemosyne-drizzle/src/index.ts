@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { DrizzleConnectionProps } from './database';
 import type { MnemosyneConfig } from '@elysiumjs/mnemosyne';
+import type { DrizzleConnectionProps } from './database';
 
 import { Application, Event } from '@elysiumjs/core';
 
@@ -33,7 +33,7 @@ export {
 	withRLS,
 	setConnectionTenant,
 	getSessionTenant,
-	createRLSPolicy,
+	createRLSPolicy
 } from './tenancy';
 
 // Auto-initialize on app launch

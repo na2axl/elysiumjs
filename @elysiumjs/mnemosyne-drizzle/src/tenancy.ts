@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { PgColumnBuilderBase, PgSchema, PgTable, PgTransaction } from 'drizzle-orm/pg-core';
 import type { TenancyStrategy } from '@elysiumjs/mnemosyne';
+import type { PgColumnBuilderBase, PgSchema, PgTable, PgTransaction } from 'drizzle-orm/pg-core';
 
+import { getTenancyConfig } from '@elysiumjs/mnemosyne';
 import { sql } from 'drizzle-orm';
 import { getTableConfig, pgPolicy, pgSchema, pgTable } from 'drizzle-orm/pg-core';
-import { getTenancyConfig } from '@elysiumjs/mnemosyne';
 
 import { Database } from './database';
 import { getTableColumnBuilders } from './model';
@@ -199,14 +199,18 @@ export class DrizzleSchemaTenancy implements TenancyStrategy<PgTable, any> {
 		if (!builders) {
 			throw new Error(
 				`No column builders registered for table. ` +
-				`Use DrizzleModel() to create models with tenant support.`
+					`Use DrizzleModel() to create models with tenant support.`
 			);
 		}
 		const config = getTableConfig(table as any);
 		return wrapTenantSchema(tenant, config.name, builders) as PgTable;
 	}
 
-	async withIsolation<T>(_connection: any, _tenant: string, callback: () => Promise<T>): Promise<T> {
+	async withIsolation<T>(
+		_connection: any,
+		_tenant: string,
+		callback: () => Promise<T>
+	): Promise<T> {
 		// Schema-based isolation doesn't need transaction wrapping
 		return callback();
 	}

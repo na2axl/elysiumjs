@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { IdType, ModelClass, RepositoryInterface } from './interfaces';
 import type { AbstractDatabase } from './database';
+import type { IdType, ModelClass, RepositoryInterface } from './interfaces';
 
 /**
  * Mixin used to create a new abstract repository class over a model.
@@ -27,10 +27,7 @@ import type { AbstractDatabase } from './database';
  * @param model The model class wrapped by the repository.
  * @param database The database manager instance.
  */
-export const AbstractRepository = <
-	TModel extends ModelClass,
-	TConnection
->(
+export const AbstractRepository = <TModel extends ModelClass, TConnection>(
 	model: TModel,
 	database: AbstractDatabase<TConnection, any>
 ) => {
