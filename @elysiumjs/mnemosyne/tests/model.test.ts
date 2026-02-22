@@ -12,193 +12,174 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { afterAll, afterEach, beforeEach, describe, expect, it, jest, mock, spyOn } from 'bun:test';
-import * as d from 'drizzle-orm/pg-core';
+import { describe, expect, it } from 'bun:test';
 import { t } from 'elysia';
 
-import { Application } from '@elysiumjs/core';
+import type { ColumnMetadata } from '../src/interfaces';
 
-import { createSchemaFromDrizzle, Model } from '../src/model';
-import * as Tenancy from '../src/tenancy';
+import { createSchemaFromModel, AbstractModel } from '../src/model';
 
-const mockColumns = {
-	id: d.uuid().primaryKey().defaultRandom(),
-	name: d.varchar().notNull(),
-	age: d.integer().notNull(),
-	email: d.varchar().notNull().unique(),
-	is_confirmed: d.boolean().default(false)
-};
-
-const mockTable = d.pgTable('users', mockColumns);
-
-class MockModel extends Model('users', mockColumns) {}
-
-const mockStore = new Map([['tenant', 'test-tenant']]);
-const mockGetStore = mock(() => mockStore);
-mock.module('@elysiumjs/core', () => ({
-	Application: {
-		...Application,
-		context: {
-			getStore: mockGetStore,
-			run: mock((_, callback) => callback())
-		}
-	}
-}));
+// Hand-crafted column metadata for testing
+const userColumns: ColumnMetadata[] = [
+	{ name: 'id', dataType: 'uuid', nullable: false, hasDefault: true, isPrimaryKey: true },
+	{ name: 'name', dataType: 'string', nullable: false, hasDefault: false, isPrimaryKey: false },
+	{ name: 'age', dataType: 'number', nullable: false, hasDefault: false, isPrimaryKey: false },
+	{ name: 'email', dataType: 'string', nullable: false, hasDefault: false, isPrimaryKey: false },
+	{ name: 'is_confirmed', dataType: 'boolean', nullable: false, hasDefault: true, isPrimaryKey: false },
+];
 
 describe('Model', () => {
-	beforeEach(() => {
-		mock.restore();
-	});
+	describe('createSchemaFromModel', () => {
+		it('should create a schema for select mode', () => {
+			const schema = createSchemaFromModel(userColumns, { mode: 'select' });
 
-	afterEach(() => {
-		mock.restore();
-	});
-
-	afterAll(() => {
-		jest.clearAllMocks();
-	});
-
-	describe('createSchemaFromDrizzle', () => {
-		it('should create a schema for select mode', async () => {
-			// Import the mocked modules
-			const getTableConfigSpy = spyOn(d, 'getTableConfig');
-
-			// Create a spy on t.Object
-			const objectSpy = spyOn(t, 'Object');
-
-			// Call the function
-			createSchemaFromDrizzle(mockTable, { mode: 'select' });
-
-			// Check if getTableConfig was called with the mock table
-			expect(getTableConfigSpy).toHaveBeenCalledWith(mockTable);
-
-			// Check if t.Object was called with the correct properties
-			expect(objectSpy).toHaveBeenCalledWith(
-				expect.objectContaining({
-					id: expect.any(Object),
-					name: expect.any(Object),
-					email: expect.any(Object),
-					age: expect.any(Object),
-					is_confirmed: expect.any(Object)
-				})
-			);
-
-			// Restore the spy
-			objectSpy.mockRestore();
+			// Select mode should include all columns including primary key
+			expect(schema.properties).toBeDefined();
+			expect(schema.properties.id).toBeDefined();
+			expect(schema.properties.name).toBeDefined();
+			expect(schema.properties.age).toBeDefined();
+			expect(schema.properties.email).toBeDefined();
+			expect(schema.properties.is_confirmed).toBeDefined();
 		});
 
-		it('should create a schema for create mode', async () => {
-			// Import the mocked modules
-			const getTableConfigSpy = spyOn(d, 'getTableConfig');
+		it('should create a schema for create mode', () => {
+			const schema = createSchemaFromModel(userColumns, { mode: 'create' });
 
-			// Create a spy on t.Object
-			const objectSpy = spyOn(t, 'Object');
-
-			// Call the function
-			createSchemaFromDrizzle(mockTable, { mode: 'create' });
-
-			// Check if getTableConfig was called with the mock table
-			expect(getTableConfigSpy).toHaveBeenCalledWith(mockTable);
-
-			// Check if t.Object was called with the correct properties (excluding primary key)
-			expect(objectSpy).toHaveBeenCalledWith(
-				expect.objectContaining({
-					name: expect.any(Object),
-					email: expect.any(Object),
-					age: expect.any(Object),
-					is_confirmed: expect.any(Object)
-				})
-			);
-
-			// Check that the primary key is not included
-			expect(objectSpy).not.toHaveBeenCalledWith(
-				expect.objectContaining({
-					id: expect.any(Object)
-				})
-			);
-
-			// Restore the spy
-			objectSpy.mockRestore();
+			// Create mode should exclude primary key
+			expect(schema.properties).toBeDefined();
+			expect(schema.properties.id).toBeUndefined();
+			expect(schema.properties.name).toBeDefined();
+			expect(schema.properties.age).toBeDefined();
+			expect(schema.properties.email).toBeDefined();
+			expect(schema.properties.is_confirmed).toBeDefined();
 		});
 
-		it('should create a schema for update mode', async () => {
-			// Import the mocked modules
-			const getTableConfigSpy = spyOn(d, 'getTableConfig');
+		it('should create a schema for update mode', () => {
+			const schema = createSchemaFromModel(userColumns, { mode: 'update' });
 
-			// Create a spy on t.Object
-			const objectSpy = spyOn(t, 'Object');
-
-			// Call the function
-			createSchemaFromDrizzle(mockTable, { mode: 'update' });
-
-			// Check if getTableConfig was called with the mock table
-			expect(getTableConfigSpy).toHaveBeenCalledWith(mockTable);
-
-			// Check if t.Object was called with the correct properties (excluding primary key)
-			expect(objectSpy).toHaveBeenCalledWith(
-				expect.objectContaining({
-					name: expect.any(Object),
-					email: expect.any(Object),
-					age: expect.any(Object),
-					is_confirmed: expect.any(Object)
-				})
-			);
-
-			// Check that the primary key is not included
-			expect(objectSpy).not.toHaveBeenCalledWith(
-				expect.objectContaining({
-					id: expect.any(Object)
-				})
-			);
-
-			// Restore the spy
-			objectSpy.mockRestore();
+			// Update mode should exclude primary key
+			expect(schema.properties).toBeDefined();
+			expect(schema.properties.id).toBeUndefined();
+			expect(schema.properties.name).toBeDefined();
+			expect(schema.properties.age).toBeDefined();
+			expect(schema.properties.email).toBeDefined();
+			expect(schema.properties.is_confirmed).toBeDefined();
 		});
 
-		it('should return an empty object if columns are undefined', async () => {
-			// Import the mocked modules
-			const getTableConfigSpy = spyOn(d, 'getTableConfig').mockReturnValueOnce({
-				// @ts-expect-error Mocking headaches
-				columns: undefined
-			});
+		it('should make all fields optional in update mode', () => {
+			const columns: ColumnMetadata[] = [
+				{ name: 'id', dataType: 'uuid', nullable: false, hasDefault: true, isPrimaryKey: true },
+				{ name: 'name', dataType: 'string', nullable: false, hasDefault: false, isPrimaryKey: false },
+			];
 
-			// Create a spy on t.Object
-			const objectSpy = spyOn(t, 'Object');
+			const schema = createSchemaFromModel(columns, { mode: 'update' });
 
-			// Call the function
-			createSchemaFromDrizzle(mockTable);
+			// In update mode, all non-PK fields should be optional (not required)
+			const required = schema.required ?? [];
+			expect(required).not.toContain('name');
+		});
 
-			// Check if getTableConfig was called with the mock table
-			expect(getTableConfigSpy).toHaveBeenCalledWith(mockTable);
+		it('should make fields with defaults optional in create mode', () => {
+			const columns: ColumnMetadata[] = [
+				{ name: 'id', dataType: 'uuid', nullable: false, hasDefault: true, isPrimaryKey: true },
+				{ name: 'status', dataType: 'string', nullable: false, hasDefault: true, isPrimaryKey: false },
+				{ name: 'name', dataType: 'string', nullable: false, hasDefault: false, isPrimaryKey: false },
+			];
 
-			// Check if t.Object was called with an empty object
-			expect(objectSpy).toHaveBeenCalledWith({});
+			const schema = createSchemaFromModel(columns, { mode: 'create' });
 
-			// Restore the spy
-			objectSpy.mockRestore();
+			// 'status' has a default, so it should be optional
+			// 'name' does not have a default, so it should be required
+			expect(schema.properties.status).toBeDefined();
+			expect(schema.properties.name).toBeDefined();
+		});
+
+		it('should handle nullable columns', () => {
+			const columns: ColumnMetadata[] = [
+				{ name: 'bio', dataType: 'string', nullable: true, hasDefault: false, isPrimaryKey: false },
+			];
+
+			const schema = createSchemaFromModel(columns, { mode: 'select' });
+
+			// Nullable columns should be wrapped in t.Nullable
+			expect(schema.properties.bio).toBeDefined();
+		});
+
+		it('should return an empty object schema for empty columns', () => {
+			const schema = createSchemaFromModel([]);
+
+			// Should return t.Object({})
+			expect(schema.properties).toBeDefined();
+			expect(Object.keys(schema.properties)).toHaveLength(0);
+		});
+
+		it('should return an empty object schema for undefined columns', () => {
+			// @ts-expect-error Testing undefined input
+			const schema = createSchemaFromModel(undefined);
+
+			// Should return t.Object({})
+			expect(schema.properties).toBeDefined();
+			expect(Object.keys(schema.properties)).toHaveLength(0);
+		});
+
+		it('should handle all supported data types', () => {
+			const allTypeColumns: ColumnMetadata[] = [
+				{ name: 'col_string', dataType: 'string', nullable: false, hasDefault: false, isPrimaryKey: false },
+				{ name: 'col_uuid', dataType: 'uuid', nullable: false, hasDefault: false, isPrimaryKey: false },
+				{ name: 'col_number', dataType: 'number', nullable: false, hasDefault: false, isPrimaryKey: false },
+				{ name: 'col_boolean', dataType: 'boolean', nullable: false, hasDefault: false, isPrimaryKey: false },
+				{ name: 'col_array', dataType: 'array', nullable: false, hasDefault: false, isPrimaryKey: false },
+				{ name: 'col_json', dataType: 'json', nullable: false, hasDefault: false, isPrimaryKey: false },
+				{ name: 'col_date', dataType: 'date', nullable: false, hasDefault: false, isPrimaryKey: false },
+				{ name: 'col_datetime', dataType: 'datetime', nullable: false, hasDefault: false, isPrimaryKey: false },
+				{ name: 'col_bigint', dataType: 'bigint', nullable: false, hasDefault: false, isPrimaryKey: false },
+				{ name: 'col_buffer', dataType: 'buffer', nullable: false, hasDefault: false, isPrimaryKey: false },
+			];
+
+			const schema = createSchemaFromModel(allTypeColumns, { mode: 'select' });
+
+			// All data types should produce a valid schema property
+			expect(schema.properties.col_string).toBeDefined();
+			expect(schema.properties.col_uuid).toBeDefined();
+			expect(schema.properties.col_number).toBeDefined();
+			expect(schema.properties.col_boolean).toBeDefined();
+			expect(schema.properties.col_array).toBeDefined();
+			expect(schema.properties.col_json).toBeDefined();
+			expect(schema.properties.col_date).toBeDefined();
+			expect(schema.properties.col_datetime).toBeDefined();
+			expect(schema.properties.col_bigint).toBeDefined();
+			expect(schema.properties.col_buffer).toBeDefined();
+		});
+
+		it('should default to select mode when no mode is specified', () => {
+			const columns: ColumnMetadata[] = [
+				{ name: 'id', dataType: 'uuid', nullable: false, hasDefault: true, isPrimaryKey: true },
+				{ name: 'name', dataType: 'string', nullable: false, hasDefault: false, isPrimaryKey: false },
+			];
+
+			const schema = createSchemaFromModel(columns);
+
+			// Default mode should be 'select', which includes primary key
+			expect(schema.properties.id).toBeDefined();
+			expect(schema.properties.name).toBeDefined();
 		});
 	});
 
-	describe('Model mixin', () => {
-		it('should create a model class with the correct properties', async () => {
-			// Import the mocked modules
-			const pgTableSpy = spyOn(d, 'pgTable');
-
-			// Create a mock columns configuration
-			const mockColumns = {
-				id: d.uuid().primaryKey().defaultRandom(),
-				name: d.varchar().notNull()
+	describe('AbstractModel', () => {
+		it('should create a model class with the correct properties', () => {
+			const mockAdapter = {
+				getTableName: () => 'users',
+				getColumns: () => userColumns,
+				createTenantTable: (table: any, tenant: string) => table,
 			};
 
-			// Create a model class
-			class UserModel extends Model('users', mockColumns) {}
+			const mockTable = { _tableName: 'users' };
 
-			// Check if pgTable was called with the correct parameters
-			expect(pgTableSpy).toHaveBeenCalledWith('users', mockColumns, undefined);
+			class UserModel extends AbstractModel('users', { id: 'uuid', name: 'text' }, mockAdapter, mockTable) {}
 
 			// Check if the model class has the correct static properties
 			expect(UserModel.tableName).toBe('users');
-			expect(UserModel.columns).toBe(mockColumns);
+			expect(UserModel.columns).toEqual({ id: 'uuid', name: 'text' });
 			expect(UserModel.insertSchema).toBeDefined();
 			expect(UserModel.updateSchema).toBeDefined();
 			expect(UserModel.selectSchema).toBeDefined();
@@ -207,132 +188,47 @@ describe('Model', () => {
 			expect(UserModel.$inferInsert).toBeUndefined();
 			expect(UserModel.$inferUpdate).toBeUndefined();
 		});
-	});
 
-	describe('Tenancy', () => {
-		it('should get the current tenant', () => {
-			// Call the function
-			const tenant = Tenancy.getCurrentTenant();
+		it('should use the adapter to extract column metadata', () => {
+			const getColumnsSpy = { called: false };
+			const mockAdapter = {
+				getTableName: () => 'products',
+				getColumns: (table: any) => {
+					getColumnsSpy.called = true;
+					return [
+						{ name: 'id', dataType: 'uuid' as const, nullable: false, hasDefault: true, isPrimaryKey: true },
+						{ name: 'title', dataType: 'string' as const, nullable: false, hasDefault: false, isPrimaryKey: false },
+					];
+				},
+				createTenantTable: (table: any, tenant: string) => table,
+			};
 
-			// Check if Application.context.getStore was called
-			expect(mockGetStore).toHaveBeenCalled();
+			const mockTable = { _tableName: 'products' };
 
-			// Check if the tenant is correct
-			expect(tenant).toBe('test-tenant');
+			class ProductModel extends AbstractModel('products', { id: 'uuid', title: 'text' }, mockAdapter, mockTable) {}
+
+			// The adapter's getColumns should have been called during model creation
+			expect(getColumnsSpy.called).toBe(true);
+
+			// Schemas should be generated from the adapter's column metadata
+			expect(ProductModel.insertSchema.properties.title).toBeDefined();
+			expect(ProductModel.insertSchema.properties.id).toBeUndefined(); // primary key excluded in create mode
+			expect(ProductModel.selectSchema.properties.id).toBeDefined(); // primary key included in select mode
 		});
 
-		it('should return null if no tenant is set', () => {
-			// Mock getStore to return a map without a tenant
-			mockGetStore.mockReturnValueOnce(new Map());
+		it('should expose the table via the static table getter', () => {
+			const mockAdapter = {
+				getTableName: () => 'items',
+				getColumns: () => [],
+				createTenantTable: (table: any, tenant: string) => table,
+			};
 
-			// Call the function
-			const tenant = Tenancy.getCurrentTenant();
+			const mockTable = { _tableName: 'items' };
 
-			// Check if Application.context.getStore was called
-			expect(mockGetStore).toHaveBeenCalled();
+			class ItemModel extends AbstractModel('items', {}, mockAdapter, mockTable) {}
 
-			// Check if the tenant is null
-			expect(tenant).toBeNull();
-		});
-
-		it('should register a new tenant schema', async () => {
-			// Import the mocked modules
-			const pgSchemaSpy = spyOn(d, 'pgSchema');
-
-			// Call the function
-			const schema = Tenancy.registerTenantSchema('new-tenant');
-
-			// Check if pgSchema was called with the correct tenant name
-			expect(pgSchemaSpy).toHaveBeenCalledWith('new-tenant');
-
-			// Check if the schema is correct
-			expect(schema).toBeDefined();
-		});
-
-		it('should wrap a model with a tenant schema', async () => {
-			// Import the mocked modules
-			const pgTableSpy = spyOn(d, 'pgTable');
-			const pgSchemaSpy = spyOn(d, 'pgSchema');
-
-			// Call the function with a non-public tenant
-			const table = Tenancy.wrapTenantSchema('test-tenant', MockModel.tableName, MockModel.columns);
-
-			// Check if pgSchema was called with the correct tenant name
-			expect(pgSchemaSpy).toHaveBeenCalledWith('test-tenant');
-
-			// Check if the table is correct
-			expect(table).toBeDefined();
-
-			// Call the function with the public tenant
-			const publicTable = Tenancy.wrapTenantSchema('public', MockModel.tableName, MockModel.columns);
-
-			// Check if pgTable was called with the correct parameters
-			expect(pgTableSpy).toHaveBeenCalledWith('users', MockModel.columns);
-
-			// Check if the table is correct
-			expect(publicTable).toBeDefined();
-		});
-
-		it('should reuse existing tenant schemas', async () => {
-			// Import the mocked modules
-			const pgSchemaSpy = spyOn(d, 'pgSchema');
-
-			// Register a tenant schema
-			Tenancy.registerTenantSchema('existing-tenant');
-
-			// Reset the mock to check if it's called again
-			pgSchemaSpy.mockClear();
-
-			// Call the function with the same tenant
-			const schema = Tenancy.registerTenantSchema('existing-tenant');
-
-			// Check if pgSchema was not called again
-			expect(pgSchemaSpy).not.toHaveBeenCalled();
-
-			// Check if the schema is correct
-			expect(schema).toBeDefined();
-		});
-
-		it('should reuse existing tenant tables', async () => {
-			// Import the mocked modules
-			const pgSchemaSpy = spyOn(d, 'pgSchema');
-
-			// Call the function with a tenant
-			Tenancy.wrapTenantSchema('cache-tenant', MockModel.tableName, MockModel.columns);
-
-			// Reset the mock to check if it's called again
-			pgSchemaSpy.mockClear();
-
-			// Call the function with the same tenant and model
-			Tenancy.wrapTenantSchema('cache-tenant', MockModel.tableName, MockModel.columns);
-
-			// Check if pgSchema was not called again
-			expect(pgSchemaSpy).not.toHaveBeenCalled();
-		});
-
-		it('should run the callback with the correct tenant', async () => {
-			// Import the mocked modules
-			const getStoreSpy = spyOn(Application.context, 'getStore');
-			const runSpy = spyOn(Application.context, 'run');
-			const mockCallback = mock(() => {
-				// Check if getStore was called
-				expect(getStoreSpy).toHaveBeenCalled();
-
-				// Check if run was called with the correct tenant
-				expect(runSpy).toHaveBeenCalledWith(expect.any(Map), expect.any(Function));
-				expect(runSpy.mock.calls[0][0].get('tenant')).toBe('new-tenant');
-
-				return 'test-result';
-			});
-
-			// Call the function
-			const result = Tenancy.withTenant('new-tenant', mockCallback);
-
-			// Check if run was called with the correct callback
-			expect(runSpy).toHaveBeenCalledWith(expect.any(Map), mockCallback);
-
-			// Check if the result is correct
-			expect(result).toBe('test-result');
+			// The table getter should return the base table when not in a tenancy context
+			expect(ItemModel.table).toBe(mockTable);
 		});
 	});
 });

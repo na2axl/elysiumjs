@@ -12,18 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { afterAll, afterEach, beforeEach, describe, expect, it, jest, mock, spyOn } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, jest, mock, spyOn } from 'bun:test';
 
-import { Service } from '@elysiumjs/core';
+import { Application, Service } from '@elysiumjs/core';
 
-import { Database } from '../src/database';
+import { AbstractDatabase } from '../src/database';
 
-// Mock drizzle function
-mock.module('drizzle-orm/bun-sql', () => ({
-	drizzle: mock(() => ({ mockDrizzleInstance: true }))
-}));
+const mockDriver = {
+	createConnection: mock((config: any) => ({ mockConnection: true, config })),
+	withTransaction: mock((conn: any, cb: any) => cb(conn)),
+	getRawClient: mock((conn: any) => ({ rawClient: true })),
+};
 
-describe('Database namespace', () => {
+class TestDatabase extends AbstractDatabase<any, any> {
+	protected driver = mockDriver;
+}
+
+describe('AbstractDatabase', () => {
 	// Mock console.error and process.exit to prevent actual console output and process exit
 	const originalConsoleError = console.error;
 	const originalProcessExit = process.exit;
@@ -39,37 +44,38 @@ describe('Database namespace', () => {
 		jest.clearAllMocks();
 	});
 
-	afterAll(() => {
-		mock.restore();
-	});
-
 	describe('registerConnection', () => {
 		it('should register a new connection', () => {
+			const db = new TestDatabase();
+
 			// Mock Service.exists to return false (connection doesn't exist)
 			const existsSpy = spyOn(Service, 'exists').mockReturnValueOnce(false);
 			const instanceSpy = spyOn(Service, 'instance');
 
 			// Call the function
-			const result = Database.registerConnection('test', { connection: 'sqlite:test.db' });
+			const result = db.registerConnection('test', { connection: 'sqlite:test.db' });
 
 			// Check if Service.exists was called with the correct connection name
 			expect(existsSpy).toHaveBeenCalledWith('db.connection.test');
 
+			// Check if the driver's createConnection was called with the config
+			expect(mockDriver.createConnection).toHaveBeenCalledWith({ connection: 'sqlite:test.db' });
+
 			// Check if Service.instance was called with the correct parameters
 			expect(instanceSpy).toHaveBeenCalledWith('db.connection.test', {
-				mockDrizzleInstance: true
+				mockConnection: true,
+				config: { connection: 'sqlite:test.db' }
 			});
-
-			// Check if the result is correct
-			expect(result as any).toEqual({ mockDrizzleInstance: true });
 		});
 
 		it('should throw an error if the connection already exists', () => {
+			const db = new TestDatabase();
+
 			// Mock Service.exists to return true (connection exists)
 			const existsSpy = spyOn(Service, 'exists').mockReturnValueOnce(true);
 
 			// Call the function
-			Database.registerConnection('test', { connection: 'sqlite:test.db' });
+			db.registerConnection('test', { connection: 'sqlite:test.db' });
 
 			// Check if console.error and process.exit were called
 			expect(console.error).toHaveBeenCalledWith(
@@ -81,6 +87,8 @@ describe('Database namespace', () => {
 
 	describe('getConnection', () => {
 		it('should retrieve an existing connection', () => {
+			const db = new TestDatabase();
+
 			// Mock Service.exists to return true (connection exists)
 			const existsSpy = spyOn(Service, 'exists').mockReturnValueOnce(true);
 
@@ -89,7 +97,7 @@ describe('Database namespace', () => {
 			const getSpy = spyOn(Service, 'get').mockReturnValue(mockConnection);
 
 			// Call the function
-			const result = Database.getConnection('test');
+			const result = db.getConnection('test');
 
 			// Check if Service.exists was called with the correct connection name
 			expect(existsSpy).toHaveBeenCalledWith('db.connection.test');
@@ -102,11 +110,13 @@ describe('Database namespace', () => {
 		});
 
 		it('should throw an error if the connection does not exist', () => {
+			const db = new TestDatabase();
+
 			// Mock Service.exists to return false (connection doesn't exist)
 			const existsSpy = spyOn(Service, 'exists').mockReturnValueOnce(false);
 
 			// Call the function
-			Database.getConnection('test');
+			db.getConnection('test');
 
 			// Check if console.error and process.exit were called
 			expect(console.error).toHaveBeenCalledWith(
@@ -118,11 +128,13 @@ describe('Database namespace', () => {
 
 	describe('connectionExists', () => {
 		it('should return true if the connection exists', () => {
+			const db = new TestDatabase();
+
 			// Mock Service.exists to return true
 			const existsSpy = spyOn(Service, 'exists').mockReturnValueOnce(true);
 
 			// Call the function
-			const result = Database.connectionExists('test');
+			const result = db.connectionExists('test');
 
 			// Check if Service.exists was called with the correct connection name
 			expect(existsSpy).toHaveBeenCalledWith('db.connection.test');
@@ -132,11 +144,13 @@ describe('Database namespace', () => {
 		});
 
 		it('should return false if the connection does not exist', () => {
+			const db = new TestDatabase();
+
 			// Mock Service.exists to return false
 			const existsSpy = spyOn(Service, 'exists').mockReturnValueOnce(false);
 
 			// Call the function
-			const result = Database.connectionExists('test');
+			const result = db.connectionExists('test');
 
 			// Check if Service.exists was called with the correct connection name
 			expect(existsSpy).toHaveBeenCalledWith('db.connection.test');
@@ -148,30 +162,54 @@ describe('Database namespace', () => {
 
 	describe('getDefaultConnection', () => {
 		it('should retrieve the default connection', () => {
-			// Mock getConnection to return a mock connection
+			const db = new TestDatabase();
+
+			// Save original descriptor and mock Application.context
+			const originalDescriptor = Object.getOwnPropertyDescriptor(Application, 'context');
+			Object.defineProperty(Application, 'context', {
+				get: () => ({ getStore: () => null }),
+				configurable: true,
+			});
+
+			// Mock Service.exists to return true and Service.get to return a mock connection
 			const mockConnection = { mockConnection: true };
+			spyOn(Service, 'exists').mockReturnValueOnce(true);
+			spyOn(Service, 'get').mockReturnValue(mockConnection);
 
 			// Call the function
-			const result = Database.getDefaultConnection();
-
-			// Check if getConnection was called with 'default'
-			// expect(Database.getConnection).toHaveBeenCalledWith('default');
+			const result = db.getDefaultConnection();
 
 			// Check if the result is correct
 			expect(result as any).toEqual(mockConnection);
+
+			// Restore original descriptor
+			if (originalDescriptor) {
+				Object.defineProperty(Application, 'context', originalDescriptor);
+			}
 		});
 	});
 
 	describe('setDefaultConnection', () => {
 		it('should set the default connection', () => {
+			const db = new TestDatabase();
+
+			// Save original descriptor and mock Application.context
+			const originalDescriptor = Object.getOwnPropertyDescriptor(Application, 'context');
+			Object.defineProperty(Application, 'context', {
+				get: () => ({ getStore: () => null }),
+				configurable: true,
+			});
+
 			const instanceSpy = spyOn(Service, 'instance');
 			const removeSpy = spyOn(Service, 'remove');
 
 			// Mock getConnection to return a mock connection
 			const mockConnection = { mockConnection: true };
+			spyOn(Service, 'exists').mockReturnValue(true);
+			spyOn(Service, 'get').mockReturnValue(mockConnection);
 
 			// Call the function
-			const result = Database.setDefaultConnection('test');
+			const result = db.setDefaultConnection('test');
 
 			// Check if Service.remove was called with the correct connection name
 			expect(removeSpy).toHaveBeenCalledWith('db.connection.default');
@@ -179,11 +217,33 @@ describe('Database namespace', () => {
 			// Check if Service.instance was called with the correct parameters
 			expect(instanceSpy).toHaveBeenCalledWith('db.connection.default', mockConnection);
 
-			// Check if getConnection was called with 'test'
-			// expect(Database.getConnection).toHaveBeenLastCalledWith('test');
-
 			// Check if the result is correct
 			expect(result as any).toEqual(mockConnection);
+
+			// Restore original descriptor
+			if (originalDescriptor) {
+				Object.defineProperty(Application, 'context', originalDescriptor);
+			}
+		});
+	});
+
+	describe('getRawClient', () => {
+		it('should return the raw client from the driver', () => {
+			const db = new TestDatabase();
+
+			// Mock getConnection to return a mock connection
+			const mockConnection = { mockConnection: true };
+			spyOn(Service, 'exists').mockReturnValue(true);
+			spyOn(Service, 'get').mockReturnValue(mockConnection);
+
+			// Call the function
+			const result = db.getRawClient('test');
+
+			// Check if the driver's getRawClient was called with the connection
+			expect(mockDriver.getRawClient).toHaveBeenCalledWith(mockConnection);
+
+			// Check if the result is correct
+			expect(result).toEqual({ rawClient: true });
 		});
 	});
 });

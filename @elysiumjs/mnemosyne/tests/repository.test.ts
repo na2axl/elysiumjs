@@ -12,413 +12,166 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Mock } from 'bun:test';
-import type { DatabaseConnection } from '../src/database';
+import { describe, expect, it, mock, spyOn } from 'bun:test';
 
-import { afterAll, beforeEach, describe, expect, it, jest, mock, spyOn } from 'bun:test';
-import { eq } from 'drizzle-orm';
-import { getTableConfig, text, uuid } from 'drizzle-orm/pg-core';
+import { AbstractDatabase } from '../src/database';
+import { AbstractRepository } from '../src/repository';
 
-import { Application } from '@elysiumjs/core';
-
-import { Database } from '../src/database';
-import { Model } from '../src/model';
-import { Repository } from '../src/repository';
-import * as Tenancy from '../src/tenancy';
-
-let mockRecord = { id: '1', name: 'Test' };
-
-// Mock database connection
-const mockDbConnection: Promise<any> & DatabaseConnection = {
-	// @ts-expect-error Mocking headaches
-	select: mock(() => mockDbConnection),
-	from: mock(() => mockDbConnection),
-	where: mock(() => mockDbConnection),
-	// @ts-expect-error Mocking headaches
-	insert: mock(() => mockDbConnection),
-	values: mock(() => mockDbConnection),
-	// @ts-expect-error Mocking headaches
-	update: mock(() => mockDbConnection),
-	set: mock(() => mockDbConnection),
-	// @ts-expect-error Mocking headaches
-	delete: mock(() => mockDbConnection),
-	returning: mock(() => mockDbConnection),
-	[Symbol.toStringTag]: 'mockDbConnection',
-	// @ts-expect-error Mocking headaches
-	catch(onRejected) {
-		return onRejected?.(new Error('Database connection error'));
-	},
-	// @ts-expect-error Mocking headaches
-	then(onFulfilled) {
-		return onFulfilled?.([mockRecord]);
-	},
-	finally(onFinally) {
-		return this.then(
-			(v) => {
-				onFinally?.();
-				return v;
-			},
-			(e) => {
-				onFinally?.();
-				throw e;
-			}
-		);
-	}
+// Create a mock driver
+const mockDriver = {
+	createConnection: mock((config: any) => ({ mockConnection: true, config })),
+	withTransaction: mock((conn: any, cb: any) => cb(conn)),
+	getRawClient: mock((conn: any) => ({ rawClient: true })),
 };
 
-// Mock transaction connection
-const mockTxConnection: Promise<any> & DatabaseConnection = {
-	// @ts-expect-error Mocking headaches
-	select: mock(() => mockTxConnection),
-	from: mock(() => mockTxConnection),
-	where: mock(() => mockTxConnection),
-	// @ts-expect-error Mocking headaches
-	insert: mock(() => mockTxConnection),
-	values: mock(() => mockTxConnection),
-	// @ts-expect-error Mocking headaches
-	update: mock(() => mockTxConnection),
-	set: mock(() => mockTxConnection),
-	// @ts-expect-error Mocking headaches
-	delete: mock(() => mockTxConnection),
-	returning: mock(() => mockTxConnection),
-	[Symbol.toStringTag]: 'mockTxConnection',
-	// @ts-expect-error Mocking headaches
-	catch(onRejected) {
-		return onRejected?.(new Error('Database connection error'));
-	},
-	// @ts-expect-error Mocking headaches
-	then(onFulfilled) {
-		return onFulfilled?.([mockRecord]);
-	},
-	finally(onFinally) {
-		return this.then(
-			(v) => {
-				onFinally?.();
-				return v;
-			},
-			(e) => {
-				onFinally?.();
-				throw e;
-			}
-		);
-	}
-};
+// Create a concrete database class for testing
+class TestDatabase extends AbstractDatabase<any, any> {
+	protected driver = mockDriver;
+}
 
-// Mock dependencies
-const mockStore = new Map<string, any>([
-	['tenant', 'test-tenant'],
-	['db:tx', mockTxConnection]
-]);
+// Create a mock model
+const MockModel = {
+	$inferSelect: undefined as unknown,
+	$inferInsert: undefined as unknown,
+	$inferUpdate: undefined as unknown,
+	table: { _tableName: 'test_table' },
+	tableName: 'test_table',
+	columns: { id: 'uuid', name: 'text' },
+	insertSchema: {},
+	updateSchema: {},
+	selectSchema: {},
+	supportTenancy: false,
+} as any;
 
-const mockContext = {
-	getStore: mock(() => mockStore)
-};
-
-mock.module('@elysiumjs/core', () => ({
-	Application: {
-		...Application,
-		instance: {
-			_appContextStorage: mockContext
-		},
-		context: mockContext
-	}
-}));
-
-describe('Repository', () => {
-	// Create a test model
-	class TestModel extends Model('test_table', {
-		id: uuid('id').primaryKey().defaultRandom(),
-		name: text('name').notNull()
-	}) {
-		public static readonly supportTenancy: boolean = false;
-	}
-
-	// Create a test repository
-	class TestRepository extends Repository(TestModel) {}
-
-	afterAll(() => {
-		mock.restore();
-	});
-
-	beforeEach(() => {
-		// Reset mocks before each test
-		jest.clearAllMocks();
-		jest.restoreAllMocks();
-	});
-
+describe('AbstractRepository', () => {
 	describe('Repository creation', () => {
 		it('should create a repository class with the correct model', () => {
-			expect(TestRepository.Model).toBe(TestModel);
+			const db = new TestDatabase();
+			const TestRepository = AbstractRepository(MockModel, db);
+
+			expect(TestRepository.Model).toBe(MockModel);
 		});
 
 		it('should set the default connection name', () => {
-			expect(TestRepository.connection).toBe('default');
-		});
+			const db = new TestDatabase();
+			const TestRepository = AbstractRepository(MockModel, db);
 
-		it('should create a repository instance', () => {
-			const repo = new TestRepository();
-			expect(repo).toBeInstanceOf(TestRepository);
+			expect(TestRepository.connection).toBe('default');
 		});
 	});
 
 	describe('Database connection', () => {
-		it('should get the database connection from the Database service', () => {
-			const getConnectionSpy = spyOn(Database, 'getConnection').mockReturnValueOnce(
-				mockDbConnection
-			);
+		it('should get the database connection via the db getter', () => {
+			const db = new TestDatabase();
+			const mockConnection = { mockConnection: true };
+			const getConnectionSpy = spyOn(db, 'getConnection').mockReturnValue(mockConnection);
 
-			// Mock Application.context.getStore to return null (no transaction)
-			(Application.context.getStore as Mock<any>).mockReturnValueOnce(null);
+			const TestRepository = AbstractRepository(MockModel, db);
 
-			const repo = new TestRepository();
-			const db = repo.db;
+			// Create a concrete subclass since AbstractRepository returns an abstract class
+			class ConcreteRepository extends TestRepository {
+				public async all() { return []; }
+				public async paginate() { return { page: 1, data: [], total: 0 }; }
+				public async find() { return null; }
+				public async findBy() { return null; }
+				public async insert(data: any) { return data; }
+				public async update(id: any, data: any) { return data; }
+				public async updateAll(data: any) { return [data]; }
+				public async delete(id: any) { return {}; }
+				public async deleteAll() { return []; }
+				public async exists(id: any) { return false; }
+			}
+
+			const repo = new ConcreteRepository();
+			const connection = repo.db;
 
 			expect(getConnectionSpy).toHaveBeenCalledWith('default');
-			expect(db).toBe(mockDbConnection);
-		});
-
-		it('should get the transaction connection from the context if available', () => {
-			(Application.context.getStore as Mock<any>).mockReturnValueOnce(mockStore);
-
-			const repo = new TestRepository();
-			const db = repo.db;
-
-			expect(Application.context.getStore).toHaveBeenCalled();
-			expect(db).toBe(mockTxConnection);
+			expect(connection).toBe(mockConnection);
 		});
 
 		it('should use a custom connection if specified', () => {
-			const getConnectionSpy = spyOn(Database, 'getConnection').mockReturnValueOnce(
-				mockDbConnection
-			);
+			const db = new TestDatabase();
+			const mockConnection = { mockConnection: true };
+			const getConnectionSpy = spyOn(db, 'getConnection').mockReturnValue(mockConnection);
 
-			// Create a repository with a custom connection
-			class CustomRepository extends Repository(TestModel) {
+			const TestRepository = AbstractRepository(MockModel, db);
+
+			// Create a concrete subclass with a custom connection
+			class CustomRepository extends TestRepository {
 				public static readonly connection = 'custom';
+				public async all() { return []; }
+				public async paginate() { return { page: 1, data: [], total: 0 }; }
+				public async find() { return null; }
+				public async findBy() { return null; }
+				public async insert(data: any) { return data; }
+				public async update(id: any, data: any) { return data; }
+				public async updateAll(data: any) { return [data]; }
+				public async delete(id: any) { return {}; }
+				public async deleteAll() { return []; }
+				public async exists(id: any) { return false; }
 			}
-
-			// Mock Application.context.getStore to return null (no transaction)
-			(Application.context.getStore as Mock<any>).mockReturnValueOnce(null);
 
 			const repo = new CustomRepository();
-			const db = repo.db;
+			const connection = repo.db;
 
 			expect(getConnectionSpy).toHaveBeenCalledWith('custom');
-			expect(db).toBe(mockDbConnection);
+			expect(connection).toBe(mockConnection);
 		});
 	});
 
-	describe('Table handling', () => {
-		it('should return the regular table if tenancy is not supported', () => {
-			const table = TestRepository.Model.table;
-			expect(getTableConfig(table).name).toBe(TestModel.tableName);
-		});
+	describe('Abstract methods', () => {
+		it('should be subclassable with all CRUD methods implemented', () => {
+			const db = new TestDatabase();
+			const TestRepository = AbstractRepository(MockModel, db);
 
-		it('should return a tenant-specific table if tenancy is supported', () => {
-			const getCurrentTenantSpy = spyOn(Tenancy, 'getCurrentTenant').mockReturnValueOnce(
-				'test-tenant'
-			);
-			const wrapTenantSchemaSpy = spyOn(Tenancy, 'wrapTenantSchema');
-
-			// Create a model with tenancy support
-			class TenantModel extends TestModel {
-				public static readonly supportTenancy = true;
+			// Create a concrete subclass implementing all abstract methods
+			class ConcreteRepository extends TestRepository {
+				public async all() { return []; }
+				public async paginate() { return { page: 1, data: [], total: 0 }; }
+				public async find() { return null; }
+				public async findBy() { return null; }
+				public async insert(data: any) { return data; }
+				public async update(id: any, data: any) { return data; }
+				public async updateAll(data: any) { return [data]; }
+				public async delete(id: any) { return {}; }
+				public async deleteAll() { return []; }
+				public async exists(id: any) { return false; }
 			}
 
-			// Create a repository with tenancy support
-			class TenantRepository extends Repository(TenantModel) {}
-
-			const _table = TenantRepository.Model.table;
-
-			expect(getCurrentTenantSpy).toHaveBeenCalled();
-			expect(wrapTenantSchemaSpy).toHaveBeenLastCalledWith('test-tenant', TenantModel.tableName, TenantModel.columns);
-		});
-	});
-
-	describe('CRUD operations', () => {
-		let repo: InstanceType<typeof TestRepository>;
-
-		beforeEach(() => {
-			repo = new TestRepository();
+			const repo = new ConcreteRepository();
+			expect(repo).toBeInstanceOf(ConcreteRepository);
+			expect(repo).toBeInstanceOf(TestRepository);
 		});
 
-		it('should retrieve all records', async () => {
-			spyOn(Database, 'getConnection').mockReturnValueOnce(mockDbConnection);
+		it('should have all required CRUD methods on the concrete subclass', () => {
+			const db = new TestDatabase();
+			const TestRepository = AbstractRepository(MockModel, db);
 
-			const result = await repo.all();
-
-			expect(mockDbConnection.select).toHaveBeenCalled();
-			// @ts-expect-error Mocking headaches
-			expect(mockDbConnection.from).toHaveBeenCalledWith(TestRepository.Model.table);
-			expect(result).toEqual([mockRecord]);
-		});
-
-		it('should find a record by id', async () => {
-			const result = await repo.find('1');
-
-			expect(mockTxConnection.select).toHaveBeenCalled();
-			// @ts-expect-error Mocking headaches
-			expect(mockTxConnection.from).toHaveBeenCalledWith(TestRepository.Model.table);
-			// @ts-expect-error Mocking headaches
-			expect(mockTxConnection.where).toHaveBeenCalledWith(eq(TestModel.table.id, '1'));
-			expect(result).toEqual(mockRecord);
-		});
-
-		it('should return null if record is not found', async () => {
-			const result = await repo.find('999');
-
-			expect(mockTxConnection.select).toHaveBeenCalled();
-			// @ts-expect-error Mocking headaches
-			expect(mockTxConnection.from).toHaveBeenCalledWith(TestRepository.Model.table);
-			// @ts-expect-error Mocking headaches
-			expect(mockTxConnection.where).toHaveBeenCalledWith(eq(TestModel.table.id, '999'));
-			expect(result).not.toEqual({ id: '999', name: 'Test' });
-		});
-
-		it('should support filtering records using findBy method', async () => {
-			// Arrange
-			const data = { name: 'Test', age: 25 };
-			const insertedRecord = await repo.insert(data);
-
-			// Act
-			const foundRecord = await repo.findBy('name', 'Test');
-
-			// Assert
-			expect(foundRecord).toEqual(insertedRecord);
-		});
-
-		it('should insert a record', async () => {
-			const data = { name: 'New Test' };
-			const result = await repo.insert(data);
-
-			expect(mockTxConnection.insert).toHaveBeenCalled();
-			// @ts-expect-error Mocking headaches
-			expect(mockTxConnection.values).toHaveBeenCalledWith(data);
-			// @ts-expect-error Mocking headaches
-			expect(mockTxConnection.returning).toHaveBeenCalled();
-			expect(result).toEqual(mockRecord);
-		});
-
-		it('should update a record by id', async () => {
-			const data = { name: 'Updated Test' };
-			const result = await repo.update('1', data);
-
-			expect(mockTxConnection.update).toHaveBeenCalled();
-			// @ts-expect-error Mocking headaches
-			expect(mockTxConnection.set).toHaveBeenCalledWith(data);
-			// @ts-expect-error Mocking headaches
-			expect(mockTxConnection.where).toHaveBeenCalledWith(eq(TestModel.table.id, '1'));
-			// @ts-expect-error Mocking headaches
-			expect(mockTxConnection.returning).toHaveBeenCalled();
-			expect(result).toEqual(mockRecord);
-		});
-
-		it('should update all records', async () => {
-			const data = { name: 'All Updated' };
-			mockRecord = { ...mockRecord, ...data };
-			const result = await repo.updateAll(data);
-
-			expect(mockTxConnection.update).toHaveBeenCalled();
-			// @ts-expect-error Mocking headaches
-			expect(mockTxConnection.set).toHaveBeenCalledWith(data);
-			// @ts-expect-error Mocking headaches
-			expect(mockTxConnection.returning).toHaveBeenCalled();
-			expect(result).toEqual([mockRecord]);
-		});
-
-		it('should delete a record by id', async () => {
-			const result = await repo.delete('1');
-
-			expect(mockTxConnection.delete).toHaveBeenCalled();
-			// @ts-expect-error Mocking headaches
-			expect(mockTxConnection.where).toHaveBeenCalledWith(eq(TestModel.table.id, '1'));
-			// @ts-expect-error Mocking headaches
-			expect(mockTxConnection.returning).toHaveBeenCalled();
-			expect(result).toEqual(mockRecord);
-		});
-
-		it('should delete all records', async () => {
-			const result = await repo.deleteAll();
-
-			expect(mockTxConnection.delete).toHaveBeenCalled();
-			// @ts-expect-error Mocking headaches
-			expect(mockTxConnection.returning).toHaveBeenCalled();
-			expect(result).toEqual([mockRecord]);
-		});
-	});
-
-	describe('Transaction management', () => {
-		it('should use the transaction from the context if available', async () => {
-			const repo = new TestRepository();
-			await repo.all();
-
-			expect(Application.context.getStore).toHaveBeenCalled();
-			expect(mockTxConnection.select).toHaveBeenCalled();
-			// @ts-expect-error Mocking headaches
-			expect(mockTxConnection.from).toHaveBeenCalledWith(TestModel.table);
-		});
-
-		it('should fall back to the regular connection if no transaction is available', async () => {
-			const getConnectionSpy = spyOn(Database, 'getConnection').mockReturnValueOnce(
-				mockDbConnection
-			);
-
-			// Mock Application.context.getStore to return null (no transaction)
-			(Application.context.getStore as Mock<any>).mockReturnValueOnce(null);
-
-			const repo = new TestRepository();
-			await repo.all();
-
-			expect(getConnectionSpy).toHaveBeenCalledWith('default');
-			expect(mockDbConnection.select).toHaveBeenCalled();
-			// @ts-expect-error Mocking headaches
-			expect(mockDbConnection.from).toHaveBeenCalledWith(TestModel.table);
-		});
-	});
-
-	describe.todo('Multi-tenancy support', () => {
-		it('should use the current tenant for models with tenancy support', async () => {
-			const getCurrentTenantSpy = spyOn(Tenancy, 'getCurrentTenant').mockReturnValueOnce(
-				'test-tenant'
-			);
-			const wrapTenantSchemaSpy = spyOn(Tenancy, 'wrapTenantSchema');
-
-			// Create a model with tenancy support
-			class TenantModel extends TestModel {
-				public readonly supportTenancy = true;
+			class ConcreteRepository extends TestRepository {
+				public async all() { return []; }
+				public async paginate() { return { page: 1, data: [], total: 0 }; }
+				public async find() { return null; }
+				public async findBy() { return null; }
+				public async insert(data: any) { return data; }
+				public async update(id: any, data: any) { return data; }
+				public async updateAll(data: any) { return [data]; }
+				public async delete(id: any) { return {}; }
+				public async deleteAll() { return []; }
+				public async exists(id: any) { return false; }
 			}
 
-			// Create a repository with tenancy support
-			class TenantRepository extends Repository(TenantModel) {}
-			const repo = new TenantRepository();
+			const repo = new ConcreteRepository();
 
-			await repo.all();
-
-			expect(getCurrentTenantSpy).toHaveBeenCalled();
-			expect(wrapTenantSchemaSpy).toHaveBeenCalledWith('test-tenant', TenantModel.tableName, TenantModel.columns);
-			expect(mockTxConnection.select).toHaveBeenCalled();
-			// @ts-expect-error Mocking headaches
-			expect(mockTxConnection.from).toHaveBeenCalledWith(TenantRepository.Model.table);
-		});
-
-		it('should use the public schema if no tenant is set', async () => {
-			// Create a model with tenancy support
-			class TenantModel extends TestModel {
-				public readonly supportTenancy = true;
-			}
-
-			// Mock getCurrentTenant to return null
-			const getCurrentTenantSpy = spyOn(Tenancy, 'getCurrentTenant').mockReturnValueOnce(null);
-			const wrapTenantSchemaSpy = spyOn(Tenancy, 'wrapTenantSchema');
-
-			// Create a repository with tenancy support
-			class TenantRepository extends Repository(TenantModel) {}
-			const repo = new TenantRepository();
-
-			await repo.all();
-
-			expect(getCurrentTenantSpy).toHaveBeenCalled();
-			expect(wrapTenantSchemaSpy).toHaveBeenCalledWith('public', TenantModel.tableName, TenantModel.columns);
+			expect(typeof repo.all).toBe('function');
+			expect(typeof repo.paginate).toBe('function');
+			expect(typeof repo.find).toBe('function');
+			expect(typeof repo.findBy).toBe('function');
+			expect(typeof repo.insert).toBe('function');
+			expect(typeof repo.update).toBe('function');
+			expect(typeof repo.updateAll).toBe('function');
+			expect(typeof repo.delete).toBe('function');
+			expect(typeof repo.deleteAll).toBe('function');
+			expect(typeof repo.exists).toBe('function');
 		});
 	});
 });
