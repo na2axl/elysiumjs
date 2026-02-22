@@ -1,7 +1,7 @@
-import { Model } from '@elysiumjs/mnemosyne';
+import { DrizzleModel } from '@elysiumjs/mnemosyne-drizzle';
 import { boolean, integer, uuid, varchar } from 'drizzle-orm/pg-core';
 
-export class UserModel extends Model('users', {
+export class UserModel extends DrizzleModel('users', {
 	id: uuid().primaryKey().defaultRandom(),
 	name: varchar({ length: 255 }).notNull(),
 	age: integer().notNull(),
