@@ -13,13 +13,9 @@
 // limitations under the License.
 
 import type { Context } from '@elysiumjs/core';
-import type { PgColumnBuilderBase, PgSchema, PgTable, PgTransaction } from 'drizzle-orm/pg-core';
+import type { TenancyStrategy } from './interfaces';
 
 import { Application, Middleware } from '@elysiumjs/core';
-import { sql } from 'drizzle-orm';
-import { pgPolicy, pgSchema, pgTable } from 'drizzle-orm/pg-core';
-
-import { Database } from './database';
 
 // ============================================================================
 // Types
@@ -103,8 +99,7 @@ export interface ModelTenancyConfig {
 // ============================================================================
 
 let _config: TenancyConfig = { mode: 'schema' };
-const tenantSchemas: Map<string, PgTable> = new Map();
-const schemaRegistry: Map<string, PgSchema> = new Map();
+let _strategy: TenancyStrategy<unknown, unknown> | null = null;
 
 // ============================================================================
 // Configuration
@@ -125,6 +120,28 @@ export const configure = (config: TenancyConfig): void => {
  * @returns The current tenancy configuration.
  */
 export const getConfig = (): TenancyConfig => _config;
+
+// ============================================================================
+// Strategy Registry
+// ============================================================================
+
+/**
+ * Registers the tenancy strategy to use for table resolution and isolation.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param strategy The tenancy strategy to register.
+ */
+export const registerTenancyStrategy = (strategy: TenancyStrategy<unknown, unknown>): void => {
+	_strategy = strategy;
+};
+
+/**
+ * Gets the currently registered tenancy strategy.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @returns The current tenancy strategy, or `null` if none is registered.
+ */
+export const getTenancyStrategy = (): TenancyStrategy<unknown, unknown> | null => {
+	return _strategy;
+};
 
 // ============================================================================
 // Context Management
@@ -158,167 +175,6 @@ export const withTenant = <T>(tenant: string, callback: () => T): T => {
 };
 
 // ============================================================================
-// Schema-based Tenancy
-// ============================================================================
-
-/**
- * Gets the Drizzle `PgSchema` for the given tenant.
- * Creates and registers the schema if it doesn't exist yet.
- * @author Axel Nana <axel.nana@workbud.com>
- * @param tenant The name of the tenant.
- * @returns The Postgres schema for the tenant.
- */
-export const getTenantSchema = (tenant: string): PgSchema => {
-	return schemaRegistry.get(tenant) ?? registerTenantSchema(tenant);
-};
-
-/**
- * Registers a new Postgres schema for a tenant.
- * If the schema is already registered, returns the existing one.
- * @author Axel Nana <axel.nana@workbud.com>
- * @param tenant The name of the tenant.
- * @returns The newly created or existing tenant schema.
- */
-export const registerTenantSchema = (tenant: string): PgSchema => {
-	if (schemaRegistry.has(tenant)) {
-		return schemaRegistry.get(tenant)!;
-	}
-	const tenantSchema = pgSchema(tenant);
-	schemaRegistry.set(tenant, tenantSchema);
-	return tenantSchema;
-};
-
-/**
- * Wraps a table definition within a tenant's Postgres schema.
- * For the `public` tenant, returns a standard `pgTable`.
- * Results are cached for performance.
- * @author Axel Nana <axel.nana@workbud.com>
- * @param tenant The tenant identifier.
- * @param tableName The name of the table.
- * @param columns The table columns definition.
- * @returns A `PgTable` scoped to the tenant's schema.
- */
-export const wrapTenantSchema = <
-	TTableName extends string,
-	TColumnsMap extends Record<string, PgColumnBuilderBase>
->(
-	tenant: string,
-	tableName: TTableName,
-	columns: TColumnsMap
-): PgTable => {
-	if (tenant === 'public') {
-		return pgTable(tableName, columns);
-	}
-
-	const fullTableName = `${tenant}.${tableName}`;
-	if (tenantSchemas.has(fullTableName)) {
-		return tenantSchemas.get(fullTableName)!;
-	}
-
-	const tenantSchema = getTenantSchema(tenant);
-	const schemaTable = tenantSchema.table(tableName, columns);
-	tenantSchemas.set(fullTableName, schemaTable);
-
-	return schemaTable;
-};
-
-// ============================================================================
-// RLS-based Tenancy (Drizzle-native)
-// ============================================================================
-
-/**
- * Execute a callback within a transaction that has the tenant context set
- * via PostgreSQL session variable.
- *
- * Uses `set_config(varName, value, true)` which:
- * - Sets the variable value as a proper GUC parameter (not an identifier)
- * - The `true` flag makes it transaction-local (reverts on commit/rollback)
- *
- * The transaction handle (`tx`) is passed to the callback so all
- * queries execute within the same transaction where `set_config` was called.
- *
- * @author Axel Nana <axel.nana@workbud.com>
- * @param tenant The tenant identifier, or `null` for the public tenant.
- * @param callback A function receiving the transaction handle.
- * @param connectionName The database connection to use.
- * @returns The return value of the callback.
- */
-export const withRLS = async <T>(
-	tenant: string | null,
-	callback: (tx: PgTransaction<any, any, any>) => Promise<T>,
-	connectionName: string = 'default'
-): Promise<T> => {
-	const db = Database.getConnection(connectionName);
-	const varName = _config.rls?.sessionVariable ?? 'app.current_tenant';
-	const value = tenant ?? 'public';
-
-	return (db as any).transaction(async (tx: PgTransaction<any, any, any>) => {
-		await tx.execute(sql`SELECT set_config(${varName}, ${value}, true)`);
-		return callback(tx);
-	});
-};
-
-/**
- * Sets the tenant for the current database connection (session-level, not transaction-local).
- * Useful for long-lived connections or connection pools.
- * @author Axel Nana <axel.nana@workbud.com>
- * @param tenant The tenant identifier, or `null` for the public tenant.
- * @param connectionName The database connection to use.
- */
-export const setConnectionTenant = async (
-	tenant: string | null,
-	connectionName: string = 'default'
-): Promise<void> => {
-	const db = Database.getConnection(connectionName);
-	const varName = _config.rls?.sessionVariable ?? 'app.current_tenant';
-	const value = tenant ?? 'public';
-
-	await (db as any).execute(sql`SELECT set_config(${varName}, ${value}, false)`);
-};
-
-/**
- * Reads the current tenant from the PostgreSQL session variable.
- * @author Axel Nana <axel.nana@workbud.com>
- * @param connectionName The database connection to use.
- * @returns The current tenant identifier, or `null` if not set.
- */
-export const getSessionTenant = async (
-	connectionName: string = 'default'
-): Promise<string | null> => {
-	const db = Database.getConnection(connectionName);
-	const varName = _config.rls?.sessionVariable ?? 'app.current_tenant';
-
-	const result = await (db as any).execute(sql`SELECT current_setting(${varName}, true) as tenant`);
-	return (result as any)?.rows?.[0]?.tenant ?? null;
-};
-
-/**
- * Create an RLS policy for tenant isolation.
- *
- * Always specifies `for` and `to` for deterministic behavior:
- * - `for: 'all'` — policy applies to SELECT, INSERT, UPDATE, DELETE
- * - `to: 'public'` — policy applies to all roles
- *
- * @author Axel Nana <axel.nana@workbud.com>
- * @param tableName The name of the table to create the policy for.
- * @param columnName The column that holds the tenant identifier. Defaults to the global config.
- * @param policyName Custom name for the policy. Defaults to `{tableName}_tenant_isolation`.
- * @returns A Drizzle `pgPolicy` definition.
- */
-export const createRLSPolicy = (tableName: string, columnName?: string, policyName?: string) => {
-	const varName = _config.rls?.sessionVariable ?? 'app.current_tenant';
-	const column = columnName ?? _config.rls?.defaultColumn ?? 'tenant_id';
-	const name = policyName ?? `${tableName}_tenant_isolation`;
-
-	return pgPolicy(name, {
-		for: 'all',
-		to: 'public',
-		using: sql`${sql.identifier(column)} = current_setting(${varName}, true)::text`,
-		withCheck: sql`${sql.identifier(column)} = current_setting(${varName}, true)::text`
-	});
-};
-
-// ============================================================================
 // TenantMiddleware Base Class
 // ============================================================================
 
@@ -326,8 +182,8 @@ export const createRLSPolicy = (tableName: string, columnName?: string, policyNa
  * Base class for tenant-aware middleware.
  *
  * The middleware extracts the tenant identifier from an HTTP header and
- * sets `ctx.tenant`. For RLS mode, route handlers should use `withRLS()`
- * to wrap their queries in a tenant-scoped transaction.
+ * sets `ctx.tenant`. For RLS mode, route handlers should use the driver's
+ * isolation mechanism to wrap their queries in a tenant-scoped transaction.
  *
  * @example
  * ```typescript
