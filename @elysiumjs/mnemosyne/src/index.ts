@@ -30,6 +30,14 @@ export type { IdType, RepositoryInterface, RepositoryClass } from './repository'
 export * as Tenancy from './tenancy';
 export { TenantMiddleware, SimpleTenantMiddleware, StrictTenantMiddleware } from './tenancy';
 export type { TenancyConfig, TenancyMode, ModelTenancyConfig } from './tenancy';
+export type {
+	ColumnMetadata,
+	DatabaseCacheConfig,
+	DatabaseCacheStrategy,
+	DatabaseDriver,
+	ModelAdapter,
+	TenancyStrategy,
+} from './interfaces';
 
 // Configuration types
 export interface MnemosyneConfig {
