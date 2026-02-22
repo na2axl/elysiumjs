@@ -28,7 +28,7 @@ import type { TSchema } from 'elysia';
  * @template TConnection The connection type managed by the driver.
  * @template TConnectionConfig The configuration used to create a connection.
  */
-export interface DatabaseDriver<TConnection, TConnectionConfig> {
+export interface DatabaseDriver<TConnection = unknown, TConnectionConfig = unknown> {
 	/**
 	 * Creates a new database connection from the given configuration.
 	 * @param config The connection configuration.
@@ -113,7 +113,7 @@ export interface ColumnMetadata {
  * @author Axel Nana <axel.nana@workbud.com>
  * @template TTable The ORM-specific table type.
  */
-export interface ModelAdapter<TTable> {
+export interface ModelAdapter<TTable = unknown> {
 	/**
 	 * Returns the name of the given table.
 	 * @param table The table to get the name of.
@@ -151,7 +151,7 @@ export interface ModelAdapter<TTable> {
  * @template TTable The ORM-specific table type.
  * @template TConnection The connection type used by the strategy.
  */
-export interface TenancyStrategy<TTable, TConnection> {
+export interface TenancyStrategy<TTable = unknown, TConnection = unknown> {
 	/**
 	 * The tenancy mode identifier (e.g. `'schema'`, `'rls'`).
 	 */
@@ -282,6 +282,14 @@ export interface RepositoryInterface<TSelect, TInsert, TUpdate, TId extends IdTy
 	 * @returns The record with the given id, or `null` if not found.
 	 */
 	find(id: TId): Promise<TSelect | null>;
+
+	/**
+	 * Finds the first record with a column matching the given value.
+	 * @param column The column to filter by.
+	 * @param value The value the column should match.
+	 * @returns The first record with a column matching the given value, or `null`.
+	 */
+	findBy<TKey extends keyof TSelect>(column: TKey, value: TSelect[TKey]): Promise<TSelect | null>;
 
 	/**
 	 * Inserts a new record in the database.

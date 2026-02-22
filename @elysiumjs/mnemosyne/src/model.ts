@@ -61,46 +61,36 @@ export const createSchemaFromModel = (
  * @returns A validation schema based on the given column.
  */
 const parseColumnType = (column: ColumnMetadata) => {
-	let type = (() => {
-		switch (column.dataType) {
-			case 'string':
-				return t.String();
-			case 'uuid':
-				return t.String({ format: 'uuid' });
-			case 'number':
-				return t.Number();
-			case 'boolean':
-				return t.Boolean();
-			case 'array':
-				return t.Array(t.Any());
-			case 'json':
-				return t.Object({});
-			case 'date':
-				return t
-					.Transform(t.String({ format: 'date' }))
-					.Decode((date) => new Date(date))
-					.Encode((date) => date.toISOString());
-			case 'datetime':
-				return t
-					.Transform(t.String({ format: 'date-time' }))
-					.Decode((date) => new Date(date))
-					.Encode((date) => date.toISOString());
-			case 'bigint':
-				return t.BigInt();
-			case 'buffer':
-				return t.File();
-			default:
-				return t.Never();
-		}
-	})();
-
-	if (column.nullable) {
-		type = t.Optional(type);
-	} else {
-		type = t.Required(type);
+	switch (column.dataType) {
+		case 'string':
+			return t.String();
+		case 'uuid':
+			return t.String({ format: 'uuid' });
+		case 'number':
+			return t.Number();
+		case 'boolean':
+			return t.Boolean();
+		case 'array':
+			return t.Array(t.Any());
+		case 'json':
+			return t.Object({});
+		case 'date':
+			return t
+				.Transform(t.String({ format: 'date' }))
+				.Decode((date) => new Date(date))
+				.Encode((date) => date.toISOString());
+		case 'datetime':
+			return t
+				.Transform(t.String({ format: 'date-time' }))
+				.Decode((date) => new Date(date))
+				.Encode((date) => date.toISOString());
+		case 'bigint':
+			return t.BigInt();
+		case 'buffer':
+			return t.File();
+		default:
+			return t.Never();
 	}
-
-	return type;
 };
 
 /**

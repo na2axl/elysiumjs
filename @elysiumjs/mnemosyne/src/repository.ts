@@ -29,7 +29,7 @@ import type { IdType, ModelClass, RepositoryInterface } from './interfaces';
  */
 export const AbstractRepository = <TModel extends ModelClass, TConnection>(
 	model: TModel,
-	database: AbstractDatabase<TConnection, any>
+	database: AbstractDatabase<TConnection, unknown>
 ) => {
 	type TSelect = TModel['$inferSelect'];
 	type TInsert = TModel['$inferInsert'];

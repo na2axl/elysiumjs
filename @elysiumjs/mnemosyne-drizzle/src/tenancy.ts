@@ -14,6 +14,7 @@
 
 import type { TenancyStrategy } from '@elysiumjs/mnemosyne';
 import type { PgColumnBuilderBase, PgSchema, PgTable, PgTransaction } from 'drizzle-orm/pg-core';
+import type { DrizzleConnection } from './database';
 
 import { getTenancyConfig } from '@elysiumjs/mnemosyne';
 import { sql } from 'drizzle-orm';
@@ -191,7 +192,7 @@ export const createRLSPolicy = (tableName: string, columnName?: string, policyNa
  *
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class DrizzleSchemaTenancy implements TenancyStrategy<PgTable, any> {
+export class DrizzleSchemaTenancy implements TenancyStrategy<PgTable, DrizzleConnection> {
 	readonly mode = 'schema';
 
 	resolveTable(table: PgTable, tenant: string): PgTable {
@@ -207,7 +208,7 @@ export class DrizzleSchemaTenancy implements TenancyStrategy<PgTable, any> {
 	}
 
 	async withIsolation<T>(
-		_connection: any,
+		_connection: DrizzleConnection,
 		_tenant: string,
 		callback: () => Promise<T>
 	): Promise<T> {
@@ -224,7 +225,7 @@ export class DrizzleSchemaTenancy implements TenancyStrategy<PgTable, any> {
  *
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class DrizzleRLSTenancy implements TenancyStrategy<PgTable, any> {
+export class DrizzleRLSTenancy implements TenancyStrategy<PgTable, DrizzleConnection> {
 	readonly mode = 'rls';
 
 	resolveTable(table: PgTable, _tenant: string): PgTable {
@@ -232,11 +233,15 @@ export class DrizzleRLSTenancy implements TenancyStrategy<PgTable, any> {
 		return table;
 	}
 
-	async withIsolation<T>(connection: any, tenant: string, callback: () => Promise<T>): Promise<T> {
+	async withIsolation<T>(
+		connection: DrizzleConnection,
+		tenant: string,
+		callback: () => Promise<T>
+	): Promise<T> {
 		const config = getTenancyConfig();
 		const varName = config.rls?.sessionVariable ?? 'app.current_tenant';
 
-		return connection.transaction(async (tx: any) => {
+		return (connection as any).transaction(async (tx: PgTransaction<any, any, any>) => {
 			await tx.execute(sql`SELECT set_config(${varName}, ${tenant}, true)`);
 			return callback();
 		});
