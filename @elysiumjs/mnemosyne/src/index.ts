@@ -12,52 +12,44 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { DatabaseConnectionProps } from './database';
-
-import { Application, Event } from '@elysiumjs/core';
-
-import { Database } from './database';
-
-export { Database, DatabaseCache } from './database';
-export type { DatabaseConnectionProps, DatabaseConnection } from './database';
-export { KeyvRedis } from './keyv-redis';
-export { Cache } from './cache';
-export type { CacheInterface } from './cache';
-export { createSchemaFromDrizzle, Model } from './model';
-export type { ModelClass } from './model';
-export { Repository } from './repository';
-export type { IdType, RepositoryInterface, RepositoryClass } from './repository';
-export * as Tenancy from './tenancy';
-export { TenantMiddleware, SimpleTenantMiddleware, StrictTenantMiddleware } from './tenancy';
-export type { TenancyConfig, TenancyMode, ModelTenancyConfig } from './tenancy';
 export type {
 	ColumnMetadata,
 	DatabaseCacheConfig,
 	DatabaseCacheStrategy,
 	DatabaseDriver,
+	IdType,
 	ModelAdapter,
-	TenancyStrategy,
+	ModelClass,
+	RepositoryClass,
+	RepositoryInterface,
+	TenancyStrategy
 } from './interfaces';
 
+export { AbstractDatabase, createDatabaseCacheStorage } from './database';
+export { createSchemaFromModel, AbstractModel } from './model';
+export { AbstractRepository } from './repository';
+
+export {
+	configure as configureTenancy,
+	getConfig as getTenancyConfig,
+	getCurrentTenant,
+	withTenant,
+	registerTenancyStrategy,
+	getTenancyStrategy,
+	TenantMiddleware,
+	SimpleTenantMiddleware,
+	StrictTenantMiddleware
+} from './tenancy';
+export type { TenancyConfig, TenancyMode, ModelTenancyConfig } from './tenancy';
+
+export { Cache } from './cache';
+export type { CacheInterface } from './cache';
+export { KeyvRedis } from './keyv-redis';
+
 // Configuration types
-export interface MnemosyneConfig {
+export interface MnemosyneConfig<TConnectionConfig = unknown> {
 	database?: {
 		default: string;
-		connections: Record<string, DatabaseConnectionProps>;
+		connections: Record<string, TConnectionConfig>;
 	};
 }
-
-// Initialize on app launch
-Event.once('elysium:app:launched', () => {
-	const app = Application.instance;
-	const config = app.getConfig<MnemosyneConfig>('elysium:mnemosyne' as any);
-
-	if (config?.database) {
-		for (const [name, props] of Object.entries(config.database.connections)) {
-			Database.registerConnection(name, props);
-		}
-		if (Database.connectionExists(config.database.default)) {
-			Database.setDefaultConnection(config.database.default);
-		}
-	}
-});

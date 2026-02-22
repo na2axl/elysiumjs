@@ -19,18 +19,17 @@
 		"typecheck": "tsc --noEmit",
 		"prepublishOnly": "bun run build"
 	},
-	"keywords": ["elysium", "database", "cache", "orm", "drizzle"],
+	"keywords": ["elysium", "database", "cache", "orm"],
 	"module": "dist/index.js",
 	"type": "module",
 	"types": "dist/index.d.ts",
-	"sideEffects": ["./src/index.ts"],
+	"sideEffects": false,
 	"peerDependencies": {
 		"@elysiumjs/core": "workspace:^"
 	},
 	"dependencies": {
 		"cache-manager": "^7.2.3",
 		"cacheable": "^2.0.3",
-		"drizzle-orm": "^0.44.6",
 		"keyv": "^5.0.0",
 		"radash": "catalog:",
 		"reflect-metadata": "catalog:"
