@@ -19,13 +19,21 @@
 		"typecheck": "tsc --noEmit",
 		"prepublishOnly": "bun run build"
 	},
-	"keywords": ["elysium", "database", "cache", "orm"],
+	"keywords": [
+		"elysium",
+		"database",
+		"cache",
+		"orm"
+	],
 	"module": "dist/index.js",
 	"type": "module",
 	"types": "dist/index.d.ts",
 	"sideEffects": false,
 	"peerDependencies": {
 		"@elysiumjs/core": "workspace:^"
+	},
+	"devDependencies": {
+		"@elysiumjs/core": "workspace:*"
 	},
 	"dependencies": {
 		"cache-manager": "^7.2.3",

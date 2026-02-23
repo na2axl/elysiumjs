@@ -3,10 +3,9 @@ import type { MainModule } from '#hero/hero.module';
 import type { User, UserInsert } from '#hero/models/user.model';
 import type { Class } from 'type-fest';
 
-import { Event, Http, HttpControllerScope, Service, WorkerPool } from '@elysiumjs/core';
-import { Cache } from '@elysiumjs/mnemosyne';
+import { Event, Http, HttpControllerScope, Service, t, WorkerPool } from '@elysiumjs/core';
 import { HermesLogger } from '@elysiumjs/hermes';
-import { t } from 'elysia';
+import { Cache } from '@elysiumjs/mnemosyne';
 import { isEmpty, uid } from 'radash';
 
 import { EmailJob } from '#hero/jobs/email.job';

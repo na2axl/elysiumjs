@@ -9,7 +9,7 @@ export class AuthMiddleware extends Middleware {
 		}
 
 		if (ctx.headers.authorization !== 'Bearer secret') {
-			throw ctx.error(401, { message: 'Unauthorized' });
+			throw ctx.status(401, { message: 'Unauthorized' });
 		}
 	}
 }

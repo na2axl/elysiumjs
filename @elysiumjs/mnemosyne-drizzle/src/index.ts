@@ -16,8 +16,10 @@ import type { MnemosyneConfig } from '@elysiumjs/mnemosyne';
 import type { DrizzleConnectionProps } from './database';
 
 import { Application, Event } from '@elysiumjs/core';
+import { registerTenancyStrategy } from '@elysiumjs/mnemosyne';
 
 import { Database } from './database';
+import { DrizzleRLSTenancy, DrizzleSchemaTenancy } from './tenancy';
 
 // Re-exports
 export { Database, DrizzleDatabaseCache } from './database';
@@ -48,5 +50,11 @@ Event.once('elysium:app:launched', () => {
 		if (Database.connectionExists(config.database.default)) {
 			Database.setDefaultConnection(config.database.default);
 		}
+	}
+
+	if (config?.tenancy) {
+		const strategy =
+			config.tenancy.mode === 'rls' ? new DrizzleRLSTenancy() : new DrizzleSchemaTenancy();
+		registerTenancyStrategy(strategy);
 	}
 });

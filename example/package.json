@@ -9,7 +9,7 @@
 	"dependencies": {
 		"@elysiumjs/core": "workspace:^",
 		"@elysiumjs/hermes": "workspace:^",
-		"@elysiumjs/mnemosyne-drizzle": "workspace:*",
+		"@elysiumjs/mnemosyne-drizzle": "workspace:^",
 		"@elysiumjs/styx": "workspace:^",
 		"radash": "catalog:"
 	}
