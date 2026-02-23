@@ -32,7 +32,6 @@ export { createSchemaFromModel, AbstractModel } from './model';
 export { AbstractRepository } from './repository';
 
 export {
-	configure as configureTenancy,
 	getConfig as getTenancyConfig,
 	getCurrentTenant,
 	withTenant,

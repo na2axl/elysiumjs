@@ -98,7 +98,6 @@ export interface ModelTenancyConfig {
 // Internal State
 // ============================================================================
 
-let _config: TenancyConfig = { mode: 'schema' };
 let _strategy: TenancyStrategy<unknown, unknown> | null = null;
 
 // ============================================================================
@@ -106,20 +105,22 @@ let _strategy: TenancyStrategy<unknown, unknown> | null = null;
 // ============================================================================
 
 /**
- * Sets the global tenancy configuration.
- * @author Axel Nana <axel.nana@workbud.com>
- * @param config The tenancy configuration to apply.
- */
-export const configure = (config: TenancyConfig): void => {
-	_config = config;
-};
-
-/**
  * Gets the current global tenancy configuration.
+ *
+ * Reads from the 'elysium:mnemosyne' app config key. Returns a default
+ * configuration if the app is not yet initialized or no tenancy config is set.
+ *
  * @author Axel Nana <axel.nana@workbud.com>
  * @returns The current tenancy configuration.
  */
-export const getConfig = (): TenancyConfig => _config;
+export const getConfig = (): TenancyConfig => {
+	const app = Application.instance;
+	if (!app) {
+		return { mode: 'schema' };
+	}
+	const config = app.getConfig<{ tenancy?: TenancyConfig }>('elysium:mnemosyne' as any);
+	return config?.tenancy ?? { mode: 'schema' };
+};
 
 // ============================================================================
 // Strategy Registry
