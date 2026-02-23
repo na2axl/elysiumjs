@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { TenancyConfig } from './tenancy';
+
 export type {
 	ColumnMetadata,
 	DatabaseCacheConfig,
@@ -52,4 +54,5 @@ export interface MnemosyneConfig<TConnectionConfig = unknown> {
 		default: string;
 		connections: Record<string, TConnectionConfig>;
 	};
+	tenancy?: TenancyConfig;
 }
