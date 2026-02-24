@@ -63,10 +63,8 @@ export const pgTable = <
 	tableName: TTableName,
 	columns: TColumns,
 	extraConfig?: (table: any) => any
-): PgTableWithColumns<{
-	[K in keyof TColumns]: TColumns[K] extends PgColumnBuilderBase<infer T> ? T : never;
-}> => {
+) => {
 	const table = drizzlePgTable(tableName, columns, extraConfig);
 	tableRegistry.set(table, columns);
-	return table as any;
+	return table;
 };

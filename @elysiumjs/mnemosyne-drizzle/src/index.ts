@@ -21,10 +21,19 @@ import { registerTenancyStrategy } from '@elysiumjs/mnemosyne';
 import { Database } from './database';
 import { DrizzleRLSTenancy, DrizzleSchemaTenancy } from './tenancy';
 
+// Re-export drizzle-orm/pg-core with enhanced pgTable
+export * from 'drizzle-orm/pg-core';
+export { pgTable, getTableBuilders } from './table';
+
 // Re-exports
 export { Database, DrizzleDatabaseCache } from './database';
 export type { DrizzleConnectionProps, DrizzleConnection } from './database';
-export { DrizzleModel, createSchemaFromDrizzle, drizzleAdapter } from './model';
+export {
+	DrizzleModel,
+	createSchemaFromDrizzle,
+	drizzleAdapter,
+	type DrizzleModelOptions
+} from './model';
 export { DrizzleRepository } from './repository';
 export {
 	DrizzleSchemaTenancy,
