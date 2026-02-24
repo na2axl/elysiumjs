@@ -28,7 +28,7 @@
 		"changeset": "changeset",
 		"version": "changeset version && bun update",
 		"release": "bun run build && bun run ci:publish",
-		"ci:publish": "for dir in @elysiumjs/*; do (cd \"$dir\" && NPM_CONFIG_IGNORE_SCRIPTS=1 bun publish -f || true); done && (cd create-elysium && NPM_CONFIG_IGNORE_SCRIPTS=1 bun publish -f || true) && changeset tag"
+		"ci:publish": "for dir in @elysiumjs/*; do (cd \"$dir\" && NPM_CONFIG_IGNORE_SCRIPTS=1 bun publish --access public -f || true); done && (cd create-elysium && NPM_CONFIG_IGNORE_SCRIPTS=1 bun publish --access public -f || true) && changeset tag"
 	},
 	"devDependencies": {
 		"@changesets/cli": "^2.29.8",

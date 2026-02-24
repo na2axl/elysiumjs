@@ -1,6 +1,6 @@
 {
 	"name": "@elysiumjs/mnemosyne-drizzle",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"license": "Apache-2.0",
 	"description": "Drizzle ORM driver for @elysiumjs/mnemosyne",
 	"private": false,
@@ -19,7 +19,13 @@
 		"typecheck": "tsc --noEmit",
 		"prepublishOnly": "bun run build"
 	},
-	"keywords": ["elysium", "database", "orm", "drizzle", "postgresql"],
+	"keywords": [
+		"elysium",
+		"database",
+		"orm",
+		"drizzle",
+		"postgresql"
+	],
 	"module": "dist/index.js",
 	"type": "module",
 	"types": "dist/index.d.ts",
@@ -29,7 +35,7 @@
 		"@elysiumjs/mnemosyne": "workspace:^"
 	},
 	"dependencies": {
-		"drizzle-orm": "^0.44.6"
+		"drizzle-orm": "^0.45.1"
 	},
 	"devDependencies": {
 		"@elysiumjs/core": "workspace:*",
