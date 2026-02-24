@@ -18,7 +18,8 @@ import * as d from 'drizzle-orm/pg-core';
 import { Application, Service } from '@elysiumjs/core';
 
 import { Database } from '../src/database';
-import { DrizzleModel, registerTableColumnBuilders } from '../src/model';
+import { DrizzleModel } from '../src/model';
+import { pgTable } from '../src/table';
 import {
 	createRLSPolicy,
 	DrizzleRLSTenancy,
@@ -137,8 +138,7 @@ describe('Tenancy', () => {
 				id: d.uuid().primaryKey().defaultRandom(),
 				name: d.varchar().notNull()
 			};
-			const table = d.pgTable('schema_strategy_test', cols);
-			registerTableColumnBuilders(table, cols);
+			const table = pgTable('schema_strategy_test', cols);
 
 			const strategy = new DrizzleSchemaTenancy();
 			const resolved = strategy.resolveTable(table, 'strategy-tenant');

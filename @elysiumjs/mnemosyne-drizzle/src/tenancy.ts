@@ -21,7 +21,7 @@ import { sql } from 'drizzle-orm';
 import { getTableConfig, pgPolicy, pgSchema, pgTable } from 'drizzle-orm/pg-core';
 
 import { Database } from './database';
-import { getTableColumnBuilders } from './model';
+import { getTableBuilders } from './table';
 
 // ============================================================================
 // Internal State
@@ -196,11 +196,11 @@ export class DrizzleSchemaTenancy implements TenancyStrategy<PgTable, DrizzleCon
 	readonly mode = 'schema';
 
 	resolveTable(table: PgTable, tenant: string): PgTable {
-		const builders = getTableColumnBuilders(table);
+		const builders = getTableBuilders(table as any);
 		if (!builders) {
 			throw new Error(
 				`No column builders registered for table. ` +
-					`Use DrizzleModel() to create models with tenant support.`
+					`Use pgTable() from '@elysiumjs/mnemosyne-drizzle' for tenant support.`
 			);
 		}
 		const config = getTableConfig(table as any);

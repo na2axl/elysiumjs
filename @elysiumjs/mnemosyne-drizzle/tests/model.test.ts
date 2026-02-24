@@ -18,7 +18,8 @@ import { t } from 'elysia';
 
 import { Application } from '@elysiumjs/core';
 
-import { createSchemaFromDrizzle, drizzleAdapter, DrizzleModel, registerTableColumnBuilders } from '../src/model';
+import { createSchemaFromDrizzle, drizzleAdapter, DrizzleModel } from '../src/model';
+import { pgTable } from '../src/table';
 import * as Tenancy from '../src/tenancy';
 
 // ============================================================================
@@ -34,6 +35,8 @@ const mockColumns = {
 };
 
 const mockTable = d.pgTable('users', mockColumns);
+
+const enhancedMockTable = pgTable('enhanced_users', mockColumns);
 
 const mockStore = new Map([['tenant', 'test-tenant']]);
 const mockGetStore = mock(() => mockStore);
@@ -105,13 +108,12 @@ describe('DrizzleModel', () => {
 
 		describe('createTenantTable', () => {
 			it('should create a tenant-scoped table when column builders are registered', () => {
-				// Register column builders for the table (simulating what DrizzleModel does)
+				// Use enhanced pgTable which auto-registers builders
 				const cols = {
 					id: d.uuid().primaryKey().defaultRandom(),
 					name: d.varchar().notNull()
 				};
-				const table = d.pgTable('items', cols);
-				registerTableColumnBuilders(table, cols);
+				const table = pgTable('items', cols);
 
 				const pgSchemaSpy = spyOn(d, 'pgSchema');
 
@@ -126,8 +128,7 @@ describe('DrizzleModel', () => {
 					id: d.uuid().primaryKey().defaultRandom(),
 					name: d.varchar().notNull()
 				};
-				const table = d.pgTable('items_public', cols);
-				registerTableColumnBuilders(table, cols);
+				const table = pgTable('items_public', cols);
 
 				const pgTableSpy = spyOn(d, 'pgTable');
 
@@ -225,39 +226,77 @@ describe('DrizzleModel', () => {
 		});
 	});
 
-	describe('DrizzleModel mixin', () => {
-		it('should create a model class with the correct properties', () => {
-			const pgTableSpy = spyOn(d, 'pgTable');
+	describe('DrizzleModel with pgTable', () => {
+		describe('single signature API', () => {
+			it('should accept a pgTable directly', () => {
+				const cols = {
+					id: d.uuid().primaryKey().defaultRandom(),
+					title: d.varchar().notNull()
+				};
+				const posts = pgTable('posts', cols);
 
-			const cols = {
-				id: d.uuid().primaryKey().defaultRandom(),
-				name: d.varchar().notNull()
-			};
+				class Post extends DrizzleModel(posts) {}
 
-			class UserModel extends DrizzleModel('users', cols) {}
+				expect(Post.tableName).toBe('posts');
+				expect(Post.table).toBeDefined();
+				expect(Post.insertSchema).toBeDefined();
+				expect(Post.updateSchema).toBeDefined();
+				expect(Post.selectSchema).toBeDefined();
+			});
 
-			expect(pgTableSpy).toHaveBeenCalledWith('users', cols, undefined);
-			expect(UserModel.tableName).toBe('users');
-			expect(UserModel.columns).toBe(cols);
-			expect(UserModel.insertSchema).toBeDefined();
-			expect(UserModel.updateSchema).toBeDefined();
-			expect(UserModel.selectSchema).toBeDefined();
-			expect(UserModel.supportTenancy).toBe(false);
-			expect(UserModel.$inferSelect).toBeUndefined();
-			expect(UserModel.$inferInsert).toBeUndefined();
-			expect(UserModel.$inferUpdate).toBeUndefined();
+			it('should support supportTenancy option', () => {
+				const cols = {
+					id: d.uuid().primaryKey().defaultRandom(),
+					name: d.varchar().notNull()
+				};
+				const tenants = pgTable('tenants', cols);
+
+				class Tenant extends DrizzleModel(tenants, { supportTenancy: true }) {}
+
+				expect(Tenant.supportTenancy).toBe(true);
+			});
+
+			it('should default supportTenancy to false', () => {
+				const cols = {
+					id: d.uuid().primaryKey().defaultRandom()
+				};
+				const items = pgTable('items', cols);
+
+				class Item extends DrizzleModel(items) {}
+
+				expect(Item.supportTenancy).toBe(false);
+			});
+
+			it('should infer types from the table', () => {
+				const cols = {
+					id: d.uuid().primaryKey().defaultRandom(),
+					email: d.varchar().notNull(),
+					age: d.integer()
+				};
+				const users = pgTable('typed_users', cols);
+
+				class TypedUser extends DrizzleModel(users) {}
+
+				// Type inference markers
+				expect(TypedUser.$inferSelect).toBeUndefined();
+				expect(TypedUser.$inferInsert).toBeUndefined();
+				expect(TypedUser.$inferUpdate).toBeUndefined();
+			});
 		});
 
-		it('should expose the underlying pgTable via .table', () => {
-			const cols = {
-				id: d.uuid().primaryKey().defaultRandom(),
-				title: d.varchar().notNull()
-			};
+		describe('tenancy with pgTable', () => {
+			it('should create tenant table when tenancy is enabled', () => {
+				const cols = {
+					id: d.uuid().primaryKey().defaultRandom(),
+					data: d.varchar().notNull()
+				};
+				const tenantData = pgTable('tenant_data', cols);
 
-			class PostModel extends DrizzleModel('posts', cols) {}
+				class TenantData extends DrizzleModel(tenantData, { supportTenancy: true }) {}
 
-			// Without tenancy context, should return the base table
-			expect(PostModel.table).toBeDefined();
+				// Should not throw when accessing table
+				expect(TenantData.table).toBeDefined();
+			});
 		});
 	});
 

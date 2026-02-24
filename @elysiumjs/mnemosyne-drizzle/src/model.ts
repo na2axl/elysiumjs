@@ -13,49 +13,13 @@
 // limitations under the License.
 
 import type { ColumnMetadata, ModelAdapter } from '@elysiumjs/mnemosyne';
-import type { PgColumn, PgColumnBuilderBase, PgTableWithColumns } from 'drizzle-orm/pg-core';
+import type { PgColumn, PgTableWithColumns } from 'drizzle-orm/pg-core';
 
 import { AbstractModel, createSchemaFromModel } from '@elysiumjs/mnemosyne';
-import { getTableConfig, pgTable } from 'drizzle-orm/pg-core';
+import { getTableConfig } from 'drizzle-orm/pg-core';
 
+import { getTableBuilders } from './table';
 import { wrapTenantSchema } from './tenancy';
-
-// ============================================================================
-// Column Builder Registry
-// ============================================================================
-
-/**
- * Maps built tables to their original column builder definitions.
- *
- * When `pgTable()` is called, column builders are consumed and turned into
- * built `PgColumn` instances. Those built columns cannot be passed to
- * `pgTable()` again. This registry preserves the original builder objects
- * so that `createTenantTable` can re-create a table in a different schema.
- */
-const columnBuilderRegistry = new WeakMap<object, Record<string, PgColumnBuilderBase>>();
-
-/**
- * Registers a table's original column builders.
- * @param table The built table.
- * @param columns The original column builder definitions.
- */
-export const registerTableColumnBuilders = (
-	table: object,
-	columns: Record<string, PgColumnBuilderBase>
-): void => {
-	columnBuilderRegistry.set(table, columns);
-};
-
-/**
- * Retrieves the original column builders for a built table.
- * @param table The built table.
- * @returns The original column builder definitions, or `undefined`.
- */
-export const getTableColumnBuilders = (
-	table: object
-): Record<string, PgColumnBuilderBase> | undefined => {
-	return columnBuilderRegistry.get(table);
-};
 
 // ============================================================================
 // Column Type Mapping
@@ -120,11 +84,11 @@ export const drizzleAdapter: ModelAdapter<PgTableWithColumns<any>> = {
 	},
 
 	createTenantTable(table, tenant) {
-		const builders = getTableColumnBuilders(table);
+		const builders = getTableBuilders(table);
 		if (!builders) {
 			throw new Error(
 				`No column builders registered for table. ` +
-					`Use DrizzleModel() to create models with tenant support.`
+					`Use pgTable() from '@elysiumjs/mnemosyne-drizzle' for tenant support.`
 			);
 		}
 		const config = getTableConfig(table);
@@ -155,39 +119,53 @@ export const createSchemaFromDrizzle = (
 };
 
 // ============================================================================
-// DrizzleModel Mixin
+// DrizzleModel Options
 // ============================================================================
 
 /**
- * Drizzle-specific model mixin.
- *
- * Creates a model class backed by a Drizzle `pgTable`, with
- * automatic validation schema generation and tenancy support.
+ * Options for creating a DrizzleModel.
+ */
+export interface DrizzleModelOptions {
+	/**
+	 * Enable tenant schema support for this model.
+	 * @default false
+	 */
+	supportTenancy?: boolean;
+}
+
+// ============================================================================
+// DrizzleModel Function
+// ============================================================================
+
+/**
+ * Creates a model class backed by a Drizzle pgTable.
  *
  * @author Axel Nana <axel.nana@workbud.com>
- * @param tableName The name of the database table.
- * @param columns The column definitions.
- * @param extraConfig Optional extra Drizzle table configuration.
+ * @param table The Drizzle table (created with enhanced pgTable).
+ * @param options Model configuration options.
  * @returns A model class with Drizzle-backed static metadata.
  */
-export const DrizzleModel = <TColumnsMap extends Record<string, PgColumnBuilderBase>>(
-	tableName: string,
-	columns: TColumnsMap,
-	extraConfig?: any
+export const DrizzleModel = <TTable extends PgTableWithColumns<any>>(
+	table: TTable,
+	options?: DrizzleModelOptions
 ) => {
-	const baseTable = pgTable(tableName, columns, extraConfig);
-	// Store original column builders so createTenantTable can re-create the table
-	registerTableColumnBuilders(baseTable, columns);
+	const config = getTableConfig(table);
+	const builders = getTableBuilders(table);
 
-	type Table = typeof baseTable;
-	type TSelect = Table['$inferSelect'];
-	type TInsert = Table['$inferInsert'];
+	type TSelect = TTable['$inferSelect'];
+	type TInsert = TTable['$inferInsert'];
 
-	const Base = AbstractModel(tableName, columns, drizzleAdapter, baseTable);
+	const Base = AbstractModel(config.name, builders ?? {}, drizzleAdapter, table);
+
+	// Override supportTenancy if specified
+	if (options?.supportTenancy !== undefined) {
+		(Base as any).supportTenancy = options.supportTenancy;
+	}
+
 	return Base as typeof Base & {
 		readonly $inferSelect: TSelect;
 		readonly $inferInsert: TInsert;
 		readonly $inferUpdate: Partial<TInsert>;
-		readonly table: Table;
+		readonly table: TTable;
 	};
 };
