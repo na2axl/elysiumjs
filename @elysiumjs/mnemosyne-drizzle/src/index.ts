@@ -22,6 +22,7 @@ import { Database } from './database';
 import { DrizzleRLSTenancy, DrizzleSchemaTenancy } from './tenancy';
 
 // Re-export drizzle-orm/pg-core with enhanced pgTable
+export { eq, gt, gte, lt, lte, ne } from 'drizzle-orm';
 export * from 'drizzle-orm/pg-core';
 export { pgTable, getTableBuilders } from './table';
 
