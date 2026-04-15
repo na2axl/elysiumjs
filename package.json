@@ -31,15 +31,15 @@
 		"ci:publish": "for dir in @elysiumjs/*; do (cd \"$dir\" && NPM_CONFIG_IGNORE_SCRIPTS=1 bun publish --access public -f || true); done && (cd create-elysium && NPM_CONFIG_IGNORE_SCRIPTS=1 bun publish --access public -f || true) && changeset tag"
 	},
 	"devDependencies": {
-		"@changesets/cli": "^2.29.8",
+		"@changesets/cli": "^2.30.0",
 		"@changesets/changelog-github": "^0.5.2",
 		"@ianvs/prettier-plugin-sort-imports": "^4.7.1",
-		"@types/bun": "^1.3.9",
-		"@types/node": "^24.10.13",
-		"prettier": "^3.8.1",
+		"@types/bun": "^1.3.12",
+		"@types/node": "^24.12.2",
+		"prettier": "^3.8.3",
 		"rimraf": "^6.1.3",
-		"turbo": "^2.8.10",
-		"type-fest": "^5.4.4",
+		"turbo": "^2.9.6",
+		"type-fest": "^5.5.0",
 		"typescript": "^5.9.3"
 	}
 }

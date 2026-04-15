@@ -113,7 +113,7 @@ let _strategy: TenancyStrategy<unknown, unknown> | null = null;
  * @author Axel Nana <axel.nana@workbud.com>
  * @returns The current tenancy configuration.
  */
-export const getConfig = (): TenancyConfig => {
+export const getTenancyConfig = (): TenancyConfig => {
 	const app = Application.instance;
 	if (!app) {
 		return { mode: 'schema' };

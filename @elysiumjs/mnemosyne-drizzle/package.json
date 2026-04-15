@@ -1,6 +1,6 @@
 {
 	"name": "@elysiumjs/mnemosyne-drizzle",
-	"version": "0.1.1",
+	"version": "0.1.3",
 	"license": "Apache-2.0",
 	"description": "Drizzle ORM driver for @elysiumjs/mnemosyne",
 	"private": false,

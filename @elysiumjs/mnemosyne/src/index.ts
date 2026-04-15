@@ -27,25 +27,15 @@ export type {
 	TenancyStrategy
 } from './interfaces';
 
-export { AbstractDatabase, createDatabaseCacheStorage } from './database';
-export { createSchemaFromModel, AbstractModel } from './model';
-export { AbstractRepository } from './repository';
+export * from './database';
+export * from './model';
+export * from './repository';
 
-export {
-	getConfig as getTenancyConfig,
-	getCurrentTenant,
-	withTenant,
-	registerTenancyStrategy,
-	getTenancyStrategy,
-	TenantMiddleware,
-	SimpleTenantMiddleware,
-	StrictTenantMiddleware
-} from './tenancy';
+export * from './tenancy';
 export type { TenancyConfig, TenancyMode, ModelTenancyConfig } from './tenancy';
 
-export { Cache } from './cache';
-export type { CacheInterface } from './cache';
-export { KeyvRedis } from './keyv-redis';
+export * from './cache';
+export * from './keyv-redis';
 
 // Configuration types
 export interface MnemosyneConfig<TConnectionConfig = unknown> {
