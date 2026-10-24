@@ -20,6 +20,7 @@ import { omit } from 'radash';
 // @ts-expect-error The Wampy type definitions are not up to date
 import Wampy from 'wampy';
 
+import { needsDefaultAlias, runAll } from './connections';
 import { Container } from './container';
 import { ServiceNotFoundError } from './errors';
 import { Event } from './event';
@@ -406,8 +407,19 @@ export namespace Wamp {
 		const maxRetries = config.maxRetries ?? 5;
 		const retryInterval = config.retryInterval ?? 5000;
 		let retryCount = 0;
+		let closed = false;
+		let timer: ReturnType<typeof setTimeout> | undefined;
+
+		// Stops the retry loop when the client is disconnected for good.
+		const disconnect = client.disconnect.bind(client);
+		client.disconnect = () => {
+			closed = true;
+			clearTimeout(timer);
+			return disconnect();
+		};
 
 		const tryConnect = async () => {
+			if (closed) return;
 			try {
 				await client.connect();
 			} catch (e) {
@@ -418,7 +430,7 @@ export namespace Wamp {
 
 				if (retryCount < maxRetries) {
 					retryCount++;
-					setTimeout(tryConnect, retryInterval);
+					timer = setTimeout(tryConnect, retryInterval);
 				} else {
 					console.error(`Max retry attempts (${maxRetries}) reached. Giving up.`);
 					Event.emit(
@@ -558,27 +570,41 @@ export type WampModuleConfig = {
  * @author Axel Nana <axel.nana@workbud.com>
  */
 @Module.register<WampModuleConfig>({
-	services: (config) => [
-		...Object.entries(config.connections).map(([name, props]) => ({
-			name: Wamp.getConnectionName(name),
-			global: true,
-			factory: () => Wamp.createClient(name, props)
-		})),
-		{
-			name: Wamp.getConnectionName('default'),
-			global: true,
-			factory: (_config: unknown, get: <T>(name: string) => T) =>
-				get<WampClient>(Wamp.getConnectionName(config.default))
-		}
-	]
+	services: (config) => {
+		const alias = needsDefaultAlias('WampModule', config);
+		return [
+			...Object.entries(config.connections).map(([name, props]) => ({
+				name: Wamp.getConnectionName(name),
+				global: true,
+				factory: () => Wamp.createClient(name, props)
+			})),
+			...(alias
+				? [
+						{
+							name: Wamp.getConnectionName('default'),
+							global: true,
+							factory: (_config: unknown, get: <T>(name: string) => T) =>
+								get<WampClient>(Wamp.getConnectionName(config.default))
+						}
+					]
+				: [])
+		];
+	}
 })
 export class WampModule extends Module.configurable<WampModuleConfig>({
+	defaults: { default: 'default' },
 	required: ['connections']
 }) {
 	/** Disconnects the clients that were created. */
 	public override async onDestroy(): Promise<void> {
 		const names = Object.keys(this.config.connections).map(Wamp.getConnectionName);
 		const clients = Container.constructed().filter(({ name }) => names.includes(name));
-		await Promise.all(clients.map(({ instance }) => (instance as WampClient).disconnect()));
+		await runAll(
+			clients.map(
+				({ instance }) =>
+					() =>
+						(instance as WampClient).disconnect()
+			)
+		);
 	}
 }

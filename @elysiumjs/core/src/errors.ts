@@ -105,6 +105,21 @@ export class MissingModuleConfigError extends ElysiumError {
 }
 
 /**
+ * Thrown when a module's configuration is present but invalid.
+ *
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class InvalidModuleConfigError extends ElysiumError {
+	constructor(
+		public readonly module: string,
+		public readonly key: string,
+		public readonly reason: string
+	) {
+		super(`Module ${module} has an invalid "${key}" configuration: ${reason}.`);
+	}
+}
+
+/**
  * Thrown when a service is requested from a module that cannot see it.
  *
  * @author Axel Nana <axel.nana@workbud.com>

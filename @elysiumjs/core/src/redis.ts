@@ -14,6 +14,7 @@
 
 import { omit } from 'radash';
 
+import { needsDefaultAlias, runAll } from './connections';
 import { Container } from './container';
 import { ServiceNotFoundError } from './errors';
 import { Module } from './module';
@@ -87,28 +88,41 @@ export namespace Redis {
  * @author Axel Nana <axel.nana@workbud.com>
  */
 @Module.register<RedisModuleConfig>({
-	services: (config) => [
-		...Object.entries(config.connections).map(([name, props]) => ({
-			name: Redis.getConnectionName(name),
-			global: true,
-			factory: () => new Bun.RedisClient(props.url, omit(props, ['url']))
-		})),
-		{
-			name: Redis.getConnectionName('default'),
-			global: true,
-			factory: (_config: unknown, get: <T>(name: string) => T) =>
-				get<Bun.RedisClient>(Redis.getConnectionName(config.default))
-		}
-	]
+	services: (config) => {
+		const alias = needsDefaultAlias('RedisModule', config);
+		return [
+			...Object.entries(config.connections).map(([name, props]) => ({
+				name: Redis.getConnectionName(name),
+				global: true,
+				factory: () => new Bun.RedisClient(props.url, omit(props, ['url']))
+			})),
+			...(alias
+				? [
+						{
+							name: Redis.getConnectionName('default'),
+							global: true,
+							factory: (_config: unknown, get: <T>(name: string) => T) =>
+								get<Bun.RedisClient>(Redis.getConnectionName(config.default))
+						}
+					]
+				: [])
+		];
+	}
 })
 export class RedisModule extends Module.configurable<RedisModuleConfig>({
+	defaults: { default: 'default' },
 	required: ['connections']
 }) {
 	/** Closes the clients that were created. */
-	public override onDestroy(): void {
+	public override async onDestroy(): Promise<void> {
 		const names = Object.keys(this.config.connections).map(Redis.getConnectionName);
-		for (const { name, instance } of Container.constructed()) {
-			if (names.includes(name)) (instance as Bun.RedisClient).close();
-		}
+		const clients = Container.constructed().filter(({ name }) => names.includes(name));
+		await runAll(
+			clients.map(
+				({ instance }) =>
+					() =>
+						(instance as Bun.RedisClient).close()
+			)
+		);
 	}
 }

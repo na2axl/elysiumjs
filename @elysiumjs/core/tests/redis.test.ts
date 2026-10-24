@@ -14,10 +14,14 @@
 
 import type { TestingApp } from '../src/testing';
 
-import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
 import { Container } from '../src/container';
-import { ServiceNotFoundError } from '../src/errors';
+import {
+	InvalidModuleConfigError,
+	ServiceNotFoundError,
+	ServiceNotReadyError
+} from '../src/errors';
 import { Redis, RedisModule } from '../src/redis';
 import { createTestingApp } from '../src/testing';
 
@@ -122,5 +126,70 @@ describe('RedisModule', () => {
 		await expect(createTestingApp({ modules: [RedisModule.with({})] })).rejects.toThrow(
 			/connections/
 		);
+	});
+
+	it('throws ServiceNotReadyError from the sync getter before the first awaited get', async () => {
+		app = await createTestingApp({ modules: [RedisModule.with(config)] });
+		expect(() => Redis.getConnection('cache')).toThrow(ServiceNotReadyError);
+	});
+
+	it('defaults the default connection to "default"', async () => {
+		app = await createTestingApp({
+			modules: [RedisModule.with({ connections: { default: { url: 'redis://d:6379' } } })]
+		});
+		await app.get('redis.connection.default');
+		expect(Redis.getConnection()).toBe(clients[0] as any);
+		expect(ClientMock).toHaveBeenCalledTimes(1);
+	});
+
+	it('works with a connection named default and an explicit default', async () => {
+		app = await createTestingApp({
+			modules: [
+				RedisModule.with({
+					default: 'default',
+					connections: { default: { url: 'redis://d:6379' } }
+				})
+			]
+		});
+		await app.get('redis.connection.default');
+		expect(Redis.getDefaultConnection()).toBe(clients[0] as any);
+	});
+
+	it('rejects an unknown default connection', async () => {
+		await expect(
+			createTestingApp({
+				modules: [RedisModule.with({ default: 'nope', connections: config.connections })]
+			})
+		).rejects.toThrow(InvalidModuleConfigError);
+	});
+
+	it('rejects a default alias colliding with a connection named default', async () => {
+		await expect(
+			createTestingApp({
+				modules: [
+					RedisModule.with({
+						default: 'main',
+						connections: { ...config.connections, default: { url: 'redis://d:6379' } }
+					})
+				]
+			})
+		).rejects.toThrow(InvalidModuleConfigError);
+	});
+
+	it('closes every client even if one throws, then rethrows the error', async () => {
+		app = await createTestingApp({ modules: [RedisModule.with(config)], boot: 'eager' });
+		clients[0].close.mockImplementation(() => {
+			throw new Error('boom');
+		});
+		const consoleError = spyOn(console, 'error').mockImplementation(() => {});
+		await app.shutdown();
+		app = undefined;
+		// The kernel logs module destroy failures instead of throwing.
+		expect(consoleError).toHaveBeenCalledWith(
+			expect.stringContaining('RedisModule'),
+			expect.objectContaining({ message: 'boom' })
+		);
+		consoleError.mockRestore();
+		expect(clients[1].close).toHaveBeenCalledTimes(1);
 	});
 });

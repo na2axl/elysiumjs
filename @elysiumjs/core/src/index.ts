@@ -38,6 +38,7 @@ export {
 	ElysiumError,
 	EnvironmentSkippedModuleError,
 	InvalidModuleError,
+	InvalidModuleConfigError,
 	MissingModuleConfigError,
 	ModuleCycleError,
 	ServiceNotFoundError,

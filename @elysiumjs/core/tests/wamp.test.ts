@@ -14,17 +14,22 @@
 
 import type { TestingApp } from '../src/testing';
 
-import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 import { Elysia } from 'elysia';
 
+import {
+	InvalidModuleConfigError,
+	ServiceNotFoundError,
+	ServiceNotReadyError
+} from '../src/errors';
 import { createTestingApp } from '../src/testing';
-import { ServiceNotFoundError } from '../src/errors';
 import { nextTick, Symbols } from '../src/utils';
 import { Wamp, WampModule } from '../src/wamp';
 import { testNode } from './module-node';
 
 // Mock Wampy: every construction yields a fresh client
 const clients: any[] = [];
+const disconnects = new Map<any, ReturnType<typeof mock>>();
 const WampyMock = mock(function (_url: string, _options: object) {
 	const client = {
 		register: mock(() =>
@@ -36,6 +41,8 @@ const WampyMock = mock(function (_url: string, _options: object) {
 		connect: mock(() => Promise.resolve()),
 		disconnect: mock(() => Promise.resolve())
 	};
+	// createClient wraps client.disconnect, so keep the mock reachable.
+	disconnects.set(client, client.disconnect);
 	clients.push(client);
 	return client;
 });
@@ -110,7 +117,97 @@ describe('WampModule', () => {
 		await app.shutdown();
 		app = undefined;
 		expect(clients).toHaveLength(1);
-		expect(clients[0].disconnect).toHaveBeenCalledTimes(1);
+		expect(disconnects.get(clients[0])).toHaveBeenCalledTimes(1);
+	});
+
+	it('throws ServiceNotReadyError from the sync getter before the first awaited get', async () => {
+		app = await createTestingApp({ modules: [WampModule.with(config)] });
+		expect(() => Wamp.getConnection('other')).toThrow(ServiceNotReadyError);
+	});
+
+	it('defaults the default connection to "default"', async () => {
+		app = await createTestingApp({
+			modules: [
+				WampModule.with({ connections: { default: { url: 'ws://d:8080/ws', realm: 'r' } } })
+			]
+		});
+		await app.get('wamp.connection.default');
+		expect(Wamp.getConnection()).toBe(clients[0]);
+		expect(WampyMock).toHaveBeenCalledTimes(1);
+	});
+
+	it('rejects an unknown default connection', async () => {
+		await expect(
+			createTestingApp({
+				modules: [WampModule.with({ default: 'nope', connections: config.connections })]
+			})
+		).rejects.toThrow(InvalidModuleConfigError);
+	});
+
+	it('rejects a default alias colliding with a connection named default', async () => {
+		await expect(
+			createTestingApp({
+				modules: [
+					WampModule.with({
+						default: 'main',
+						connections: { ...config.connections, default: { url: 'ws://d/ws', realm: 'r' } }
+					})
+				]
+			})
+		).rejects.toThrow(InvalidModuleConfigError);
+	});
+
+	it('disconnects every client with eager boot', async () => {
+		app = await createTestingApp({ modules: [WampModule.with(config)], boot: 'eager' });
+		await app.shutdown();
+		app = undefined;
+		expect(clients).toHaveLength(2);
+		for (const client of clients) expect(disconnects.get(client)).toHaveBeenCalledTimes(1);
+	});
+
+	it('disconnects every client even if one rejects, then rethrows the error', async () => {
+		app = await createTestingApp({ modules: [WampModule.with(config)], boot: 'eager' });
+		disconnects.get(clients[0])!.mockImplementation(() => Promise.reject(new Error('boom')));
+		const consoleError = spyOn(console, 'error').mockImplementation(() => {});
+		await app.shutdown();
+		app = undefined;
+		// The kernel logs module destroy failures instead of throwing.
+		expect(consoleError).toHaveBeenCalledWith(
+			expect.stringContaining('WampModule'),
+			expect.objectContaining({ message: 'boom' })
+		);
+		consoleError.mockRestore();
+		expect(disconnects.get(clients[1])).toHaveBeenCalledTimes(1);
+	});
+
+	it('stops retrying to connect once shut down', async () => {
+		const consoleError = spyOn(console, 'error').mockImplementation(() => {});
+		app = await createTestingApp({
+			modules: [
+				WampModule.with({
+					connections: {
+						default: { url: 'ws://d/ws', realm: 'r', retryInterval: 20, maxRetries: 5 }
+					}
+				})
+			]
+		});
+		WampyMock.mockImplementationOnce(function () {
+			const client = {
+				connect: mock(() => Promise.reject(new Error('down'))),
+				disconnect: mock(() => Promise.resolve())
+			};
+			clients.push(client);
+			return client;
+		});
+		await app.get('wamp.connection.default');
+		await Bun.sleep(5);
+		const attempts = clients[0].connect.mock.calls.length;
+		expect(attempts).toBe(1);
+		await app.shutdown();
+		app = undefined;
+		await Bun.sleep(60);
+		expect(clients[0].connect.mock.calls.length).toBe(attempts);
+		consoleError.mockRestore();
 	});
 
 	it('requires connections', async () => {
