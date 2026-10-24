@@ -17,6 +17,7 @@ import type { ModuleNode } from './module-graph';
 import type { ServiceDefinition, ServiceFactoryDefinition } from './service';
 
 import {
+	CircularDependencyError,
 	DuplicateGlobalServiceError,
 	ElysiumError,
 	EnvironmentSkippedModuleError,
@@ -84,6 +85,7 @@ const GLOBAL_OWNER = '<global>';
 
 const globalScope = new Map<string, ContainerEntry>();
 const moduleScopes = new Map<string, Map<string, ContainerEntry>>();
+const building: ContainerEntry[] = [];
 const constructedEntries: { entry: ContainerEntry; instance: unknown }[] = [];
 
 let overridden: ReadonlySet<string> = new Set();
@@ -114,11 +116,28 @@ const runOnInit = (entry: ContainerEntry, instance: unknown): Promise<void> | un
 };
 
 /**
+ * Runs the entry's `create` in its owner's context, tracking the entries being built
+ * so that a dependency cycle is reported rather than overflowing the stack.
+ */
+const construct = (entry: ContainerEntry): unknown => {
+	const at = building.indexOf(entry);
+	if (at !== -1) {
+		throw new CircularDependencyError([...building.slice(at), entry].map((e) => e.name));
+	}
+	building.push(entry);
+	try {
+		return inOwnerContext(entry.owner, entry.create);
+	} finally {
+		building.pop();
+	}
+};
+
+/**
  * Builds (or reuses) the instance of an entry. Singletons are recorded once.
  */
 const instantiate = (entry: ContainerEntry): Instantiation => {
 	if (entry.scope === ServiceScope.FACTORY) {
-		const instance = inOwnerContext(entry.owner, entry.create);
+		const instance = construct(entry);
 		return { instance, ready: runOnInit(entry, instance) };
 	}
 
@@ -128,7 +147,7 @@ const instantiate = (entry: ContainerEntry): Instantiation => {
 		return { instance: entry.instance, ready: entry.initialised ? undefined : entry.initPromise };
 	}
 
-	const instance = inOwnerContext(entry.owner, entry.create);
+	const instance = construct(entry);
 	entry.instance = instance;
 	constructedEntries.push({ entry, instance });
 
@@ -179,7 +198,12 @@ const entryValue = (entry: ContainerEntry): unknown => {
  * Awaits everything an entry needs before it can be built synchronously: its owning
  * module's initialisation and, recursively, its injected dependencies.
  */
-const prepare = async (entry: ContainerEntry): Promise<void> => {
+const prepare = async (entry: ContainerEntry, path: readonly ContainerEntry[]): Promise<void> => {
+	const at = path.indexOf(entry);
+	if (at !== -1) {
+		throw new CircularDependencyError([...path.slice(at), entry].map((e) => e.name));
+	}
+	const trail = [...path, entry];
 	if (needsOwnerInit(entry) && moduleInitHook) {
 		await moduleInitHook(entry.owner!);
 	}
@@ -192,13 +216,16 @@ const prepare = async (entry: ContainerEntry): Promise<void> => {
 	);
 	for (const dependency of found) {
 		if (!dependency) continue;
-		if (dependency.entry.scope === ServiceScope.FACTORY) await prepare(dependency.entry);
-		else await entryValueAsync(dependency.entry);
+		if (dependency.entry.scope === ServiceScope.FACTORY) await prepare(dependency.entry, trail);
+		else await entryValueAsync(dependency.entry, trail);
 	}
 };
 
-const entryValueAsync = async (entry: ContainerEntry): Promise<unknown> => {
-	await prepare(entry);
+const entryValueAsync = async (
+	entry: ContainerEntry,
+	path: readonly ContainerEntry[] = []
+): Promise<unknown> => {
+	await prepare(entry, path);
 	const { instance, ready } = instantiate(entry);
 	await ready;
 	return instance;

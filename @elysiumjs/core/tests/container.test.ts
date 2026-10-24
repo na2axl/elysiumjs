@@ -18,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { Container } from '../src/container';
 import {
+	CircularDependencyError,
 	DuplicateGlobalServiceError,
 	EnvironmentSkippedModuleError,
 	ServiceNotFoundError,
@@ -322,5 +323,51 @@ describe('Container', () => {
 		await expect(run(A, () => Service.resolve('Nope'))).rejects.toBeInstanceOf(
 			ServiceNotFoundError
 		);
+	});
+	describe('circular dependencies', () => {
+		const guard = <T>(promise: Promise<T>) =>
+			Promise.race([
+				promise,
+				new Promise<never>((_, reject) =>
+					setTimeout(() => reject(new Error('hung: no CircularDependencyError')), 1000)
+				)
+			]);
+
+		const registerCycle = () => {
+			class CycA {
+				constructor(@Service.inject('CycB') public b: unknown) {}
+			}
+			class CycB {
+				constructor(@Service.inject('CycA') public a: unknown) {}
+			}
+			Container.register(A, CycA, undefined);
+			Container.register(A, CycB, undefined);
+		};
+
+		it('throws on resolve instead of hanging', async () => {
+			registerCycle();
+			const attempt = guard(run(A, () => Service.resolve('CycA')));
+			await expect(attempt).rejects.toBeInstanceOf(CircularDependencyError);
+			await expect(guard(run(A, () => Service.resolve('CycA')))).rejects.toThrow(
+				'CycA -> CycB -> CycA'
+			);
+		});
+
+		it('throws on a synchronous get', () => {
+			registerCycle();
+			expect(() => run(A, () => Service.get('CycA'))).toThrow(CircularDependencyError);
+			expect(() => run(A, () => Service.get('CycB'))).toThrow('CycB -> CycA -> CycB');
+		});
+
+		it('throws for a self-cycle in both paths', async () => {
+			class Self {
+				constructor(@Service.inject('Self') public me: unknown) {}
+			}
+			Container.register(A, Self, undefined);
+			expect(() => run(A, () => Service.get('Self'))).toThrow('Self -> Self');
+			await expect(guard(run(A, () => Service.resolve('Self')))).rejects.toBeInstanceOf(
+				CircularDependencyError
+			);
+		});
 	});
 });
