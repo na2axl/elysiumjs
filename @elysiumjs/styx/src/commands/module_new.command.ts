@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { exists, rmdir } from 'node:fs/promises';
+import { exists, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { Command, CommandArgumentType } from '@elysiumjs/core';
@@ -99,7 +99,7 @@ export class ModuleNewCommand extends BaseCommand {
 		// 3. If multi-module conversion is enabled, convert the project to a multi-module project
 		if (this.convert) {
 			const modulesDir = join(getProjectPath(), 'src', 'modules');
-			if (await exists(modulesDir)) await rmdir(modulesDir, { recursive: true });
+			if (await exists(modulesDir)) await rm(modulesDir, { recursive: true });
 
 			await createModule(this.module!, 'root');
 
