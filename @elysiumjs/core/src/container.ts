@@ -56,6 +56,12 @@ export type ContainerEntry = {
 
 	/** Pending `onInit` of a singleton, when it is asynchronous. */
 	initPromise?: Promise<void>;
+
+	/** The error thrown by a singleton's `onInit`, once it has failed. */
+	initFailure?: { error: unknown };
+
+	/** The service class, when the entry was registered from one. Used to await its dependencies. */
+	cls?: Class<any>;
 };
 
 /**
@@ -115,6 +121,8 @@ const instantiate = (entry: ContainerEntry): Instantiation => {
 		return { instance, ready: runOnInit(entry, instance) };
 	}
 
+	if (entry.initFailure) throw entry.initFailure.error;
+
 	if ('instance' in entry) {
 		return { instance: entry.instance, ready: entry.initialised ? undefined : entry.initPromise };
 	}
@@ -125,9 +133,15 @@ const instantiate = (entry: ContainerEntry): Instantiation => {
 
 	const ready = runOnInit(entry, instance);
 	if (ready) {
-		entry.initPromise = ready.then(() => {
-			entry.initialised = true;
-		});
+		entry.initPromise = ready.then(
+			() => {
+				entry.initialised = true;
+			},
+			(error) => {
+				entry.initFailure = { error };
+				throw error;
+			}
+		);
 		entry.initPromise.catch(() => {});
 	} else {
 		entry.initialised = true;
@@ -154,11 +168,30 @@ const entryValue = (entry: ContainerEntry): unknown => {
 	return instance;
 };
 
-const entryValueAsync = async (entry: ContainerEntry): Promise<unknown> => {
+/**
+ * Awaits everything an entry needs before it can be built synchronously: its owning
+ * module's initialisation and, recursively, its injected dependencies.
+ */
+const prepare = async (entry: ContainerEntry): Promise<void> => {
 	if (needsOwnerInit(entry) && moduleInitHook) {
 		await moduleInitHook(entry.owner!);
 	}
+	if (!entry.cls || ('instance' in entry && entry.scope !== ServiceScope.FACTORY)) return;
 
+	const dependencies: InjectedService[] = Reflect.getMetadata(Symbols.services, entry.cls) ?? [];
+	// Look dependencies up synchronously, in the owner's context.
+	const found = inOwnerContext(entry.owner, () =>
+		dependencies.map((dependency) => Container.lookup(dependency.name, ModuleContext.current()))
+	);
+	for (const dependency of found) {
+		if (!dependency) continue;
+		if (dependency.entry.scope === ServiceScope.FACTORY) await prepare(dependency.entry);
+		else await entryValueAsync(dependency.entry);
+	}
+};
+
+const entryValueAsync = async (entry: ContainerEntry): Promise<unknown> => {
+	await prepare(entry);
 	const { instance, ready } = instantiate(entry);
 	await ready;
 	return instance;
@@ -195,6 +228,7 @@ export namespace Container {
 			scope: options.scope ?? ServiceScope.SINGLETON,
 			global: options.global ?? owner === null,
 			owner,
+			cls: isClass ? def : undefined,
 			create: isClass
 				? () => make(def)
 				: () => def.factory(config, (service) => require(service, def.name)),

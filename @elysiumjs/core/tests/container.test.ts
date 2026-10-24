@@ -240,6 +240,56 @@ describe('Container', () => {
 		expect(run(A, () => Service.get(AService))).toBeInstanceOf(AService);
 	});
 
+	it('resolve awaits dependencies that are still initialising', async () => {
+		class D {
+			public ready = false;
+			async onInit() {
+				await Bun.sleep(5);
+				this.ready = true;
+			}
+		}
+		class X {
+			constructor(@Service.inject(D) public dep: D) {}
+		}
+		Container.register(A, D, undefined);
+		Container.register(A, X, undefined);
+		const x = await run(A, () => Service.resolve(X));
+		expect(x.dep.ready).toBe(true);
+	});
+
+	it('resolve awaits a pending init of the dependency owner module', async () => {
+		class D {}
+		class X {
+			constructor(@Service.inject('DService') public dep: D) {}
+		}
+		Container.register(B, { name: 'DService', factory: () => new D() }, undefined);
+		Container.register(A, X, undefined);
+		Container.setVisibility({ visibleOwners: () => [B], exportsOf: () => true });
+		let initialised = false;
+		Container.setModuleInitHook((owner) => {
+			if (owner.id !== 'B' || initialised) return;
+			return Bun.sleep(5).then(() => {
+				initialised = true;
+			});
+		});
+		const x = await run(A, () => Service.resolve(X));
+		expect(initialised).toBe(true);
+		expect(x.dep).toBeInstanceOf(D);
+	});
+
+	it('surfaces a failed onInit from both get and resolve', async () => {
+		class Broken {
+			async onInit() {
+				throw new Error('boom');
+			}
+		}
+		Container.register(A, Broken, undefined);
+		expect(() => run(A, () => Service.get(Broken))).toThrow(ServiceNotReadyError);
+		await expect(run(A, () => Service.resolve(Broken))).rejects.toThrow('boom');
+		expect(() => run(A, () => Service.get(Broken))).toThrow('boom');
+		await expect(run(A, () => Service.resolve(Broken))).rejects.toThrow('boom');
+	});
+
 	it('resolve rejects with typed errors', async () => {
 		await expect(run(A, () => Service.resolve('Nope'))).rejects.toBeInstanceOf(
 			ServiceNotFoundError
