@@ -14,21 +14,63 @@
 
 import type { Mock } from 'bun:test';
 
+import { Application, RedisModule } from '@elysiumjs/core';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 import { createCache } from 'cache-manager';
 import * as KV from 'keyv';
 
-import { Event, Redis } from '@elysiumjs/core';
-
-import { Cache } from '../src/cache';
+import { Cache, MnemosyneModule } from '../src';
 
 // Mock dependencies
 mock.module('cache-manager', () => ({
 	createCache: mock(createCache)
 }));
 
-Redis.registerConnection('cache', {
-	url: process.env.REDIS_TEST_URL!
+// A minimal in-memory stand-in for Bun.RedisClient
+const data = new Map<string, string>();
+const originalRedisClient = Bun.RedisClient;
+const RedisClientFake = mock(function () {
+	return {
+		close: mock(),
+		get: async (k: string) => data.get(k) ?? null,
+		set: async (k: string, v: string) => {
+			data.set(k, v);
+			return 'OK';
+		},
+		del: async (k: string) => Number(data.delete(k)),
+		exists: async (k: string) => data.has(k),
+		mget: async (...keys: string[]) => keys.map((k) => data.get(k) ?? null),
+		send: async (cmd: string, args: string[]) => {
+			if (cmd === 'UNLINK') return Number(data.delete(args[0]));
+			if (cmd === 'SCAN') return ['0', [...data.keys()]];
+			if (cmd === 'FLUSHDB') return data.clear();
+			return null;
+		}
+	};
+}) as unknown as typeof Bun.RedisClient;
+
+let app: Awaited<ReturnType<typeof Application.testing>>;
+
+beforeAll(async () => {
+	Bun.RedisClient = RedisClientFake;
+	app = await Application.testing({
+		modules: [
+			RedisModule.with({
+				default: 'cache',
+				connections: { cache: { url: 'redis://cache:6379' } }
+			}),
+			MnemosyneModule
+		]
+	});
+	await app.get('mnemosyne.cache.redis');
+	await app.get('mnemosyne.cache.memory');
+});
+
+afterAll(async () => {
+	// Some tests spy on Keyv without restoring it
+	mock.restore();
+	await app.shutdown();
+	Bun.RedisClient = originalRedisClient;
 });
 
 // Test the weak cache
@@ -82,9 +124,8 @@ describe('Cache.weak', () => {
 
 // Test the Redis cache
 describe('Cache.redis', () => {
-	beforeAll(() => {
-		Cache.redis.clear();
-		Event.emit('elysium:app:launched', null, null);
+	beforeAll(async () => {
+		await Cache.redis.clear();
 	});
 
 	// Reset mocks before each test
@@ -109,7 +150,7 @@ describe('Cache.redis', () => {
 		expect(getSpy).toHaveBeenCalledWith('test-key');
 
 		// Check if the result is correct
-		expect(result).toBeNull();
+		expect(result).toBeUndefined();
 	});
 
 	it('should call set method with the correct parameters', async () => {

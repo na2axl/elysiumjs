@@ -13,14 +13,3 @@
 // limitations under the License.
 
 import 'reflect-metadata';
-
-import { mock } from 'bun:test';
-
-// Mock dependencies
-
-mock.module('node:async_hooks', () => ({
-	AsyncLocalStorage: class {
-		public run = mock((_map, callback) => callback());
-		public disable = mock();
-	}
-}));

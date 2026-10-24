@@ -15,7 +15,7 @@
 import type { CacheInterface } from './cache';
 import type { DatabaseCacheConfig, DatabaseDriver } from './interfaces';
 
-import { Application, Service } from '@elysiumjs/core';
+import { Application, Service, ServiceNotFoundError } from '@elysiumjs/core';
 
 import { Cache } from './cache';
 
@@ -35,8 +35,8 @@ export const createDatabaseCacheStorage = (
 /**
  * Abstract database manager.
  *
- * Manages named database connections using a driver. Connections are
- * registered in the service container and can be retrieved by name.
+ * Retrieves named database connections using a driver. Connections are registered as
+ * global services `db.connection.{name}` by the driver modules.
  *
  * @author Axel Nana <axel.nana@workbud.com>
  * @template TConnection The connection type managed by the driver.
@@ -62,6 +62,7 @@ export abstract class AbstractDatabase<TConnection, TConnectionConfig> {
 	 *
 	 * For the default connection, checks the async context for a
 	 * transaction handle (`db:tx`) before falling back to the service container.
+	 * @throws {ServiceNotFoundError} If no connection with that name is registered.
 	 *
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param name The connection name.
@@ -73,39 +74,10 @@ export abstract class AbstractDatabase<TConnection, TConnectionConfig> {
 			if (tx) return tx;
 		}
 
-		const serviceName = this.getConnectionName(name);
-		if (!Service.exists(serviceName)) {
-			// TODO: Use logger service here
-			console.error(
-				`No connection with name ${name} found. Please make sure to register the connection before using it.`
-			);
-			process.exit(1);
-		}
+		const connection = Service.get<TConnection>(this.getConnectionName(name));
+		if (connection === null) throw new ServiceNotFoundError(this.getConnectionName(name));
 
-		return Service.get<TConnection>(serviceName)!;
-	}
-
-	/**
-	 * Creates and registers a new connection.
-	 *
-	 * This will make the registered connection available for dependency injection with
-	 * the key `db.connection.{name}`, where `{name}` is replaced with the given name.
-	 *
-	 * @author Axel Nana <axel.nana@workbud.com>
-	 * @param name The connection name.
-	 * @param config The connection configuration.
-	 * @returns The newly created and registered connection.
-	 */
-	public registerConnection(name: string, config: TConnectionConfig): TConnection {
-		const serviceName = this.getConnectionName(name);
-		if (Service.exists(serviceName)) {
-			// TODO: Use logger service here
-			console.error(`A connection with the name ${name} has already been registered.`);
-			process.exit(1);
-		}
-
-		const connection = this.driver.createConnection(config);
-		return Service.instance(serviceName, connection);
+		return connection;
 	}
 
 	/**
@@ -125,18 +97,6 @@ export abstract class AbstractDatabase<TConnection, TConnectionConfig> {
 	 */
 	public getDefaultConnection(): TConnection {
 		return this.getConnection('default');
-	}
-
-	/**
-	 * Sets the default connection.
-	 * @author Axel Nana <axel.nana@workbud.com>
-	 * @param name The name of the connection to set as default.
-	 * @returns The default connection.
-	 */
-	public setDefaultConnection(name: string): TConnection {
-		const serviceName = this.getConnectionName('default');
-		Service.remove(serviceName);
-		return Service.instance(serviceName, this.getConnection(name));
 	}
 
 	/**

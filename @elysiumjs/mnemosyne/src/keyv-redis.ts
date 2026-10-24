@@ -17,7 +17,7 @@ import type { KeyvEntry, StoredData } from 'keyv';
 
 import { EventEmitter } from 'node:events';
 
-import { Event, Redis } from '@elysiumjs/core';
+import { Event, Redis, Service } from '@elysiumjs/core';
 
 /**
  * Keyv adapter for redis. This adapter is based on the Bun's Redis client.
@@ -68,10 +68,6 @@ export class KeyvRedis extends EventEmitter implements KeyvStoreAdapter {
 	}) {
 		super();
 
-		Event.once('elysium:app:launched', () => {
-			this.#client = Redis.getConnection(props.connection);
-		});
-
 		this.#connection = props.connection;
 		this.#namespace = props.namespace;
 		this.#keyPrefixSeparator = props.keyPrefixSeparator ?? '::';
@@ -84,8 +80,15 @@ export class KeyvRedis extends EventEmitter implements KeyvStoreAdapter {
 		});
 	}
 
-	public get client() {
-		return this.#client!;
+	/**
+	 * Resolves the Redis client on first use. The async path is always safe, even when the
+	 * Redis module has not been initialised yet (lazy boot).
+	 */
+	protected async getClient(): Promise<Bun.RedisClient> {
+		this.#client ??= await Service.resolve<Bun.RedisClient>(
+			Redis.getConnectionName(this.#connection)
+		);
+		return this.#client;
 	}
 
 	/**
@@ -118,23 +121,26 @@ export class KeyvRedis extends EventEmitter implements KeyvStoreAdapter {
 	}
 
 	public async get<Value>(key: string): Promise<StoredData<Value> | undefined> {
+		const client = await this.getClient();
 		key = this.createKeyPrefix(key, this.#namespace);
-		const value = await this.client.get(key);
+		const value = await client.get(key);
 
 		return value === null ? undefined : (value as Value);
 	}
 
 	public async set(key: string, value: any, ttl?: number) {
+		const client = await this.getClient();
 		key = this.createKeyPrefix(key, this.#namespace);
 
 		if (ttl) {
-			await this.client.set(key, value, 'PX', ttl);
+			await client.set(key, value, 'PX', ttl);
 		} else {
-			await this.client.set(key, value);
+			await client.set(key, value);
 		}
 	}
 
 	public async setMany(values: Array<KeyvEntry>): Promise<void> {
+		const client = await this.getClient();
 		// TODO: Use MULTI when available in Bun
 		const multi = [];
 
@@ -142,10 +148,10 @@ export class KeyvRedis extends EventEmitter implements KeyvStoreAdapter {
 			const prefixedKey = this.createKeyPrefix(key, this.#namespace);
 			if (ttl) {
 				// eslint-disable-next-line @typescript-eslint/naming-convention, @typescript-eslint/no-unsafe-argument
-				multi.push(this.client.set(prefixedKey, value, 'PX', ttl));
+				multi.push(client.set(prefixedKey, value, 'PX', ttl));
 			} else {
 				// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-				multi.push(this.client.set(prefixedKey, value));
+				multi.push(client.set(prefixedKey, value));
 			}
 		}
 
@@ -153,19 +159,19 @@ export class KeyvRedis extends EventEmitter implements KeyvStoreAdapter {
 	}
 
 	public async delete(key: string): Promise<boolean> {
+		const client = await this.getClient();
 		key = this.createKeyPrefix(key, this.#namespace);
 		// TODO: Use UNLINK when available in Bun
-		const deleted = await (this.#useUnlink
-			? this.client.send('UNLINK', [key])
-			: this.client.del(key));
+		const deleted = await (this.#useUnlink ? client.send('UNLINK', [key]) : client.del(key));
 
 		return deleted > 0;
 	}
 
 	public async clear(): Promise<void> {
+		const client = await this.getClient();
 		try {
 			if (!this.#namespace && this.#noNamespaceAffectsAll) {
-				await this.client.send('FLUSHDB', []);
+				await client.send('FLUSHDB', []);
 				return;
 			}
 
@@ -175,7 +181,7 @@ export class KeyvRedis extends EventEmitter implements KeyvStoreAdapter {
 			const deletePromises = [];
 
 			do {
-				const result = await this.client.send('SCAN', [
+				const result = await client.send('SCAN', [
 					cursor,
 					'MATCH',
 					match,
@@ -197,7 +203,7 @@ export class KeyvRedis extends EventEmitter implements KeyvStoreAdapter {
 					keys = keys.filter((key: string) => !key.includes(this.#keyPrefixSeparator));
 				}
 
-				deletePromises.push(keys.map((key: string) => this.client.del(key)));
+				deletePromises.push(keys.map((key: string) => client.del(key)));
 			} while (cursor !== '0');
 
 			await Promise.all(deletePromises);
@@ -207,37 +213,42 @@ export class KeyvRedis extends EventEmitter implements KeyvStoreAdapter {
 	}
 
 	public async has(key: string): Promise<boolean> {
+		const client = await this.getClient();
 		key = this.createKeyPrefix(key, this.#namespace);
-		return this.client.exists(key);
+		return client.exists(key);
 	}
 
 	public async hasMany(keys: string[]): Promise<boolean[]> {
+		const client = await this.getClient();
 		const multi = [];
 
 		for (const key of keys) {
 			const prefixedKey = this.createKeyPrefix(key, this.#namespace);
-			multi.push(this.client.exists(prefixedKey));
+			multi.push(client.exists(prefixedKey));
 		}
 
 		return Promise.all(multi);
 	}
 
 	public async getMany<Value>(keys: string[]): Promise<Array<StoredData<Value | undefined>>> {
+		const client = await this.getClient();
 		if (keys.length === 0) {
 			return [];
 		}
 
 		keys = keys.map((key) => this.createKeyPrefix(key, this.#namespace));
-		const values = await this.client.mget(...keys);
+		const values = await client.mget(...keys);
 
 		return values as Value[];
 	}
 
 	public async disconnect(): Promise<void> {
-		this.client.close();
+		// Never opens a client just to close it.
+		this.#client?.close();
 	}
 
 	public async deleteMany(keys: string[]): Promise<boolean> {
+		const client = await this.getClient();
 		let result = false;
 
 		// TODO: Use MULTI when available in Bun
@@ -246,9 +257,9 @@ export class KeyvRedis extends EventEmitter implements KeyvStoreAdapter {
 		for (const key of keys) {
 			const prefixedKey = this.createKeyPrefix(key, this.#namespace);
 			if (this.#useUnlink) {
-				multi.push(this.client.send('UNLINK', [prefixedKey]));
+				multi.push(client.send('UNLINK', [prefixedKey]));
 			} else {
-				multi.push(this.client.del(prefixedKey));
+				multi.push(client.del(prefixedKey));
 			}
 		}
 
@@ -266,11 +277,12 @@ export class KeyvRedis extends EventEmitter implements KeyvStoreAdapter {
 	public async *iterator<Value>(
 		namespace?: string
 	): AsyncGenerator<Array<string | Awaited<Value> | undefined>, void> {
+		const client = await this.getClient();
 		const match = namespace ? `${namespace}${this.#keyPrefixSeparator}*` : '*';
 		let cursor = '0';
 
 		do {
-			const result = await this.client.send('SCAN', [cursor, 'MATCH', match, 'TYPE', 'string']);
+			const result = await client.send('SCAN', [cursor, 'MATCH', match, 'TYPE', 'string']);
 
 			// Parse the result
 			let [newCursor, keys] = result;
@@ -281,7 +293,7 @@ export class KeyvRedis extends EventEmitter implements KeyvStoreAdapter {
 			}
 
 			if (keys.length > 0) {
-				const values = await this.client.mget(...keys);
+				const values = await client.mget(...keys);
 				for (const i of keys.keys()) {
 					const key = this.getKeyWithoutPrefix(keys[i], namespace);
 					const value = values[i];

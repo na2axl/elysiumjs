@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { TenancyConfig } from './tenancy';
-
 export type {
 	ColumnMetadata,
 	DatabaseCacheConfig,
@@ -35,13 +33,5 @@ export * from './tenancy';
 export type { TenancyConfig, TenancyMode, ModelTenancyConfig } from './tenancy';
 
 export * from './cache';
+export * from './mnemosyne.module';
 export * from './keyv-redis';
-
-// Configuration types
-export interface MnemosyneConfig<TConnectionConfig = unknown> {
-	database?: {
-		default: string;
-		connections: Record<string, TConnectionConfig>;
-	};
-	tenancy?: TenancyConfig;
-}

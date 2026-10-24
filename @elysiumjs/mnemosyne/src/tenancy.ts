@@ -15,7 +15,7 @@
 import type { Context } from '@elysiumjs/core';
 import type { TenancyStrategy } from './interfaces';
 
-import { Application, Middleware } from '@elysiumjs/core';
+import { Application, Middleware, Service } from '@elysiumjs/core';
 
 // ============================================================================
 // Types
@@ -95,53 +95,36 @@ export interface ModelTenancyConfig {
 }
 
 // ============================================================================
-// Internal State
-// ============================================================================
-
-let _strategy: TenancyStrategy<unknown, unknown> | null = null;
-
-// ============================================================================
 // Configuration
 // ============================================================================
+
+/** Name of the global service holding the {@link TenancyConfig}, registered by driver modules. */
+export const TENANCY_CONFIG_SERVICE = 'mnemosyne.tenancy.config';
+
+/** Name of the global service holding the {@link TenancyStrategy}, registered by driver modules. */
+export const TENANCY_STRATEGY_SERVICE = 'mnemosyne.tenancy.strategy';
 
 /**
  * Gets the current global tenancy configuration.
  *
- * Reads from the 'elysium:mnemosyne' app config key. Returns a default
- * configuration if the app is not yet initialized or no tenancy config is set.
+ * Reads the global service `mnemosyne.tenancy.config`. Returns a default
+ * configuration if none is registered.
  *
  * @author Axel Nana <axel.nana@workbud.com>
  * @returns The current tenancy configuration.
  */
 export const getTenancyConfig = (): TenancyConfig => {
-	const app = Application.instance;
-	if (!app) {
-		return { mode: 'schema' };
-	}
-	const config = app.getConfig<{ tenancy?: TenancyConfig }>('elysium:mnemosyne' as any);
-	return config?.tenancy ?? { mode: 'schema' };
-};
-
-// ============================================================================
-// Strategy Registry
-// ============================================================================
-
-/**
- * Registers the tenancy strategy to use for table resolution and isolation.
- * @author Axel Nana <axel.nana@workbud.com>
- * @param strategy The tenancy strategy to register.
- */
-export const registerTenancyStrategy = (strategy: TenancyStrategy<unknown, unknown>): void => {
-	_strategy = strategy;
+	return Service.get<TenancyConfig>(TENANCY_CONFIG_SERVICE) ?? { mode: 'schema' };
 };
 
 /**
- * Gets the currently registered tenancy strategy.
+ * Gets the tenancy strategy registered by the driver module as the global service
+ * `mnemosyne.tenancy.strategy`.
  * @author Axel Nana <axel.nana@workbud.com>
  * @returns The current tenancy strategy, or `null` if none is registered.
  */
 export const getTenancyStrategy = (): TenancyStrategy<unknown, unknown> | null => {
-	return _strategy;
+	return Service.get<TenancyStrategy<unknown, unknown>>(TENANCY_STRATEGY_SERVICE);
 };
 
 // ============================================================================

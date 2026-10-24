@@ -14,12 +14,16 @@
 
 import type { KeyvStoreAdapter } from 'keyv';
 
+import { Service, ServiceNotFoundError } from '@elysiumjs/core';
 import { createCache } from 'cache-manager';
-import { KeyvCacheableMemory } from 'cacheable';
 import { Keyv } from 'keyv';
 import { alphabetical } from 'radash';
 
-import { KeyvRedis } from './keyv-redis';
+/** Name of the global service backing `Cache.redis`. */
+export const REDIS_CACHE_SERVICE = 'mnemosyne.cache.redis';
+
+/** Name of the global service backing `Cache.memory`. */
+export const MEMORY_CACHE_SERVICE = 'mnemosyne.cache.memory';
 
 /**
  * Interface for a cache storage.
@@ -118,7 +122,7 @@ export interface CacheInterface {
  * @param store The cache storage to use in the interface.
  * @returns A new `CacheInterface`.
  */
-const makeCacheInterface = (store: KeyvStoreAdapter): CacheInterface => {
+export const makeCacheInterface = (store: KeyvStoreAdapter): CacheInterface => {
 	const base = createCache({
 		stores: [
 			new Keyv({
@@ -154,10 +158,17 @@ const makeCacheInterface = (store: KeyvStoreAdapter): CacheInterface => {
 	};
 };
 
-export abstract class Cache {
-	static #redis: CacheInterface | undefined;
-	static #memory: CacheInterface | undefined;
+const getCache = (name: string): CacheInterface => {
+	const cache = Service.get<CacheInterface>(name);
+	if (!cache) throw new ServiceNotFoundError(name);
+	return cache;
+};
 
+/**
+ * Static access to the caches provided by the `MnemosyneModule`.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export abstract class Cache {
 	/**
 	 * A weak cache storage for simple non-intrusive caching of data.
 	 * @author Axel Nana <axel.nana@workbud.com>
@@ -191,28 +202,18 @@ export abstract class Cache {
 	/**
 	 * Redis-based cache storage.
 	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @throws {ServiceNotFoundError} If the `MnemosyneModule` is not loaded or has no redis cache.
 	 */
 	public static get redis(): CacheInterface {
-		if (!Cache.#redis) {
-			Cache.#redis = makeCacheInterface(
-				new KeyvRedis({
-					connection: 'cache'
-				})
-			);
-		}
-
-		return Cache.#redis;
+		return getCache(REDIS_CACHE_SERVICE);
 	}
 
 	/**
 	 * Memory-based cache storage.
 	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @throws {ServiceNotFoundError} If the `MnemosyneModule` is not loaded or has no memory cache.
 	 */
 	public static get memory(): CacheInterface {
-		if (!Cache.#memory) {
-			Cache.#memory = makeCacheInterface(new KeyvCacheableMemory({ ttl: 60000, lruSize: 5000 }));
-		}
-
-		return Cache.#memory;
+		return getCache(MEMORY_CACHE_SERVICE);
 	}
 }
