@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import '@elysiumjs/core';
-import './commands';
-
+export { HephaestusModule } from './hephaestus.module';
 export type { HephaestusConfig, PlatformTarget } from './types';
 export { HephaestusConfigSchema, PlatformTargetSchema } from './types';
 

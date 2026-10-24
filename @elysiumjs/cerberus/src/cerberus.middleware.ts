@@ -16,7 +16,7 @@ import type { Context } from '@elysiumjs/core';
 import type { CerberusConfig } from './utils';
 
 import { defineAbility } from '@casl/ability';
-import { Application, Middleware } from '@elysiumjs/core';
+import { Middleware, Service } from '@elysiumjs/core';
 
 /**
  * Cerberus Middleware class.
@@ -28,11 +28,15 @@ import { Application, Middleware } from '@elysiumjs/core';
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export class CerberusMiddleware extends Middleware {
+	public constructor(
+		@Service.inject('elysium.module.CerberusModule.config')
+		public readonly config: CerberusConfig
+	) {
+		super();
+	}
+
 	public override async onBeforeHandle(ctx: Context) {
-		const config = Application.instance.getConfig<CerberusConfig>('elysium:cerberus');
-		if (config === null) {
-			throw ctx.status(500, 'Cerberus configuration not provided in the application');
-		}
+		const config = this.config;
 
 		const subject = await config.getSubject(ctx);
 

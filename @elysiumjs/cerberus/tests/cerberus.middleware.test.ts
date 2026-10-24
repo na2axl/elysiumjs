@@ -14,7 +14,7 @@
 
 import { defineAbility } from '@casl/ability';
 import { Service } from '@elysiumjs/core';
-import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { CerberusMiddleware } from '../src/cerberus.middleware';
 
@@ -28,16 +28,12 @@ describe('CerberusMiddleware', () => {
 		};
 	}
 
-	function registerMockApp(config: any) {
-		const mockApp = {
-			getConfig: mock((_key: string) => config)
-		};
-		Service.instance('elysium.app', mockApp as any);
+	function build(config: any) {
+		middleware = new CerberusMiddleware(config);
 	}
 
 	beforeEach(() => {
 		Service.clear();
-		middleware = new CerberusMiddleware();
 	});
 
 	afterEach(() => {
@@ -45,25 +41,12 @@ describe('CerberusMiddleware', () => {
 	});
 
 	describe('onBeforeHandle', () => {
-		it('should throw 500 when no config is provided', async () => {
-			registerMockApp(null);
-			const ctx = createMockContext();
-
-			try {
-				await middleware.onBeforeHandle(ctx);
-				expect(true).toBe(false); // Should not reach
-			} catch (error: any) {
-				expect(error.message).toContain('500');
-				expect(error.message).toContain('Cerberus configuration not provided');
-			}
-		});
-
 		it('should use defineAbility when config.defineAbility is provided', async () => {
 			const mockAbility = defineAbility((can) => {
 				can('read', 'Post');
 			});
 
-			registerMockApp({
+			build({
 				getSubject: async () => ({ id: 'user-1' }),
 				defineAbility: async () => mockAbility
 			});
@@ -75,7 +58,7 @@ describe('CerberusMiddleware', () => {
 		});
 
 		it('should use getAbilities when config.getAbilities is provided', async () => {
-			registerMockApp({
+			build({
 				getSubject: async () => ({ id: 'user-1' }),
 				getAbilities: async () => [
 					{ action: 'read', resource: 'Post' },
@@ -94,7 +77,7 @@ describe('CerberusMiddleware', () => {
 		});
 
 		it('should default to manage all when no abilities method is provided', async () => {
-			registerMockApp({
+			build({
 				getSubject: async () => ({ id: 'user-1' })
 			});
 

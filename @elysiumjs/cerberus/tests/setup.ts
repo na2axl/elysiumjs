@@ -14,11 +14,3 @@
 
 import 'reflect-metadata';
 
-import { mock } from 'bun:test';
-
-mock.module('node:async_hooks', () => ({
-	AsyncLocalStorage: class {
-		public run = mock((_map: any, callback: any) => callback());
-		public disable = mock();
-	}
-}));
