@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Command, CommandArgumentType, Redis } from '@elysiumjs/core';
+import { Command, CommandArgumentType, Redis, Service } from '@elysiumjs/core';
 
 import { JobStatus } from '../job';
 
@@ -100,7 +100,10 @@ export class HeraclesCleanCommand extends Command {
 				process.exit(1);
 			}
 
-			const redisClient = Redis.getConnection(this.redis);
+			// Resolved asynchronously: the app may be booted lazily, so the client may not exist yet
+			const redisClient = await Service.resolve<Bun.RedisClient>(
+				Redis.getConnectionName(this.redis)
+			);
 
 			// Get queues to process
 			if (this.queues.length === 0) {

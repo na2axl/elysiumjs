@@ -17,12 +17,13 @@ import type { JobDispatchOptions } from '../queue';
 import type { TransportEvent } from '../transport';
 import type { QueuedJob, QueueState, Worker, WorkerQueueOptions } from '../worker';
 
-import { Redis, Service } from '@elysiumjs/core';
+import { ModuleContext, Redis } from '@elysiumjs/core';
 import { RedisClient } from 'bun';
 
 import { Job, JobOverlapBehavior, JobStatus, WithId } from '../job';
 import { TransportMode } from '../transport';
 import { RedisTransport } from '../transports/redis.transport';
+import { JobRegistry } from '../registry';
 import { getJobMetadata } from '../utils';
 import { BaseWorker } from './base.worker';
 
@@ -641,15 +642,19 @@ export class RedisWorker extends BaseWorker<RedisTransport> {
 		messageOptions: any
 	): Promise<void> {
 		try {
-			// Get job class from Service container
-			const JobClass = Service.get(jobName) as JobClass<Job>;
+			const entry = JobRegistry.get(jobName);
 
-			if (!JobClass) {
+			if (!entry) {
 				throw new Error(`Job class not found: ${jobName}`);
 			}
 
-			// Create job instance
-			const job = new (WithId(JobClass, jobId, dispatchId))(...(args || []));
+			// Create the job in its owning module's context, and run it there too
+			const job = ModuleContext.run(
+				entry.module,
+				() => new (WithId(entry.jobClass, jobId, dispatchId))(...(args || []))
+			);
+			const run = job.run.bind(job);
+			job.run = () => ModuleContext.run(entry.module, run);
 			job.queueName = queueName;
 
 			// Parse job options

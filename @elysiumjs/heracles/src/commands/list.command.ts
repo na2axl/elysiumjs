@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { JobClass } from '../job';
+import { Command, ConsoleFormat, InteractsWithConsole } from '@elysiumjs/core';
 
-import { Command, ConsoleFormat, InteractsWithConsole, Service } from '@elysiumjs/core';
+import { JobRegistry } from '../registry';
 
 /**
  * Command used to list all registered Heracles jobs.
@@ -26,15 +26,14 @@ export class HeraclesListCommand extends Command {
 	public static readonly description: string = 'List all registered Heracles jobs and schedulers.';
 
 	public async run(): Promise<void> {
-		const jobs = Service.keys('elysium.heracles.job.*');
+		const jobs = JobRegistry.all();
 
 		if (jobs.length === 0) {
 			this.write('No registered jobs found.');
 		} else {
 			this.title('Jobs:');
-			for (const key of jobs) {
-				const alias = key.replace('elysium.heracles.job.', '');
-				const job = Service.get<JobClass>(key)!;
+			for (const { name, jobClass: job } of jobs) {
+				const alias = name.replace('elysium.heracles.job.', '');
 				const args = alias === job.name ? ' ' : ` (${job.name}) `;
 
 				this.write(

@@ -16,7 +16,7 @@ import 'reflect-metadata';
 
 import type { Class } from 'type-fest';
 
-import { InteractsWithConsole, Service } from '@elysiumjs/core';
+import { InteractsWithConsole } from '@elysiumjs/core';
 import { assign, uid } from 'radash';
 
 import { Symbols } from './utils';
@@ -186,9 +186,6 @@ export abstract class Job extends InteractsWithConsole {
 			);
 
 			const name = `elysium.heracles.job.${options.name}`;
-
-			// Register job class as a service
-			Service.instance(name, target);
 
 			// Store metadata for queue assignment and configuration
 			const metadata: JobMetadata = {

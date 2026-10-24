@@ -45,7 +45,7 @@ describe('Job class', () => {
 			expect(metadata.priority).toBe(0);
 			expect(metadata.maxRetries).toBeUndefined();
 			expect(metadata.retryDelay).toBeUndefined();
-			expect(instanceSpy).toHaveBeenCalledWith('elysium.heracles.job.DefaultJob', DefaultJob);
+			expect(instanceSpy).not.toHaveBeenCalled();
 		});
 
 		it('should register a job with custom options', () => {

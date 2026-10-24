@@ -24,6 +24,7 @@ import { RedisWorker } from '../workers/redis.worker';
 export class HeraclesWorkCommand extends Command {
 	public static readonly command: string = 'heracles:work';
 	public static readonly description: string = 'Start an Heracles worker for specific queues.';
+	public static readonly boot = true;
 
 	@Command.arg({
 		name: 'id',

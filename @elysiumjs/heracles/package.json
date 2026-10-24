@@ -5,9 +5,7 @@
   "module": "dist/index.js",
   "type": "module",
   "types": "dist/index.d.ts",
-  "sideEffects": [
-    "./src/index.ts"
-  ],
+  "sideEffects": false,
   "scripts": {
     "test": "bun test",
     "dev": "bun --watch src/index.ts",
