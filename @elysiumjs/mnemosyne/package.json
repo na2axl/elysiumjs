@@ -36,8 +36,8 @@
 		"@elysiumjs/core": "workspace:*"
 	},
 	"dependencies": {
-		"cache-manager": "^7.2.3",
-		"cacheable": "^2.0.3",
+		"cache-manager": "^7.2.9",
+		"cacheable": "^2.5.0",
 		"keyv": "^5.6.0",
 		"radash": "catalog:",
 		"reflect-metadata": "catalog:"
