@@ -23,8 +23,5 @@ export * from './make_repository.command';
 export * from './make_service.command';
 export * from './make_validator.command';
 
-export * from './migration_generate.command';
-export * from './migration_run.command';
-
 export * from './module_new.command';
 export * from './module_rename.command';

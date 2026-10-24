@@ -37,7 +37,6 @@
     "@elysiumjs/core": "workspace:*",
     "@elysiumjs/heracles": "workspace:*",
     "@elysiumjs/mnemosyne": "workspace:*",
-    "@elysiumjs/mnemosyne-drizzle": "workspace:*",
     "@types/prompts": "^2.4.9",
     "@types/string-template": "^1.0.7",
     "prompts": "^2.4.2",
@@ -47,7 +46,6 @@
   "peerDependencies": {
     "@elysiumjs/core": "workspace:^",
     "@elysiumjs/heracles": "workspace:^",
-    "@elysiumjs/mnemosyne": "workspace:^",
-    "@elysiumjs/mnemosyne-drizzle": "workspace:^"
+    "@elysiumjs/mnemosyne": "workspace:^"
   }
 }

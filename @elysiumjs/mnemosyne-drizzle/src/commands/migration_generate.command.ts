@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,20 +12,40 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { existsSync } from 'node:fs';
 import { exists } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 
 import { Command, CommandArgumentType } from '@elysiumjs/core';
 import prompts from 'prompts';
 
-import { getProjectPath } from '../utils';
-import { BaseCommand } from './base.command';
+
+/**
+ * Gets the root path of the Elysium.js project: the closest parent holding an `.elysiumrc`.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+const getProjectPath = () => {
+	const startPath = process.cwd();
+	let dir = startPath;
+
+	while (true) {
+		if (existsSync(join(dir, '.elysiumrc'))) return dir;
+
+		const parentDir = dirname(dir);
+		if (dir === parentDir) break;
+
+		dir = parentDir;
+	}
+
+	return startPath;
+};
 
 /**
  * Generates migration files.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 @Command.register()
-export class MigrationGenerateCommand extends BaseCommand {
+export class MigrationGenerateCommand extends Command {
 	public static readonly command: string = 'migration:generate';
 	public static readonly description: string = 'Generates migration files.';
 

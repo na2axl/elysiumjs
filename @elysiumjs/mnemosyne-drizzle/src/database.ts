@@ -17,6 +17,7 @@ import type { DrizzleConfig } from 'drizzle-orm';
 import type { BunSQLDatabase } from 'drizzle-orm/bun-sql';
 import type { CacheConfig } from 'drizzle-orm/cache/core/types';
 
+import { Service, ServiceNotReadyError } from '@elysiumjs/core';
 import { AbstractDatabase, createDatabaseCacheStorage } from '@elysiumjs/mnemosyne';
 import { getTableName, is, Table } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
@@ -61,7 +62,8 @@ export type DrizzleConnection = BunSQLDatabase<Record<string, never>> & { $clien
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export class DrizzleDatabaseCache extends DrizzleCache {
-	#cache: Omit<CacheInterface, 'tags'>;
+	#storageEngine: 'redis' | 'memory';
+	#cache?: Omit<CacheInterface, 'tags'>;
 	private usedTablesPerKey: Record<string, string[]> = {};
 
 	constructor(
@@ -70,7 +72,24 @@ export class DrizzleDatabaseCache extends DrizzleCache {
 		storageEngine: 'redis' | 'memory' = 'redis'
 	) {
 		super();
-		this.#cache = createDatabaseCacheStorage({ storage: storageEngine });
+		this.#storageEngine = storageEngine;
+	}
+
+	/**
+	 * Resolves the cache storage on first use rather than at construction, so that a connection
+	 * can be built before the module providing the cache has finished initialising.
+	 */
+	async #storage(): Promise<Omit<CacheInterface, 'tags'>> {
+		if (this.#cache) return this.#cache;
+		for (;;) {
+			try {
+				this.#cache = createDatabaseCacheStorage({ storage: this.#storageEngine });
+				return this.#cache;
+			} catch (error) {
+				if (!(error instanceof ServiceNotReadyError)) throw error;
+				await Service.resolve(error.service);
+			}
+		}
 	}
 
 	public override strategy(): 'explicit' | 'all' {
@@ -78,7 +97,7 @@ export class DrizzleDatabaseCache extends DrizzleCache {
 	}
 
 	public override async get(key: string): Promise<any[] | undefined> {
-		return (await this.#cache.get<any[]>(key)) ?? undefined;
+		return (await (await this.#storage()).get<any[]>(key)) ?? undefined;
 	}
 
 	public override async put(
@@ -88,7 +107,7 @@ export class DrizzleDatabaseCache extends DrizzleCache {
 		_isTag: boolean,
 		config?: CacheConfig
 	): Promise<void> {
-		await this.#cache.set(key, response, (config?.ex ?? this.globalTtl) * 1000);
+		await (await this.#storage()).set(key, response, (config?.ex ?? this.globalTtl) * 1000);
 		for (const table of tables) {
 			const keys = this.usedTablesPerKey[table];
 			if (keys === undefined) {
@@ -118,8 +137,9 @@ export class DrizzleDatabaseCache extends DrizzleCache {
 		}
 
 		if (keysToDelete.size > 0 || tagsArray.length > 0) {
-			await this.#cache.mdel(tagsArray);
-			await this.#cache.mdel([...keysToDelete]);
+			const cache = await this.#storage();
+			await cache.mdel(tagsArray);
+			await cache.mdel([...keysToDelete]);
 			for (const table of tablesArray) {
 				const tableName = is(table, Table) ? getTableName(table as Table) : (table as string);
 				this.usedTablesPerKey[tableName] = [];
@@ -141,6 +161,17 @@ export class DrizzleDatabaseCache extends DrizzleCache {
  * @author Axel Nana <axel.nana@workbud.com>
  */
 class DrizzleDatabase extends AbstractDatabase<DrizzleConnection, DrizzleConnectionProps> {
+	/**
+	 * Creates a Drizzle connection from its properties. Used by the `DrizzleModule` to build
+	 * the `db.connection.{name}` services.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param props The connection properties.
+	 * @returns A new connection.
+	 */
+	public createConnection(props: DrizzleConnectionProps): DrizzleConnection {
+		return this.driver.createConnection(props);
+	}
+
 	protected driver: DatabaseDriver<DrizzleConnection, DrizzleConnectionProps> = {
 		createConnection(config) {
 			const cache =

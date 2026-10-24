@@ -12,15 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { MnemosyneConfig } from '@elysiumjs/mnemosyne';
-import type { DrizzleConnectionProps } from './database';
-
-import { Application, Event } from '@elysiumjs/core';
-import { registerTenancyStrategy } from '@elysiumjs/mnemosyne';
-
-import { Database } from './database';
-import { DrizzleRLSTenancy, DrizzleSchemaTenancy } from './tenancy';
-
 // Re-export drizzle-orm/pg-core with enhanced pgTable
 export * from 'drizzle-orm';
 export * from 'drizzle-orm/pg-core';
@@ -42,6 +33,7 @@ export {
 	drizzleAdapter,
 	type DrizzleModelOptions
 } from './model';
+export { DrizzleModule, type DrizzleModuleConfig } from './drizzle.module';
 export { DrizzleRepository } from './repository';
 export {
 	DrizzleSchemaTenancy,
@@ -54,24 +46,3 @@ export {
 	getSessionTenant,
 	createRLSPolicy
 } from './tenancy';
-
-// Auto-initialize on app launch
-Event.once('elysium:app:launched', () => {
-	const app = Application.instance;
-	const config = app.getConfig<MnemosyneConfig<DrizzleConnectionProps>>('elysium:mnemosyne' as any);
-
-	if (config?.database) {
-		for (const [name, props] of Object.entries(config.database.connections)) {
-			Database.registerConnection(name, props);
-		}
-		if (Database.connectionExists(config.database.default)) {
-			Database.setDefaultConnection(config.database.default);
-		}
-	}
-
-	if (config?.tenancy) {
-		const strategy =
-			config.tenancy.mode === 'rls' ? new DrizzleRLSTenancy() : new DrizzleSchemaTenancy();
-		registerTenancyStrategy(strategy);
-	}
-});

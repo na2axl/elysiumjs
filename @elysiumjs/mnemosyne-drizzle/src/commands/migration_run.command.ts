@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,20 +15,19 @@
 import { basename } from 'node:path';
 
 import { Command, CommandArgumentType } from '@elysiumjs/core';
-import { Database } from '@elysiumjs/mnemosyne-drizzle';
 import prompts from 'prompts';
 import { alphabetical } from 'radash';
 
-import { BaseCommand } from './base.command';
+import { Database } from '../database';
 
 /**
  * Execute migration files.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 @Command.register()
-export class MigrationRunCommand extends BaseCommand {
+export class MigrationRunCommand extends Command {
 	public static readonly command: string = 'migration:run';
-	public static readonly description: string = 'Generates migration files.';
+	public static readonly description: string = 'Runs pending migrations.';
 
 	@Command.arg({
 		description: 'The name of the tenant in which the migrations will be executed.',
