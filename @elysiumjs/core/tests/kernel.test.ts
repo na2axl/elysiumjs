@@ -235,6 +235,46 @@ describe('Kernel', () => {
 		expect(events).toEqual(['B', 'A', 'destroy:A', 'destroy:B']);
 	});
 
+	it('lets onInit read its own module services without re-entering init', async () => {
+		@Module.register({ imports: [], services: [{ name: 'self.svc', global: true, factory: () => 7 }] })
+		class Leaf extends Module {}
+		@Module.register({
+			imports: [Leaf],
+			services: [{ name: 'own.svc', global: true, factory: () => 3 }]
+		})
+		class Self extends Module {
+			onInit() {
+				events.push(`Self:${Service.get<number>('own.svc')}`);
+			}
+		}
+		@Module.register({ services: [{ name: 'async.svc', global: true, factory: () => 4 }] })
+		class AsyncSelf extends Module {
+			async onInit() {
+				await Promise.resolve();
+				events.push(`AsyncSelf:${Service.get<number>('async.svc')}`);
+			}
+		}
+		@Module.register({ services: [{ name: 'base.svc', global: true, factory: () => 5 }] })
+		class Base extends Module {
+			onInit() {
+				events.push(`Base:${Service.get<number>('top.svc')}`);
+			}
+		}
+		@Module.register({
+			imports: [Base],
+			services: [{ name: 'top.svc', global: true, factory: () => 6 }]
+		})
+		class Top extends Module {}
+		const kernel = new Kernel(buildModuleGraph([Self, AsyncSelf, Top], 'test'));
+		await kernel.register();
+
+		expect(Service.get('own.svc')).toBe(3);
+		await expect(Service.resolve('async.svc')).resolves.toBe(4);
+		expect(Service.get('base.svc')).toBe(5);
+		expect(events).toEqual(['Self:3', 'AsyncSelf:4', 'Base:6']);
+		await kernel.shutdown();
+	});
+
 	it('records a failing sync onInit reached through the hook and skips it on shutdown', async () => {
 		@Module.register({ services: [{ name: 'bad.svc', global: true, factory: () => 1 }] })
 		class Bad extends Module {

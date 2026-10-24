@@ -61,6 +61,7 @@ export class Kernel {
 	private readonly instances = new Map<ModuleNode, Module>();
 	private readonly registered = new Map<ModuleNode, Registered[]>();
 	private readonly initialised = new Set<ModuleNode>();
+	private readonly initialising = new Set<ModuleNode>();
 	private readonly initOrder: ModuleNode[] = [];
 	private readonly inFlight = new Map<ModuleNode, Promise<void>>();
 	private readonly failures = new Map<ModuleNode, { error: unknown }>();
@@ -88,7 +89,9 @@ export class Kernel {
 		Service.instance(KERNEL_SERVICE, this);
 		Container.setVisibility(graph);
 		Container.setModuleInitHook((node) =>
-			this.initialised.has(node) || this.initSync(node) ? undefined : this.initModule(node)
+			this.initialised.has(node) || this.initialising.has(node) || this.initSync(node)
+				? undefined
+				: this.initModule(node)
 		);
 		Container.setSkippedLookup(this.buildSkippedLookup());
 
@@ -187,13 +190,25 @@ export class Kernel {
 		const instance = this.moduleInstance(node);
 		const own = this.ownClasses.get(node);
 		if (own) this.wired.push(...wireEventListeners(node, own.owned, own.services));
-		const result: unknown = ModuleContext.run(node, () => instance.onInit());
+		// While onInit runs, the module's own services resolve without re-entering init.
+		this.initialising.add(node);
+		let result: unknown;
+		try {
+			result = ModuleContext.run(node, () => instance.onInit());
+		} catch (error) {
+			this.initialising.delete(node);
+			throw error;
+		}
 		const done = () => {
+			this.initialising.delete(node);
 			this.initialised.add(node);
 			this.initOrder.push(node);
 		};
 		if (typeof (result as { then?: unknown } | null)?.then === 'function') {
-			return Promise.resolve(result).then(done);
+			return Promise.resolve(result).then(done, (error) => {
+				this.initialising.delete(node);
+				throw error;
+			});
 		}
 		done();
 		return undefined;
@@ -207,7 +222,7 @@ export class Kernel {
 	 * @throws The error of a failing synchronous `onInit`, which is remembered.
 	 */
 	private initSync(node: ModuleNode): boolean {
-		if (this.initialised.has(node)) return true;
+		if (this.initialised.has(node) || this.initialising.has(node)) return true;
 		const failure = this.failures.get(node);
 		if (failure) throw failure.error;
 		if (this.inFlight.has(node)) return false;
