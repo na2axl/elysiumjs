@@ -12,14 +12,4 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import 'reflect-metadata';
-import '@elysiumjs/core';
-import './commands';
-
-import { getProjectPath } from './utils';
-
-const projectPath = getProjectPath();
-const { App } = await import(`${projectPath}/src/app`);
-
-@App.register()
-export class StyxApp extends App {}
+export { StyxModule } from './styx.module';

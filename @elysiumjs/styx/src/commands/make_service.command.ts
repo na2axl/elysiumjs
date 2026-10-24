@@ -21,7 +21,7 @@ import prompts from 'prompts';
 import { snake } from 'radash';
 import formatter from 'string-template';
 
-import { getModulePath, parseProjectConfig } from '../config';
+import { addToModuleHint, getModulePath, parseProjectConfig } from '../config';
 import { getRootPath } from '../utils';
 import { BaseCommand } from './base.command';
 
@@ -199,5 +199,6 @@ export class MakeServiceCommand extends BaseCommand {
 		await file.write(stub);
 
 		this.success(`Service ${this.bold(file.name!)} created successfully.`);
+		this.info(await addToModuleHint('services', answers.name, answers.module));
 	}
 }

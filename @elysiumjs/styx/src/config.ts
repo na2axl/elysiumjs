@@ -14,6 +14,8 @@
 
 import { join } from 'node:path';
 
+import { pascal } from 'radash';
+
 import { getProjectPath } from './utils';
 
 /**
@@ -87,6 +89,24 @@ export const getModulePath = async (moduleName: string) => {
 	}
 
 	return config.modules![moduleName];
+};
+
+/**
+ * Builds the hint telling the user which module list a generated class must be added to.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param list The module list to add the class to.
+ * @param className The generated class name.
+ * @param moduleName The module the class was generated in, if any.
+ * @returns The hint to print.
+ */
+export const addToModuleHint = async (
+	list: 'commands' | 'jobs' | 'services' | 'controllers',
+	className: string,
+	moduleName?: string
+) => {
+	const name = moduleName ?? 'main';
+	const path = await getModulePath(name);
+	return `Add ${className} to the ${list} list of ${pascal(name)}Module in ${path}/${name}.module.ts.`;
 };
 
 /**

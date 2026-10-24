@@ -12,6 +12,20 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-import { StyxApp } from '@elysiumjs/styx';
 
-new StyxApp();
+import 'reflect-metadata';
+
+import { ElysiumError } from '@elysiumjs/core';
+
+import { getProjectPath, resolveAppEntry } from './utils';
+
+try {
+	const App = await resolveAppEntry(getProjectPath());
+	await App.start();
+} catch (error) {
+	if (error instanceof ElysiumError) {
+		console.error(error.message);
+		process.exit(1);
+	}
+	throw error;
+}

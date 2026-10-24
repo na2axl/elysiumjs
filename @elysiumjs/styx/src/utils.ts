@@ -16,6 +16,40 @@ import { existsSync } from 'node:fs';
 import { mkdir, readdir, rename } from 'node:fs/promises';
 import { dirname, extname, join } from 'node:path';
 
+import { Application, ElysiumError } from '@elysiumjs/core';
+import { pascal } from 'radash';
+
+/**
+ * Thrown when the project entry point exports no `Application` subclass.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class AppEntryNotFoundError extends ElysiumError {
+	constructor(public readonly path: string) {
+		super(`Could not find an exported Application class in ${path}`);
+	}
+}
+
+/**
+ * Loads the project entry (`src/app.ts`, else `index.ts`) and returns its exported `Application` subclass.
+ * @author Axel Nana <axel.nana@workbud.com>
+ *
+ * @param projectPath The root path of the project.
+ * @throws {AppEntryNotFoundError} When the entry exports no `Application` subclass.
+ */
+export const resolveAppEntry = async (projectPath: string): Promise<typeof Application> => {
+	const appFile = join(projectPath, 'src', 'app.ts');
+	const entry = existsSync(appFile) ? appFile : join(projectPath, 'index.ts');
+
+	const exports: Record<string, unknown> = await import(entry);
+	for (const value of Object.values(exports)) {
+		if (typeof value === 'function' && value.prototype instanceof Application) {
+			return value as typeof Application;
+		}
+	}
+
+	throw new AppEntryNotFoundError(entry);
+};
+
 /**
  * Gets the root path of the styx package.
  * @author Axel Nana <axel.nana@workbud.com>
@@ -60,6 +94,17 @@ export const createModule = async (name: string, oldName?: string) => {
 	{
 		const moduleDir = join(root, 'src', 'modules', name);
 		await mkdir(moduleDir, { recursive: true });
+
+		if (!oldName) {
+			const moduleFile = join(moduleDir, `${name}.module.ts`);
+			if (!existsSync(moduleFile)) {
+				const className = `${pascal(name)}Module`;
+				await Bun.write(
+					moduleFile,
+					`import { Module } from '@elysiumjs/core';\n\n@Module.register({\n\tservices: [],\n\tcontrollers: [],\n\tcommands: []\n})\nexport class ${className} extends Module {}\n`
+				);
+			}
+		}
 
 		if (oldName) {
 			if (oldName === 'root') {

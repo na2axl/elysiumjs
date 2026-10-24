@@ -21,7 +21,7 @@ import prompts from 'prompts';
 import { snake } from 'radash';
 import formatter from 'string-template';
 
-import { getModulePath, parseProjectConfig } from '../config';
+import { addToModuleHint, getModulePath, parseProjectConfig } from '../config';
 import { getRootPath } from '../utils';
 import { BaseCommand } from './base.command';
 
@@ -181,5 +181,6 @@ export class MakeJobCommand extends BaseCommand {
 		await file.write(stub);
 
 		this.success(`Job ${this.bold(file.name!)} created successfully.`);
+		this.info(await addToModuleHint('jobs', answers.name, answers.module));
 	}
 }

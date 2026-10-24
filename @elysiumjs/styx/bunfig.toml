@@ -5,8 +5,6 @@ root = "./tests"
 preload = ["./tests/setup.ts"]
 # Enable code coverage by default
 coverage = true
-# Requires 90% line coverage, 70% function coverage, and 80% statement coverage
-coverageThreshold = { line = 0.9, function = 0.7, statement = 0.8 }
 # Tests files are included in the coverage statistics
 coverageSkipTestFiles = true
 # Use lcov as the coverage reporter

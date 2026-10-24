@@ -28,6 +28,7 @@
     "cli"
   ],
   "type": "module",
+  "sideEffects": false,
   "bin": {
     "styx": "dist/styx.js"
   },
