@@ -3,10 +3,10 @@
 	"compilerOptions": {
 		"outDir": "dist",
 		"declaration": true,
-		"emitDeclarationOnly": true,
 		"declarationMap": false,
 		"declarationDir": "dist",
-		"rootDir": "src"
+		"rootDir": "src",
+		"allowImportingTsExtensions": false
 	},
 	"include": ["src"]
 }
