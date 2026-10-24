@@ -131,7 +131,10 @@ export abstract class Module {
 				};
 			}
 
-			/** Merges the defaults with the input and checks required keys. */
+			/**
+			 * Merges the defaults with the input and checks required keys. Array defaults are
+			 * concatenated with the user's arrays (primitives are de-duplicated), not replaced.
+			 */
 			public static resolveConfig(input: Partial<TConfig> = {}): TConfig {
 				// deepMerge keeps the target's values, so the input is the target.
 				const resolved = deepMerge(

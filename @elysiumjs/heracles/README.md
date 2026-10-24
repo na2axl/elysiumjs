@@ -28,6 +28,8 @@ Queues are declared on `HeraclesModule`. The Redis transport reads its connectio
 import { Application, RedisModule } from '@elysiumjs/core';
 import { HeraclesModule, RedisTransport } from '@elysiumjs/heracles';
 
+import { MainModule } from './main.module';
+
 @Application.register({
 	modules: [
 		RedisModule.with({
@@ -91,15 +93,10 @@ export class MainModule extends Module {}
 
 ### 3. Dispatch a Job
 
-A process that only dispatches jobs (such as your web server) must start the queue's transport first:
+Dispatching starts the queue's transport on first use, so a producer (such as your web server) needs no extra setup.
 
 ```typescript
-import { Service } from '@elysiumjs/core';
-import { Heracles, Queue } from '@elysiumjs/heracles';
-
-// For example in a module's `onServe` hook:
-await Service.resolve('heracles.queues'); // creates the configured queues
-await Queue.get('emails').start();
+import { Heracles } from '@elysiumjs/heracles';
 
 await Heracles.dispatch(SendEmailJob, ['user@example.com', 'Welcome!', 'Welcome to our platform!']);
 

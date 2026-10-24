@@ -1,6 +1,6 @@
 {
 	"packages": {
-		"dev": [
+		"prod": [
 			"@elysiumjs/hephaestus@latest"
 		]
 	},

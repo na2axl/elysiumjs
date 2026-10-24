@@ -19,7 +19,7 @@ export type { QueuedJob, QueueState, Worker, WorkerInfo, WorkerQueueOptions } fr
 export type { RedisTransportOptions } from './transports/redis.transport';
 
 export { HeraclesModule, type HeraclesModuleConfig } from './heracles.module';
-export { DuplicateJobError } from './registry';
+export { DuplicateJobError, QUEUES_SERVICE } from './registry';
 export { Heracles } from './heracles';
 export { Job, JobStatus, JobOverlapBehavior } from './job';
 export { Queue } from './queue';

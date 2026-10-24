@@ -202,6 +202,7 @@ describe('HeraclesModule', () => {
 		class SendingTransport {
 			constructor(_mode: unknown, _options?: unknown) {}
 			public onMessage(_handler: unknown): void {}
+			public async start(): Promise<void> {}
 			public async send(event: unknown): Promise<void> {
 				sent.push(event);
 			}
@@ -224,6 +225,39 @@ describe('HeraclesModule', () => {
 		expect(Queue.exists('default')).toBe(true);
 		expect(JobRegistry.get(JOB)).toBeDefined();
 		expect(sent.length).toBe(1);
+	});
+
+	it('starts a stopped queue exactly once for concurrent dispatches', async () => {
+		let starts = 0;
+		const sent: unknown[] = [];
+		class CountingTransport {
+			constructor(_mode: unknown, _options?: unknown) {}
+			public onMessage(_handler: unknown): void {}
+			public async start(): Promise<void> {
+				starts++;
+				await new Promise((resolve) => setTimeout(resolve, 10));
+			}
+			public async send(event: unknown): Promise<void> {
+				sent.push(event);
+			}
+			public async stop(): Promise<void> {}
+		}
+
+		@Module.register({ jobs: [SendInvoiceJob] })
+		class UserModule extends Module {}
+
+		app = await Application.testing({
+			modules: [
+				UserModule,
+				HeraclesModule.with({ queues: { default: { transport: CountingTransport as any } } })
+			]
+		});
+
+		await Promise.all([Heracles.dispatch(SendInvoiceJob, []), Heracles.dispatch(SendInvoiceJob, [])]);
+		await Heracles.dispatch(SendInvoiceJob, []);
+
+		expect(starts).toBe(1);
+		expect(sent.length).toBe(3);
 	});
 
 	it('clears the registry on destroy', async () => {

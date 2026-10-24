@@ -16,6 +16,7 @@ import { afterEach, describe, expect, it } from 'bun:test';
 
 import { Container } from '../src/container';
 import { ServiceNotFoundError, ServiceNotVisibleError } from '../src/errors';
+import { Event } from '../src/event';
 import { Module } from '../src/module';
 import { Service } from '../src/service';
 import { createTestingApp } from '../src/testing';
@@ -129,5 +130,44 @@ describe('Application.testing', () => {
 		expect(Container.constructed()).toHaveLength(0);
 		await expect(app.get('Leftover')).rejects.toBeInstanceOf(ServiceNotFoundError);
 		await first.kernel.shutdown();
+	});
+});
+
+describe('@Event.on handlers and module context', () => {
+	let app: Awaited<ReturnType<typeof createTestingApp>> | undefined;
+
+	afterEach(async () => {
+		await app?.shutdown();
+		app = undefined;
+	});
+
+	// FINDING: this currently yields null (Service.get returns undefined outside a module context).
+	// Pending a ruling on event wiring.
+	it.todo('resolves a module-private service from a static @Event.on handler emitted outside any module context', async () => {
+		const seen: unknown[] = [];
+
+		@Service.register({ name: 'private.svc' })
+		class PrivateSvc {}
+
+		class Listener {
+			@Event.on({ event: 'ctx:probe' })
+			public static onProbe() {
+				try {
+					seen.push(Service.get('private.svc') ?? null);
+				} catch (e) {
+					seen.push(e);
+				}
+			}
+		}
+
+		@Module.register({ services: [PrivateSvc], controllers: [Listener] })
+		class OwnerModule extends Module {}
+
+		app = await createTestingApp({ modules: [OwnerModule], boot: 'eager' });
+		Event.emit('ctx:probe', {});
+		await new Promise((resolve) => setTimeout(resolve, 10));
+
+		expect(seen).toHaveLength(1);
+		expect(seen[0]).toBeInstanceOf(PrivateSvc);
 	});
 });

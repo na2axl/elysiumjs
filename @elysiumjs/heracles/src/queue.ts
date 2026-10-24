@@ -199,6 +199,9 @@ export class Queue extends InteractsWithConsole {
 	 */
 	public readonly name: string;
 
+	/** The in-flight or settled start of the transport. */
+	private starting: Promise<void> | undefined;
+
 	/**
 	 * The transport used by this queue
 	 */
@@ -525,15 +528,27 @@ export class Queue extends InteractsWithConsole {
 	}
 
 	/**
-	 * Start the queue's transport.
+	 * Start the queue's transport. Starting is idempotent: concurrent and repeated calls share
+	 * one in-flight start, and the transport is started once until {@link Queue.stop} is called.
 	 *
 	 * @returns A promise that resolves when the transport has started.
 	 */
-	public async start(): Promise<void> {
-		if (this.transport) {
-			await this.transport.start();
-			this.info(`Queue '${this.name}' transport started`);
+	public start(): Promise<void> {
+		if (!this.transport) return Promise.resolve();
+
+		if (!this.starting) {
+			const transport = this.transport;
+			this.starting = (async () => {
+				await transport.start();
+				this.info(`Queue '${this.name}' transport started`);
+			})().catch((error) => {
+				// Let a later call retry.
+				this.starting = undefined;
+				throw error;
+			});
 		}
+
+		return this.starting;
 	}
 
 	/**
@@ -543,6 +558,9 @@ export class Queue extends InteractsWithConsole {
 	 */
 	public async stop(): Promise<void> {
 		if (this.transport) {
+			const pending = this.starting;
+			this.starting = undefined;
+			await pending?.catch(() => {});
 			await this.transport.stop();
 			this.info(`Queue '${this.name}' transport stopped`);
 		}

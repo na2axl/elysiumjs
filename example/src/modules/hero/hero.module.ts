@@ -1,5 +1,4 @@
-import { Module, Service } from '@elysiumjs/core';
-import { Queue } from '@elysiumjs/heracles';
+import { Module } from '@elysiumjs/core';
 
 import { ProgressDemoCommand } from '#hero/commands/progress-demo.command';
 import { SpinnerDemoCommand } from '#hero/commands/spinner-demo.command';
@@ -17,11 +16,4 @@ import { UserService } from '#hero/services/user.service';
 	commands: [ProgressDemoCommand, SpinnerDemoCommand, TestCommand],
 	jobs: [EmailJob, FailingJob]
 })
-export class MainModule extends Module {
-	/** Starts the email queue so that this process can dispatch jobs to the workers. */
-	public override async onServe(): Promise<void> {
-		// Creates the queues configured on the HeraclesModule.
-		await Service.resolve('heracles.queues');
-		await Queue.get('email').start();
-	}
-}
+export class MainModule extends Module {}

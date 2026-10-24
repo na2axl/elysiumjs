@@ -5,8 +5,10 @@ Build tooling for Elysium.js applications: standalone binaries, Docker images an
 ## Installation
 
 ```bash
-bun add -D @elysiumjs/hephaestus
+bun add @elysiumjs/hephaestus
 ```
+
+Install it as a regular dependency, not a dev dependency: `HephaestusModule` is imported by your application at runtime.
 
 ## Usage
 

@@ -136,33 +136,36 @@ export abstract class Application extends InteractsWithConsole {
 	 */
 	public static register(props: AppProps = {}): ClassDecorator {
 		return function (target) {
-			// Get metadata from the prototype chain
+			// The nearest ancestor's metadata already includes its own ancestors.
 			let parentMetadata: AppProps | undefined;
 			let proto = Object.getPrototypeOf(target);
-
-			// Traverse up the prototype chain to find metadata
 			while (proto && proto !== Object.prototype) {
-				const metadata = Reflect.getMetadata(Symbols.app, proto);
-				if (metadata) {
-					parentMetadata = metadata;
-					break;
-				}
+				parentMetadata = Reflect.getOwnMetadata(Symbols.app, proto);
+				if (parentMetadata) break;
 				proto = Object.getPrototypeOf(proto);
 			}
 
-			// Merge with parent metadata if found, then with current metadata
-			if (parentMetadata) {
-				props = deepMerge<AppProps>(parentMetadata, props);
-			}
+			const ownMetadata: AppProps | undefined = Reflect.getOwnMetadata(Symbols.app, target);
 
-			// Merge with existing metadata on the current class (if any)
-			const currentMetadata = Reflect.getMetadata(Symbols.app, target);
-			if (currentMetadata) {
-				props = deepMerge<AppProps>(currentMetadata, props);
-			}
+			// Modules are concatenated (parent first) and never merged, so that configured modules
+			// keep their config intact.
+			const modules = [
+				...(parentMetadata?.modules ?? []),
+				...(ownMetadata?.modules ?? []),
+				...(props.modules ?? [])
+			];
+			const withoutModules = ({ modules: _modules, ...rest }: AppProps): AppProps => rest;
 
-			// Default props
-			props = deepMerge<AppProps>(props, { modules: [], swagger: false });
+			// Precedence, highest first: own props, own metadata, parent metadata, defaults.
+			props = {
+				...deepMerge<AppProps>(
+					withoutModules(props),
+					withoutModules(ownMetadata ?? {}),
+					withoutModules(parentMetadata ?? {}),
+					{ swagger: false }
+				),
+				modules
+			};
 
 			// Store the merged metadata
 			Reflect.defineMetadata(Symbols.app, props, target);

@@ -58,6 +58,9 @@ export namespace Heracles {
 
 		const queue = Queue.get(metadata.queue);
 
+		// Producers don't have to start queues: the first dispatch does, shared across callers.
+		await queue.start();
+
 		// Generate a unique dispatch ID for this job dispatch
 		const dispatchId = `dispatch_${Date.now()}_${uid(8)}`;
 

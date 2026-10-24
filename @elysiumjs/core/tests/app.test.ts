@@ -56,6 +56,80 @@ describe('@Application.register decorator', () => {
 	});
 });
 
+describe('@Application.register merging', () => {
+	const makeModules = () => {
+		@Module.register()
+		class A extends Module.configurable<{ a: number }>() {}
+		@Module.register()
+		class B extends Module.configurable<{ b: number }>() {}
+		@Module.register()
+		class C extends Module {}
+		return { A, B, C };
+	};
+
+	it('should keep swagger props and apply the defaults when keys are omitted', () => {
+		@Application.register({ swagger: { path: '/docs' } })
+		class WithSwagger extends Application {}
+		@Application.register({ swagger: true as any })
+		class WithTrue extends Application {}
+		@Application.register()
+		class Bare extends Application {}
+
+		expect(Reflect.getMetadata(Symbols.app, WithSwagger).swagger).toEqual({ path: '/docs' });
+		expect(Reflect.getMetadata(Symbols.app, WithTrue).swagger).toBe(true);
+		const bare = Reflect.getMetadata(Symbols.app, Bare);
+		expect(bare.swagger).toBe(false);
+		expect(bare.modules).toEqual([]);
+	});
+
+	it('should let a subclass override scalar and object props of its parent', () => {
+		@Application.register({ debug: false, server: { name: 'parent', port: 1 }, swagger: false })
+		class Parent extends Application {}
+
+		@Application.register({ debug: true, server: { port: 2 }, swagger: { path: '/d' } })
+		class Child extends Parent {}
+
+		const meta = Reflect.getMetadata(Symbols.app, Child);
+		expect(meta.debug).toBe(true);
+		expect(meta.server).toEqual({ name: 'parent', port: 2 });
+		expect(meta.swagger).toEqual({ path: '/d' });
+		expect(Reflect.getMetadata(Symbols.app, Parent).debug).toBe(false);
+	});
+
+	it('should concatenate modules, parent first, leaving configs intact', () => {
+		const { A, B, C } = makeModules();
+		const a = A.with({ a: 10 });
+		const b = B.with({ b: 20 });
+
+		@Application.register({ modules: [a] })
+		class Parent extends Application {}
+
+		@Application.register({ modules: [b, C] })
+		class Child extends Parent {}
+
+		const modules = Reflect.getMetadata(Symbols.app, Child).modules;
+		expect(modules).toEqual([a, b, C]);
+		expect(modules[0]).toBe(a);
+		expect(modules[1].config).toEqual({ b: 20 });
+		expect(modules[0].config).toEqual({ a: 10 });
+	});
+
+	it('should not merge the parent twice when the subclass has no own metadata', () => {
+		const { A } = makeModules();
+
+		@Application.register({ modules: [A.with({ a: 1 })] })
+		class Parent extends Application {}
+
+		@Application.register()
+		class Child extends Parent {}
+
+		class Plain extends Parent {}
+
+		expect(Reflect.getMetadata(Symbols.app, Child).modules).toHaveLength(1);
+		expect(Reflect.getMetadata(Symbols.app, Plain).modules).toHaveLength(1);
+	});
+});
+
 describe('Application.context', () => {
 	it('falls back to a shared storage when no application instance exists', () => {
 		Container.reset();
