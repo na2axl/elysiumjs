@@ -23,6 +23,9 @@ import { ArgusSDK } from './sdk';
  * Configurable module that starts the {@link ArgusSDK} on init, installs the request-span
  * plugin on the root app when serving, and shuts the SDK down on destroy.
  *
+ * If the SDK was already initialised (e.g. by a preload), the module leaves it running and
+ * does not shut it down.
+ *
  * `serviceName` has no sensible default and is required.
  * @author Axel Nana <axel.nana@workbud.com>
  */
@@ -34,6 +37,8 @@ export class ArgusModule extends Module.configurable<TracingConfig>({
 	#started = false;
 
 	public override onInit(): void {
+		// A preload (or anything else) already owns the SDK: leave it alone.
+		if (ArgusSDK.isInitialized()) return;
 		ArgusSDK.initialize(this.config);
 		this.#started = true;
 	}

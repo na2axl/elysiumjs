@@ -15,8 +15,9 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { Application, Module } from '@elysiumjs/core';
-import { describe, expect, it, mock } from 'bun:test';
+import { Application, Env, MissingModuleConfigError, Module } from '@elysiumjs/core';
+import { Elysia } from 'elysia';
+import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
 const init = mock((_options: unknown) => {});
 mock.module('@sentry/bun', () => ({
@@ -39,6 +40,22 @@ const moduleWith = (config: Record<string, unknown>) => {
 };
 
 describe('SentryModule', () => {
+	afterEach(() => mock.restore());
+
+	it('fails at boot when neither config nor SENTRY_DSN provides a dsn', async () => {
+		spyOn(Env, 'get').mockReturnValue(undefined as never);
+		await expect(Application.testing({ modules: [moduleWith({})], boot: 'eager' })).rejects.toBeInstanceOf(
+			MissingModuleConfigError
+		);
+	});
+
+	it('boots with only SENTRY_DSN set', async () => {
+		spyOn(Env, 'get').mockImplementation(((name: string) =>
+			name === 'SENTRY_DSN' ? 'https://k@example.com/2' : undefined) as never);
+		const app = await Application.testing({ modules: [moduleWith({})], boot: 'eager' });
+		await app.shutdown();
+	});
+
 	it('has no bare side-effect imports in its entry point', () => {
 		const source = readFileSync(join(import.meta.dir, '../src/index.ts'), 'utf8');
 		const bare = source.match(/^import\s+['"][^'"]+['"]/gm) ?? [];
@@ -59,6 +76,8 @@ describe('SentryModule', () => {
 			);
 			expect(use).toHaveBeenCalledTimes(1);
 			const installed = (use.mock.calls[0] as unknown[])[0] as any;
+			expect(installed).toBeInstanceOf(Elysia);
+			expect(installed.decorator.Sentry).toBeDefined();
 			expect(installed.config.name).toBe('@elysiumjs/plugin-sentry');
 		} finally {
 			await app.shutdown();

@@ -16,12 +16,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { Application, MissingModuleConfigError, Module } from '@elysiumjs/core';
+import { Elysia } from 'elysia';
 import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
 import { ArgusModule, ArgusSDK, argusPlugin } from '../src';
-
-@Module.register({})
-class PlainModule extends Module {}
 
 const withConfig = (config: Record<string, unknown>) => {
 	@Module.register({ imports: [ArgusModule.with(config as any)] })
@@ -76,6 +74,7 @@ describe('ArgusModule', () => {
 			await instance.onServe({ use } as any);
 			expect(use).toHaveBeenCalledTimes(1);
 			const installed = (use.mock.calls[0] as unknown[])[0] as any;
+			expect(installed).toBeInstanceOf(Elysia);
 			expect(installed.config.name).toBe((argusPlugin() as any).config.name);
 		} finally {
 			await app.shutdown();
@@ -93,10 +92,28 @@ describe('ArgusModule', () => {
 		expect(shutdown).toHaveBeenCalledTimes(1);
 	});
 
-	it('does not shut the SDK down when it never started', async () => {
+	it('leaves a pre-initialised SDK alone', async () => {
+		const init = spyOn(ArgusSDK, 'initialize').mockImplementation(() => {});
 		const shutdown = spyOn(ArgusSDK, 'shutdown').mockResolvedValue(undefined);
-		const app = await Application.testing({ modules: [PlainModule], boot: 'eager' });
+		spyOn(ArgusSDK, 'isInitialized').mockReturnValue(true);
+		const app = await Application.testing({
+			modules: [withConfig({ serviceName: 'svc' })],
+			boot: 'eager'
+		});
 		await app.shutdown();
+		expect(init).not.toHaveBeenCalled();
+		expect(shutdown).not.toHaveBeenCalled();
+	});
+
+	it('does not shut the SDK down when its init failed', async () => {
+		spyOn(ArgusSDK, 'initialize').mockImplementation(() => {
+			throw new Error('boom');
+		});
+		const shutdown = spyOn(ArgusSDK, 'shutdown').mockResolvedValue(undefined);
+		const app = await Application.testing({ modules: [withConfig({ serviceName: 'svc' })] }).catch(
+			() => undefined
+		);
+		await app?.shutdown();
 		expect(shutdown).not.toHaveBeenCalled();
 	});
 });

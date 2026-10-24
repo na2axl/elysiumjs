@@ -14,17 +14,23 @@
 
 import type * as Sentry from '@sentry/bun';
 
-import { Application, Module } from '@elysiumjs/core';
+import { Application, Env, MissingModuleConfigError, Module } from '@elysiumjs/core';
 
 import { plugin } from './plugin';
 
 /**
  * Configurable module that installs the Sentry plugin on the root app when serving.
- * `dsn` is not required in the config because the plugin falls back to `SENTRY_DSN`.
+ * `dsn` may come from the config or from `SENTRY_DSN`; boot fails when neither is set.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 @Module.register({})
 export class SentryModule extends Module.configurable<Sentry.BunOptions>() {
+	public override onInit(): void {
+		if (!this.config.dsn && !Env.get('SENTRY_DSN')) {
+			throw new MissingModuleConfigError(SentryModule.name, ['dsn (or SENTRY_DSN)']);
+		}
+	}
+
 	public override async onServe(app: Parameters<Module['onServe']>[0]): Promise<void> {
 		app.use(await plugin(this.config)(Application.instance));
 	}

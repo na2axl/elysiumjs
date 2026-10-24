@@ -23,10 +23,13 @@ import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions';
 /**
  * ArgusSDK initializes OpenTelemetry for the Elysium framework.
  *
- * CRITICAL: This MUST be called before any application code runs.
- * Auto-instrumentation patches modules at import time; if app code
- * imports modules before OTel is initialized, those imports won't
- * be instrumented.
+ * CRITICAL: For full auto-instrumentation this MUST be called before any
+ * application code runs (e.g. from a `--preload` file). Auto-instrumentation
+ * patches modules at import time; modules imported before OTel is initialized
+ * won't be instrumented. `ArgusModule` initialises the SDK in `onInit`, which
+ * only covers modules loaded afterwards; when the SDK was already initialised
+ * (e.g. by a preload), the module detects it with {@link ArgusSDK.isInitialized}
+ * and leaves it alone.
  *
  * @example
  * ```typescript
@@ -48,6 +51,14 @@ export class ArgusSDK {
 	private sdk: NodeSDK | null = null;
 
 	private constructor() {}
+
+	/**
+	 * Whether {@link ArgusSDK.initialize} has already been called.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 */
+	public static isInitialized(): boolean {
+		return ArgusSDK.instance !== undefined;
+	}
 
 	/**
 	 * Initializes the OpenTelemetry SDK.
