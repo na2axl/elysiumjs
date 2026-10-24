@@ -33,7 +33,7 @@
   "author": "Workbud Technologies Inc.",
   "license": "Apache-2.0",
   "dependencies": {
-    "commander": "^14.0.1",
+    "commander": "^15.0.0",
     "radash": "catalog:",
     "reflect-metadata": "catalog:"
   },

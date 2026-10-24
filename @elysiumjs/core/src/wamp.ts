@@ -12,12 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Class, Primitive } from 'type-fest';
+import type { Class } from 'type-fest';
 import type { ModuleNode } from './module-graph';
 
 import { Elysia } from 'elysia';
 import { omit } from 'radash';
-// @ts-expect-error The Wampy type definitions are not up to date
 import Wampy from 'wampy';
 
 import { needsDefaultAlias, runAll } from './connections';
@@ -124,7 +123,7 @@ export type WampClientProps = {
 	 * @param method The authentication method.
 	 * @param extra Authentication metadata.
 	 */
-	onChallenge?(method: string, extra: any): string | null;
+	onChallenge?(method: string, extra: Record<string, unknown>): string | Promise<string>;
 
 	/**
 	 * Callback for handling the WAMP connection open event.
@@ -139,7 +138,7 @@ export type WampClientProps = {
 	/**
 	 * Callback for handling the WAMP connection error event.
 	 */
-	onError?(): void;
+	onError?(error: Error): void;
 
 	/**
 	 * Callback for handling the WAMP connection reconnect event.
@@ -149,101 +148,14 @@ export type WampClientProps = {
 	/**
 	 * Callback for handling the WAMP connection reconnect success event.
 	 */
-	onReconnectSuccess?(): void;
+	onReconnectSuccess?(details: Record<string, unknown>): void;
 };
 
-export type WampClient = {
-	/**
-	 * Disconnects from WAMP server. Clears all queues, subscriptions and calls.
-	 * @author Axel Nana <axel.nana@workbud.com>
-	 */
-	disconnect(): Promise<void>;
-
-	subscribe(
-		topic: string,
-		handler: WampSubscriptionHandler,
-		options?: WampSubscriptionOptions
-	): Promise<{
-		topic: string;
-		requestId: string;
-		subscriptionId: string;
-		subscriptionKey: string;
-	}>;
-
-	unsubscribe(
-		subscriptionIdOrKey: string,
-		handler?: WampSubscriptionHandler
-	): Promise<{
-		topic: string;
-		requestId: string;
-	}>;
-
-	publish(
-		topic: string,
-		params?:
-			| Primitive
-			| Array<any>
-			| Record<string, Primitive | Array<any>>
-			| { argsList: Array<any>; argsDict: Record<string, any> },
-		options?: {
-			exclude?: number | number[];
-			exclude_authid?: string | string[];
-			exclude_authrole?: string | string[];
-			eligible?: number | number[];
-			eligible_authid?: string | string[];
-			eligible_authrole?: string | string[];
-			exclude_me?: boolean;
-			disclose_me?: boolean;
-			ppt_scheme?: string;
-			ppt_serializer?: string;
-			ppt_cipher?: string;
-			ppt_keyid?: string;
-		}
-	): Promise<{
-		topic: string;
-		requestId: string;
-		publicationId: string;
-	}>;
-
-	call(
-		procedure: string,
-		params?:
-			| Primitive
-			| Array<any>
-			| Record<string, Primitive | Array<any>>
-			| { argsList: Array<any>; argsDict: Record<string, any> },
-		options?: {
-			disclose_me?: boolean;
-			progress_callback?(args: { argsList: Array<any>; argsDict: Record<string, any> }): void;
-			timeout?: number;
-			ppt_scheme?: string;
-			ppt_serializer?: string;
-			ppt_cipher?: string;
-			ppt_keyid?: string;
-		}
-	): Promise<{
-		details: Record<string, any>;
-		argsList?: Array<any>;
-		argsDict?: Record<string, any>;
-	}>;
-
-	cancel(requestId: string, options?: { mode?: 'kill' | 'killnowait' | 'skip' }): true;
-
-	register(
-		topic: string,
-		handler: WampRegistrationHandler,
-		options?: WampRegistrationOptions
-	): Promise<{
-		topic: string;
-		requestId: string;
-		registrationId: string;
-	}>;
-
-	unregister(registrationId: string): Promise<{
-		topic: string;
-		requestId: string;
-	}>;
-};
+/**
+ * The WAMP client, as provided by Wampy.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type WampClient = Wampy;
 
 /**
  * Data sent to a WAMP RPC.
@@ -397,8 +309,8 @@ export namespace Wamp {
 		const client = new Wampy(config.url, {
 			ws: WampWebsocket,
 			...omit(config, ['url']),
-			onError() {
-				config.onError?.();
+			onError(error) {
+				config.onError?.(error);
 				// TODO: Add more details like controller name and url
 				Event.emit('elysium:error', new Error(`An error occurred in WAMP connection ${name}`));
 			}
@@ -477,7 +389,7 @@ export namespace Wamp {
 							registration.topic,
 							inModule(registration.handler),
 							registration.options
-						).then((r: { topic: string; requestId: string; registrationId: string }) => {
+						).then((r) => {
 							// TODO: Use the logger service here
 							console.log(`Registered ${registration.topic} with id ${r.registrationId}`);
 						});
@@ -488,17 +400,10 @@ export namespace Wamp {
 							subscription.topic,
 							inModule(subscription.handler),
 							subscription.options
-						).then(
-							(s: {
-								topic: string;
-								requestId: string;
-								subscriptionId: string;
-								subscriptionKey: string;
-							}) => {
-								// TODO: Use the logger service here
-								console.log(`Subscribed ${subscription.topic} with id ${s.subscriptionId}`);
-							}
-						);
+						).then((s) => {
+							// TODO: Use the logger service here
+							console.log(`Subscribed ${subscription.topic} with id ${s.subscriptionId}`);
+						});
 					}
 				});
 

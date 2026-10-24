@@ -15,7 +15,7 @@
 import type { TracingConfig } from './types';
 
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
-import { Resource } from '@opentelemetry/resources';
+import { resourceFromAttributes } from '@opentelemetry/resources';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { ConsoleSpanExporter, TraceIdRatioBasedSampler } from '@opentelemetry/sdk-trace-base';
 import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions';
@@ -79,7 +79,7 @@ export class ArgusSDK {
 		const exporter = ArgusSDK.createExporter(config);
 
 		ArgusSDK.instance.sdk = new NodeSDK({
-			resource: new Resource({
+			resource: resourceFromAttributes({
 				[ATTR_SERVICE_NAME]: config.serviceName
 			}),
 			traceExporter: exporter,

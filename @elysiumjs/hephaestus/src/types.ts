@@ -51,18 +51,18 @@ export const HephaestusConfigSchema = z.object({
 			bytecode: z.boolean().default(true),
 			split: z.boolean().default(false)
 		})
-		.default({}),
+		.prefault({}),
 	assets: z
 		.object({
 			embed: z.array(z.string()).default([]),
 			exclude: z.array(z.string()).default([])
 		})
-		.default({}),
+		.prefault({}),
 	env: z
 		.object({
 			generateExample: z.boolean().default(true)
 		})
-		.default({}),
+		.prefault({}),
 	docker: z
 		.object({
 			enabled: z.boolean().default(false),

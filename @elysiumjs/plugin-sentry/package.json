@@ -43,6 +43,6 @@
   },
   "dependencies": {
     "@elysiajs/opentelemetry": "^1.4.0",
-    "@sentry/bun": "^10.17.0"
+    "@sentry/bun": "^11.9.0"
   }
 }

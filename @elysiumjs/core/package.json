@@ -37,7 +37,7 @@
     "elysia": "^1.4.9",
     "radash": "catalog:",
     "reflect-metadata": "catalog:",
-    "wampy": "^7.2.0"
+    "wampy": "^8.0.2"
   },
   "trustedDependencies": [
     "es5-ext"
