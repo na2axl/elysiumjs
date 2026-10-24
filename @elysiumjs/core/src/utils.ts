@@ -46,6 +46,8 @@ export namespace Symbols {
 	export const configuredModule = Symbol('elysium:ConfiguredModule');
 
 	export const moduleConfig = Symbol('elysium:ModuleConfig');
+
+	export const command = Symbol('elysium:Command');
 }
 
 /**

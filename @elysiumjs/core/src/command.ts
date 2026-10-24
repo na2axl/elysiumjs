@@ -17,7 +17,6 @@ import type { Class } from 'type-fest';
 import { isArray, trim } from 'radash';
 
 import { ConsoleFormat, InteractsWithConsole } from './console';
-import { Service } from './service';
 import { Symbols } from './utils';
 
 /**
@@ -125,7 +124,23 @@ export type CommandClass<T extends Command = Command> = Class<T> & {
 	 * Whether the command is only available in development mode.
 	 */
 	readonly dev: boolean;
+
+	/**
+	 * Whether the application is booted eagerly before the command runs.
+	 */
+	readonly boot: boolean;
 };
+
+/**
+ * Gets the name a command is invoked by: the `name` given to `@Command.register()`,
+ * or else the static `command`.
+ * @param cls The command class.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export function getCommandName(cls: Class<any>): string {
+	const options: { name?: string } | undefined = Reflect.getMetadata(Symbols.command, cls);
+	return options?.name ?? (cls as unknown as CommandClass).command;
+}
 
 /**
  * Base class for commands.
@@ -159,26 +174,22 @@ export abstract class Command extends InteractsWithConsole {
 	public static readonly dev: boolean = false;
 
 	/**
-	 * Registers a command in the service container for autodiscovery.
-	 *
-	 * Commands registered with this decorator will be automatically discovered
-	 * and made available in the CLI without needing to be listed explicitly.
+	 * Whether the whole application is booted before the command runs.
+	 * When `true`, every module is initialised and every service constructed first,
+	 * as for `serve`. Otherwise modules are initialised lazily, on demand.
+	 */
+	public static readonly boot: boolean = false;
+
+	/**
+	 * Marks a class as a command. Records metadata only: the command still has to be
+	 * listed in the `commands` of a module to be available in the CLI.
 	 *
 	 * @param options Optional registration options.
+	 * @author Axel Nana <axel.nana@workbud.com>
 	 */
 	public static register(options: { name?: string } = {}): ClassDecorator {
 		return function (target) {
-			const commandClass = target as unknown as CommandClass;
-			const name = options.name ?? commandClass.command;
-			const serviceName = `elysium.command.${name}`;
-
-			if (Service.exists(serviceName)) {
-				return target;
-			}
-
-			Service.instance(serviceName, target);
-
-			return target;
+			Reflect.defineMetadata(Symbols.command, options, target);
 		} as ClassDecorator;
 	}
 

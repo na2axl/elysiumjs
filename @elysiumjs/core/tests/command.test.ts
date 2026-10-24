@@ -14,7 +14,8 @@
 
 import { afterAll, afterEach, beforeEach, describe, expect, it, jest, mock, spyOn } from 'bun:test';
 
-import { Command, CommandArgumentType, CommandSpinner } from '../src/command';
+import { Command, CommandArgumentType, CommandSpinner, getCommandName } from '../src/command';
+import { Container } from '../src/container';
 import { Symbols } from '../src/utils';
 
 // Test Command.arg decorator
@@ -954,5 +955,47 @@ describe('CommandSpinner', () => {
 		expect(process.stdout.clearLine).toHaveBeenCalled();
 		expect(process.stdout.write).toHaveBeenCalled();
 		expect(output).toContain('Task paused');
+	});
+});
+
+describe('@Command.register decorator', () => {
+	it('should only record metadata and leave the container untouched', () => {
+		const before = Container.globalNames();
+
+		@Command.register({ name: 'meta:cmd' })
+		class MetaCommand extends Command {
+			public static readonly command = 'meta:original';
+			public async run() {}
+		}
+
+		expect(Container.globalNames()).toEqual(before);
+		expect(Reflect.getMetadata(Symbols.command, MetaCommand)).toEqual({ name: 'meta:cmd' });
+	});
+
+	it('should resolve the command name from the decorator, then from the static command', () => {
+		@Command.register({ name: 'decorated' })
+		class Decorated extends Command {
+			public static readonly command = 'static-name';
+			public async run() {}
+		}
+
+		@Command.register()
+		class Plain extends Command {
+			public static readonly command = 'static-name';
+			public async run() {}
+		}
+
+		class Undecorated extends Command {
+			public static readonly command = 'undecorated';
+			public async run() {}
+		}
+
+		expect(getCommandName(Decorated)).toBe('decorated');
+		expect(getCommandName(Plain)).toBe('static-name');
+		expect(getCommandName(Undecorated)).toBe('undecorated');
+	});
+
+	it('should not boot the application eagerly by default', () => {
+		expect(Command.boot).toBe(false);
 	});
 });

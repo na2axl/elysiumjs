@@ -21,6 +21,7 @@ import {
 	DuplicateCommandError,
 	ModuleCycleError
 } from '../src/errors.ts';
+import { Command } from '../src/command.ts';
 import { buildModuleGraph, selectConfig } from '../src/module-graph.ts';
 import { Module } from '../src/module.ts';
 
@@ -177,6 +178,23 @@ describe('buildModuleGraph', () => {
 			expect(e).toBeInstanceOf(DuplicateCommandError);
 			expect((e as DuplicateCommandError).modules).toEqual(['M1', 'M2']);
 		}
+	});
+
+	it('uses the @Command.register name when detecting command collisions', () => {
+		@Command.register({ name: 'x' })
+		class Renamed {
+			static command = 'original';
+		}
+		class Plain {
+			static command = 'x';
+		}
+
+		@Module.register({ commands: [Renamed as any] })
+		class M1 extends Module {}
+		@Module.register({ commands: [Plain as any] })
+		class M2 extends Module {}
+
+		expect(() => buildModuleGraph([M1, M2], 'development')).toThrow(DuplicateCommandError);
 	});
 
 	it('drops dev commands under production', () => {

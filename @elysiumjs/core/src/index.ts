@@ -30,9 +30,31 @@ export { type Context, type Route, HttpControllerScope, Http } from './http';
 export { Job } from './job';
 export { Middleware } from './middleware';
 export { RequestLoggerMiddleware } from './middlewares/request-logger.middleware';
-export { type ModuleClass, Module } from './module';
+export {
+	ConflictingModuleConfigError,
+	DuplicateCommandError,
+	DuplicateGlobalServiceError,
+	ElysiumError,
+	EnvironmentSkippedModuleError,
+	InvalidModuleError,
+	MissingModuleConfigError,
+	ModuleCycleError,
+	ServiceNotFoundError,
+	ServiceNotReadyError,
+	ServiceNotVisibleError
+} from './errors';
+export { Kernel } from './kernel';
+export { type ConfiguredModule, type ModuleClass, type ModuleProps, Module } from './module';
+export { ModuleContext } from './module-context';
+export { type ModuleGraph, type ModuleNode } from './module-graph';
+export { type TestingApp, type TestingOptions } from './testing';
 export { Redis } from './redis';
-export { ServiceScope, Service } from './service';
+export {
+	type ServiceDefinition,
+	type ServiceFactoryDefinition,
+	ServiceScope,
+	Service
+} from './service';
 export {
 	type WampRegistrationOptions,
 	type WampSubscriptionOptions,

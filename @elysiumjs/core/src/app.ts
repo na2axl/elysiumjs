@@ -16,26 +16,29 @@ import type { ElysiaSwaggerConfig } from '@elysiajs/swagger';
 import type { AnyElysia, ElysiaConfig, ErrorContext, TSchema } from 'elysia';
 import type { CommandClass } from './command';
 import type { Route } from './http';
-import type { ModuleClass } from './module';
-import type { RedisConnectionProps } from './redis';
-import type { WampClientProps } from './wamp';
+import type { ConfiguredModule, ModuleClass } from './module';
+import type { ModuleNode } from './module-graph';
+import type { TestingApp, TestingOptions } from './testing';
 
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { parseArgs } from 'node:util';
 
 import { swagger as swaggerPlugin } from '@elysiajs/swagger';
 import { Value } from '@sinclair/typebox/value';
 import { Elysia } from 'elysia';
 import { first } from 'radash';
 
+import { getCommandName } from './command';
 import { ConsoleFormat, InteractsWithConsole } from './console';
 import { initEnv } from './env';
+import { ElysiumError } from './errors';
 import { Event } from './event';
+import { Kernel } from './kernel';
 import { applyMiddlewares } from './middleware';
-import { Redis } from './redis';
+import { ModuleContext } from './module-context';
+import { buildModuleGraph } from './module-graph';
 import { Service } from './service';
+import { createTestingApp } from './testing';
 import { deepMerge, Symbols } from './utils';
-import { Wamp } from './wamp';
 
 /**
  * An application plugin, consisting of a function that returns an Elysia instance.
@@ -44,13 +47,10 @@ import { Wamp } from './wamp';
 export type ElysiumPlugin = (app: Application) => Promise<AnyElysia>;
 
 /**
- * Properties required when declaring an app using the `@app()` decorator.
+ * Properties required when declaring an app using the `@Application.register()` decorator.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export type AppProps = {
-	// Allows to pass custom options to the application properties.
-	[key: string]: any;
-
 	/**
 	 * Enables or disables debug mode.
 	 */
@@ -67,39 +67,9 @@ export type AppProps = {
 	};
 
 	/**
-	 * The wamp client configuration for the app.
+	 * The modules the application is made of. They act as the imports of the root module.
 	 */
-	wamp?: {
-		/**
-		 * The default connection name.
-		 */
-		default: string;
-
-		/**
-		 * The list of connections.
-		 */
-		connections: Record<string, WampClientProps>;
-	};
-
-	/**
-	 * The list of modules provided the app.
-	 */
-	modules?: ModuleClass[];
-
-	/**
-	 * The redis configuration for the app.
-	 */
-	redis?: {
-		/**
-		 * The default connection name.
-		 */
-		default: string;
-
-		/**
-		 * The list of connections.
-		 */
-		connections: Record<string, RedisConnectionProps>;
-	};
+	modules?: (ModuleClass | ConfiguredModule<any>)[];
 
 	/**
 	 * Swagger documentation configuration.
@@ -133,6 +103,8 @@ export abstract class Application extends InteractsWithConsole {
 	// @ts-expect-error The property is not initialized in the constructor.
 	#elysia: Elysia<Route>;
 	#debug: boolean;
+	#kernel: Kernel | undefined;
+	#onSignal: (() => void) | undefined;
 
 	private readonly _appContextStorage: AppContext = new AsyncLocalStorage();
 
@@ -211,38 +183,33 @@ export abstract class Application extends InteractsWithConsole {
 			initEnv(Bun.env);
 		}
 
+		Service.remove('elysium.app');
 		Service.instance('elysium.app', this);
+	}
 
-		const { redis, wamp } = Reflect.getMetadata(Symbols.app, this.constructor) as AppProps;
+	/**
+	 * Creates the application and runs it.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 */
+	public static start<T extends Application>(this: new () => T): Promise<void> {
+		return new this().run();
+	}
 
-		if (redis) {
-			for (const connectionName in redis.connections) {
-				Redis.registerConnection(connectionName, redis.connections[connectionName]);
-			}
+	/**
+	 * Boots a module graph without a CLI or an HTTP server, for tests.
+	 * @param options The modules to boot, service overrides, environment and boot mode.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 */
+	public static testing(options: TestingOptions): Promise<TestingApp> {
+		return createTestingApp(options);
+	}
 
-			if (Redis.connectionExists(redis.default)) {
-				Redis.setDefaultConnection(redis.default);
-			}
-		}
-
-		if (wamp) {
-			for (const connectionName in wamp.connections) {
-				Wamp.registerConnection(connectionName, wamp.connections[connectionName]);
-			}
-
-			if (Wamp.connectionExists(wamp.default)) {
-				Wamp.setDefaultConnection(wamp.default);
-			}
-		}
-
-		// Run the application
-		this.run()
-			.then(() => Event.emit('elysium:app:launched', this, this))
-			.catch((error) => {
-				Event.emit('elysium:error', error);
-				this.trace(error, 'An error occurred while launching the application');
-				process.exit(1);
-			});
+	/**
+	 * The kernel running this application's module graph. Available once `run()` has started.
+	 */
+	public get kernel(): Kernel {
+		if (!this.#kernel) throw new ElysiumError('The application has not been started yet.');
+		return this.#kernel;
 	}
 
 	/**
@@ -288,185 +255,151 @@ export abstract class Application extends InteractsWithConsole {
 	 */
 	protected async onStop(_elysia: Elysia<Route>): Promise<void> {}
 
-	protected async run(): Promise<void> {
-		const argv = process.argv.slice(2);
-
-		const action = argv[0];
-
-		if (!action) {
-			this.commandDescribe();
-		} else {
-			switch (action) {
-				case 'serve': {
-					return this.commandServe();
-				}
-				case 'work': {
-					return this.commandWork(argv.slice(1));
-				}
-				case 'help': {
-					const command = argv[1];
-
-					if (command) {
-						const commands = this.getCommands();
-						const commandClass = commands.find((commandClass) => commandClass.command === command);
-
-						if (commandClass) {
-							const commandInstance = Service.make(commandClass);
-							this.write(await commandInstance.help());
-							return process.exit(0);
-						}
-
-						console.error(`Command <${command}> not found.`);
-					} else {
-						console.error('No command provided. Usage: styx help <command>');
-					}
-
-					this.commandList();
-					break;
-				}
-				case 'list': {
-					this.write(this.bold('Available commands:'));
-					this.commandList();
-					break;
-				}
-				default: {
-					const args = argv.slice(1);
-
-					return this.commandExec(action, args);
-				}
-			}
+	/**
+	 * Runs the CLI action given in `argv`: describe, `list`, `help`, `serve` or a command.
+	 * Prints any error and exits with a non-zero code.
+	 * @param argv The command line arguments, without the executable and script.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 */
+	public async run(argv: string[] = process.argv.slice(2)): Promise<void> {
+		this.installSignalHandlers();
+		try {
+			const { modules } = this.props();
+			this.#kernel = new Kernel(buildModuleGraph(modules ?? []));
+			return await this.dispatch(argv);
+		} catch (error) {
+			return this.fail(error);
 		}
+	}
 
-		return process.exit(0);
+	private props(): AppProps {
+		return Reflect.getMetadata(Symbols.app, this.constructor) ?? {};
+	}
+
+	private async dispatch([action, ...rest]: string[]): Promise<void> {
+		switch (action) {
+			case undefined:
+				this.commandDescribe();
+				return this.exit(0);
+			case 'serve':
+				return this.commandServe();
+			case 'list':
+				this.write(this.bold('Available commands:'));
+				this.commandList();
+				return this.exit(0);
+			case 'help':
+				return this.commandHelp(rest[0]);
+			default:
+				return this.commandExec(action, rest);
+		}
+	}
+
+	/** Prints an error, shuts down what was started and exits with code 1. */
+	private async fail(error: unknown): Promise<void> {
+		const message = error instanceof Error ? error.message : String(error);
+		this.error(message);
+		if (!(error instanceof ElysiumError) && this.isDebug) this.trace(error as Error);
+		Event.emit('elysium:error', error);
+		await this.#kernel?.shutdown();
+		return this.exit(1);
+	}
+
+	/** Exits the process, after detaching the signal handlers. */
+	private exit(code: number): void {
+		this.removeSignalHandlers();
+		return process.exit(code);
+	}
+
+	private removeSignalHandlers(): void {
+		if (!this.#onSignal) return;
+		process.off('SIGINT', this.#onSignal);
+		process.off('SIGTERM', this.#onSignal);
+		this.#onSignal = undefined;
+	}
+
+	private installSignalHandlers(): void {
+		this.removeSignalHandlers();
+		const onSignal = () => {
+			Promise.resolve()
+				.then(() => this.#elysia?.stop())
+				.then(() => this.#kernel?.shutdown())
+				.finally(() => this.exit(0));
+		};
+		this.#onSignal = onSignal;
+		process.on('SIGINT', onSignal);
+		process.on('SIGTERM', onSignal);
+	}
+
+	/** The commands available in the module graph, with their owning module. */
+	private getCommands(): { item: CommandClass; module: ModuleNode }[] {
+		return this.kernel.graph.collect('commands') as { item: CommandClass; module: ModuleNode }[];
+	}
+
+	private findCommand(name: string) {
+		return this.getCommands().find(({ item }) => getCommandName(item) === name);
 	}
 
 	/**
-	 * Retrieves the configuration value for the given key.
-	 * @param key The key to retrieve the configuration value for.
-	 * @returns The configuration value for the given key, or `null` if not found.
+	 * Builds a command inside its owning module: lazily by default, after an eager boot
+	 * when the command sets `boot`.
 	 */
-	public getConfig<T>(key: keyof AppProps): T | null {
-		return Reflect.getMetadata(Symbols.app, this.constructor)?.[key] ?? null;
+	private async prepareCommand({ item, module }: { item: CommandClass; module: ModuleNode }) {
+		await this.kernel.register();
+		if (!item.boot) return this.kernel.prepare(item, module);
+		await this.kernel.bootEager();
+		return ModuleContext.run(module, () => Service.make(item));
+	}
+
+	/**
+	 * Prints the help of a command.
+	 * @param name The command name.
+	 */
+	private async commandHelp(name: string | undefined): Promise<void> {
+		const found = name ? this.findCommand(name) : undefined;
+		if (!found) {
+			this.error(
+				name ? `Command <${name}> not found.` : 'No command provided. Usage: styx help <command>'
+			);
+			this.commandList();
+			return this.exit(1);
+		}
+
+		const command = await this.prepareCommand(found);
+		this.write(await ModuleContext.run(found.module, () => command.help()));
+		await this.kernel.shutdown();
+		return this.exit(0);
 	}
 
 	/**
 	 * Executes a command.
-	 * @param command The command to execute.
+	 * @param name The command to execute.
 	 * @param argv The command line arguments.
 	 */
-	private async commandExec(command: string, argv: string[]): Promise<void> {
-		const commands = this.getCommands();
-
-		// Find the command class
-		const commandClass = commands.find((commandClass) => commandClass.command === command);
-
-		if (!commandClass) {
-			console.error(`Command ${command} not found`);
+	private async commandExec(name: string, argv: string[]): Promise<void> {
+		const found = this.findCommand(name);
+		if (!found) {
+			this.error(`Command ${name} not found`);
 			this.commandList();
-			return process.exit(1);
+			return this.exit(1);
 		}
 
-		try {
-			// Create the command instance
-			const commandInstance = Service.make(commandClass);
-
-			// Run the command
-			const initialized = await commandInstance.init(...argv);
-
-			if (initialized) {
-				await commandInstance.run();
+		const command = await this.prepareCommand(found);
+		await ModuleContext.run(found.module, async () => {
+			if (await command.init(...argv)) {
+				await command.run();
 			} else {
-				const help = await commandInstance.help();
-				this.write(help);
-			}
-
-			return process.exit(0);
-		} catch (error: any) {
-			console.error(error.message);
-			return process.exit(1);
-		}
-	}
-
-	/**
-	 * Discovers all registered commands from the service container.
-	 * Commands are registered via `@Command.register()` and stored with the
-	 * `elysium.command.*` service name pattern.
-	 *
-	 * @returns An array of all discovered command classes, filtered by build mode.
-	 */
-	private getCommands(): CommandClass[] {
-		const commandKeys = Service.keys('elysium.command.*');
-		const commands = commandKeys
-			.map((key) => Service.get<CommandClass>(key))
-			.filter((cmd): cmd is CommandClass => cmd !== null);
-
-		return commands.filter((cmd) => (Bun.env.NODE_ENV === 'production' ? !cmd.dev : true));
-	}
-
-	private async commandWork(argv: string[]) {
-		this.info('Starting worker process...');
-
-		// Parse queue arguments
-		const { values } = parseArgs({
-			args: argv,
-			options: {
-				queue: {
-					type: 'string',
-					multiple: true,
-					default: ['default'],
-					short: 'q'
-				},
-				concurrency: {
-					type: 'string',
-					default: '1',
-					short: 'c'
-				},
-				['max-retries']: {
-					type: 'string',
-					default: '5',
-					short: 'r'
-				},
-				['retry-delay']: {
-					type: 'string',
-					default: '5000',
-					short: 'd'
-				},
-				['pause-on-error']: {
-					type: 'boolean',
-					default: false,
-					short: 'p'
-				}
+				this.write(await command.help());
 			}
 		});
-
-		// Import worker-specific code
-		const { Worker } = await import('./worker');
-
-		// Start the worker with the specified queues
-		const queues = values.queue
-			.map((queue) => queue.split(','))
-			.reduce((acc, queues) => acc.concat(queues), []);
-
-		const worker = Worker.spawn(self as unknown as globalThis.Worker, queues, {
-			concurrency: parseInt(values.concurrency, 10),
-			maxRetries: parseInt(values['max-retries'], 10),
-			retryDelay: parseInt(values['retry-delay'], 10),
-			pauseOnError: values['pause-on-error']
-		});
-
-		this.success(
-			`Worker process ${this.format(worker.id, ConsoleFormat.GREEN)} started with queues: ${queues.map((q) => this.format(q, ConsoleFormat.CYAN)).join(', ')}`
-		);
+		await this.kernel.shutdown();
+		return this.exit(0);
 	}
 
 	/**
 	 * Starts the server on the specified port.
 	 */
 	private async commandServe(): Promise<void> {
-		const { server, modules, swagger, plugins } = Reflect.getMetadata(
-			Symbols.app,
-			this.constructor
-		) as AppProps;
+		const { server, swagger, plugins } = this.props();
 
 		this.#elysia = new Elysia(server).onRequest((c) => {
 			if (this.isDebug) {
@@ -545,29 +478,10 @@ export abstract class Application extends InteractsWithConsole {
 		const middlewares = Reflect.getMetadata(Symbols.middlewares, this.constructor) ?? [];
 		applyMiddlewares(middlewares, this.#elysia);
 
-		for (const moduleClass of modules!) {
-			const plugin = Reflect.getMetadata(Symbols.elysiaPlugin, moduleClass);
-			if (plugin === undefined) {
-				// TODO: Use the logger service here
-				console.error(
-					`Invalid module class ${moduleClass.name} registered in app ${this.constructor.name}. Ensure that you used the @module() decorator on the module.`
-				);
-				return process.exit(1);
-			}
-
-			const module = Service.bind(moduleClass);
-
-			this.#elysia.use(await plugin(module));
-		}
-
 		Event.emit('elysium:server:after-init', this, this);
 
 		// Register the server
 		this.#elysia.listen(server?.port ?? (parseInt(process.env.PORT!, 10) || 3000));
-
-		process.on('SIGINT', () => {
-			this.#elysia.stop().then(() => process.exit(0));
-		});
 	}
 
 	/**
@@ -589,20 +503,16 @@ export abstract class Application extends InteractsWithConsole {
 	}
 
 	private commandList() {
-		const commands = this.getCommands();
-
-		const groups = commands.reduce((acc, commandClass) => {
-			const groupKey: string = first(commandClass.command.split(':'))!;
-			const group = acc.get(groupKey) ?? [];
-			group.push(commandClass);
-			acc.set(groupKey, group);
+		const groups = this.getCommands().reduce((acc, { item }) => {
+			const groupKey: string = first(getCommandName(item).split(':'))!;
+			acc.set(groupKey, [...(acc.get(groupKey) ?? []), item]);
 			return acc;
 		}, new Map<string, CommandClass[]>());
 
 		for (const [group, groupCommands] of groups) {
 			this.section(this.format(group, ConsoleFormat.BLUE));
 			for (const commandClass of groupCommands) {
-				this.commandDescription(commandClass.command, '', commandClass.description);
+				this.commandDescription(getCommandName(commandClass), '', commandClass.description);
 			}
 		}
 	}

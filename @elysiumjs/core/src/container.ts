@@ -86,6 +86,7 @@ const globalScope = new Map<string, ContainerEntry>();
 const moduleScopes = new Map<string, Map<string, ContainerEntry>>();
 const constructedEntries: { entry: ContainerEntry; instance: unknown }[] = [];
 
+let overridden: ReadonlySet<string> = new Set();
 let visibility: VisibilityResolver | null = null;
 let moduleInitHook: ((owner: ModuleNode) => Promise<void> | void) | null = null;
 let skippedLookup: ((name: string) => { module: string; environment: string } | null) | null = null;
@@ -228,6 +229,7 @@ export namespace Container {
 			? (Reflect.getMetadata(Symbols.serviceOptions, def) ?? {})
 			: def;
 		const name = options.name ?? (isClass ? def.name : '');
+		if (overridden.has(name)) return name;
 
 		add({
 			name,
@@ -272,6 +274,15 @@ export namespace Container {
 			);
 		}
 		scope.set(entry.name, entry);
+	}
+
+	/**
+	 * Declares global service names that win over module registrations: `register` skips
+	 * any definition with one of these names, so lookups reach the global entry.
+	 * Pass `null` to clear.
+	 */
+	export function setOverrides(names: Iterable<string> | null): void {
+		overridden = new Set(names ?? []);
 	}
 
 	/**

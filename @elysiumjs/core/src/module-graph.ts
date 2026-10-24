@@ -17,6 +17,7 @@ import type { ConfiguredModule, ModuleClass, ModuleProps } from './module';
 
 import { isEqual } from 'radash';
 
+import { getCommandName } from './command';
 import { ConflictingModuleConfigError, DuplicateCommandError, ModuleCycleError } from './errors';
 import { getModuleProps, isConfiguredModule } from './module';
 import { currentEnvironment, Symbols } from './utils';
@@ -158,7 +159,7 @@ function assertUniqueCommands(nodes: readonly ModuleNode[], environment: string)
 	const seen = new Map<string, string>();
 	for (const node of nodes) {
 		for (const command of commandsOf(node.props, environment)) {
-			const name = (command as any).command as string;
+			const name = getCommandName(command);
 			const owner = seen.get(name);
 			if (owner !== undefined && owner !== node.id) {
 				throw new DuplicateCommandError(name, [owner, node.id]);
