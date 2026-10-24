@@ -18,9 +18,13 @@ import { mock } from 'bun:test';
 
 // Mock dependencies
 
+const { AsyncLocalStorage: RealAsyncLocalStorage } = process.getBuiltinModule('node:async_hooks');
+
 mock.module('node:async_hooks', () => ({
-	AsyncLocalStorage: class {
-		public run = mock((_map, callback) => callback());
+	AsyncLocalStorage: class<T> extends RealAsyncLocalStorage<T> {
+		public run = mock((store: T, callback: () => unknown) =>
+			RealAsyncLocalStorage.prototype.run.call(this, store, callback)
+		);
 		public disable = mock();
 	}
 }));

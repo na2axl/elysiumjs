@@ -38,6 +38,24 @@ export namespace Symbols {
 	export const elysiaPlugin = Symbol('elysium:ElysiaPlugin');
 
 	export const middlewareGuards = Symbol('elysium:MiddlewareGuards');
+
+	export const serviceOptions = Symbol('elysium:ServiceOptions');
+
+	export const module = Symbol('elysium:Module');
+
+	export const configuredModule = Symbol('elysium:ConfiguredModule');
+
+	export const moduleConfig = Symbol('elysium:ModuleConfig');
+}
+
+/**
+ * Gets the current environment name.
+ * @returns `NODE_ENV`, or `development` when unset.
+ *
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export function currentEnvironment(): string {
+	return Bun.env.NODE_ENV ?? 'development';
 }
 
 export const nextTick = () => new Promise((resolve) => process.nextTick(resolve));
