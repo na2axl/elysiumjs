@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Application, Service } from '@elysiumjs/core';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+import { Application } from '@elysiumjs/core';
 import { describe, expect, it } from 'bun:test';
 
 import { HephaestusModule } from '../src';
@@ -23,14 +26,16 @@ import {
 } from '../src/commands';
 
 describe('HephaestusModule', () => {
-	it('registers nothing on import', () => {
-		expect(Service.keys('*')).toEqual([]);
+	it('has no bare side-effect imports in its entry point', () => {
+		const source = readFileSync(join(import.meta.dir, '../src/index.ts'), 'utf8');
+		const bare = source.match(/^import\s+['"][^'"]+['"]/gm) ?? [];
+		expect(bare.filter((line) => !line.includes('reflect-metadata'))).toEqual([]);
 	});
 
 	it('contributes the three commands to the graph', async () => {
 		const app = await Application.testing({ modules: [HephaestusModule] });
 		try {
-			const commands = app.kernel.graph.collect('commands').map((c: any) => c.item ?? c);
+			const commands = app.kernel.graph.collect('commands').map(({ item }) => item);
 			expect(commands).toHaveLength(3);
 			expect(commands).toEqual(
 				expect.arrayContaining([

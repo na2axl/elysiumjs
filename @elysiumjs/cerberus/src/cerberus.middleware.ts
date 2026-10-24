@@ -18,6 +18,8 @@ import type { CerberusConfig } from './utils';
 import { defineAbility } from '@casl/ability';
 import { Middleware, Service } from '@elysiumjs/core';
 
+import { CERBERUS_CONFIG } from './cerberus.tokens';
+
 /**
  * Cerberus Middleware class.
  *
@@ -29,21 +31,19 @@ import { Middleware, Service } from '@elysiumjs/core';
  */
 export class CerberusMiddleware extends Middleware {
 	public constructor(
-		@Service.inject('elysium.module.CerberusModule.config')
+		@Service.inject(CERBERUS_CONFIG)
 		public readonly config: CerberusConfig
 	) {
 		super();
 	}
 
 	public override async onBeforeHandle(ctx: Context) {
-		const config = this.config;
+		const subject = await this.config.getSubject(ctx);
 
-		const subject = await config.getSubject(ctx);
-
-		if (config.defineAbility) {
-			ctx['elysium:cerberus'] = await config.defineAbility(subject, defineAbility);
-		} else if (config.getAbilities) {
-			const abilities = await config.getAbilities(ctx);
+		if (this.config.defineAbility) {
+			ctx['elysium:cerberus'] = await this.config.defineAbility(subject, defineAbility);
+		} else if (this.config.getAbilities) {
+			const abilities = await this.config.getAbilities(ctx);
 
 			ctx['elysium:cerberus'] = defineAbility((can) => {
 				for (const ability of abilities) {

@@ -14,5 +14,6 @@
 
 export { Cerberus } from './capability';
 export { CerberusMiddleware } from './cerberus.middleware';
+export { CERBERUS_CONFIG } from './cerberus.tokens';
 export { CerberusModule } from './cerberus.module';
 export type { CerberusConfig, Subject, Ability } from './utils';

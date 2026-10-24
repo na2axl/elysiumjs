@@ -13,8 +13,7 @@
 // limitations under the License.
 
 import { defineAbility } from '@casl/ability';
-import { Service } from '@elysiumjs/core';
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { describe, expect, it } from 'bun:test';
 
 import { CerberusMiddleware } from '../src/cerberus.middleware';
 
@@ -31,14 +30,6 @@ describe('CerberusMiddleware', () => {
 	function build(config: any) {
 		middleware = new CerberusMiddleware(config);
 	}
-
-	beforeEach(() => {
-		Service.clear();
-	});
-
-	afterEach(() => {
-		Service.clear();
-	});
 
 	describe('onBeforeHandle', () => {
 		it('should use defineAbility when config.defineAbility is provided', async () => {

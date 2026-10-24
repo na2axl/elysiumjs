@@ -17,6 +17,7 @@ import type { CerberusConfig } from './utils';
 import { Module } from '@elysiumjs/core';
 
 import { CerberusMiddleware } from './cerberus.middleware';
+import { CERBERUS_CONFIG } from './cerberus.tokens';
 
 /**
  * Configurable module providing the {@link CerberusMiddleware}. Bind a config with
@@ -25,6 +26,15 @@ import { CerberusMiddleware } from './cerberus.middleware';
  */
 @Module.register({
 	services: [CerberusMiddleware],
+	// `true` also exports the config token, which is what lets importing modules construct
+	// the middleware (it injects the config).
 	exports: true
 })
-export class CerberusModule extends Module.configurable<CerberusConfig>({}) {}
+export class CerberusModule extends Module.configurable<CerberusConfig>({
+	required: ['getSubject']
+}) {
+	/** Stable injection token of the config; it does not depend on the class name. */
+	public static override get config(): string {
+		return CERBERUS_CONFIG;
+	}
+}

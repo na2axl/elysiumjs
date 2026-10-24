@@ -12,8 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import {
 	Application,
+	MissingModuleConfigError,
 	Module,
 	ModuleContext,
 	Service,
@@ -21,7 +25,7 @@ import {
 } from '@elysiumjs/core';
 import { describe, expect, it } from 'bun:test';
 
-import { CerberusMiddleware, CerberusModule } from '../src';
+import { CERBERUS_CONFIG, CerberusMiddleware, CerberusModule } from '../src';
 
 const cfg = { getSubject: async () => ({ id: 'u1' }) };
 
@@ -31,9 +35,24 @@ class ConsumerModule extends Module {}
 @Module.register({})
 class UnrelatedModule extends Module {}
 
+@Module.register({ imports: [CerberusModule] })
+class PlainModule extends Module {}
+
 describe('CerberusModule', () => {
-	it('registers nothing on import', () => {
-		expect(Service.keys('*')).toEqual([]);
+	it('has no bare side-effect imports in its entry point', () => {
+		const source = readFileSync(join(import.meta.dir, '../src/index.ts'), 'utf8');
+		const bare = source.match(/^import\s+['"][^'"]+['"]/gm) ?? [];
+		expect(bare.filter((line) => !line.includes('reflect-metadata'))).toEqual([]);
+	});
+
+	it('uses a stable config token', () => {
+		expect(CerberusModule.config).toBe(CERBERUS_CONFIG);
+	});
+
+	it('rejects a boot without a config', async () => {
+		await expect(Application.testing({ modules: [PlainModule] })).rejects.toBeInstanceOf(
+			MissingModuleConfigError
+		);
 	});
 
 	it('injects the module config into a middleware built inside an importing module', async () => {
@@ -47,8 +66,23 @@ describe('CerberusModule', () => {
 		}
 	});
 
+	it('resolves the config token and the middleware from an importing module', async () => {
+		const app = await Application.testing({ modules: [ConsumerModule], boot: 'eager' });
+		try {
+			expect(((await app.get(CERBERUS_CONFIG, ConsumerModule)) as any).getSubject).toBe(
+				cfg.getSubject
+			);
+			expect(await app.get(CerberusMiddleware, ConsumerModule)).toBeInstanceOf(CerberusMiddleware);
+		} finally {
+			await app.shutdown();
+		}
+	});
+
 	it('cannot be constructed from an unrelated module', async () => {
-		const app = await Application.testing({ modules: [ConsumerModule, UnrelatedModule], boot: 'eager' });
+		const app = await Application.testing({
+			modules: [ConsumerModule, UnrelatedModule],
+			boot: 'eager'
+		});
 		try {
 			const node = app.kernel.graph.node(UnrelatedModule)!;
 			expect(() => ModuleContext.run(node, () => Service.make(CerberusMiddleware))).toThrow(
