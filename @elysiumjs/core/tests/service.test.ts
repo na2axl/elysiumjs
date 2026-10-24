@@ -12,282 +12,145 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Mock } from 'bun:test';
+import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 
-import { afterAll, afterEach, beforeEach, describe, expect, it, jest, mock, spyOn } from 'bun:test';
-
+import { Container } from '../src/container';
+import { DuplicateGlobalServiceError, ServiceNotFoundError } from '../src/errors';
 import { Service, ServiceScope } from '../src/service';
 import { Symbols } from '../src/utils';
 
-// Mock process.exit to prevent tests from exiting
-const originalExit = process.exit;
-const originalConsoleError = console.error;
-
 describe('Service', () => {
 	beforeEach(() => {
-		process.exit = mock() as any;
-		console.error = mock() as any;
-		Service.clear();
-	});
-
-	afterEach(() => {
-		process.exit = originalExit;
-		console.error = originalConsoleError;
+		Container.reset();
 	});
 
 	afterAll(() => {
-		Service.clear();
+		Container.reset();
 	});
 
-	describe('Service registration', () => {
-		it('should register a service with the @Service.register decorator', () => {
-			@Service.register()
+	describe('@Service.register', () => {
+		it('only writes metadata and leaves the container empty', () => {
+			@Service.register({ name: 'custom', scope: ServiceScope.FACTORY, global: true })
 			class TestService {}
 
-			expect(Service.exists(TestService)).toBe(true);
-			expect(Service.exists('TestService')).toBe(true);
-		});
-
-		it('should register a service with a custom name', () => {
-			@Service.register({ name: 'CustomName' })
-			class TestService {}
-
-			expect(Service.exists('CustomName')).toBe(true);
+			expect(Service.exists('custom')).toBe(false);
 			expect(Service.exists(TestService)).toBe(false);
+			expect(Service.keys('*')).toEqual([]);
+			expect(Reflect.getMetadata(Symbols.serviceOptions, TestService)).toEqual({
+				name: 'custom',
+				scope: ServiceScope.FACTORY,
+				global: true
+			});
 		});
 
-		it('should register a service with singleton scope by default', () => {
+		it('writes empty options when called without arguments', () => {
 			@Service.register()
 			class TestService {}
 
-			const instance1 = Service.get(TestService);
-			const instance2 = Service.get(TestService);
-
-			expect(instance1).toBe(instance2);
-		});
-
-		it('should register a service with factory scope', () => {
-			@Service.register({ scope: ServiceScope.FACTORY })
-			class TestService {}
-
-			const instance1 = Service.get(TestService);
-			const instance2 = Service.get(TestService);
-
-			expect(instance1).not.toBe(instance2);
-		});
-
-		it('should not allow registering a service with the same name twice', () => {
-			@Service.register({ name: 'test' })
-			class TestService1 {}
-
-			@Service.register({ name: 'test' })
-			class TestService {}
-
-			expect(console.error).toHaveBeenCalled();
-			expect(process.exit).toHaveBeenCalledWith(1);
+			expect(Reflect.getMetadata(Symbols.serviceOptions, TestService)).toEqual({});
 		});
 	});
 
-	describe('Service retrieval', () => {
-		it('should retrieve a service by class', () => {
-			@Service.register()
+	describe('global imperative API', () => {
+		it('binds, retrieves and removes a service by class and name', () => {
 			class TestService {}
-
-			const instance = Service.get(TestService);
-			expect(instance).toBeInstanceOf(TestService);
-		});
-
-		it('should retrieve a service by name', () => {
-			@Service.register()
-			class TestService {}
-
-			const instance = Service.get('TestService');
-			expect(instance).toBeInstanceOf(TestService);
-		});
-
-		it('should return null if the service does not exist', () => {
-			const instance = Service.get('NonExistentService');
-			expect(instance).toBeNull();
-		});
-	});
-
-	describe('Service dependency injection', () => {
-		it('should inject dependencies into a service constructor', () => {
-			@Service.register()
-			class DependencyService {
-				public value = 'dependency';
-			}
-
-			@Service.register()
-			class TestService {
-				constructor(@Service.inject() public dependency: DependencyService) {}
-			}
-
-			const instance = Service.get(TestService);
-			expect(instance.dependency).toBeInstanceOf(DependencyService);
-			expect(instance.dependency.value).toBe('dependency');
-		});
-
-		it('should inject dependencies with custom names', () => {
-			@Service.register({ name: 'CustomDependency' })
-			class DependencyService {
-				public value = 'custom dependency';
-			}
-
-			@Service.register()
-			class TestService {
-				constructor(@Service.inject('CustomDependency') public dependency: any) {}
-			}
-
-			const instance = Service.get(TestService);
-			expect(instance.dependency.value).toBe('custom dependency');
-		});
-
-		it('should throw an error if a dependency does not exist', () => {
-			@Service.register()
-			class TestService {
-				constructor(@Service.inject('NonExistentDependency') public dependency: any) {}
-			}
-
-			Service.make(TestService);
-			expect(console.error).toHaveBeenCalled();
-			expect(process.exit).toHaveBeenCalledWith(1);
-		});
-	});
-
-	describe('Service scopes', () => {
-		it('should create a singleton service', () => {
-			@Service.register({ scope: ServiceScope.SINGLETON })
-			class TestService {}
-
-			const instance1 = Service.get(TestService);
-			const instance2 = Service.get(TestService);
-
-			expect(instance1).toBe(instance2);
-		});
-
-		it('should create a factory service', () => {
-			@Service.register({ scope: ServiceScope.FACTORY })
-			class TestService {}
-
-			const instance1 = Service.get(TestService);
-			const instance2 = Service.get(TestService);
-
-			expect(instance1).not.toBe(instance2);
-		});
-
-		it('should create a new instance with make() even for singleton services', () => {
-			@Service.register({ scope: ServiceScope.SINGLETON })
-			class TestService {}
-
-			const instance1 = Service.get(TestService);
-			const instance2 = Service.make(TestService);
-
-			expect(instance1).not.toBe(instance2);
-		});
-	});
-
-	describe('Service lifecycle', () => {
-		it('should bind a service as a singleton', () => {
-			class TestService {}
-
 			const instance = Service.bind(TestService);
 			expect(Service.exists(TestService)).toBe(true);
 			expect(Service.get(TestService)).toBe(instance);
+
+			Service.remove(TestService);
+			expect(Service.exists(TestService)).toBe(false);
+			expect(Service.get('TestService')).toBeNull();
 		});
 
-		it('should bind a service with a custom name', () => {
+		it('binds with a custom name', () => {
 			class TestService {}
-
 			const instance = Service.bind(TestService, 'CustomName');
-			expect(Service.exists('CustomName')).toBe(true);
 			expect(Service.get('CustomName')).toBe(instance);
 		});
 
-		it('should register a service instance', () => {
+		it('registers an instance by class or name', () => {
 			class TestService {}
-			const testInstance = new TestService();
-
-			const instance = Service.instance(TestService, testInstance);
-			expect(Service.exists(TestService)).toBe(true);
-			expect(Service.get(TestService)).toBe(testInstance);
-			expect(instance).toBe(testInstance);
+			const a = new TestService();
+			const b = new TestService();
+			expect(Service.instance(TestService, a)).toBe(a);
+			expect(Service.instance('Named', b)).toBe(b);
+			expect(Service.get(TestService)).toBe(a);
+			expect(Service.get('Named')).toBe(b);
 		});
 
-		it('should register a service instance with a custom name', () => {
-			class TestService {}
-			const testInstance = new TestService();
-
-			const instance = Service.instance('CustomName', testInstance);
-			expect(Service.exists('CustomName')).toBe(true);
-			expect(Service.get('CustomName')).toBe(testInstance);
-			expect(instance).toBe(testInstance);
-		});
-
-		it('should register a factory function with a class', () => {
+		it('registers factories that build a new instance each time', () => {
 			class TestService {
-				public value: string;
-				constructor() {
-					this.value = 'factory';
-				}
+				value = 'factory';
 			}
+			const first = Service.factory(TestService);
+			expect(first.value).toBe('factory');
+			expect(Service.get(TestService)).not.toBe(first);
 
-			const instance = Service.factory(TestService);
-			expect(Service.exists(TestService)).toBe(true);
-			expect(instance).toBeInstanceOf(TestService);
-			expect(instance.value).toBe('factory');
-
-			// Should create a new instance each time
-			const instance2 = Service.get(TestService);
-			expect(instance2).not.toBe(instance);
-			expect(instance2).toBeInstanceOf(TestService);
+			const custom = Service.factory('Custom', () => ({ value: 'custom' }));
+			expect(custom.value).toBe('custom');
+			expect(Service.get('Custom')).not.toBe(custom);
 		});
 
-		it('should register a factory function with a custom name', () => {
-			const factoryFn = () => ({ value: 'custom factory' });
-
-			const instance = Service.factory('CustomFactory', factoryFn);
-			expect(Service.exists('CustomFactory')).toBe(true);
-			expect(instance.value).toBe('custom factory');
-
-			// Should create a new instance each time
-			const instance2 = Service.get('CustomFactory');
-			expect(instance2).not.toBe(instance);
-			expect(instance2.value).toBe('custom factory');
+		it('make() builds a fresh instance and injects dependencies', () => {
+			class Dep {}
+			class TestService {
+				constructor(@Service.inject(Dep) public dep: Dep) {}
+			}
+			const dep = Service.bind(Dep);
+			const made = Service.make(TestService);
+			expect(made.dep).toBe(dep);
+			expect(Service.make(TestService)).not.toBe(made);
 		});
 
-		it('should remove a service by class', () => {
-			@Service.register()
+		it('make() throws ServiceNotFoundError for a missing dependency', () => {
+			class TestService {
+				constructor(@Service.inject('Missing') public dep: any) {}
+			}
+			expect(() => Service.make(TestService)).toThrow(ServiceNotFoundError);
+		});
+
+		it('throws on duplicate registration instead of exiting', () => {
 			class TestService {}
-
-			expect(Service.exists(TestService)).toBe(true);
-			Service.remove(TestService);
-			expect(Service.exists(TestService)).toBe(false);
+			Service.bind(TestService);
+			expect(() => Service.instance(TestService, new TestService())).toThrow(
+				DuplicateGlobalServiceError
+			);
+			expect(() => Service.factory('TestService', () => ({}))).toThrow(DuplicateGlobalServiceError);
+			expect(() => Service.registerLazy('TestService', () => ({}))).toThrow(
+				DuplicateGlobalServiceError
+			);
 		});
 
-		it('should remove a service by name', () => {
-			@Service.register()
-			class TestService {}
-
-			expect(Service.exists('TestService')).toBe(true);
-			Service.remove('TestService');
-			expect(Service.exists('TestService')).toBe(false);
+		it('registerLazy resolves on first access only, once', () => {
+			let calls = 0;
+			Service.registerLazy('Lazy', () => {
+				calls++;
+				return { n: calls };
+			});
+			expect(calls).toBe(0);
+			expect(Service.get('Lazy')).toBe(Service.get('Lazy'));
+			expect(calls).toBe(1);
 		});
 
-		it('should clear all services', () => {
-			@Service.register()
-			class TestService1 {}
+		it('keys() matches glob-like patterns', () => {
+			Service.instance('a.one', {});
+			Service.instance('a.two', {});
+			Service.instance('b.one', {});
+			expect(Service.keys('a.*').sort()).toEqual(['a.one', 'a.two']);
+			expect(Service.keys('?.one').sort()).toEqual(['a.one', 'b.one']);
+		});
 
-			@Service.register()
-			class TestService2 {}
-
-			expect(Service.exists(TestService1)).toBe(true);
-			expect(Service.exists(TestService2)).toBe(true);
-
+		it('clear() empties the global scope', () => {
+			Service.instance('x', {});
 			Service.clear();
+			expect(Service.keys('*')).toEqual([]);
+		});
 
-			expect(Service.exists(TestService1)).toBe(false);
-			expect(Service.exists(TestService2)).toBe(false);
+		it('resolve() awaits and returns a global service', async () => {
+			const x = {};
+			Service.instance('x', x);
+			expect(await Service.resolve('x')).toBe(x);
 		});
 	});
 });

@@ -16,6 +16,7 @@ import type { Class } from 'type-fest';
 
 import { isString } from 'radash';
 
+import { Container } from './container';
 import { Symbols } from './utils';
 
 /**
@@ -47,44 +48,6 @@ type ServiceClass = Class<any>;
 type TypedServiceClass<T> = Class<T>;
 
 /**
- * Describes metadata for each registered service.
- * @author Axel Nana <axel.nana@workbud.com>
- */
-type ServiceRegistration = {
-	/**
-	 * The service's scope.
-	 */
-	scope: ServiceScope;
-
-	/**
-	 * A factory function that create the service.
-	 *
-	 * When `scope` is set to `Scope.SINGLETON`, this function always return the
-	 * same instance.
-	 *
-	 * @returns An instance to the service.
-	 */
-	factory: () => any;
-};
-
-/**
- * Describes the metadata stored for each injected services.
- * @author Axel Nana <axel.nana@workbud.com>
- */
-type InjectedService = {
-	/**
-	 * The name of the injected service. It should match the one used when
-	 * registering the service.
-	 */
-	name: string;
-
-	/**
-	 * The index in the constructor where the service is injected.
-	 */
-	index: number;
-};
-
-/**
  * Type for a factory function.
  * @author Axel Nana <axel.nana@workbud.com>
  */
@@ -99,35 +62,6 @@ type FactoryFn<T> = () => T extends void ? never : T;
 const isClass = <T, V>(value: Class<T> | V): value is Class<T> => {
 	return typeof value === 'function' && value.prototype && value.prototype.constructor === value;
 };
-
-/**
- * Sentinel value to distinguish "lazy, not yet resolved" from a resolved entry.
- * @author Axel Nana <axel.nana@workbud.com>
- */
-const LAZY_SENTINEL = Symbol('lazy');
-
-/**
- * Describes a lazy service entry in the registry.
- * @author Axel Nana <axel.nana@workbud.com>
- */
-interface LazyEntry {
-	[LAZY_SENTINEL]: true;
-	resolver: () => any;
-}
-
-/**
- * Type guard to check if a registry entry is a lazy (unresolved) entry.
- * @author Axel Nana <axel.nana@workbud.com>
- */
-const isLazy = (value: unknown): value is LazyEntry => {
-	return typeof value === 'object' && value !== null && LAZY_SENTINEL in value;
-};
-
-/**
- * Storage for registered services.
- * @author Axel Nana <axel.nana@workbud.com>
- */
-const servicesRegistry = new Map<string, ServiceRegistration | LazyEntry>();
 
 /**
  * Properties required when declaring a service using the `@service()` decorator.
@@ -151,41 +85,50 @@ export type ServiceProps = Partial<{
 	 * @see ServiceScope
 	 */
 	scope: ServiceScope;
+
+	/**
+	 * Whether the service is visible from every module without being exported.
+	 */
+	global: boolean;
 }>;
+
+/**
+ * Describes a service built by a factory function instead of a class.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type ServiceFactoryDefinition = {
+	/** The name of the service. */
+	name: string;
+
+	/** Builds the service from the owning module's config and a resolver for visible services. */
+	factory: (config: any, get: <T>(name: string | Class<T>) => T) => unknown;
+
+	/** The service's scope. Defaults to `ServiceScope.SINGLETON`. */
+	scope?: ServiceScope;
+
+	/** Whether the service is visible from every module. */
+	global?: boolean;
+};
+
+/**
+ * Anything a module can list in its `services`.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type ServiceDefinition = Class<any> | ServiceFactoryDefinition;
+
+const nameOf = (service: string | ServiceClass): string =>
+	isString(service) ? service : service.name;
 
 export namespace Service {
 	/**
-	 * Marks a class as a service
+	 * Marks a class as a service. This only records metadata: the service is registered
+	 * when the module that lists it is loaded.
 	 * @author Axel Nana <axel.nana@workbud.com>
-	 * @param options The decorator options.
+	 * @param props The service options.
 	 */
-	export const register = (options?: ServiceProps) => {
+	export const register = (props?: ServiceProps) => {
 		return function (target: ServiceClass) {
-			const name = options?.name ?? target.name;
-			const scope = options?.scope ?? ServiceScope.SINGLETON;
-
-			if (Service.exists(name)) {
-				// TODO: Use the logger service here
-				console.error(`A service with the name ${name} has already been registered.`);
-				process.exit(1);
-			}
-
-			const factory = () => Service.make(target);
-
-			if (scope === ServiceScope.SINGLETON) {
-				const service = factory();
-				servicesRegistry.set(name, {
-					scope,
-					factory() {
-						return service;
-					}
-				});
-			} else {
-				servicesRegistry.set(name, {
-					scope,
-					factory
-				});
-			}
+			Reflect.defineMetadata(Symbols.serviceOptions, props ?? {}, target);
 		};
 	};
 
@@ -211,49 +154,40 @@ export namespace Service {
 	};
 
 	/**
-	 * Retrieves a registered service's instance from the container.
-	 * Resolves lazy services on first access and caches the result.
+	 * Retrieves a service visible from the current module context (global services only
+	 * when there is none). Lazy services are built on first access.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param service The name of the service, or its class.
-	 * @returns An instance of the registered service, or `null` if no service with that name/type was registered.
+	 * @returns The service, or `null` if none with that name/type is visible.
+	 * @throws {ServiceNotReadyError} If the service, or its module, is still initialising.
 	 */
 	export const get = <T>(service: string | TypedServiceClass<T>): T | null => {
-		const name = isString(service) ? service : service.name;
-
-		if (exists(name)) {
-			const entry = servicesRegistry.get(name)!;
-
-			// Resolve lazy service on first access
-			if (isLazy(entry)) {
-				const instance = entry.resolver();
-				servicesRegistry.set(name, {
-					scope: ServiceScope.SINGLETON,
-					factory: () => instance
-				});
-				return instance as T;
-			}
-
-			return entry.factory() as T;
-		}
-
-		return null;
+		return Container.get(nameOf(service)) as T | null;
 	};
 
 	/**
-	 * Registers a lazy service that is only instantiated on first access.
+	 * Like `get`, but waits for the `onInit` of the service and of its owning module.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param service The name of the service, or its class.
+	 * @throws {ServiceNotFoundError | ServiceNotVisibleError | EnvironmentSkippedModuleError}
+	 */
+	export const resolve = <T>(service: string | TypedServiceClass<T>): Promise<T> => {
+		return Container.resolve(nameOf(service), 'Service.resolve') as Promise<T>;
+	};
+
+	/**
+	 * Registers a global lazy service that is only instantiated on first access.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param name The name of the service.
 	 * @param resolver A factory function called on first access.
+	 * @throws {DuplicateGlobalServiceError} If a global service with that name exists.
 	 */
 	export const registerLazy = <T>(name: string, resolver: () => T): void => {
-		if (servicesRegistry.has(name) && !isLazy(servicesRegistry.get(name))) {
-			throw new Error(`Service ${name} already registered`);
-		}
-		servicesRegistry.set(name, { [LAZY_SENTINEL]: true, resolver } as LazyEntry);
+		addGlobal(name, ServiceScope.SINGLETON, resolver);
 	};
 
 	/**
-	 * Instantiates a service with its dependencies.
+	 * Instantiates a service with its dependencies, resolved from the current module context.
 	 *
 	 * This function always create a new instance of the service, even if the service's scope is `ServiceScope.SINGLETON`
 	 * and it has already been registered in the container.
@@ -261,31 +195,14 @@ export namespace Service {
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 *
 	 * @param service The service class to instantiate.
+	 * @throws {ServiceNotFoundError | ServiceNotVisibleError | EnvironmentSkippedModuleError}
 	 */
 	export const make = <T>(service: TypedServiceClass<T>): T => {
-		const dependencies: Array<InjectedService> =
-			Reflect.getMetadata(Symbols.services, service) ?? [];
-
-		const params: any[] = [];
-		dependencies.forEach((dependency) => {
-			const s = get(dependency.name);
-
-			if (s === null) {
-				// TODO: Use the logger service here
-				console.error(
-					`Cannot inject service ${dependency.name}. No service was registered with the name: ${dependency.name}`
-				);
-				process.exit(1);
-			}
-
-			params[dependency.index] = s;
-		});
-
-		return new service(...params);
+		return Container.make(service);
 	};
 
 	/**
-	 * Binds a service to the container and sets it as a singleton.
+	 * Binds a service to the global scope and sets it as a singleton.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param service The service class to bind.
 	 * @param name An optional name for the service. If not set, the name of the service class is used instead.
@@ -296,7 +213,7 @@ export namespace Service {
 	};
 
 	/**
-	 * Binds a service to the container and sets it as a factory.
+	 * Binds a service to the global scope and sets it as a factory.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param name A name for the service.
 	 * @param factory The factory function used to instantiate the service.
@@ -304,7 +221,7 @@ export namespace Service {
 	export function factory<T>(name: string, factory: FactoryFn<T>): T;
 
 	/**
-	 * Binds a service to the container and sets it as a factory.
+	 * Binds a service to the global scope and sets it as a factory.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param service The service class to bind.
 	 * @param name An optional name for the service. If not set, the name of the service class is used instead.
@@ -312,7 +229,7 @@ export namespace Service {
 	export function factory<T>(service: TypedServiceClass<T>, name?: string): T;
 
 	/**
-	 * Binds a service to the container and sets it as a factory.
+	 * Binds a service to the global scope and sets it as a factory.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param serviceOrName The service class to bind or its name.
 	 * @param nameOrFactory The service name or a factory function.
@@ -325,80 +242,56 @@ export namespace Service {
 			? serviceOrName
 			: ((nameOrFactory as string | undefined) ?? serviceOrName.name);
 
-		if (exists(serviceName)) {
-			// TODO: Use the logger service here
-			console.error(`A service with the name ${serviceName} has already been registered.`);
-			process.exit(1);
-		}
-
-		const factory = () => {
+		const create = () => {
 			return isClass(serviceOrName) ? make(serviceOrName) : (nameOrFactory as FactoryFn<T>)();
 		};
 
-		servicesRegistry.set(serviceName, {
-			scope: ServiceScope.FACTORY,
-			factory
-		});
+		addGlobal(serviceName, ServiceScope.FACTORY, create);
 
-		return factory();
+		return create() as T;
 	}
 
 	/**
-	 * Binds a service's instance to the container.
+	 * Binds a service's instance to the global scope.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param service The service class or name to bind.
 	 * @param instance The instance to bind.
+	 * @throws {DuplicateGlobalServiceError} If a global service with that name exists.
 	 */
 	export const instance = <T>(service: string | TypedServiceClass<T>, instance: T): T => {
-		const serviceName = isString(service) ? service : service.name;
-
-		if (exists(serviceName)) {
-			// TODO: Use the logger service here
-			console.error(`A service with the name ${serviceName} has already been registered.`);
-			process.exit(1);
-		}
-
-		servicesRegistry.set(serviceName, {
-			scope: ServiceScope.SINGLETON,
-			factory() {
-				return instance;
-			}
-		});
-
+		addGlobal(nameOf(service), ServiceScope.SINGLETON, () => instance, { instance });
 		return instance;
 	};
 
 	/**
-	 * Removes a service from the container.
+	 * Removes a service from the global scope.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param service The service class or name to remove.
 	 */
 	export const remove = (service: string | TypedServiceClass<any>): void => {
-		const serviceName = isString(service) ? service : service.name;
-		servicesRegistry.delete(serviceName);
+		Container.removeGlobal(nameOf(service));
 	};
 
 	/**
-	 * Checks if a service exists in the container.
+	 * Checks if a service exists in the global scope.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param service The service class or name to check.
 	 * @returns `true` if the service exists, `false` otherwise.
 	 */
 	export const exists = (service: string | TypedServiceClass<any>): boolean => {
-		const serviceName = isString(service) ? service : service.name;
-		return servicesRegistry.has(serviceName);
+		return Container.hasGlobal(nameOf(service));
 	};
 
 	/**
-	 * Clears the container.
+	 * Clears the global scope.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 */
 	export const clear = () => {
-		servicesRegistry.clear();
+		Container.clearGlobal();
 	};
 
 	/**
-	 * Returns an array of registered service names matching the given pattern.
+	 * Returns an array of global service names matching the given pattern.
 	 * Pattern supports '*' (any sequence) and '?' (any single character), similarly to Redis KEYS.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param pattern The glob-like pattern to match service names.
@@ -414,6 +307,23 @@ export namespace Service {
 				.replace(/\?/g, '.') +
 			'$';
 		const regex = new RegExp(regexPattern);
-		return Array.from(servicesRegistry.keys()).filter((key) => regex.test(key));
+		return Container.globalNames().filter((key) => regex.test(key));
+	};
+
+	const addGlobal = (
+		name: string,
+		scope: ServiceScope,
+		create: () => unknown,
+		prebuilt?: { instance: unknown }
+	): void => {
+		Container.add({
+			name,
+			scope,
+			global: true,
+			owner: null,
+			create,
+			initialised: prebuilt !== undefined,
+			...(prebuilt ? { instance: prebuilt.instance } : {})
+		});
 	};
 }
