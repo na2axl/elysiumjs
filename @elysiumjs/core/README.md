@@ -105,6 +105,15 @@ Or, if using `styx`, run:
 bun styx serve
 ```
 
+## Lazy boot
+
+A CLI command boots lazily: running `app:cmd` initialises the command's own module and the modules it imports, not the whole graph. `help <cmd>` is always lazy, even for commands with `static boot = true`.
+
+- **Sync helpers are safe** (`Service.get()`, `Database.getConnection()`, `Redis.getConnection()`, ...) when the module that owns the service initialises synchronously. Elysium then initialises that module on the spot, even if the command does not import it.
+- **Use `await Service.resolve(...)`** when the owning module has an asynchronous `onInit`. A sync `get` then throws `ServiceNotReadyError`, which names the module.
+- **Use `static boot = true`** on a command that needs every module initialised before it runs (workers, servers). It initialises every module and builds every service first.
+- Service factories receive a synchronous `get`; it may only read services whose owning modules initialise synchronously, otherwise it throws `ServiceNotReadyError`.
+
 ## Migrating from the pre-module API
 
 - The `database`, `redis`, `wamp` and `elysium:hermes` keys of `@Application.register()` are gone. Add `DrizzleModule.with()`, `RedisModule.with()`, `WampModule.with()` and `HermesModule.with()` to `modules` instead.

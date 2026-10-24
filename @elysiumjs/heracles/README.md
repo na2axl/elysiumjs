@@ -113,7 +113,7 @@ await Heracles.dispatch(
 
 ### 4. Start Workers
 
-Add `StyxModule` to your application, then use `styx` to launch Heracles workers (`heracles:work` boots every module before it runs):
+Run workers with `bun run index.ts heracles:work` (or `styx heracles:work`) with `HeraclesModule` loaded. The `styx` binary runs your app and needs no `StyxModule`; `StyxModule` is skipped in production, where workers still run. `heracles:work` boots every module before it runs:
 
 ```bash
 # Start a Redis worker for the 'emails' queue with concurrency of 3 jobs
