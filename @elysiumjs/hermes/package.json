@@ -8,7 +8,7 @@
   "scripts": {
     "format": "prettier --write \"./src/**/*.ts\"",
     "clean": "rimraf dist",
-    "build:js": "bun build ./src/index.ts --outdir ./dist --target bun --packages external --root ./src --minify",
+    "build:js": "bun build ./src/index.ts --outdir ./dist --target bun --packages external --root ./src --minify-syntax --minify-whitespace",
     "build:ts": "tsc",
     "build": "bun run clean && bun run build:js && bun run build:ts",
     "test": "bun test",
