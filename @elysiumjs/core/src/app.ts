@@ -162,7 +162,7 @@ export abstract class Application extends InteractsWithConsole {
 			}
 
 			// Default props
-			props = deepMerge<AppProps>({ modules: [], swagger: false }, props);
+			props = deepMerge<AppProps>(props, { modules: [], swagger: false });
 
 			// Store the merged metadata
 			Reflect.defineMetadata(Symbols.app, props, target);
