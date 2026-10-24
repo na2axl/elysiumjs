@@ -283,6 +283,17 @@ export namespace Service {
 	};
 
 	/**
+	 * Checks if a service has already been built, without building it.
+	 * Lets modules release only the resources they actually created.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param name The name of the service to check.
+	 * @returns `true` if the service has a live instance, `false` otherwise.
+	 */
+	export const isConstructed = (name: string): boolean => {
+		return Container.constructed().some((entry) => entry.name === name);
+	};
+
+	/**
 	 * Clears the global scope.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 */

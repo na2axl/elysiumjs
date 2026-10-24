@@ -63,6 +63,17 @@ describe('Service', () => {
 			expect(Service.get('TestService')).toBeNull();
 		});
 
+		it('reports whether a service has been built, without building it', () => {
+			let built = 0;
+			Service.registerLazy('lazy-one', () => ++built);
+			expect(Service.isConstructed('lazy-one')).toBe(false);
+			expect(built).toBe(0);
+
+			Service.get('lazy-one');
+			expect(Service.isConstructed('lazy-one')).toBe(true);
+			expect(Service.isConstructed('unknown')).toBe(false);
+		});
+
 		it('binds with a custom name', () => {
 			class TestService {}
 			const instance = Service.bind(TestService, 'CustomName');
