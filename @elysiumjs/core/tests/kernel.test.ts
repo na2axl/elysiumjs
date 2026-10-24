@@ -37,10 +37,11 @@ const reset = () => {
 };
 
 /** Creates a service class with a given name that records its destruction. */
-const tracked = (name: string, failInit = false) => {
+const tracked = (name: string, failInit: false | 'async' | 'sync' = false) => {
 	const cls = class {
-		async onInit() {
-			if (failInit) throw new Error('init failed');
+		onInit() {
+			if (failInit === 'sync') throw new Error('init failed');
+			if (failInit === 'async') return Promise.reject(new Error('init failed'));
 		}
 		onDestroy() {
 			events.push(`destroy:${name}`);
@@ -336,7 +337,7 @@ describe('Kernel', () => {
 	});
 
 	it('after a failing service onInit during bootEager, shutdown destroys only what was constructed, in reverse', async () => {
-		const [S1, S2, S3, S4] = [tracked('S1'), tracked('S2'), tracked('S3', true), tracked('S4')];
+		const [S1, S2, S3, S4] = [tracked('S1'), tracked('S2'), tracked('S3', 'async'), tracked('S4')];
 		@Module.register({ services: [S1, S2, S3, S4] })
 		class A extends Module {}
 		const kernel = new Kernel(buildModuleGraph([A], 'test'));
@@ -345,6 +346,18 @@ describe('Kernel', () => {
 		await expect(kernel.bootEager()).rejects.toThrow('init failed');
 		await kernel.shutdown();
 		// S3 never became live and S4 was never constructed: neither is destroyed.
+		expect(events).toEqual(['destroy:S2', 'destroy:S1']);
+	});
+
+	it('treats a synchronously failing service onInit the same way', async () => {
+		const [S1, S2, S3, S4] = [tracked('S1'), tracked('S2'), tracked('S3', 'sync'), tracked('S4')];
+		@Module.register({ services: [S1, S2, S3, S4] })
+		class A extends Module {}
+		const kernel = new Kernel(buildModuleGraph([A], 'test'));
+		await kernel.register();
+
+		await expect(kernel.bootEager()).rejects.toThrow('init failed');
+		await kernel.shutdown();
 		expect(events).toEqual(['destroy:S2', 'destroy:S1']);
 	});
 

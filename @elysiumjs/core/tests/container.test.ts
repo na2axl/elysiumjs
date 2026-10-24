@@ -304,6 +304,20 @@ describe('Container', () => {
 		expect(Container.constructed().map((c) => c.name)).toEqual(['Fine']);
 	});
 
+	it('records a synchronous onInit failure and rethrows it on every access', async () => {
+		const failure = new Error('sync boom');
+		class SyncBroken {
+			onInit() {
+				throw failure;
+			}
+		}
+		Container.register(A, SyncBroken, undefined);
+		expect(() => run(A, () => Service.get(SyncBroken))).toThrow(failure);
+		expect(() => run(A, () => Service.get(SyncBroken))).toThrow(failure);
+		await expect(run(A, () => Service.resolve(SyncBroken))).rejects.toBe(failure);
+		expect(Container.constructed()).toEqual([]);
+	});
+
 	it('resolve rejects with typed errors', async () => {
 		await expect(run(A, () => Service.resolve('Nope'))).rejects.toBeInstanceOf(
 			ServiceNotFoundError

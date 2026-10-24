@@ -131,7 +131,13 @@ const instantiate = (entry: ContainerEntry): Instantiation => {
 	entry.instance = instance;
 	constructedEntries.push({ entry, instance });
 
-	const ready = runOnInit(entry, instance);
+	let ready: Promise<void> | undefined;
+	try {
+		ready = runOnInit(entry, instance);
+	} catch (error) {
+		entry.initFailure = { error };
+		throw error;
+	}
 	if (ready) {
 		entry.initPromise = ready.then(
 			() => {
