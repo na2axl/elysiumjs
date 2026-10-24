@@ -64,7 +64,18 @@ describe('Application class', () => {
 	let output = '';
 	let errors = '';
 
+	const signalListeners = { SIGINT: [] as Function[], SIGTERM: [] as Function[] };
+	const servers: { stop(force?: boolean): Promise<unknown> }[] = [];
+
+	/** Runs the serve action and records the server so it is stopped after the test. */
+	const serve = async (app: Application) => {
+		await app.run(['serve']);
+		servers.push(app.elysia);
+	};
+
 	beforeEach(() => {
+		signalListeners.SIGINT = process.listeners('SIGINT');
+		signalListeners.SIGTERM = process.listeners('SIGTERM');
 		process.exit = mock() as any;
 		mock.restore();
 
@@ -79,8 +90,20 @@ describe('Application class', () => {
 	});
 
 	afterEach(async () => {
-		// Let pending signal-driven shutdowns finish while process.exit is still mocked.
-		await new Promise((resolve) => setTimeout(resolve, 20));
+		for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+			for (const listener of process.listeners(signal)) {
+				if (!signalListeners[signal].includes(listener)) process.off(signal, listener);
+			}
+		}
+		for (const server of servers.splice(0)) {
+			try {
+				await server.stop(true);
+			} catch {
+				// Already stopped by the test.
+			}
+		}
+
+		Event.off('elysium:app:launched');
 		process.exit = originalExit;
 		process.stdout.write = originalStdoutWrite;
 		process.stderr.write = originalStderrWrite;
@@ -266,7 +289,7 @@ describe('Application class', () => {
 			class TestApp extends Application {}
 
 			const instance = new TestApp();
-			await instance.run(['serve']);
+			await serve(instance);
 
 			expect(instance.elysia).toBeDefined();
 		});
@@ -520,6 +543,61 @@ describe('Application class', () => {
 			expect(seen).toEqual(['ContextModule', 'ContextModule']);
 		});
 
+		it('should emit app:launched once for a lazy command, before it runs', async () => {
+			const { TestCommand, PrivateService } = makeCommand('launch:lazy');
+			const launched = mock(() => events.push('launched'));
+			Event.on('elysium:app:launched', launched);
+
+			@Module.register({ services: [PrivateService], commands: [TestCommand] })
+			class LaunchModule extends Module {}
+
+			await appWith(LaunchModule).run(['launch:lazy']);
+
+			expect(launched).toHaveBeenCalledTimes(1);
+			expect(events).toEqual(['launched', 'run:launch:lazy:secret']);
+		});
+
+		it('should emit app:launched once for a boot command, after the eager boot', async () => {
+			const { TestCommand, PrivateService } = makeCommand('launch:boot', { boot: true });
+			const launched = mock(() => events.push('launched'));
+			Event.on('elysium:app:launched', launched);
+
+			@Module.register({ services: [PrivateService], commands: [TestCommand] })
+			class BootModule extends Module {
+				public async onInit() {
+					events.push('init');
+				}
+			}
+
+			await appWith(BootModule).run(['launch:boot']);
+
+			expect(launched).toHaveBeenCalledTimes(1);
+			expect(events).toEqual(['init', 'launched', 'run:launch:boot:secret']);
+		});
+
+		it('should not emit app:launched for list', async () => {
+			const launched = mock();
+			Event.on('elysium:app:launched', launched);
+
+			await appWith().run(['list']);
+
+			expect(launched).not.toHaveBeenCalled();
+		});
+
+		it('should detach its signal handlers when the server stops', async () => {
+			@Application.register({ server: { port: 0 } })
+			class TestApp extends Application {}
+
+			const before = process.listeners('SIGINT').length;
+			const instance = new TestApp();
+			await serve(instance);
+			expect(process.listeners('SIGINT')).toHaveLength(before + 1);
+
+			await instance.elysia.stop();
+			expect(process.listeners('SIGINT')).toHaveLength(before);
+			expect(process.listeners('SIGTERM')).toHaveLength(signalListeners.SIGTERM.length);
+		});
+
 		it('should print an ElysiumError raised in the graph phase and exit 1', async () => {
 			@Module.register({})
 			class BrokenModule extends Module {}
@@ -609,7 +687,7 @@ describe('Application class', () => {
 			});
 
 			const instance = new TestApp();
-			await instance.run(['serve']);
+			await serve(instance);
 
 			expect(instance.elysia.listen).toHaveBeenCalledWith(3131);
 		});
@@ -627,7 +705,7 @@ describe('Application class', () => {
 			const emitSpy = spyOn(Event, 'emit');
 
 			const instance = new TestApp();
-			await instance.run(['serve']);
+			await serve(instance);
 			await nextTick();
 
 			expect(onStartSpy).toHaveBeenCalledWith(instance.elysia);
@@ -645,7 +723,7 @@ describe('Application class', () => {
 			const emitSpy = spyOn(Event, 'emit');
 
 			const instance = new TestApp();
-			await instance.run(['serve']);
+			await serve(instance);
 
 			await nextTick();
 			process.emit('SIGINT');
@@ -669,7 +747,7 @@ describe('Application class', () => {
 			const emitSpy = spyOn(Event, 'emit');
 
 			const instance = new TestApp();
-			await instance.run(['serve']);
+			await serve(instance);
 
 			instance.elysia.get('/', ({ error }) => {
 				throw error(500, 'Test error');
@@ -707,7 +785,7 @@ describe('Application class', () => {
 			Reflect.defineMetadata(Symbols.middlewares, mockMiddlewares, TestApp);
 
 			const instance = new TestApp();
-			await instance.run(['serve']);
+			await serve(instance);
 
 			expect(applyMiddlewaresSpy).toHaveBeenCalledWith(mockMiddlewares, instance.elysia);
 		});

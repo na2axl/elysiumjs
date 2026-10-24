@@ -15,7 +15,7 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import { Container } from '../src/container';
-import { ServiceNotVisibleError } from '../src/errors';
+import { ServiceNotFoundError, ServiceNotVisibleError } from '../src/errors';
 import { Module } from '../src/module';
 import { Service } from '../src/service';
 import { createTestingApp } from '../src/testing';
@@ -114,9 +114,20 @@ describe('Application.testing', () => {
 	});
 
 	it('starts from a clean container on every call', async () => {
-		app = await createTestingApp({ modules: [MailModule] });
-		const second = await createTestingApp({ modules: [] });
-		expect(Container.hasGlobal('Mailer')).toBe(false);
-		await second.shutdown();
+		const first = await createTestingApp({
+			modules: [MailModule],
+			overrides: { Leftover: { value: 1 } },
+			boot: 'eager'
+		});
+		expect(Container.hasGlobal('Leftover')).toBe(true);
+		expect(Container.constructed().length).toBeGreaterThan(0);
+
+		// No shutdown() in between: the second call must reset what the first left behind.
+		app = await createTestingApp({ modules: [] });
+
+		expect(Container.hasGlobal('Leftover')).toBe(false);
+		expect(Container.constructed()).toHaveLength(0);
+		await expect(app.get('Leftover')).rejects.toBeInstanceOf(ServiceNotFoundError);
+		await first.kernel.shutdown();
 	});
 });

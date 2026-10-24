@@ -320,6 +320,7 @@ export abstract class Application extends InteractsWithConsole {
 	private installSignalHandlers(): void {
 		this.removeSignalHandlers();
 		const onSignal = () => {
+			this.removeSignalHandlers();
 			Promise.resolve()
 				.then(() => this.#elysia?.stop())
 				.then(() => this.#kernel?.shutdown())
@@ -344,10 +345,16 @@ export abstract class Application extends InteractsWithConsole {
 	 * when the command sets `boot`.
 	 */
 	private async prepareCommand({ item, module }: { item: CommandClass; module: ModuleNode }) {
-		await this.kernel.register();
+		await this.bootKernel(item.boot);
 		if (!item.boot) return this.kernel.prepare(item, module);
-		await this.kernel.bootEager();
 		return ModuleContext.run(module, () => Service.make(item));
+	}
+
+	/** Registers the kernel (and boots it eagerly if asked), then announces the launch. */
+	private async bootKernel(eager: boolean): Promise<void> {
+		await this.kernel.register();
+		if (eager) await this.kernel.bootEager();
+		Event.emit('elysium:app:launched', this, this);
 	}
 
 	/**
@@ -400,6 +407,8 @@ export abstract class Application extends InteractsWithConsole {
 	 */
 	private async commandServe(): Promise<void> {
 		const { server, swagger, plugins } = this.props();
+
+		await this.bootKernel(true);
 
 		this.#elysia = new Elysia(server).onRequest((c) => {
 			if (this.isDebug) {
@@ -473,6 +482,8 @@ export abstract class Application extends InteractsWithConsole {
 				await this.onStop(elysia as unknown as Elysia<Route>);
 				Event.emit('elysium:server:stop', elysia, this);
 				this._appContextStorage.disable();
+				this.removeSignalHandlers();
+				await this.#kernel?.shutdown();
 			});
 
 		const middlewares = Reflect.getMetadata(Symbols.middlewares, this.constructor) ?? [];
