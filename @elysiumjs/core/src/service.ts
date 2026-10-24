@@ -284,6 +284,7 @@ export namespace Service {
 
 	/**
 	 * Checks if a service has already been built, without building it.
+	 * Matches by name in any scope (global or module), not only the global one.
 	 * Lets modules release only the resources they actually created.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param name The name of the service to check.

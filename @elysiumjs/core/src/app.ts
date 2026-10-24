@@ -99,6 +99,9 @@ type ServerError = ErrorContext & { code: string | number; error: any };
  */
 export type AppContext = AsyncLocalStorage<Map<'tenant' | 'http:context' | 'db:tx', unknown>>;
 
+/** Context used when no application instance exists, for instance under `Application.testing`. */
+const fallbackContext: AppContext = new AsyncLocalStorage();
+
 /**
  * Base class for the application main entry.
  * @author Axel Nana <axel.nana@workbud.com>
@@ -121,9 +124,10 @@ export abstract class Application extends InteractsWithConsole {
 
 	/**
 	 * Gets the application context shared between asynchronous operations.
+	 * Falls back to a module-level storage when no application instance exists.
 	 */
 	public static get context(): AppContext {
-		return Application.instance._appContextStorage;
+		return Application.instance?._appContextStorage ?? fallbackContext;
 	}
 
 	/**

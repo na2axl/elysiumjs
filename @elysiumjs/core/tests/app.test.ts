@@ -56,6 +56,17 @@ describe('@Application.register decorator', () => {
 	});
 });
 
+describe('Application.context', () => {
+	it('falls back to a shared storage when no application instance exists', () => {
+		Container.reset();
+		const context = Application.context;
+		expect(context).toBeDefined();
+		expect(Application.context).toBe(context);
+		const store = new Map<any, unknown>([['tenant', 'a']]);
+		expect(context.run(store, () => Application.context.getStore())).toBe(store);
+	});
+});
+
 // Test Application class
 describe('Application class', () => {
 	const originalExit = process.exit;
