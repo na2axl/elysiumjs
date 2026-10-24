@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Application, Service } from '@elysiumjs/core';
+import { Application, Event, Service } from '@elysiumjs/core';
 import { getTenancyConfig, getTenancyStrategy } from '@elysiumjs/mnemosyne';
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
