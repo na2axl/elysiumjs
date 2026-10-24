@@ -18,7 +18,9 @@ import type { ElysiaPlugin } from '../src/utils';
 import { afterAll, afterEach, describe, expect, it, mock, spyOn } from 'bun:test';
 import * as Elysia from 'elysia';
 
+import { Application } from '../src/app';
 import { Http, HttpControllerScope } from '../src/http';
+import { ModuleContext } from '../src/module-context';
 import * as M from '../src/middleware';
 import { Service } from '../src/service';
 import { nextTick, Symbols } from '../src/utils';
@@ -648,6 +650,42 @@ describe('Http namespace', () => {
 				expect.any(Function),
 				expect.anything()
 			);
+		});
+
+		it('should close a generator handler in the module context when iteration stops early', async () => {
+			const closed: (string | undefined)[] = [];
+
+			@Http.controller({ path: '/test' })
+			class TestController {
+				@Http.get({ path: '/stream' })
+				async *stream() {
+					try {
+						yield 1;
+						yield 2;
+					} finally {
+						closed.push(ModuleContext.current()?.id);
+					}
+				}
+			}
+
+			await nextTick();
+
+			@Application.register()
+			class TestApp extends Application {}
+			new TestApp();
+
+			const node = testNode();
+			const plugin: ElysiaPlugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestController);
+			const app = await plugin(node);
+			const route = app.routes.find((r) => r.path === '/test/stream')!;
+			const handler = route.handler as (c: any) => AsyncGenerator;
+
+			const iterator = handler({ controller: () => new TestController(), params: {} });
+			expect((await iterator.next()).value).toBe(1);
+			await iterator.return(undefined);
+
+			expect(closed).toEqual([node.id]);
+			Service.clear();
 		});
 	});
 });

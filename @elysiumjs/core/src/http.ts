@@ -218,10 +218,22 @@ export type ElysiaApp = Elysia<Route, Singleton>;
  * The body of a generator runs when it is iterated, not when it is created.
  */
 async function* iterateInModule<T>(node: ModuleNode, generator: AsyncGenerator<T>) {
-	while (true) {
-		const step = await ModuleContext.run(node, () => generator.next());
-		if (step.done) return;
-		yield step.value;
+	let finished = false;
+	try {
+		while (true) {
+			const step = await ModuleContext.run(node, () => generator.next());
+			if (step.done) {
+				finished = true;
+				return;
+			}
+			yield step.value;
+		}
+	} catch (error) {
+		finished = true;
+		throw error;
+	} finally {
+		// Closed early (cancelled stream, disconnected client): let the handler clean up.
+		if (!finished) await ModuleContext.run(node, () => generator.return(undefined));
 	}
 }
 

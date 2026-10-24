@@ -75,7 +75,21 @@ describe('Application class', () => {
 	};
 
 	/** Lets the after-response hooks of a handled request finish before the test is cleaned up. */
-	const settle = () => new Promise((resolve) => setImmediate(resolve));
+	const afterResponseQueue: (() => void)[] = [];
+	const afterResponses: Promise<void>[] = [];
+
+	/** A module middleware that reports when the after-response hooks of a request have run. */
+	class AfterResponseProbe extends Middleware {
+		public onAfterResponse() {
+			afterResponseQueue.shift()?.();
+		}
+	}
+
+	/** Handles a request, and tracks its after-response hooks so cleanup can wait for them. */
+	const request = (app: Application, url: string) => {
+		afterResponses.push(new Promise<void>((resolve) => afterResponseQueue.push(resolve)));
+		return app.elysia.handle(new Request(url));
+	};
 
 	beforeEach(() => {
 		signalListeners.SIGINT = process.listeners('SIGINT');
@@ -94,7 +108,8 @@ describe('Application class', () => {
 	});
 
 	afterEach(async () => {
-		await settle();
+		await Promise.all(afterResponses.splice(0));
+		afterResponseQueue.length = 0;
 		for (const signal of ['SIGINT', 'SIGTERM'] as const) {
 			for (const listener of process.listeners(signal)) {
 				if (!signalListeners[signal].includes(listener)) process.off(signal, listener);
@@ -713,6 +728,7 @@ describe('Application class', () => {
 				}
 			}
 
+			@Middleware.register(AfterResponseProbe)
 			@Module.register({ services: [PrivateService], controllers: [AController] })
 			class A extends Module {}
 
@@ -722,7 +738,7 @@ describe('Application class', () => {
 			const instance = new TestApp();
 			await serve(instance);
 
-			const response = await instance.elysia.handle(new Request('http://localhost/a/x'));
+			const response = await request(instance, 'http://localhost/a/x');
 			expect(response.status).toBe(200);
 			expect(await response.json()).toEqual({ value: 'from-a' });
 			expect(seen).toBe('A');
@@ -752,6 +768,7 @@ describe('Application class', () => {
 				}
 			}
 
+			@Middleware.register(AfterResponseProbe)
 			@Module.register({ services: [Greeter], controllers: [PController] })
 			class A extends Module {}
 
@@ -761,10 +778,10 @@ describe('Application class', () => {
 			const instance = new TestApp();
 			await serve(instance);
 
-			const injected = await instance.elysia.handle(new Request('http://localhost/p/inject'));
+			const injected = await request(instance, 'http://localhost/p/inject');
 			expect(await injected.text()).toBe('hi');
 
-			const streamed = await instance.elysia.handle(new Request('http://localhost/p/stream'));
+			const streamed = await request(instance, 'http://localhost/p/stream');
 			await streamed.text();
 			expect(seen).toEqual(['A', 'A']);
 		});
@@ -778,6 +795,7 @@ describe('Application class', () => {
 				}
 			}
 
+			@Middleware.register(AfterResponseProbe)
 			@Module.register({ controllers: [XController], prefix: '/api' })
 			class A extends Module {}
 
@@ -787,7 +805,7 @@ describe('Application class', () => {
 			const instance = new TestApp();
 			await serve(instance);
 
-			const response = await instance.elysia.handle(new Request('http://localhost/api/x'));
+			const response = await request(instance, 'http://localhost/api/x');
 			expect(response.status).toBe(200);
 			expect(await response.text()).toBe('ok');
 		});
@@ -819,7 +837,7 @@ describe('Application class', () => {
 				}
 			}
 
-			@Middleware.register(GuardMiddleware)
+			@Middleware.register(GuardMiddleware, AfterResponseProbe)
 			@Module.register({ services: [Secret], controllers: [GController] })
 			class A extends Module {}
 
@@ -829,7 +847,7 @@ describe('Application class', () => {
 			const instance = new TestApp();
 			await serve(instance);
 
-			const response = await instance.elysia.handle(new Request('http://localhost/g'));
+			const response = await request(instance, 'http://localhost/g');
 			expect(built).toBe('secret');
 			expect(response.headers.get('x-guard')).toBe('A');
 		});
@@ -1003,6 +1021,7 @@ describe('Application class', () => {
 				}
 			}
 
+			@Middleware.register(AfterResponseProbe)
 			@Module.register({ controllers: [FailingController] })
 			class A extends Module {}
 
@@ -1020,7 +1039,7 @@ describe('Application class', () => {
 			const instance = new TestApp();
 			await serve(instance);
 
-			const response = await instance.elysia.handle(new Request('http://localhost/'));
+			const response = await request(instance, 'http://localhost/');
 
 			expect(response.status).toBe(500);
 			expect(await response.json()).toMatchObject({ type: 'UNKNOWN' });
