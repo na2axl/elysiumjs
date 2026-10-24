@@ -1,4 +1,5 @@
-import { HermesLogger, Service, ServiceScope } from '@elysiumjs/core';
+import { Service, ServiceScope } from '@elysiumjs/core';
+import { HermesLogger } from '@elysiumjs/hermes';
 
 @Service.register({ name: '{alias}', scope: ServiceScope.{scope} })
 export class {name} {

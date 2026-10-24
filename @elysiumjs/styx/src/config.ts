@@ -104,7 +104,12 @@ export const addToModuleHint = async (
 	className: string,
 	moduleName?: string
 ) => {
-	const name = moduleName ?? 'main';
+	const config = await parseProjectConfig();
+	if (!config.mono && !moduleName) {
+		return `Add ${className} to the ${list} list of the module that should own it.`;
+	}
+
+	const name = config.mono ? 'main' : moduleName!;
 	const path = await getModulePath(name);
 	return `Add ${className} to the ${list} list of ${pascal(name)}Module in ${path}/${name}.module.ts.`;
 };
