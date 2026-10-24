@@ -21,6 +21,7 @@ import { Heracles } from '../src/heracles';
 import { Job } from '../src/job';
 import { Queue } from '../src/queue';
 import { DuplicateJobError, JobRegistry, QUEUES_SERVICE } from '../src/registry';
+import { RedisTransport } from '../src/transports/redis.transport';
 import { RedisWorker } from '../src/workers/redis.worker';
 
 @Service.register({ global: false })
@@ -144,6 +145,56 @@ describe('HeraclesModule', () => {
 		await app.shutdown();
 		app = undefined;
 		expect(Queue.exists('module-test-q')).toBe(false);
+	});
+
+	it('shuts down cleanly with a real RedisTransport queue that was never started', async () => {
+		app = await Application.testing({
+			modules: [
+				HeraclesModule.with({
+					queues: { 'never-started': { transport: RedisTransport as any } }
+				})
+			]
+		});
+		await app.get(QUEUES_SERVICE);
+		expect(Queue.exists('never-started')).toBe(true);
+		const errors = spyOn(console, 'error').mockImplementation(() => {});
+		await app.shutdown();
+		app = undefined;
+		const logged = errors.mock.calls.length;
+		errors.mockRestore();
+		expect(logged).toBe(0);
+		expect(Queue.exists('never-started')).toBe(false);
+	});
+
+	it('stops and removes every queue even when one stop throws', async () => {
+		const stopped: string[] = [];
+		const make = (fail: boolean) =>
+			class {
+				constructor(_mode: unknown, _options?: unknown) {}
+				public onMessage(_handler: unknown): void {}
+				public async stop(): Promise<void> {
+					if (fail) throw new Error('stop failed');
+					stopped.push('ok');
+				}
+			};
+		app = await Application.testing({
+			modules: [
+				HeraclesModule.with({
+					queues: {
+						'qa-bad': { transport: make(true) as any },
+						'qa-good': { transport: make(false) as any }
+					}
+				})
+			]
+		});
+		await app.get(QUEUES_SERVICE);
+		const errors = spyOn(console, 'error').mockImplementation(() => {});
+		await app.shutdown();
+		app = undefined;
+		errors.mockRestore();
+		expect(stopped).toEqual(['ok']);
+		expect(Queue.exists('qa-bad')).toBe(false);
+		expect(Queue.exists('qa-good')).toBe(false);
 	});
 
 	it('lets a module that does not import HeraclesModule dispatch on a lazy boot', async () => {

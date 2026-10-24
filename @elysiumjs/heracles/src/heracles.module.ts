@@ -17,7 +17,7 @@ import type { Job, JobClass } from './job';
 import type { QueueOptions } from './queue';
 import type { JobRegistryEntry } from './registry';
 
-import { ElysiumError, KERNEL_SERVICE, Module, Service } from '@elysiumjs/core';
+import { ElysiumError, KERNEL_SERVICE, Module, runAll, Service } from '@elysiumjs/core';
 
 import { HeraclesCleanCommand, HeraclesListCommand, HeraclesWorkCommand } from './commands';
 import { Queue } from './queue';
@@ -46,10 +46,15 @@ export class ConfiguredQueues {
 	}
 
 	public async onDestroy(): Promise<void> {
-		for (const queue of this.queues) {
-			await queue.stop();
-			Queue.remove(queue.name);
-		}
+		await runAll(
+			this.queues.map((queue) => async () => {
+				try {
+					await queue.stop();
+				} finally {
+					Queue.remove(queue.name);
+				}
+			})
+		);
 	}
 }
 

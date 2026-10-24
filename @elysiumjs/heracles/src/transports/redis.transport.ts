@@ -275,14 +275,15 @@ export class RedisTransport extends InteractsWithConsole implements Transport {
 		}
 
 		// Unsubscribe from all channels
+		// The clients only exist once the transport has been started
 		if (this.mode === TransportMode.CONSUMER) {
-			await this.subscriberClient.unsubscribe();
+			await this.subscriberClient?.unsubscribe();
 		}
 
 		// Close all connections
-		this.commandClient.close();
-		this.subscriberClient.close();
-		this.publisherClient.close();
+		this.commandClient?.close();
+		this.subscriberClient?.close();
+		this.publisherClient?.close();
 
 		this.info('RedisTransport stopped');
 	}
