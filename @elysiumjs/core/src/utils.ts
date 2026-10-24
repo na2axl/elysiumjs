@@ -32,8 +32,6 @@ export namespace Symbols {
 
 	export const http = Symbol('elysium:Http');
 
-	export const job = Symbol('elysium:Job');
-
 	export const arg = Symbol('elysium:CommandArguments');
 
 	export const elysiaPlugin = Symbol('elysium:ElysiaPlugin');

@@ -12,472 +12,150 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Mock } from 'bun:test';
+import type { TestingApp } from '../src/testing';
 
-import { afterAll, beforeEach, describe, expect, it, jest, mock, spyOn } from 'bun:test';
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { Elysia } from 'elysia';
-import { last } from 'radash';
 
-import { Event } from '../src/event';
+import { createTestingApp } from '../src/testing';
+import { ServiceNotFoundError } from '../src/errors';
 import { nextTick, Symbols } from '../src/utils';
+import { Wamp, WampModule } from '../src/wamp';
 import { testNode } from './module-node';
-import { Wamp } from '../src/wamp';
 
-// Mock Wampy
-const mockWampy = {
-	register: mock(() => Promise.resolve({ topic: 'test.rpc', requestId: '1', registrationId: '1' })),
-	subscribe: mock(() =>
-		Promise.resolve({
-			topic: 'test.topic',
-			requestId: '1',
-			subscriptionId: '1',
-			subscriptionKey: '1'
-		})
-	),
-	connect: mock(() => Promise.resolve())
-};
+// Mock Wampy: every construction yields a fresh client
+const clients: any[] = [];
+const WampyMock = mock(function (_url: string, _options: object) {
+	const client = {
+		register: mock(() =>
+			Promise.resolve({ topic: 'test.rpc', requestId: '1', registrationId: '1' })
+		),
+		subscribe: mock(() =>
+			Promise.resolve({ topic: 't', requestId: '1', subscriptionId: '1', subscriptionKey: '1' })
+		),
+		connect: mock(() => Promise.resolve()),
+		disconnect: mock(() => Promise.resolve())
+	};
+	clients.push(client);
+	return client;
+});
+
+mock.module('wampy', () => ({ default: WampyMock }));
 
 // Mock WebSocket
-global.WebSocket = mock(() => ({
-	protocol: 'wamp.2.json'
-})) as any;
+const originalWebSocket = global.WebSocket;
+global.WebSocket = mock(() => ({ protocol: 'wamp.2.json' })) as any;
 
-// Mock controller instance
-const mockController = {
-	handleRpc: mock(),
-	handleSubscription: mock(),
-	onOpenHandler: mock(),
-	onChallengeHandler: mock(),
-	onCloseHandler: mock(),
-	onErrorHandler: mock(),
-	onReconnectHandler: mock(),
-	onReconnectSuccessHandler: mock()
+afterAll(() => {
+	global.WebSocket = originalWebSocket;
+	mock.restore();
+});
+
+const config = {
+	default: 'main',
+	connections: {
+		main: { url: 'ws://main:8080/ws', realm: 'realm1', maxRetries: 3 },
+		other: { url: 'ws://other:8080/ws', realm: 'realm2' }
+	}
 };
 
-// Mock Wampy constructor
-mock.module('wampy', () => ({
-	default: mock(function (...args: any[]) {
-		return mockWampy;
-	})
-}));
-
-describe('Wamp', () => {
-	afterAll(() => {
-		mock.restore();
-	});
+describe('WampModule', () => {
+	let app: TestingApp | undefined;
 
 	beforeEach(() => {
-		jest.restoreAllMocks();
+		clients.length = 0;
+		WampyMock.mockClear();
 	});
 
-	describe('@Wamp.controller decorator', () => {
-		it('should set metadata on the target class', () => {
-			// Create a test class
-			@Wamp.controller({
-				url: 'ws://localhost:8080/ws',
-				realm: 'realm1'
-			})
-			class TestWampController {}
-
-			// Check if metadata was set correctly
-			const plugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestWampController);
-			expect(plugin).toBeDefined();
-			expect(typeof plugin).toBe('function');
-		});
-
-		it('should create an Elysia app', async () => {
-			// Create a test class
-			@Wamp.controller({
-				url: 'ws://localhost:8080/ws',
-				realm: 'realm1'
-			})
-			class TestWampController {}
-
-			// Get the plugin function
-			const plugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestWampController);
-
-			// Call the plugin function
-			const app = await plugin(testNode());
-
-			// Check if an Elysia app was created
-			expect(app).toBeInstanceOf(Elysia);
-		});
-
-		it('should create a WAMP connection with the correct options', async () => {
-			// Create a test class
-			@Wamp.controller({
-				url: 'ws://localhost:8080/ws',
-				realm: 'realm1',
-				autoReconnect: true,
-				maxRetries: 5,
-				retryInterval: 1000
-			})
-			class TestWampController {}
-
-			// Get the plugin function
-			const plugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestWampController);
-
-			// Call the plugin function
-			await plugin(testNode());
-
-			// Check if Wampy was called with the correct options
-			// @ts-expect-error Mocking headaches
-			const { default: Wampy } = await import('wampy');
-			expect(Wampy).toHaveBeenCalledWith(
-				'ws://localhost:8080/ws',
-				expect.objectContaining({
-					realm: 'realm1',
-					autoReconnect: true,
-					maxRetries: 5,
-					retryInterval: 1000
-				})
-			);
-		});
-
-		it('should connect to the WAMP server when the app starts', async () => {
-			// Create a test class
-			@Wamp.controller({
-				url: 'ws://localhost:8080/ws',
-				realm: 'realm1'
-			})
-			class TestWampController {}
-
-			// Get the plugin function
-			const plugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestWampController);
-
-			// Call the plugin function
-			const app: Elysia = await plugin(testNode());
-
-			// Trigger the onStart event
-			await app.event.start?.[0].fn(app);
-
-			// Check if connect was called
-			expect(mockWampy.connect).toHaveBeenCalled();
-		});
+	afterEach(async () => {
+		await app?.shutdown();
+		app = undefined;
 	});
 
-	describe('@Wamp.register decorator', () => {
-		it('should register an RPC handler', async () => {
-			// Create a test class
-			@Wamp.controller({
-				url: 'ws://localhost:8080/ws',
-				realm: 'realm1'
-			})
-			class TestWampController {
-				@Wamp.register('test.rpc')
-				handleRpc(data: any) {
-					return { success: true };
-				}
-			}
-
-			// Get the plugin function
-			const plugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestWampController);
-
-			// Call the plugin function
-			const app: Elysia = await plugin(testNode());
-			app.listen(3131);
-			await nextTick();
-
-			// Check if the RPC was registered
-			expect(mockWampy.register).toHaveBeenCalledWith('test.rpc', expect.any(Function), undefined);
-
-			app.stop();
-		});
-
-		it('should register an RPC handler with options', async () => {
-			// Create a test class
-			@Wamp.controller({
-				url: 'ws://localhost:8080/ws',
-				realm: 'realm1'
-			})
-			class TestWampController {
-				@Wamp.register('test.rpc', { match: 'prefix', invoke: 'roundrobin' })
-				handleRpc(data: any) {
-					return { success: true };
-				}
-			}
-
-			// Get the plugin function
-			const plugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestWampController);
-
-			// Call the plugin function
-			const app: Elysia = await plugin(testNode());
-			app.listen(3131);
-			await nextTick();
-
-			// Check if the RPC was registered with options
-			expect(mockWampy.register).toHaveBeenCalledWith('test.rpc', expect.any(Function), {
-				match: 'prefix',
-				invoke: 'roundrobin'
-			});
-
-			app.stop();
-		});
-
-		it('should set metadata on the target class', () => {
-			// Create a test class
-			@Wamp.controller({
-				url: 'ws://localhost:8080/ws',
-				realm: 'realm1'
-			})
-			class TestWampController {
-				@Wamp.register('test.rpc')
-				handleRpc(data: any) {
-					return { success: true };
-				}
-			}
-
-			// Check if metadata was set correctly
-			const metadata = Reflect.getMetadata(Symbols.wamp, TestWampController);
-			expect(metadata).toBeDefined();
-			expect(metadata.registrations).toBeArrayOfSize(1);
-			expect(metadata.registrations[0].topic).toBe('test.rpc');
-			expect(metadata.registrations[0].handler).toBeDefined();
-		});
+	it('creates no client until the first get', async () => {
+		app = await createTestingApp({ modules: [WampModule.with(config)] });
+		expect(WampyMock).not.toHaveBeenCalled();
+		expect(Wamp.connectionExists('other')).toBe(true);
 	});
 
-	describe('@Wamp.subscribe decorator', () => {
-		it('should register a subscription handler', async () => {
-			// Create a test class
-			@Wamp.controller({
-				url: 'ws://localhost:8080/ws',
-				realm: 'realm1'
-			})
-			class TestWampController {
-				@Wamp.subscribe('test.topic')
-				handleSubscription(data: any) {
-					// Handle subscription
-				}
-			}
-
-			// Get the plugin function
-			const plugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestWampController);
-
-			// Call the plugin function
-			const app: Elysia = await plugin(testNode());
-			app.listen(3131);
-			await nextTick();
-
-			// Check if the subscription was registered
-			expect(mockWampy.subscribe).toHaveBeenCalledWith(
-				'test.topic',
-				expect.any(Function),
-				undefined
-			);
-
-			app.stop();
-		});
-
-		it('should register a subscription handler with options', async () => {
-			// Create a test class
-			@Wamp.controller({
-				url: 'ws://localhost:8080/ws',
-				realm: 'realm1'
-			})
-			class TestWampController {
-				@Wamp.subscribe('test.topic', { match: 'prefix' })
-				handleSubscription(data: any) {
-					// Handle subscription
-				}
-			}
-
-			// Get the plugin function
-			const plugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestWampController);
-
-			// Call the plugin function
-			const app: Elysia = await plugin(testNode());
-			app.listen(3131);
-			await nextTick();
-
-			// Check if the subscription was registered with options
-			expect(mockWampy.subscribe).toHaveBeenCalledWith('test.topic', expect.any(Function), {
-				match: 'prefix'
-			});
-
-			app.stop();
-		});
-
-		it('should set metadata on the target class', () => {
-			// Create a test class
-			@Wamp.controller({
-				url: 'ws://localhost:8080/ws',
-				realm: 'realm1'
-			})
-			class TestWampController {
-				@Wamp.subscribe('test.topic')
-				handleSubscription(data: any) {
-					// Handle subscription
-				}
-			}
-
-			// Check if metadata was set correctly
-			const metadata = Reflect.getMetadata(Symbols.wamp, TestWampController);
-			expect(metadata).toBeDefined();
-			expect(metadata.subscriptions).toBeArrayOfSize(1);
-			expect(metadata.subscriptions[0].topic).toBe('test.topic');
-			expect(metadata.subscriptions[0].handler).toBeDefined();
-		});
+	it('creates and connects the client with the connection options', async () => {
+		app = await createTestingApp({ modules: [WampModule.with(config)] });
+		await app.get('wamp.connection.main');
+		const client = Wamp.getConnection('main');
+		expect(client).toBe(clients[0]);
+		expect(WampyMock).toHaveBeenCalledWith(
+			'ws://main:8080/ws',
+			expect.objectContaining({ realm: 'realm1', maxRetries: 3 })
+		);
+		expect(clients[0].connect).toHaveBeenCalled();
 	});
 
-	describe('Lifecycle event decorators', () => {
-		it('should register onChallenge handler', async () => {
-			// Create a test class
-			@Wamp.controller({
-				url: 'ws://localhost:8080/ws',
-				realm: 'realm1',
-				authid: 'test',
-				authmethods: ['ticket', 'wampcra']
-			})
-			class TestWampController {
-				@Wamp.onChallenge()
-				onChallengeHandler() {
-					mockController.onChallengeHandler();
-				}
-			}
+	it('resolves the default alias to the configured connection, sharing its instance', async () => {
+		app = await createTestingApp({ modules: [WampModule.with(config)] });
+		await app.get('wamp.connection.default');
+		expect(Wamp.getDefaultConnection()).toBe(Wamp.getConnection('main'));
+		expect(Wamp.getConnection()).toBe(Wamp.getConnection('main'));
+		expect(WampyMock).toHaveBeenCalledTimes(1);
+	});
 
-			// Check if metadata was set correctly
-			const metadata = Reflect.getMetadata(Symbols.wamp, TestWampController);
-			expect(metadata).toBeDefined();
-			expect(metadata.challenge).toBeDefined();
+	it('throws ServiceNotFoundError for an unknown connection', async () => {
+		app = await createTestingApp({ modules: [WampModule.with(config)] });
+		expect(() => Wamp.getConnection('nope')).toThrow(ServiceNotFoundError);
+		expect(Wamp.connectionExists('nope')).toBe(false);
+	});
+
+	it('disconnects only the clients that were created on shutdown', async () => {
+		app = await createTestingApp({ modules: [WampModule.with(config)] });
+		await app.get('wamp.connection.default');
+		await app.shutdown();
+		app = undefined;
+		expect(clients).toHaveLength(1);
+		expect(clients[0].disconnect).toHaveBeenCalledTimes(1);
+	});
+
+	it('requires connections', async () => {
+		await expect(createTestingApp({ modules: [WampModule.with({})] })).rejects.toThrow(
+			/connections/
+		);
+	});
+});
+
+describe('Wamp controllers', () => {
+	let app: TestingApp | undefined;
+
+	beforeEach(() => {
+		clients.length = 0;
+		WampyMock.mockClear();
+	});
+
+	afterEach(async () => {
+		await app?.shutdown();
+		app = undefined;
+	});
+
+	it('registers RPCs and subscriptions on the module connection when the app starts', async () => {
+		app = await createTestingApp({ modules: [WampModule.with(config)] });
+
+		await app.get('wamp.connection.other');
+
+		@Wamp.controller({ connection: 'other' })
+		class TestWampController {
+			@Wamp.register('test.rpc', { match: 'prefix' })
+			public rpc() {}
+
+			@Wamp.subscribe('test.topic')
+			public topic() {}
+		}
+
+		const plugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestWampController);
+		const elysia: Elysia = await plugin(testNode());
+		await elysia.event.start?.[0].fn(elysia as any);
+		await nextTick();
+
+		const client = Wamp.getConnection('other') as any;
+		expect(client.register).toHaveBeenCalledWith('test.rpc', expect.any(Function), {
+			match: 'prefix'
 		});
-
-		it('should register onOpen handler', async () => {
-			// Create a test class
-			@Wamp.controller({
-				url: 'ws://localhost:8080/ws',
-				realm: 'realm1'
-			})
-			class TestWampController {
-				@Wamp.onOpen()
-				onOpenHandler() {
-					mockController.onOpenHandler();
-				}
-			}
-
-			// Get the plugin function
-			const plugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestWampController);
-
-			// Call the plugin function
-			const app: Elysia = await plugin(testNode());
-
-			// Trigger the onStart event
-			await app.event.start?.[0].fn(app);
-
-			// Check if the onOpen handler was called
-			expect(mockController.onOpenHandler).toHaveBeenCalled();
-		});
-
-		it('should register onClose handler', () => {
-			// Create a test class
-			@Wamp.controller({
-				url: 'ws://localhost:8080/ws',
-				realm: 'realm1'
-			})
-			class TestWampController {
-				@Wamp.onClose()
-				onCloseHandler() {
-					mockController.onCloseHandler();
-				}
-			}
-
-			// Check if metadata was set correctly
-			const metadata = Reflect.getMetadata(Symbols.wamp, TestWampController);
-			expect(metadata).toBeDefined();
-			expect(metadata.close).toBeDefined();
-		});
-
-		it('should register onError handler', () => {
-			// Create a test class
-			@Wamp.controller({
-				url: 'ws://localhost:8080/ws',
-				realm: 'realm1'
-			})
-			class TestWampController {
-				@Wamp.onError()
-				onErrorHandler() {
-					mockController.onErrorHandler();
-				}
-			}
-
-			// Check if metadata was set correctly
-			const metadata = Reflect.getMetadata(Symbols.wamp, TestWampController);
-			expect(metadata).toBeDefined();
-			expect(metadata.error).toBeDefined();
-		});
-
-		it('should register onReconnect handler', () => {
-			// Create a test class
-			@Wamp.controller({
-				url: 'ws://localhost:8080/ws',
-				realm: 'realm1'
-			})
-			class TestWampController {
-				@Wamp.onReconnect()
-				onReconnectHandler() {
-					mockController.onReconnectHandler();
-				}
-			}
-
-			// Check if metadata was set correctly
-			const metadata = Reflect.getMetadata(Symbols.wamp, TestWampController);
-			expect(metadata).toBeDefined();
-			expect(metadata.reconnect).toBeDefined();
-		});
-
-		it('should register onReconnectSuccess handler', () => {
-			// Create a test class
-			@Wamp.controller({
-				url: 'ws://localhost:8080/ws',
-				realm: 'realm1'
-			})
-			class TestWampController {
-				@Wamp.onReconnectSuccess()
-				onReconnectSuccessHandler() {
-					mockController.onReconnectSuccessHandler();
-				}
-			}
-
-			// Check if metadata was set correctly
-			const metadata = Reflect.getMetadata(Symbols.wamp, TestWampController);
-			expect(metadata).toBeDefined();
-			expect(metadata.reconnectSuccess).toBeDefined();
-		});
-
-		it('should emit an error event when a WAMP error occurs', async () => {
-			// Get the Wampy constructor arguments
-			// @ts-expect-error wampy doesn't have type definitions
-			const { default: Wampy } = await import('wampy');
-			(Wampy as Mock<any>).mockClear();
-
-			const emitSpy = spyOn(Event, 'emit');
-
-			// Create a test class with an error handler
-			@Wamp.controller({
-				url: 'ws://localhost:8080/ws',
-				realm: 'realm1'
-			})
-			class TestWampController {
-				@Wamp.onError()
-				onErrorHandler() {
-					console.log('onErrorHandler !');
-					mockController.onErrorHandler();
-				}
-			}
-
-			// Get the plugin function
-			const plugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestWampController);
-
-			// Call the plugin function
-			await plugin(testNode());
-
-			const wampyArgs: any = last((Wampy as Mock<any>).mock.calls[0]);
-
-			// Trigger the onError callback
-			wampyArgs.onError();
-
-			// Check if the error handler was called and an event was emitted
-			expect(mockController.onErrorHandler).toHaveBeenCalled();
-			expect(emitSpy).toHaveBeenCalledWith('elysium:error', expect.any(Error));
-		});
+		expect(client.subscribe).toHaveBeenCalledWith('test.topic', expect.any(Function), undefined);
 	});
 });

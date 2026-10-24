@@ -14,6 +14,9 @@
 
 import { omit } from 'radash';
 
+import { Container } from './container';
+import { ServiceNotFoundError } from './errors';
+import { Module } from './module';
 import { Service } from './service';
 
 /**
@@ -22,6 +25,18 @@ import { Service } from './service';
  */
 export type RedisConnectionProps = Bun.RedisOptions & { url: string };
 
+/**
+ * Configuration of the {@link RedisModule}.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type RedisModuleConfig = {
+	/** The name of the connection that `default` resolves to. */
+	default: string;
+
+	/** The connections to declare, by name. */
+	connections: Record<string, RedisConnectionProps>;
+};
+
 export namespace Redis {
 	/**
 	 * Creates a service name for a redis connection.
@@ -29,51 +44,21 @@ export namespace Redis {
 	 * @param name The name of the connection.
 	 * @returns A service name for the connection.
 	 */
-	const getConnectionName = (name: string) => {
+	export const getConnectionName = (name: string) => {
 		return `redis.connection.${name}`;
 	};
 
 	/**
-	 * Retrieves the client for a redis connection.
+	 * Retrieves the client for a redis connection declared by the {@link RedisModule}.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param name The name of the connection.
 	 * @returns The Bun.RedisClient for the connection with the given name.
+	 * @throws {ServiceNotFoundError} If no connection with that name is declared.
 	 */
-	export const getConnection = (name: string) => {
-		if (!Service.exists(getConnectionName(name))) {
-			// TODO: Use logger service here
-			console.error(
-				`No Redis connection with name ${name} found. Please make sure to register the connection before using it.`
-			);
-			process.exit(1);
-		}
-
-		return Service.get<Bun.RedisClient>(getConnectionName(name))!;
-	};
-
-	/**
-	 * Creates and registers a new redis connection.
-	 *
-	 * This will make the registered connection available for dependency injection with
-	 * the key `redis.connection.{name}`, where `{name}` is replaced with the given name.
-	 *
-	 * @author Axel Nana <axel.nana@workbud.com>
-	 *
-	 * @param name The name of the connection.
-	 * @param config The configuration for the redis connection.
-	 * @returns The newly created and registered redis connection.
-	 */
-	export const registerConnection = (name: string, config: RedisConnectionProps) => {
-		if (Service.exists(getConnectionName(name))) {
-			// TODO: Use logger service here
-			console.error(`A Redis connection with the name ${name} has already been registered.`);
-			process.exit(1);
-		}
-
-		return Service.instance(
-			getConnectionName(name),
-			new Bun.RedisClient(config.url, omit(config, ['url']))
-		);
+	export const getConnection = (name: string = 'default') => {
+		const client = Service.get<Bun.RedisClient>(getConnectionName(name));
+		if (client === null) throw new ServiceNotFoundError(getConnectionName(name));
+		return client;
 	};
 
 	/**
@@ -94,16 +79,36 @@ export namespace Redis {
 	export const getDefaultConnection = () => {
 		return getConnection('default');
 	};
+}
 
-	/**
-	 * Sets the default redis connection.
-	 * @author Axel Nana <axel.nana@workbud.com>
-	 * @param name The name of the connection to set as default.
-	 * @returns The default redis connection.
-	 */
-	export const setDefaultConnection = (name: string) => {
-		const serviceName = getConnectionName('default');
-		Service.remove(serviceName);
-		return Service.instance(serviceName, getConnection(name));
-	};
+/**
+ * Declares redis connections as global services named `redis.connection.{name}`, plus
+ * `redis.connection.default` aliasing the configured default. Clients are created on first use.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+@Module.register<RedisModuleConfig>({
+	services: (config) => [
+		...Object.entries(config.connections).map(([name, props]) => ({
+			name: Redis.getConnectionName(name),
+			global: true,
+			factory: () => new Bun.RedisClient(props.url, omit(props, ['url']))
+		})),
+		{
+			name: Redis.getConnectionName('default'),
+			global: true,
+			factory: (_config: unknown, get: <T>(name: string) => T) =>
+				get<Bun.RedisClient>(Redis.getConnectionName(config.default))
+		}
+	]
+})
+export class RedisModule extends Module.configurable<RedisModuleConfig>({
+	required: ['connections']
+}) {
+	/** Closes the clients that were created. */
+	public override onDestroy(): void {
+		const names = Object.keys(this.config.connections).map(Redis.getConnectionName);
+		for (const { name, instance } of Container.constructed()) {
+			if (names.includes(name)) (instance as Bun.RedisClient).close();
+		}
+	}
 }

@@ -27,7 +27,6 @@ export { Env } from './env';
 export { type EventData, type EventHandler, Event } from './event';
 export { type LoggerInterface, ConsoleLogger } from './logger';
 export { type Context, type Route, HttpControllerScope, Http } from './http';
-export { Job } from './job';
 export { Middleware } from './middleware';
 export { RequestLoggerMiddleware } from './middlewares/request-logger.middleware';
 export {
@@ -48,7 +47,7 @@ export { type ConfiguredModule, type ModuleClass, type ModuleProps, Module } fro
 export { ModuleContext } from './module-context';
 export { type ModuleGraph, type ModuleNode } from './module-graph';
 export { type TestingApp, type TestingOptions } from './testing';
-export { Redis } from './redis';
+export { type RedisConnectionProps, type RedisModuleConfig, Redis, RedisModule } from './redis';
 export {
 	type ServiceDefinition,
 	type ServiceFactoryDefinition,
@@ -63,10 +62,12 @@ export {
 	type WampSubscriptionHandlerArgs,
 	type WampRegistrationHandler,
 	type WampSubscriptionHandler,
-	Wamp
+	type WampClientProps,
+	type WampModuleConfig,
+	Wamp,
+	WampModule
 } from './wamp';
 export { type WS, type WSError, Websocket } from './websocket';
-export { type QueueOptions, WorkerPool, Worker } from './worker';
 
 /**
  * The type for the context of the application.

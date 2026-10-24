@@ -20,7 +20,10 @@ import { omit } from 'radash';
 // @ts-expect-error The Wampy type definitions are not up to date
 import Wampy from 'wampy';
 
+import { Container } from './container';
+import { ServiceNotFoundError } from './errors';
 import { Event } from './event';
+import { Module } from './module';
 import { ModuleContext } from './module-context';
 import { Service } from './service';
 import { nextTick, Symbols } from './utils';
@@ -349,49 +352,47 @@ export namespace Wamp {
 	 * @param name The name of the connection.
 	 * @returns A service name for the connection.
 	 */
-	const getConnectionName = (name: string) => {
+	export const getConnectionName = (name: string) => {
 		return `wamp.connection.${name}`;
 	};
 
 	/**
-	 * Retrieves the client for a WAMP connection.
+	 * Retrieves the client for a WAMP connection declared by the {@link WampModule}.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param name The name of the connection.
 	 * @returns The Wampy client for the connection with the given name.
+	 * @throws {ServiceNotFoundError} If no connection with that name is declared.
 	 */
-	export const getConnection = (name: string) => {
-		if (!Service.exists(getConnectionName(name))) {
-			// TODO: Use logger service here
-			console.error(
-				`No WAMP connection with name ${name} found. Please make sure to register the connection before using it.`
-			);
-			process.exit(1);
-		}
-
-		return Service.get<WampClient>(getConnectionName(name))!;
+	export const getConnection = (name: string = 'default') => {
+		const client = Service.get<WampClient>(getConnectionName(name));
+		if (client === null) throw new ServiceNotFoundError(getConnectionName(name));
+		return client;
 	};
 
 	/**
-	 * Creates and registers a new WAMP client.
-	 *
-	 * This will make the registered connection available for dependency injection with
-	 * the key `wamp.connection.{name}`, where `{name}` is replaced with the given name.
-	 *
+	 * Checks if a WAMP connection with the given name exists.
 	 * @author Axel Nana <axel.nana@workbud.com>
-	 *
 	 * @param name The name of the connection.
-	 * @param config The configuration for the WAMP client.
-	 * @returns The newly created and configured WAMP client for the given connection.
+	 * @returns `true` if the connection exists, `false` otherwise.
 	 */
-	export const registerConnection = (name: string, config: WampClientProps) => {
-		if (Service.exists(getConnectionName(name))) {
-			// TODO: Use logger service here
-			console.error(
-				`A WAMP connection with name ${name} already exists. Please ensure to register a new connection before overwriting it.`
-			);
-			process.exit(1);
-		}
+	export const connectionExists = (name: string) => {
+		return Service.exists(getConnectionName(name));
+	};
 
+	/**
+	 * Retrieves the default WAMP connection.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @returns The default WAMP connection.
+	 */
+	export const getDefaultConnection = () => {
+		return getConnection('default');
+	};
+
+	/**
+	 * Creates a WAMP client and starts connecting it, retrying on failure.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 */
+	export const createClient = (name: string, config: WampClientProps): WampClient => {
 		const client = new Wampy(config.url, {
 			ws: WampWebsocket,
 			...omit(config, ['url']),
@@ -430,38 +431,7 @@ export namespace Wamp {
 
 		tryConnect();
 
-		return Service.instance<WampClient>(getConnectionName(name), client);
-	};
-
-	/**
-	 * Checks if a WAMP connection with the given name exists.
-	 * @author Axel Nana <axel.nana@workbud.com>
-	 * @param name The name of the connection.
-	 * @returns `true` if the connection exists, `false` otherwise.
-	 */
-	export const connectionExists = (name: string) => {
-		return Service.exists(getConnectionName(name));
-	};
-
-	/**
-	 * Retrieves the default WAMP connection.
-	 * @author Axel Nana <axel.nana@workbud.com>
-	 * @returns The default WAMP connection.
-	 */
-	export const getDefaultConnection = () => {
-		return getConnection('default');
-	};
-
-	/**
-	 * Sets the default WAMP connection.
-	 * @author Axel Nana <axel.nana@workbud.com>
-	 * @param name The name of the connection to set as default.
-	 * @returns The default WAMP connection.
-	 */
-	export const setDefaultConnection = (name: string) => {
-		const serviceName = getConnectionName('default');
-		Service.remove(serviceName);
-		return Service.instance<WampClient>(serviceName, getConnection(name));
+		return client;
 	};
 
 	/**
@@ -568,4 +538,47 @@ export namespace Wamp {
 			Reflect.defineMetadata(Symbols.wamp, metadata, target.constructor);
 		};
 	};
+}
+
+/**
+ * Configuration of the {@link WampModule}.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type WampModuleConfig = {
+	/** The name of the connection that `default` resolves to. */
+	default: string;
+
+	/** The connections to declare, by name. */
+	connections: Record<string, WampClientProps>;
+};
+
+/**
+ * Declares WAMP connections as global services named `wamp.connection.{name}`, plus
+ * `wamp.connection.default` aliasing the configured default. Clients are created on first use.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+@Module.register<WampModuleConfig>({
+	services: (config) => [
+		...Object.entries(config.connections).map(([name, props]) => ({
+			name: Wamp.getConnectionName(name),
+			global: true,
+			factory: () => Wamp.createClient(name, props)
+		})),
+		{
+			name: Wamp.getConnectionName('default'),
+			global: true,
+			factory: (_config: unknown, get: <T>(name: string) => T) =>
+				get<WampClient>(Wamp.getConnectionName(config.default))
+		}
+	]
+})
+export class WampModule extends Module.configurable<WampModuleConfig>({
+	required: ['connections']
+}) {
+	/** Disconnects the clients that were created. */
+	public override async onDestroy(): Promise<void> {
+		const names = Object.keys(this.config.connections).map(Wamp.getConnectionName);
+		const clients = Container.constructed().filter(({ name }) => names.includes(name));
+		await Promise.all(clients.map(({ instance }) => (instance as WampClient).disconnect()));
+	}
 }
