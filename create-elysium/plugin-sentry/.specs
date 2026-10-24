@@ -4,8 +4,9 @@
 			"@elysiumjs/plugin-sentry@latest"
 		]
 	},
-	"import": {
+	"module": {
 		"name": "@elysiumjs/plugin-sentry",
-		"alias": "sentryPlugin"
+		"import": "SentryModule",
+		"expression": "SentryModule.with({})"
 	}
 }

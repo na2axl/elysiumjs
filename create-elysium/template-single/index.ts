@@ -10,8 +10,4 @@ Event.on('elysium:error', (e: EventData<Error>) => {
 	console.error(JSON.stringify(e));
 });
 
-Event.on('elysium:app:stop', () => {
-	console.log('Stopping Elysium');
-});
-
-new App();
+await App.start();

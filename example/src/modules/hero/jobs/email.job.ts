@@ -1,6 +1,6 @@
 import { random } from 'radash';
 
-import { Job } from '@elysiumjs/core';
+import { Job } from '@elysiumjs/heracles';
 
 @Job.register({ queue: 'email', name: 'send-email' })
 export class EmailJob extends Job {

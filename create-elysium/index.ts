@@ -21,6 +21,8 @@ import { Command, ConsoleFormat } from '@elysiumjs/core';
 import prompts from 'prompts';
 import { assign, objectify, pascal, snake } from 'radash';
 
+import type { EnabledModule } from './utils';
+
 import { getAppCode, getModuleCode } from './utils';
 
 const __dirname = dirname(Bun.fileURLToPath(import.meta.url));
@@ -256,8 +258,7 @@ class CreateElysiumCommand extends Command {
 
 		await Bun.$`cd ${projectPath} && bun install`.quiet();
 
-		const enabledPlugins: { name: string; alias: string }[] = [];
-		const sideEffectImports: string[] = [];
+		const enabledModules: EnabledModule[] = [];
 
 		const setupPluginOrFeature = async (name: string, kind: 'plugin' | 'feature') => {
 			const pluginPath = join(__dirname, `${kind}-${name}`);
@@ -295,12 +296,8 @@ class CreateElysiumCommand extends Command {
 				patchedPackageJson = assign(patchedPackageJson, specs.patch);
 			}
 
-			if (kind === 'plugin') {
-				enabledPlugins.push({ name: specs.import.name, alias: specs.import.alias });
-			}
-
-			if (specs.sideEffectImport) {
-				sideEffectImports.push(specs.sideEffectImport as string);
+			if (specs.module) {
+				enabledModules.push(specs.module as EnabledModule);
 			}
 		};
 
@@ -341,21 +338,9 @@ class CreateElysiumCommand extends Command {
 				(m: string) =>
 					answers.template === 'multi' ? `#${m}/${snake(m)}.module` : `#root/${snake(m)}.module`
 			),
-			enabledPlugins
+			enabledModules
 		);
 		await Bun.file(join(projectPath, 'src', 'app.ts')).write(appCode);
-
-		if (sideEffectImports.length > 0) {
-			const entryFilePath = join(projectPath, 'index.ts');
-			const entryFile = Bun.file(entryFilePath);
-			const entryContents = await entryFile.text();
-			const importLines = sideEffectImports.map((pkg) => `import '${pkg}';`).join('\n');
-			const updatedContents = entryContents.replace(
-				"import 'reflect-metadata';",
-				`import 'reflect-metadata';\n${importLines}`
-			);
-			await entryFile.write(updatedContents);
-		}
 
 		if (answers.features.includes('prettier')) {
 			s.update('Formatting code using Prettier...');

@@ -3,7 +3,8 @@ import type { MainModule } from '#hero/hero.module';
 import type { User, UserInsert } from '#hero/models/user.model';
 import type { Class } from 'type-fest';
 
-import { Event, Http, HttpControllerScope, Service, t, WorkerPool } from '@elysiumjs/core';
+import { Event, Http, HttpControllerScope, Service, t } from '@elysiumjs/core';
+import { Heracles } from '@elysiumjs/heracles';
 import { HermesLogger } from '@elysiumjs/hermes';
 import { Cache } from '@elysiumjs/mnemosyne';
 import { isEmpty, uid } from 'radash';
@@ -89,7 +90,7 @@ export class UserController {
 	private static addFromEvent(e: EventData<User>) {
 		const us = Service.get<UserService>('user.service')!;
 		us.data.push(e.data);
-		WorkerPool.instance.runJob(EmailJob, e.data.email, 'Hello from Elysium!');
+		void Heracles.dispatch(EmailJob, [e.data.email, 'Hello from Elysium!']);
 	}
 
 	@Http.onRequest()

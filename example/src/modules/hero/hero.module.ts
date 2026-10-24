@@ -1,18 +1,27 @@
-import { Module } from '@elysiumjs/core';
+import { Module, Service } from '@elysiumjs/core';
+import { Queue } from '@elysiumjs/heracles';
 
+import { ProgressDemoCommand } from '#hero/commands/progress-demo.command';
+import { SpinnerDemoCommand } from '#hero/commands/spinner-demo.command';
+import { TestCommand } from '#hero/commands/test.command';
 import { UserController } from '#hero/controllers/http/user.controller';
-import { TestController } from '#hero/controllers/wamp/test.controller';
 import { ChatServerController } from '#hero/controllers/websocket/chat-server.controller';
+import { EmailJob } from '#hero/jobs/email.job';
+import { FailingJob } from '#hero/jobs/failing.job';
+import { UserRepository } from '#hero/repositories/user.repository';
+import { UserService } from '#hero/services/user.service';
 
 @Module.register({
-	controllers: [UserController, ChatServerController]
+	services: [UserService, UserRepository],
+	controllers: [UserController, ChatServerController],
+	commands: [ProgressDemoCommand, SpinnerDemoCommand, TestCommand],
+	jobs: [EmailJob, FailingJob]
 })
 export class MainModule extends Module {
-	public constructor() {
-		super();
-	}
-
-	public override async afterRegister(): Promise<void> {
-		console.log('Module registered successfully');
+	/** Starts the email queue so that this process can dispatch jobs to the workers. */
+	public override async onServe(): Promise<void> {
+		// Creates the queues configured on the HeraclesModule.
+		await Service.resolve('heracles.queues');
+		await Queue.get('email').start();
 	}
 }

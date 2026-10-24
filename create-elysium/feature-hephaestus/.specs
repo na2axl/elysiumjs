@@ -4,5 +4,9 @@
 			"@elysiumjs/hephaestus@latest"
 		]
 	},
-	"sideEffectImport": "@elysiumjs/hephaestus"
+	"module": {
+		"name": "@elysiumjs/hephaestus",
+		"import": "HephaestusModule",
+		"expression": "HephaestusModule"
+	}
 }

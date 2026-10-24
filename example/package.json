@@ -8,6 +8,7 @@
 	},
 	"dependencies": {
 		"@elysiumjs/core": "workspace:^",
+		"@elysiumjs/heracles": "workspace:^",
 		"@elysiumjs/hermes": "workspace:^",
 		"@elysiumjs/mnemosyne-drizzle": "workspace:^",
 		"@elysiumjs/styx": "workspace:^",
