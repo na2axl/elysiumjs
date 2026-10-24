@@ -98,6 +98,19 @@ describe('Module', () => {
 			expect(XModule.resolveConfig({ url: 'v' }).opts).toEqual({ a: 1, b: 2 });
 		});
 
+		it('resolveConfig leaves nested input and defaults unchanged and unshared', () => {
+			const input = { url: 'u', opts: { a: 9 } } as any;
+			const r1 = XModule.resolveConfig(input);
+			const r2 = XModule.resolveConfig({ url: 'v' });
+			expect(input).toEqual({ url: 'u', opts: { a: 9 } });
+			expect(r1.opts).toEqual({ a: 9, b: 2 });
+
+			r2.opts.a = 77;
+			const r3 = XModule.resolveConfig({ url: 'w' });
+			expect(r3.opts).toEqual({ a: 1, b: 2 });
+			expect(r2.opts).not.toBe(r3.opts);
+		});
+
 		it('resolveConfig throws listing missing required keys', () => {
 			try {
 				XModule.resolveConfig({});

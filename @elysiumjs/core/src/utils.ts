@@ -14,7 +14,7 @@
 
 import type { Elysia } from 'elysia';
 
-import { isObject, isPrimitive } from 'radash';
+import { isObject } from 'radash';
 
 export namespace Symbols {
 	export const app = Symbol('elysium:Application');
@@ -63,53 +63,78 @@ export const nextTick = () => new Promise((resolve) => process.nextTick(resolve)
 export type ElysiaPlugin = () => Promise<Elysia>;
 
 /**
- * Deeply merges objects from right to left
- * Arrays are also merged if they are found in child objects
- *
- * @param target The target object to merge into
- * @param sources One or more source objects to merge from
- * @returns The merged object (same reference as target)
+ * Copies plain objects and arrays recursively. Everything else (primitives, class
+ * instances, functions) is kept by reference.
  */
-export function deepMerge<T extends Record<string, any | any[]>>(target: T, ...sources: T[]): T {
-	if (!sources.length) return target;
-
-	const source = sources.shift();
-	if (source === undefined) return target;
-
-	if (isObject(target) && isObject(source)) {
-		for (const key in source) {
-			if (isObject(source[key])) {
-				if (!target[key]) {
-					Object.assign(target, { [key]: source[key] });
-				} else {
-					deepMerge(target[key], source[key]);
-				}
-			} else if (Array.isArray(source[key])) {
-				if (!Array.isArray(target[key])) {
-					target[key] = [] as any;
-				}
-				// Merge arrays by concatenating and removing duplicates for primitive values
-				if (source[key].length > 0 && !isObject(source[key][0])) {
-					target[key] = [...new Set([...target[key], ...source[key]])] as any;
-				} else {
-					// For arrays of objects, merge each item
-					source[key].forEach((item: any, index: number) => {
-						if (isObject(item) && target[key][index]) {
-							target[key][index] = deepMerge(target[key][index], item);
-						} else {
-							if (!target[key].includes(item)) {
-								target[key].push(item);
-							}
-						}
-					});
-				}
-			} else if (isPrimitive(source[key])) {
-				target[key] ??= source[key];
-			} else {
-				deepMerge(target[key], source[key]);
+function cloneValue<V>(value: V): V {
+	if (Array.isArray(value)) return value.map(cloneValue) as V;
+	if (isObject(value)) {
+		const out: Record<string, any> = {};
+		// Symbol keys are copied too (e.g. TypeBox schemas carry their kind under a symbol)
+		for (const key of Reflect.ownKeys(value)) {
+			if (Object.prototype.propertyIsEnumerable.call(value, key)) {
+				out[key as string] = cloneValue((value as any)[key]);
 			}
 		}
+		return out as V;
 	}
+	return value;
+}
 
-	return deepMerge(target, ...sources);
+/**
+ * Merges `source` into `target`. `target` must be a fresh object owned by the caller.
+ */
+function mergeInto(target: Record<string, any>, source: Record<string, any>): void {
+	for (const key of Object.keys(source)) {
+		const value = source[key];
+		if (isObject(value)) {
+			if (isObject(target[key])) {
+				mergeInto(target[key], value);
+			} else if (target[key] === undefined) {
+				target[key] = cloneValue(value);
+			}
+		} else if (Array.isArray(value)) {
+			if (!Array.isArray(target[key])) {
+				target[key] = [];
+			}
+			const current: any[] = target[key];
+			if (value.length > 0 && !isObject(value[0])) {
+				// Merge arrays by concatenating and removing duplicates for primitive values
+				target[key] = [...new Set([...current, ...value])];
+			} else {
+				// For arrays of objects, merge each item
+				value.forEach((item: any, index: number) => {
+					if (isObject(item) && isObject(current[index])) {
+						mergeInto(current[index], item);
+					} else if (!current.includes(item)) {
+						current.push(cloneValue(item));
+					}
+				});
+			}
+		} else if (target[key] === undefined) {
+			// Primitives, class instances and functions: the target's value wins, kept by reference
+			target[key] = value;
+		}
+	}
+}
+
+/**
+ * Deeply merges objects from right to left. The target's values win over the sources'.
+ * Arrays are also merged if they are found in child objects.
+ *
+ * Neither `target` nor any source is mutated, and the result shares no plain object or
+ * array with them. Class instances and functions are kept by reference.
+ *
+ * @param target The base object
+ * @param sources One or more source objects providing the missing values
+ * @returns A new merged object
+ */
+export function deepMerge<T extends Record<string, any | any[]>>(target: T, ...sources: T[]): T {
+	const result = cloneValue(target) as Record<string, any>;
+	for (const source of sources) {
+		if (isObject(result) && isObject(source)) {
+			mergeInto(result, source);
+		}
+	}
+	return result as T;
 }
