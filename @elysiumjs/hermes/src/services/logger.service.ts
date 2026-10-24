@@ -77,6 +77,14 @@ export class HermesLogger implements LoggerInterface {
 		this.pino.fatal(ctx ?? {}, msg);
 	}
 
+	/**
+	 * Flushes buffered log lines of the underlying transport, when it supports it.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 */
+	public flush(): void {
+		this.pino.flush?.();
+	}
+
 	public child(ctx: Record<string, unknown>): HermesLogger {
 		const child = Object.create(this) as HermesLogger;
 		child.pino = this.pino.child(ctx);

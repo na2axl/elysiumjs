@@ -12,26 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { HermesConfig } from './types';
-
-import { Application, Service } from '@elysiumjs/core';
-
-import { HermesLogger } from './services/logger.service';
-
-// Lazy singleton resolver: reads config from Application on first access.
-let hermesInstance: HermesLogger | null = null;
-const hermesResolver = () => {
-	if (!hermesInstance) {
-		const app = Service.get<Application>('elysium.app');
-		const config = app?.getConfig<Partial<HermesConfig>>('elysium:hermes');
-		hermesInstance = new HermesLogger(config ?? {});
-	}
-	return hermesInstance;
-};
-
-Service.registerLazy(HermesLogger.name, hermesResolver);
-Service.registerLazy('logger', hermesResolver);
-
+export { HermesModule } from './hermes.module';
 export { HermesLogger } from './services/logger.service';
 export { HttpTransport } from './transports/http.transport';
 export type { HttpTransportOptions } from './transports/http.transport';
