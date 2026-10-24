@@ -47,7 +47,7 @@ import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions';
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export class ArgusSDK {
-	private static instance: ArgusSDK;
+	private static instance: ArgusSDK | undefined;
 	private sdk: NodeSDK | null = null;
 
 	private constructor() {}
@@ -117,5 +117,6 @@ export class ArgusSDK {
 		if (ArgusSDK.instance?.sdk) {
 			await ArgusSDK.instance.sdk.shutdown();
 		}
+		ArgusSDK.instance = undefined;
 	}
 }

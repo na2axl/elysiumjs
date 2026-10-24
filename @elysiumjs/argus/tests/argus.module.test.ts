@@ -110,7 +110,7 @@ describe('ArgusModule', () => {
 			throw new Error('boom');
 		});
 		const shutdown = spyOn(ArgusSDK, 'shutdown').mockResolvedValue(undefined);
-		const app = await Application.testing({ modules: [withConfig({ serviceName: 'svc' })] }).catch(
+		const app = await Application.testing({ modules: [withConfig({ serviceName: 'svc' })], boot: 'eager' }).catch(
 			() => undefined
 		);
 		await app?.shutdown();
