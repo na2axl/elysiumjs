@@ -24,7 +24,7 @@ bun install @elysiumjs/core
 - PostgreSQL database support with Drizzle ORM
 - Model classes and repositories for database interactions
 - Multi-tenancy support enabled
-- Swagger documentation
+- OpenAPI documentation (Scalar or Swagger UI)
 
 ## Usage
 

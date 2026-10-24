@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ElysiaSwaggerConfig } from '@elysiajs/swagger';
+import type { ElysiaOpenAPIConfig } from '@elysiajs/openapi';
 import type { AnyElysia, ElysiaConfig, ErrorContext, TSchema } from 'elysia';
 import type { CommandClass } from './command';
 import type { ElysiaApp, Route } from './http';
@@ -23,7 +23,7 @@ import type { ElysiaPlugin } from './utils';
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-import { swagger as swaggerPlugin } from '@elysiajs/swagger';
+import { openapi as openapiPlugin } from '@elysiajs/openapi';
 import { Value } from '@sinclair/typebox/value';
 import { Elysia } from 'elysia';
 import { first } from 'radash';
@@ -73,11 +73,11 @@ export type AppProps = {
 	modules?: (ModuleClass | ConfiguredModule<any>)[];
 
 	/**
-	 * Swagger documentation configuration.
+	 * OpenAPI documentation configuration.
 	 *
-	 * Set it to `false` to disable Swagger documentation.
+	 * Set it to `false` to disable OpenAPI documentation.
 	 */
-	swagger?: ElysiaSwaggerConfig<Route> | false;
+	openapi?: ElysiaOpenAPIConfig | false;
 
 	/**
 	 * The validation schema for the application environment.
@@ -162,7 +162,7 @@ export abstract class Application extends InteractsWithConsole {
 					withoutModules(props),
 					withoutModules(ownMetadata ?? {}),
 					withoutModules(parentMetadata ?? {}),
-					{ swagger: false }
+					{ openapi: false }
 				),
 				modules
 			};
@@ -433,7 +433,7 @@ export abstract class Application extends InteractsWithConsole {
 	 * mounts their controllers and listens.
 	 */
 	private async commandServe(): Promise<void> {
-		const { server, swagger, plugins } = this.props();
+		const { server, openapi, plugins } = this.props();
 
 		await this.bootKernel(true);
 
@@ -450,8 +450,8 @@ export abstract class Application extends InteractsWithConsole {
 			tenant: request.headers.get('x-tenant-id') ?? 'public'
 		}));
 
-		if (swagger) {
-			this.#elysia.use(swaggerPlugin(swagger));
+		if (openapi) {
+			this.#elysia.use(openapiPlugin(openapi));
 		}
 
 		for (const plugin of plugins ?? []) {

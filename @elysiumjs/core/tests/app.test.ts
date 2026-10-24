@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { Mock } from 'bun:test';
 import type { ValueError } from '@sinclair/typebox/value';
 import type { AppContext } from '../src/app';
 
@@ -68,32 +69,32 @@ describe('@Application.register merging', () => {
 		return { A, B, C };
 	};
 
-	it('should keep swagger props and apply the defaults when keys are omitted', () => {
-		@Application.register({ swagger: { path: '/docs' } })
-		class WithSwagger extends Application {}
-		@Application.register({ swagger: true as any })
+	it('should keep openapi props and apply the defaults when keys are omitted', () => {
+		@Application.register({ openapi: { path: '/docs' } })
+		class WithOpenapi extends Application {}
+		@Application.register({ openapi: true as any })
 		class WithTrue extends Application {}
 		@Application.register()
 		class Bare extends Application {}
 
-		expect(Reflect.getMetadata(Symbols.app, WithSwagger).swagger).toEqual({ path: '/docs' });
-		expect(Reflect.getMetadata(Symbols.app, WithTrue).swagger).toBe(true);
+		expect(Reflect.getMetadata(Symbols.app, WithOpenapi).openapi).toEqual({ path: '/docs' });
+		expect(Reflect.getMetadata(Symbols.app, WithTrue).openapi).toBe(true);
 		const bare = Reflect.getMetadata(Symbols.app, Bare);
-		expect(bare.swagger).toBe(false);
+		expect(bare.openapi).toBe(false);
 		expect(bare.modules).toEqual([]);
 	});
 
 	it('should let a subclass override scalar and object props of its parent', () => {
-		@Application.register({ debug: false, server: { name: 'parent', port: 1 }, swagger: false })
+		@Application.register({ debug: false, server: { name: 'parent', port: 1 }, openapi: false })
 		class Parent extends Application {}
 
-		@Application.register({ debug: true, server: { port: 2 }, swagger: { path: '/d' } })
+		@Application.register({ debug: true, server: { port: 2 }, openapi: { path: '/d' } })
 		class Child extends Parent {}
 
 		const meta = Reflect.getMetadata(Symbols.app, Child);
 		expect(meta.debug).toBe(true);
 		expect(meta.server).toEqual({ name: 'parent', port: 2 });
-		expect(meta.swagger).toEqual({ path: '/d' });
+		expect(meta.openapi).toEqual({ path: '/d' });
 		expect(Reflect.getMetadata(Symbols.app, Parent).debug).toBe(false);
 	});
 
@@ -913,7 +914,7 @@ describe('Application class', () => {
 
 	describe('serve', () => {
 		it('should handle the serve command', async () => {
-			@Application.register({ server: { port: 0 }, modules: [], swagger: false })
+			@Application.register({ server: { port: 0 }, modules: [], openapi: false })
 			class TestApp extends Application {}
 
 			Event.on('elysium:server:after-init', async (e) => {
@@ -947,7 +948,7 @@ describe('Application class', () => {
 			@Module.register({ services: [PrivateService], controllers: [AController] })
 			class A extends Module {}
 
-			@Application.register({ server: { port: 0 }, modules: [A], swagger: false })
+			@Application.register({ server: { port: 0 }, modules: [A], openapi: false })
 			class TestApp extends Application {}
 
 			const instance = new TestApp();
@@ -987,7 +988,7 @@ describe('Application class', () => {
 			@Module.register({ services: [Greeter], controllers: [PController] })
 			class A extends Module {}
 
-			@Application.register({ server: { port: 0 }, modules: [A], swagger: false })
+			@Application.register({ server: { port: 0 }, modules: [A], openapi: false })
 			class TestApp extends Application {}
 
 			const instance = new TestApp();
@@ -1014,7 +1015,7 @@ describe('Application class', () => {
 			@Module.register({ controllers: [XController], prefix: '/api' })
 			class A extends Module {}
 
-			@Application.register({ server: { port: 0 }, modules: [A], swagger: false })
+			@Application.register({ server: { port: 0 }, modules: [A], openapi: false })
 			class TestApp extends Application {}
 
 			const instance = new TestApp();
@@ -1056,7 +1057,7 @@ describe('Application class', () => {
 			@Module.register({ services: [Secret], controllers: [GController] })
 			class A extends Module {}
 
-			@Application.register({ server: { port: 0 }, modules: [A], swagger: false })
+			@Application.register({ server: { port: 0 }, modules: [A], openapi: false })
 			class TestApp extends Application {}
 
 			const instance = new TestApp();
@@ -1096,7 +1097,7 @@ describe('Application class', () => {
 				}
 			}
 
-			@Application.register({ server: { port: 0 }, modules: [Feature], swagger: false })
+			@Application.register({ server: { port: 0 }, modules: [Feature], openapi: false })
 			class TestApp extends Application {}
 
 			const instance = new TestApp();
@@ -1119,14 +1120,18 @@ describe('Application class', () => {
 			@Module.register({ services: [Broken] })
 			class A extends Module {}
 
-			@Application.register({ server: { port: 0 }, modules: [A], swagger: false })
+			@Application.register({ server: { port: 0 }, modules: [A], openapi: false })
 			class TestApp extends Application {}
 
-			const listenSpy = spyOn(Elysia.prototype, 'listen');
+			let listenSpy: Mock<(...args: any[]) => any> | undefined;
+			Event.on('elysium:server:before-init', (e) => {
+				listenSpy = spyOn(e.source.elysia, 'listen');
+			});
+
 			const instance = new TestApp();
 			await instance.run(['serve']);
 
-			expect(listenSpy).not.toHaveBeenCalled();
+			expect(listenSpy?.mock.calls ?? []).toHaveLength(0);
 			expect(process.exit).toHaveBeenCalledWith(1);
 			expect(errors).toContain('boot failed');
 		});
@@ -1139,12 +1144,17 @@ describe('Application class', () => {
 				}
 			}
 
-			@Application.register({ server: { port: 0 }, modules: [A], swagger: false })
+			@Application.register({ server: { port: 0 }, modules: [A], openapi: false })
 			class TestApp extends Application {}
 
-			const listenSpy = spyOn(Elysia.prototype, 'listen');
+			let listenSpy: Mock<(...args: any[]) => any> | undefined;
+			Event.on('elysium:server:before-init', (e) => {
+				listenSpy = spyOn(e.source.elysia, 'listen');
+			});
+
 			await new TestApp().run(['serve']);
 
+			expect(listenSpy).toBeDefined();
 			expect(listenSpy).not.toHaveBeenCalled();
 			expect(process.exit).toHaveBeenCalledWith(1);
 			expect(errors).toContain('serve hook failed');
@@ -1156,7 +1166,7 @@ describe('Application class', () => {
 			@Module.register({ controllers: [NotAController] })
 			class A extends Module {}
 
-			@Application.register({ server: { port: 0 }, modules: [A], swagger: false })
+			@Application.register({ server: { port: 0 }, modules: [A], openapi: false })
 			class TestApp extends Application {}
 
 			await new TestApp().run(['serve']);
@@ -1178,7 +1188,7 @@ describe('Application class', () => {
 			@Module.register({ services: [Tracked] })
 			class A extends Module {}
 
-			@Application.register({ server: { port: 0 }, modules: [A], swagger: false })
+			@Application.register({ server: { port: 0 }, modules: [A], openapi: false })
 			class TestApp extends Application {}
 
 			const instance = new TestApp();
@@ -1240,7 +1250,7 @@ describe('Application class', () => {
 			@Module.register({ controllers: [FailingController] })
 			class A extends Module {}
 
-			@Application.register({ server: { port: 0 }, modules: [A], swagger: false })
+			@Application.register({ server: { port: 0 }, modules: [A], openapi: false })
 			class TestApp extends Application {
 				protected async onError(): Promise<boolean> {
 					return true;

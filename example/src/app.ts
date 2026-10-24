@@ -44,7 +44,7 @@ import { XServerMiddleware } from '#hero/middlewares/x-server.middleware';
 		port: parseInt(process.env.PORT!, 10) || 3000
 	},
 	debug: false,
-	swagger: {
+	openapi: {
 		path: '/docs',
 		documentation: {
 			info: {

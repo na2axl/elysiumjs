@@ -79,7 +79,7 @@ export const env = t.Object({});
 		port: parseInt(process.env.PORT!, 10) || 3000
 	},
 	debug: false,
-	swagger: {
+	openapi: {
 		path: '/docs',
 		documentation: {
 			info: {

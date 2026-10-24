@@ -42,7 +42,7 @@
     "@elysiumjs/core": "workspace:^"
   },
   "dependencies": {
-    "@elysiajs/opentelemetry": "^1.4.0",
+    "@elysiajs/opentelemetry": "^1.4.11",
     "@sentry/bun": "^11.9.0"
   }
 }

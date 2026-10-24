@@ -308,7 +308,7 @@ export type HttpControllerProps = {
 
 	/**
 	 * The list of tags for the controller.
-	 * Used in Swagger documentation.
+	 * Used in OpenAPI documentation.
 	 */
 	tags?: Array<string>;
 
@@ -341,13 +341,13 @@ export type RequestHandlerDecoratorProps = {
 
 	/**
 	 * The operation ID for the handler.
-	 * Used in Swagger documentation.
+	 * Used in OpenAPI documentation.
 	 */
 	operationId?: string;
 
 	/**
 	 * The description for the handler.
-	 * Used in Swagger documentation.
+	 * Used in OpenAPI documentation.
 	 */
 	description?: string;
 
