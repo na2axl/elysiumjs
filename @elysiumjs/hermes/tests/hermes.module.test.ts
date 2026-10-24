@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { Application, Service } from '@elysiumjs/core';
-import { afterEach, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it, spyOn } from 'bun:test';
 
 import { HermesLogger, HermesModule } from '../src';
 
@@ -34,25 +34,32 @@ describe('HermesModule', () => {
 		app = await Application.testing({ modules: [HermesModule.with({ level: 'debug' })] });
 		const logger = await app.get<HermesLogger>('logger');
 		expect(logger).toBeInstanceOf(HermesLogger);
-		expect((logger as any).config.level).toBe('debug');
+		expect((logger as any).pino.level).toBe('debug');
 		expect(await app.get(HermesLogger)).toBe(logger);
 	});
 
 	it('falls back to the default level and format', async () => {
 		app = await Application.testing({ modules: [HermesModule] });
 		const logger = await app.get<HermesLogger>('logger');
-		expect((logger as any).config).toMatchObject({ level: 'info', format: 'json' });
+		expect((logger as any).pino.level).toBe('info');
 	});
 
-	it('flushes the logger on shutdown', async () => {
+	it('flushes a built logger on shutdown', async () => {
+		const flush = spyOn(HermesLogger.prototype, 'flush');
 		app = await Application.testing({ modules: [HermesModule.with({})] });
-		const logger = await app.get<HermesLogger>('logger');
-		let flushed = 0;
-		logger.flush = () => {
-			flushed++;
-		};
+		await app.get('logger');
 		await app.shutdown();
 		app = undefined;
-		expect(flushed).toBe(1);
+		expect(flush).toHaveBeenCalled();
+		flush.mockRestore();
+	});
+
+	it('constructs nothing on shutdown when the logger was never resolved', async () => {
+		const flush = spyOn(HermesLogger.prototype, 'flush');
+		app = await Application.testing({ modules: [HermesModule.with({})] });
+		await app.shutdown();
+		app = undefined;
+		expect(flush).not.toHaveBeenCalled();
+		flush.mockRestore();
 	});
 });

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Module, Service } from '@elysiumjs/core';
+import { Module } from '@elysiumjs/core';
 
 import { HermesLogger } from './services/logger.service';
 import { DEFAULT_CONFIG, type HermesConfig } from './types';
@@ -33,10 +33,5 @@ import { DEFAULT_CONFIG, type HermesConfig } from './types';
 	]
 })
 export class HermesModule extends Module.configurable<HermesConfig>({
-	defaults: { level: DEFAULT_CONFIG.level, format: DEFAULT_CONFIG.format }
-}) {
-	/** Flushes the logger's transports. */
-	public override onDestroy(): void {
-		Service.get<HermesLogger>(HermesLogger.name)?.flush();
-	}
-}
+	defaults: { ...DEFAULT_CONFIG }
+}) {}

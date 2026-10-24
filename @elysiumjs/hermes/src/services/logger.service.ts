@@ -85,6 +85,11 @@ export class HermesLogger implements LoggerInterface {
 		this.pino.flush?.();
 	}
 
+	/** Flushes on shutdown. Only called for a logger the container built. */
+	public onDestroy(): void {
+		this.flush();
+	}
+
 	public child(ctx: Record<string, unknown>): HermesLogger {
 		const child = Object.create(this) as HermesLogger;
 		child.pino = this.pino.child(ctx);
