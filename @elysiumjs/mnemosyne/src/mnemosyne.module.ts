@@ -26,20 +26,24 @@ import { KeyvRedis } from './keyv-redis';
  */
 export type MnemosyneModuleConfig = {
 	cache: {
-		/** The Redis-backed cache. Omit to not provide `Cache.redis`. */
-		redis?: {
-			/** The name of the Redis connection to use. */
-			connection: string;
-		};
+		/** The Redis-backed cache. Set to `false` to not provide `Cache.redis`. */
+		redis?:
+			| {
+					/** The name of the Redis connection to use. */
+					connection: string;
+			  }
+			| false;
 
-		/** The memory cache. Omit to not provide `Cache.memory`. */
-		memory?: {
-			/** The default TTL of entries, in milliseconds. */
-			ttl: number;
+		/** The memory cache. Set to `false` to not provide `Cache.memory`. */
+		memory?:
+			| {
+					/** The default TTL of entries, in milliseconds. */
+					ttl: number;
 
-			/** The maximum number of entries kept. */
-			lruSize: number;
-		};
+					/** The maximum number of entries kept. */
+					lruSize: number;
+			  }
+			| false;
 	};
 };
 

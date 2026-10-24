@@ -168,8 +168,9 @@ export class KeyvRedis extends EventEmitter implements KeyvStoreAdapter {
 	}
 
 	public async clear(): Promise<void> {
-		const client = await this.getClient();
 		try {
+			const client = await this.getClient();
+
 			if (!this.#namespace && this.#noNamespaceAffectsAll) {
 				await client.send('FLUSHDB', []);
 				return;
@@ -243,8 +244,8 @@ export class KeyvRedis extends EventEmitter implements KeyvStoreAdapter {
 	}
 
 	public async disconnect(): Promise<void> {
-		// Never opens a client just to close it.
-		this.#client?.close();
+		// The connection is owned by the Redis module; only drop our reference to it.
+		this.#client = undefined;
 	}
 
 	public async deleteMany(keys: string[]): Promise<boolean> {

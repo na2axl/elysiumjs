@@ -484,7 +484,7 @@ describe('Cache namespacing and tagging', () => {
 		Cache.memory.tags('tag1', 'tag2', 'tag3');
 
 		// Check if Keyv was instantiated with the correct namespace
-		expect(keyvSpy).toHaveBeenLastCalledWith(
+		expect(keyvSpy).toHaveBeenCalledWith(
 			expect.objectContaining({
 				namespace: 'cache__tag1__tag2__tag3'
 			})

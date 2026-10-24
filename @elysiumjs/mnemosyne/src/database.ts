@@ -49,11 +49,13 @@ export abstract class AbstractDatabase<TConnection, TConnectionConfig> {
 	protected abstract driver: DatabaseDriver<TConnection, TConnectionConfig>;
 
 	/**
-	 * Creates a service name for a database connection.
+	 * Creates a service name for a database connection. Driver modules register their
+	 * connections (and the `default` alias) under this name.
+	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param name The name of the connection.
 	 * @returns A service name for the connection.
 	 */
-	private getConnectionName(name: string): string {
+	public static getConnectionName(name: string): string {
 		return `db.connection.${name}`;
 	}
 
@@ -74,8 +76,9 @@ export abstract class AbstractDatabase<TConnection, TConnectionConfig> {
 			if (tx) return tx;
 		}
 
-		const connection = Service.get<TConnection>(this.getConnectionName(name));
-		if (connection === null) throw new ServiceNotFoundError(this.getConnectionName(name));
+		const serviceName = AbstractDatabase.getConnectionName(name);
+		const connection = Service.get<TConnection>(serviceName);
+		if (connection === null) throw new ServiceNotFoundError(serviceName);
 
 		return connection;
 	}
@@ -87,7 +90,7 @@ export abstract class AbstractDatabase<TConnection, TConnectionConfig> {
 	 * @returns `true` if the connection exists, `false` otherwise.
 	 */
 	public connectionExists(name: string): boolean {
-		return Service.exists(this.getConnectionName(name));
+		return Service.exists(AbstractDatabase.getConnectionName(name));
 	}
 
 	/**
