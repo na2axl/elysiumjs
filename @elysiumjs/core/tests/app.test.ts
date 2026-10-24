@@ -626,6 +626,68 @@ describe('Application class', () => {
 			expect(events).toEqual(['run:eager:only:secret']);
 		});
 
+		it('should let a lazy command call sync helpers on a module it does not import', async () => {
+			const seen: unknown[] = [];
+
+			@Module.register({
+				services: [{ name: 'infra.conn', global: true, factory: () => ({ conn: true }) }]
+			})
+			class InfraModule extends Module {
+				public onInit() {}
+			}
+
+			class SyncHelperCommand extends Command {
+				public static readonly command = 'sync:helper';
+				public async run() {
+					seen.push(Service.get('infra.conn'));
+				}
+			}
+
+			@Module.register({ commands: [SyncHelperCommand] })
+			class CliModule extends Module {}
+
+			await appWith(InfraModule, CliModule).run(['sync:helper']);
+
+			expect(seen).toEqual([{ conn: true }]);
+			expect(process.exit).toHaveBeenCalledWith(0);
+		});
+
+		it('should name the module and the remedies when a sync get hits an async-init owner', async () => {
+			const messages: string[] = [];
+
+			@Module.register({
+				services: [{ name: 'slow.conn', global: true, factory: () => ({ conn: true }) }]
+			})
+			class SlowInfraModule extends Module {
+				public async onInit() {
+					await nextTick();
+				}
+			}
+
+			class SlowHelperCommand extends Command {
+				public static readonly command = 'slow:helper';
+				public async run() {
+					try {
+						Service.get('slow.conn');
+					} catch (e) {
+						messages.push((e as Error).constructor.name, (e as Error).message);
+					}
+					messages.push(String(await Service.resolve('slow.conn').then(() => 'resolved')));
+				}
+			}
+
+			@Module.register({ commands: [SlowHelperCommand] })
+			class SlowCliModule extends Module {}
+
+			await appWith(SlowInfraModule, SlowCliModule).run(['slow:helper']);
+
+			expect(messages[0]).toBe('ServiceNotReadyError');
+			expect(messages[1]).toContain('SlowInfraModule');
+			expect(messages[1]).toContain('static boot = true');
+			expect(messages[1]).toContain('Service.resolve');
+			expect(messages[2]).toBe('resolved');
+		});
+
 		it('should run init, run and help inside the owning module context', async () => {
 			const seen: (string | undefined)[] = [];
 

@@ -32,9 +32,11 @@ export { type Context, type Route, HttpControllerScope, Http } from './http';
 export { Middleware } from './middleware';
 export { RequestLoggerMiddleware } from './middlewares/request-logger.middleware';
 export {
+	CircularDependencyError,
 	ConflictingModuleConfigError,
 	DuplicateCommandError,
 	DuplicateGlobalServiceError,
+	DuplicateModuleNameError,
 	ElysiumError,
 	EnvironmentSkippedModuleError,
 	EventListenerNotSupportedError,

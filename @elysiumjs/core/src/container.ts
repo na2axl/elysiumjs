@@ -166,12 +166,12 @@ const entryValue = (entry: ContainerEntry): unknown => {
 		const pending = moduleInitHook(entry.owner!);
 		if (isPromise(pending)) {
 			pending.catch(() => {});
-			throw new ServiceNotReadyError(entry.name);
+			throw new ServiceNotReadyError(entry.name, entry.owner?.id ?? null);
 		}
 	}
 
 	const { instance, ready } = instantiate(entry);
-	if (ready) throw new ServiceNotReadyError(entry.name);
+	if (ready) throw new ServiceNotReadyError(entry.name, entry.owner?.id ?? null);
 	return instance;
 };
 

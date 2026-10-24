@@ -63,6 +63,7 @@ export class Kernel {
 	private readonly initialised = new Set<ModuleNode>();
 	private readonly initOrder: ModuleNode[] = [];
 	private readonly inFlight = new Map<ModuleNode, Promise<void>>();
+	private readonly failures = new Map<ModuleNode, { error: unknown }>();
 	private readonly ownClasses = new Map<
 		ModuleNode,
 		{ owned: Class<any>[]; services: Set<Class<any>> }
@@ -87,7 +88,7 @@ export class Kernel {
 		Service.instance(KERNEL_SERVICE, this);
 		Container.setVisibility(graph);
 		Container.setModuleInitHook((node) =>
-			this.initialised.has(node) ? undefined : this.initModule(node)
+			this.initialised.has(node) || this.initSync(node) ? undefined : this.initModule(node)
 		);
 		Container.setSkippedLookup(this.buildSkippedLookup());
 
@@ -121,6 +122,8 @@ export class Kernel {
 	 */
 	public initModule(node: ModuleNode): Promise<void> {
 		if (this.initialised.has(node)) return Promise.resolve();
+		const failure = this.failures.get(node);
+		if (failure) return Promise.reject(failure.error);
 		let pending = this.inFlight.get(node);
 		if (!pending) {
 			pending = this.runInit(node);
@@ -172,12 +175,57 @@ export class Kernel {
 
 	private async runInit(node: ModuleNode): Promise<void> {
 		for (const imported of node.imports) await this.initModule(imported);
+		await this.initOwn(node);
+	}
+
+	/**
+	 * Wires the listeners and runs the `onInit` of a module whose imports are initialised.
+	 * The module is recorded as initialised at once when `onInit` is synchronous.
+	 * @returns A promise when `onInit` is asynchronous.
+	 */
+	private initOwn(node: ModuleNode): Promise<void> | undefined {
 		const instance = this.moduleInstance(node);
 		const own = this.ownClasses.get(node);
 		if (own) this.wired.push(...wireEventListeners(node, own.owned, own.services));
-		await ModuleContext.run(node, () => instance.onInit());
-		this.initialised.add(node);
-		this.initOrder.push(node);
+		const result: unknown = ModuleContext.run(node, () => instance.onInit());
+		const done = () => {
+			this.initialised.add(node);
+			this.initOrder.push(node);
+		};
+		if (typeof (result as { then?: unknown } | null)?.then === 'function') {
+			return Promise.resolve(result).then(done);
+		}
+		done();
+		return undefined;
+	}
+
+	/**
+	 * Initialises a module synchronously when that is possible: every import is (or can be
+	 * made) initialised the same way and `onInit` returns no promise.
+	 * @returns Whether the module is initialised. When `false`, its initialisation is
+	 * asynchronous and has been started or is in flight.
+	 * @throws The error of a failing synchronous `onInit`, which is remembered.
+	 */
+	private initSync(node: ModuleNode): boolean {
+		if (this.initialised.has(node)) return true;
+		const failure = this.failures.get(node);
+		if (failure) throw failure.error;
+		if (this.inFlight.has(node)) return false;
+		for (const imported of node.imports) {
+			if (!this.initSync(imported)) return false;
+		}
+
+		let pending: Promise<void> | undefined;
+		try {
+			pending = this.initOwn(node);
+		} catch (error) {
+			this.failures.set(node, { error });
+			throw error;
+		}
+		if (!pending) return true;
+		pending.catch(() => {});
+		this.inFlight.set(node, pending);
+		return false;
 	}
 
 	private async runShutdown(): Promise<void> {

@@ -154,8 +154,38 @@ export class ServiceNotFoundError extends ElysiumError {
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export class ServiceNotReadyError extends ElysiumError {
-	constructor(public readonly service: string) {
-		super(`Service "${service}" is not ready yet. Use Service.resolve() to await it.`);
+	constructor(
+		public readonly service: string,
+		public readonly owner: string | null = null
+	) {
+		const where = owner ? ` Its module ${owner} initialises asynchronously.` : '';
+		super(
+			`Service "${service}" is not ready yet.${where} Use "await Service.resolve()" to await it, or set "static boot = true" on the command to initialise every module before it runs.`
+		);
+	}
+}
+
+/**
+ * Thrown when services depend on each other in a cycle.
+ *
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class CircularDependencyError extends ElysiumError {
+	constructor(public readonly path: string[]) {
+		super(`Circular service dependency detected: ${path.join(' -> ')}`);
+	}
+}
+
+/**
+ * Thrown when two different module classes share the same name.
+ *
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class DuplicateModuleNameError extends ElysiumError {
+	constructor(public readonly moduleName: string) {
+		super(
+			`Two different modules are both named "${moduleName}". Module names identify modules in configuration and errors, so they must be unique: rename one of them.`
+		);
 	}
 }
 

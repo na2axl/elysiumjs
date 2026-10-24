@@ -203,6 +203,94 @@ describe('Kernel', () => {
 		expect(events).toEqual(['B', 'A']);
 	});
 
+	it('initialises sync modules synchronously through the container hook, imports first', async () => {
+		@Module.register({ services: [{ name: 'b.svc', global: true, factory: () => 1 }] })
+		class B extends Module {
+			onInit() {
+				events.push('B');
+			}
+			onDestroy() {
+				events.push('destroy:B');
+			}
+		}
+		@Module.register({ imports: [B], services: [{ name: 'a.svc', global: true, factory: () => 2 }] })
+		class A extends Module {
+			onInit() {
+				events.push('A');
+			}
+			onDestroy() {
+				events.push('destroy:A');
+			}
+		}
+		const graph = buildModuleGraph([A], 'test');
+		const kernel = new Kernel(graph);
+		await kernel.register();
+
+		expect(Service.get('a.svc')).toBe(2);
+		expect(events).toEqual(['B', 'A']);
+		await kernel.shutdown();
+		expect(events).toEqual(['B', 'A', 'destroy:A', 'destroy:B']);
+	});
+
+	it('records a failing sync onInit reached through the hook and skips it on shutdown', async () => {
+		@Module.register({ services: [{ name: 'bad.svc', global: true, factory: () => 1 }] })
+		class Bad extends Module {
+			onInit() {
+				throw new Error('sync boom');
+			}
+			onDestroy() {
+				events.push('destroy:Bad');
+			}
+		}
+		const graph = buildModuleGraph([Bad], 'test');
+		const kernel = new Kernel(graph);
+		await kernel.register();
+
+		expect(() => Service.get('bad.svc')).toThrow('sync boom');
+		expect(() => Service.get('bad.svc')).toThrow('sync boom');
+		await expect(kernel.initModule(graph.node(Bad)!)).rejects.toThrow('sync boom');
+		await kernel.shutdown();
+		expect(events).toEqual([]);
+	});
+
+	it('lets a factory get a service of a sync-init module under Service.resolve', async () => {
+		@Module.register({ services: [{ name: 'infra.conn', global: true, factory: () => 'conn' }] })
+		class Infra extends Module {}
+		@Module.register({
+			services: [
+				{ name: 'user.repo', factory: (_c: unknown, get: any) => ({ conn: get('infra.conn') }) }
+			]
+		})
+		class User extends Module {}
+		const graph = buildModuleGraph([Infra, User], 'test');
+		const kernel = new Kernel(graph);
+		await kernel.register();
+
+		const repo = await ModuleContext.run(graph.node(User)!, () => Service.resolve('user.repo'));
+		expect(repo).toEqual({ conn: 'conn' });
+	});
+
+	it('gives a factory get on an async-init owner the improved ServiceNotReadyError', async () => {
+		@Module.register({ services: [{ name: 'slow.conn', global: true, factory: () => 'conn' }] })
+		class Slow extends Module {
+			async onInit() {
+				await Promise.resolve();
+			}
+		}
+		@Module.register({
+			services: [
+				{ name: 'user.repo', factory: (_c: unknown, get: any) => ({ conn: get('slow.conn') }) }
+			]
+		})
+		class User extends Module {}
+		const graph = buildModuleGraph([Slow, User], 'test');
+		const kernel = new Kernel(graph);
+		await kernel.register();
+
+		const attempt = ModuleContext.run(graph.node(User)!, () => Service.resolve('user.repo'));
+		await expect(attempt).rejects.toThrow(/Slow initialises asynchronously/);
+	});
+
 	it('runs onInit once for a diamond dependency', async () => {
 		@Module.register()
 		class D extends Module {
