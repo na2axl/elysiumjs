@@ -45,6 +45,7 @@ export {
 	ServiceNotReadyError,
 	ServiceNotVisibleError
 } from './errors';
+export { needsDefaultAlias, runAll } from './connections';
 export { Kernel } from './kernel';
 export { type ConfiguredModule, type ModuleClass, type ModuleProps, Module } from './module';
 export { ModuleContext } from './module-context';
