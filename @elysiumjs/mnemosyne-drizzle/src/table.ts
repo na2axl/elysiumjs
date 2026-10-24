@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { PgColumnBuilderBase, PgTableWithColumns } from 'drizzle-orm/pg-core';
+import type { AnyPgColumnBuilder, PgTableWithColumns } from 'drizzle-orm/pg-core';
 
 import { pgTable as drizzlePgTable } from 'drizzle-orm/pg-core';
 
@@ -27,7 +27,7 @@ import { pgTable as drizzlePgTable } from 'drizzle-orm/pg-core';
  * built `PgColumn` instances. This registry preserves the original builder
  * objects so that tenant tables can be re-created in different schemas.
  */
-const tableRegistry = new WeakMap<PgTableWithColumns<any>, Record<string, PgColumnBuilderBase>>();
+const tableRegistry = new WeakMap<PgTableWithColumns<any>, Record<string, AnyPgColumnBuilder>>();
 
 /**
  * Retrieves the original column builders for a table.
@@ -36,7 +36,7 @@ const tableRegistry = new WeakMap<PgTableWithColumns<any>, Record<string, PgColu
  */
 export const getTableBuilders = (
 	table: PgTableWithColumns<any>
-): Record<string, PgColumnBuilderBase> | undefined => {
+): Record<string, AnyPgColumnBuilder> | undefined => {
 	return tableRegistry.get(table);
 };
 
@@ -58,7 +58,7 @@ export const getTableBuilders = (
  */
 export const pgTable = <
 	TTableName extends string,
-	TColumns extends Record<string, PgColumnBuilderBase>
+	TColumns extends Record<string, AnyPgColumnBuilder>
 >(
 	tableName: TTableName,
 	columns: TColumns,

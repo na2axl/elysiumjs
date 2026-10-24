@@ -12,13 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { basename } from 'node:path';
+import { basename, dirname } from 'node:path';
 
 import { Command, CommandArgumentType } from '@elysiumjs/core';
 import prompts from 'prompts';
 import { alphabetical } from 'radash';
 
 import { Database } from '../database';
+
+/**
+ * Gets the name under which a migration file is tracked. Drizzle Kit 1.0 stores each migration
+ * as `<folder>/migration.sql`, in which case the folder name identifies the migration.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param path The path of the migration file.
+ */
+const getMigrationName = (path: string) =>
+	basename(path) === 'migration.sql' ? basename(dirname(path)) : basename(path);
 
 /**
  * Execute migration files.
@@ -59,7 +68,7 @@ export class MigrationRunCommand extends Command {
 		const sql = Database.getConnection(this.connection).$client;
 		await sql.connect();
 
-		await sql.begin(async (sql) => {
+		await sql.begin(async (sql: Bun.SQL) => {
 			if (this.fresh) {
 				await sql`DROP SCHEMA IF EXISTS ${sql(this.tenant)} CASCADE;`;
 				await sql`CREATE SCHEMA ${sql(this.tenant)};`;
@@ -125,7 +134,7 @@ export class MigrationRunCommand extends Command {
 
 			const files = await Array.fromAsync(filesIt);
 			const sqlFiles = alphabetical(
-				files.filter((file) => !completedMigrations.includes(basename(file))),
+				files.filter((file) => !completedMigrations.includes(getMigrationName(file))),
 				(file) => file
 			);
 
@@ -144,7 +153,7 @@ export class MigrationRunCommand extends Command {
 			for (const path of sqlFiles) {
 				await sql.file(path);
 				const [{ name }] =
-					await sql`INSERT INTO elysium_migrations (name, batch, applied_at) VALUES (${basename(path)}, ${batch}, ${new Date()}) RETURNING name;`;
+					await sql`INSERT INTO elysium_migrations (name, batch, applied_at) VALUES (${getMigrationName(path)}, ${batch}, ${new Date()}) RETURNING name;`;
 				s.pause(`Migration ${this.bold(name)} applied successfully.`);
 			}
 

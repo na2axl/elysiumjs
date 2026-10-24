@@ -1,9 +1,11 @@
-import { DrizzleModel } from '@elysiumjs/mnemosyne-drizzle';
+import { DrizzleModel, pgTable } from '@elysiumjs/mnemosyne-drizzle';
 import { uuid } from 'drizzle-orm/pg-core';
 
-export class {name} extends DrizzleModel('{table}', {
+export const {canonicalName}Table = pgTable('{table}', {
 	id: uuid().primaryKey().defaultRandom(),
-}) {
+});
+
+export class {name} extends DrizzleModel({canonicalName}Table) {
 	public static readonly supportTenancy = {supportTenancy};
 }
 

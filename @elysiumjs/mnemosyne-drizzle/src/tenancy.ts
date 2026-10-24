@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import type { TenancyStrategy } from '@elysiumjs/mnemosyne';
-import type { PgColumnBuilderBase, PgSchema, PgTable, PgTransaction } from 'drizzle-orm/pg-core';
+import type { AnyPgColumnBuilder, PgAsyncTransaction, PgSchema, PgTable } from 'drizzle-orm/pg-core';
 import type { DrizzleConnection } from './database';
 
 import { getTenancyConfig } from '@elysiumjs/mnemosyne';
@@ -73,7 +73,7 @@ export const registerTenantSchema = (tenant: string): PgSchema => {
  */
 export const wrapTenantSchema = <
 	TTableName extends string,
-	TColumnsMap extends Record<string, PgColumnBuilderBase>
+	TColumnsMap extends Record<string, AnyPgColumnBuilder>
 >(
 	tenant: string,
 	tableName: TTableName,
@@ -109,7 +109,7 @@ export const wrapTenantSchema = <
  */
 export const withRLS = async <T>(
 	tenant: string | null,
-	callback: (tx: PgTransaction<any, any, any>) => Promise<T>,
+	callback: (tx: PgAsyncTransaction<any, any>) => Promise<T>,
 	connectionName: string = 'default'
 ): Promise<T> => {
 	const db = Database.getConnection(connectionName);
@@ -117,7 +117,7 @@ export const withRLS = async <T>(
 	const varName = config.rls?.sessionVariable ?? 'app.current_tenant';
 	const value = tenant ?? 'public';
 
-	return (db as any).transaction(async (tx: PgTransaction<any, any, any>) => {
+	return (db as any).transaction(async (tx: PgAsyncTransaction<any, any>) => {
 		await tx.execute(sql`SELECT set_config(${varName}, ${value}, true)`);
 		return callback(tx);
 	});
@@ -241,7 +241,7 @@ export class DrizzleRLSTenancy implements TenancyStrategy<PgTable, DrizzleConnec
 		const config = getTenancyConfig();
 		const varName = config.rls?.sessionVariable ?? 'app.current_tenant';
 
-		return (connection as any).transaction(async (tx: PgTransaction<any, any, any>) => {
+		return (connection as any).transaction(async (tx: PgAsyncTransaction<any, any>) => {
 			await tx.execute(sql`SELECT set_config(${varName}, ${tenant}, true)`);
 			return callback();
 		});

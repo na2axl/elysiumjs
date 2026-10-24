@@ -89,7 +89,7 @@ export class MigrationGenerateCommand extends Command {
 			schemaPath = `${projectRoot}/src/database/schema.ts`;
 		}
 
-		await Bun.$`bunx --bun drizzle-kit generate --dialect postgresql --schema ${schemaPath} --out ${projectRoot}/src/database/migrations --prefix timestamp --name ${this.name}`;
+		await Bun.$`bunx --bun drizzle-kit generate --dialect postgresql --schema ${schemaPath} --out ${projectRoot}/src/database/migrations --name ${this.name}`;
 
 		const sqlFiles = new Bun.Glob(`${projectRoot}/src/database/migrations/**/*.sql`).scan();
 		for await (const path of sqlFiles) {

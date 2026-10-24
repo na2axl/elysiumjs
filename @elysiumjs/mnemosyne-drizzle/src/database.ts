@@ -14,7 +14,7 @@
 
 import type { CacheInterface, DatabaseCacheConfig, DatabaseDriver } from '@elysiumjs/mnemosyne';
 import type { DrizzleConfig } from 'drizzle-orm';
-import type { BunSQLDatabase } from 'drizzle-orm/bun-sql';
+import type { BunSQLDatabase } from 'drizzle-orm/bun-sql/postgres';
 import type { CacheConfig } from 'drizzle-orm/cache/core/types';
 
 import { Service, ServiceNotReadyError } from '@elysiumjs/core';

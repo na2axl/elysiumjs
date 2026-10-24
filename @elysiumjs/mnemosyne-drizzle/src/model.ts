@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import type { ColumnMetadata, ModelAdapter } from '@elysiumjs/mnemosyne';
-import type { PgColumn, PgTableWithColumns } from 'drizzle-orm/pg-core';
+import type { PgColumn, PgTableWithColumns, TableConfig } from 'drizzle-orm/pg-core';
 
 import { AbstractModel, createSchemaFromModel } from '@elysiumjs/mnemosyne';
 import { getTableConfig } from 'drizzle-orm/pg-core';
@@ -32,23 +32,30 @@ import { wrapTenantSchema } from './tenancy';
  */
 const mapDrizzleDataType = (col: PgColumn): ColumnMetadata['dataType'] => {
 	if (col.columnType === 'PgUUID') return 'uuid';
-	switch (col.dataType) {
-		case 'string':
-			return 'string';
+	if ((col as { dimensions?: number }).dimensions) return 'array';
+
+	// Drizzle 1.0 column data types are `<kind>` or `<kind> <constraint>` (e.g. `object json`).
+	const [kind, constraint] = col.dataType.split(' ');
+	switch (kind) {
 		case 'number':
 			return 'number';
 		case 'boolean':
 			return 'boolean';
 		case 'array':
 			return 'array';
-		case 'json':
-			return 'json';
-		case 'date':
-			return 'date';
 		case 'bigint':
 			return 'bigint';
-		case 'buffer':
-			return 'buffer';
+		case 'object':
+			switch (constraint) {
+				case 'json':
+					return 'json';
+				case 'date':
+					return 'date';
+				case 'buffer':
+					return 'buffer';
+				default:
+					return 'string';
+			}
 		default:
 			return 'string';
 	}
@@ -145,7 +152,7 @@ export interface DrizzleModelOptions {
  * @param options Model configuration options.
  * @returns A model class with Drizzle-backed static metadata.
  */
-export const DrizzleModel = <TTable extends PgTableWithColumns<any>>(
+export const DrizzleModel = <TTable extends PgTableWithColumns<TableConfig>>(
 	table: TTable,
 	options?: DrizzleModelOptions
 ) => {

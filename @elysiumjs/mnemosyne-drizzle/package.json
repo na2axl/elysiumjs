@@ -34,7 +34,7 @@
 		"@elysiumjs/mnemosyne": "workspace:^"
 	},
 	"dependencies": {
-		"drizzle-orm": "^0.45.1",
+		"drizzle-orm": "^1.0.0-rc.5",
 		"prompts": "^2.4.2",
 		"radash": "catalog:"
 	},

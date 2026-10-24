@@ -22,6 +22,7 @@ import { Database, DrizzleDatabaseCache, DrizzleModule, DrizzleRLSTenancy, Drizz
 const URL = 'postgres://u:p@localhost:5432/db';
 
 const stubClient = () => ({
+	options: {},
 	connect: mock(async () => {}),
 	begin: mock(async (_callback: unknown) => {}),
 	close: mock(async () => {})

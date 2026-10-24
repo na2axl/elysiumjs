@@ -4,11 +4,14 @@
 '@elysiumjs/cerberus': minor
 '@elysiumjs/hephaestus': minor
 '@elysiumjs/heracles': minor
+'@elysiumjs/mnemosyne-drizzle': minor
 '@elysiumjs/plugin-sentry': minor
-'@elysiumjs/styx': patch
+'@elysiumjs/styx': minor
 'create-elysium': minor
 ---
 
 Upgrade dependencies to their latest major versions: wampy 8, zod 4, commander 15, @casl/ability 7, OpenTelemetry SDK 2 (sdk-node 0.300, resources 3), @sentry/bun 11. Generated projects now use TypeScript 7.
+
+Breaking in `@elysiumjs/mnemosyne-drizzle`: it now requires drizzle-orm 1.0 (release candidate) and generated projects use drizzle-kit 1.0. `ColumnsWithTable` is no longer re-exported. `migration:generate` writes 1.0 migration folders (`<timestamp>_<name>/migration.sql`), and `migration:run` tracks those by folder name while still running flat `*.sql` files. Existing projects should upgrade their migrations folder with `drizzle-kit up`. The `make:model` stub now generates a `pgTable` and a `DrizzleModel` built from it.
 
 Breaking in `@elysiumjs/core`: the WAMP `onChallenge` callback must return a string (or a promise of one); `null` is no longer accepted. `onError` now receives the error and `onReconnectSuccess` receives wampy's details object.
