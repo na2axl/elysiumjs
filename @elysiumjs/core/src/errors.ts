@@ -192,3 +192,20 @@ export class InvalidControllerError extends ElysiumError {
 		);
 	}
 }
+
+/**
+ * Thrown when an instance method of a class that is not a service is declared an event listener.
+ *
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class EventListenerNotSupportedError extends ElysiumError {
+	constructor(
+		public readonly className: string,
+		public readonly method: string,
+		public readonly moduleName: string
+	) {
+		super(
+			`${className}.${method} (module ${moduleName}) is an instance event listener, but ${className} is not listed in the services of ${moduleName}. Make the method static or register the class as a service.`
+		);
+	}
+}

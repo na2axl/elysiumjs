@@ -141,9 +141,7 @@ describe('@Event.on handlers and module context', () => {
 		app = undefined;
 	});
 
-	// FINDING: this currently yields null (Service.get returns undefined outside a module context).
-	// Pending a ruling on event wiring.
-	it.todo('resolves a module-private service from a static @Event.on handler emitted outside any module context', async () => {
+	it('resolves a module-private service from a static @Event.on handler emitted outside any module context', async () => {
 		const seen: unknown[] = [];
 
 		@Service.register({ name: 'private.svc' })

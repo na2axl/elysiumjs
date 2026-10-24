@@ -16,11 +16,14 @@ import { EventEmitter } from 'node:events';
 
 import { isString } from 'radash';
 
+import { Symbols } from './utils';
+
 /**
  * Internal event bus used by the framework.
+ * @internal
  * @author Axel Nana <axel.nana@workbud.com>
  */
-class EventBus extends EventEmitter {
+export class EventBus extends EventEmitter {
 	static readonly instance = new EventBus();
 
 	private constructor() {
@@ -87,6 +90,45 @@ export type ListenProps = {
 	prepend?: boolean;
 };
 
+/**
+ * A listener recorded on a class by `@Event.on` / `@Event.once`.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type EventListenerMeta = {
+	readonly event: string;
+	readonly method: string | symbol;
+	readonly mode: 'on' | 'once';
+	readonly prepend: boolean;
+	readonly static: boolean;
+};
+
+/**
+ * Gets the listeners recorded on a class by the `@Event.on` / `@Event.once` decorators.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param cls The class to inspect.
+ */
+export function getEventListeners(cls: object): readonly EventListenerMeta[] {
+	return Reflect.getOwnMetadata(Symbols.eventListeners, cls) ?? [];
+}
+
+const recordListener = (
+	target: object,
+	method: string | symbol,
+	mode: 'on' | 'once',
+	props: Omit<ListenProps, 'mode'>
+): void => {
+	const isStatic = typeof target === 'function';
+	const owner = isStatic ? target : target.constructor;
+	Reflect.defineMetadata(
+		Symbols.eventListeners,
+		[
+			...getEventListeners(owner),
+			{ event: props.event, method, mode, prepend: props.prepend ?? false, static: isStatic }
+		],
+		owner
+	);
+};
+
 export namespace Event {
 	/**
 	 * Emits an event with the provided data and source.
@@ -104,7 +146,14 @@ export namespace Event {
 	};
 
 	/**
-	 * Marks a method as an event listener.
+	 * Marks a method as an event listener. The decorator only records the listener on the class.
+	 * The kernel registers it when the module that lists the class in its `services` or
+	 * `controllers` initialises, and runs it in that module's context, so it sees the module's
+	 * private services. Listeners on classes that no loaded module lists never fire, and a lazy
+	 * CLI boot only wires the modules it prepares (eager boot wires every module).
+	 *
+	 * Static methods are called on the class. Instance methods require a class registered as a
+	 * service: they run on the instance the container resolves.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param options The decorator options.
 	 */
@@ -128,27 +177,15 @@ export namespace Event {
 		if (isString(event)) {
 			EventBus.instance.on(event, handler!);
 		} else {
-			return function (_target, _propertyKey, descriptor) {
-				const listener = async function (eventData: EventData<any>) {
-					try {
-						await (descriptor.value as EventHandler<any>)(eventData);
-					} catch (e: unknown) {
-						EventBus.instance.emitError(e);
-					}
-				};
-
-				const prepend = event.prepend ?? false;
-				if (prepend) {
-					EventBus.instance.prependListener(event.event, listener);
-				} else {
-					EventBus.instance.on(event.event, listener);
-				}
+			return function (target, propertyKey) {
+				recordListener(target, propertyKey, 'on', event);
 			};
 		}
 	}
 
 	/**
 	 * Marks a method as an event listener that listens for the event only once.
+	 * Like {@link Event.on}, the decorator is metadata-only and the kernel wires it per module.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param options The decorator options.
 	 */
@@ -172,21 +209,8 @@ export namespace Event {
 		if (isString(event)) {
 			EventBus.instance.once(event, handler!);
 		} else {
-			return function (_target, _propertyKey, descriptor) {
-				const listener = async function (eventData: EventData<any>) {
-					try {
-						await (descriptor.value as EventHandler<any>)(eventData);
-					} catch (e: unknown) {
-						EventBus.instance.emitError(e);
-					}
-				};
-
-				const prepend = event.prepend ?? false;
-				if (prepend) {
-					EventBus.instance.prependOnceListener(event.event, listener);
-				} else {
-					EventBus.instance.once(event.event, listener);
-				}
+			return function (target, propertyKey) {
+				recordListener(target, propertyKey, 'once', event);
 			};
 		}
 	}

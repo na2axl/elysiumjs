@@ -29,3 +29,4 @@ Breaking changes:
 - `Application.register` merges subclass props over the parent's (own props, then own metadata, then parent, then defaults), and concatenates `modules` parent first. Previously defaults and parent values won, so `swagger` could not be enabled.
 - `Heracles.dispatch` starts a stopped queue on first use, so producers no longer start queues. `Queue.start()` is idempotent.
 - `create-elysium` generates apps that use modules, and adds Sentry and Hephaestus to the `modules` list.
+- `@Event.on`/`@Event.once` method listeners are wired by the kernel per module and run in their module's context; listeners on classes not listed in a loaded module no longer fire.

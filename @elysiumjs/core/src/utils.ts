@@ -38,6 +38,8 @@ export namespace Symbols {
 
 	export const middlewareGuards = Symbol('elysium:MiddlewareGuards');
 
+	export const eventListeners = Symbol('elysium:EventListeners');
+
 	export const serviceOptions = Symbol('elysium:ServiceOptions');
 
 	export const module = Symbol('elysium:Module');

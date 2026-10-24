@@ -25,7 +25,7 @@ const prependListenerSpy = spyOn(EventEmitter.prototype, 'prependListener');
 const prependOnceListenerSpy = spyOn(EventEmitter.prototype, 'prependOnceListener');
 const removeAllListenersSpy = spyOn(EventEmitter.prototype, 'removeAllListeners');
 
-const { Event } = await import('../src/event');
+const { Event, getEventListeners } = await import('../src/event');
 
 describe('Event namespace', () => {
 	beforeEach(() => {
@@ -129,165 +129,35 @@ describe('Event namespace', () => {
 	});
 
 	describe('on (decorator)', () => {
-		it('should create a method decorator that registers an event listener', () => {
-			// Create a test class with a decorated method
-			class TestClass {
-				@Event.on({ event: 'test-event' })
-				handleEvent(_eventData: EventData<any>) {}
-			}
-
-			// Create an instance of the test class
-			new TestClass();
-
-			// Check if prependListener or on was called with the correct event name
-			expect(onSpy).toHaveBeenCalledWith('test-event', expect.any(Function));
-		});
-
-		it('should create a method decorator that prepends an event listener when specified', () => {
-			// Create a test class with a decorated method
+		it('only records the listener as class metadata', () => {
 			class TestClass {
 				@Event.on({ event: 'test-event', prepend: true })
 				handleEvent(_eventData: EventData<any>) {}
+
+				@Event.on({ event: 'test-static' })
+				static handleStatic(_eventData: EventData<any>) {}
 			}
 
-			// Create an instance of the test class
-			new TestClass();
-
-			// Check if prependListener was called with the correct event name
-			expect(prependListenerSpy).toHaveBeenCalledWith('test-event', expect.any(Function));
-		});
-
-		it('should handle errors in event listeners', async () => {
-			// Create a test class with a decorated method that throws an error
-			class TestClass {
-				@Event.on({ event: 'test-event' })
-				handleEvent(_eventData: EventData<any>) {
-					throw new Error('Test error');
-				}
-			}
-
-			// Create an instance of the test class
-			new TestClass();
-
-			// Get the listener function that was registered
-			const listener = onSpy.mock.calls[0][1];
-
-			// Call the listener with test data
-			await listener({ data: 'test', source: null });
-
-			// Check if emitError was called with an error
-			expect(emitSpy).toHaveBeenCalledWith('elysium:error', {
-				data: expect.any(Error),
-				source: null
-			});
+			expect(onSpy).not.toHaveBeenCalledWith('test-event', expect.any(Function));
+			expect(prependListenerSpy).not.toHaveBeenCalled();
+			expect(getEventListeners(TestClass)).toEqual([
+				{ event: 'test-event', method: 'handleEvent', mode: 'on', prepend: true, static: false },
+				{ event: 'test-static', method: 'handleStatic', mode: 'on', prepend: false, static: true }
+			]);
 		});
 	});
 
 	describe('once (decorator)', () => {
-		it('should create a method decorator that registers a one-time event listener', () => {
-			// Create a test class with a decorated method
+		it('only records the listener as class metadata', () => {
 			class TestClass {
 				@Event.once({ event: 'test-event' })
 				handleEvent(_eventData: EventData<any>) {}
 			}
 
-			// Create an instance of the test class
-			new TestClass();
-
-			// Check if once was called with the correct event name
-			expect(onceSpy).toHaveBeenCalledWith('test-event', expect.any(Function));
-		});
-
-		it('should create a method decorator that prepends a one-time event listener when specified', () => {
-			// Create a test class with a decorated method
-			class TestClass {
-				@Event.once({ event: 'test-event', prepend: true })
-				handleEvent(_eventData: EventData<any>) {}
-			}
-
-			// Create an instance of the test class
-			new TestClass();
-
-			// Check if prependOnceListener was called with the correct event name
-			expect(prependOnceListenerSpy).toHaveBeenCalledWith('test-event', expect.any(Function));
-		});
-
-		it('should handle errors in event listeners', async () => {
-			// Create a test class with a decorated method that throws an error
-			class TestClass {
-				@Event.once({ event: 'test-event' })
-				handleEvent(_eventData: EventData<any>) {
-					throw new Error('Test error');
-				}
-			}
-
-			// Create an instance of the test class
-			new TestClass();
-
-			// Get the listener function that was registered
-			const listener = onSpy.mock.calls[0][1];
-
-			// Call the listener with test data
-			await listener({ data: 'test', source: null });
-
-			// Check if emitError was called with an error
-			expect(emitSpy).toHaveBeenCalledWith('elysium:error', {
-				data: expect.any(Error),
-				source: null
-			});
-		});
-	});
-
-	describe('listen', () => {
-		it('should use on decorator when mode is "on"', () => {
-			// Create a test class with a decorated method
-			class TestClass {
-				@Event.listen({ event: 'test-event', mode: 'on' })
-				handleEvent(_eventData: EventData<any>) {}
-			}
-
-			// Create an instance of the test class
-			new TestClass();
-
-			// Check if on was called with the correct parameters
-			expect(onSpy).toHaveBeenCalledWith('test-event', expect.any(Function));
-		});
-
-		it('should use once decorator when mode is "once"', () => {
-			// Create a test class with a decorated method
-			class TestClass {
-				@Event.listen({ event: 'test-event', mode: 'once' })
-				handleEvent(_eventData: EventData<any>) {}
-			}
-
-			// Create an instance of the test class
-			new TestClass();
-
-			// Check if once was called with the correct parameters
-			expect(onceSpy).toHaveBeenCalledWith('test-event', expect.any(Function));
-		});
-
-		it('should log an error for unknown mode', () => {
-			// Mock console.error
-			const originalConsoleError = console.error;
-			console.error = mock();
-
-			// Create a test class with a decorated method using an invalid mode
-			class TestClass {
-				@Event.listen({ event: 'test-event', mode: 'invalid' as any })
-				handleEvent(_eventData: EventData<any>) {}
-			}
-
-			// Create an instance of the test class
-			new TestClass();
-
-			// Check if console.error was called with the correct message
-			expect(console.error).toHaveBeenCalledWith(
-				expect.stringContaining("Unknown mode provided to @listen. Use either 'on' or 'once'")
-			);
-
-			// Restore console.error
-			console.error = originalConsoleError;
+			expect(onceSpy).not.toHaveBeenCalledWith('test-event', expect.any(Function));
+			expect(getEventListeners(TestClass)).toEqual([
+				{ event: 'test-event', method: 'handleEvent', mode: 'once', prepend: false, static: false }
+			]);
 		});
 	});
 });

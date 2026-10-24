@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import type { Class } from 'type-fest';
+import type { WiredListener } from './event-wiring';
 import type { Module } from './module';
 import type { ModuleGraph, ModuleNode } from './module-graph';
 import type { ServiceDefinition } from './service';
@@ -21,6 +22,8 @@ import { isEqual } from 'radash';
 
 import { Container } from './container';
 import { ConflictingModuleConfigError, ElysiumError } from './errors';
+import { EventBus } from './event';
+import { wireEventListeners } from './event-wiring';
 import { getModuleProps } from './module';
 import { ModuleContext } from './module-context';
 import { selectConfig } from './module-graph';
@@ -60,6 +63,11 @@ export class Kernel {
 	private readonly initialised = new Set<ModuleNode>();
 	private readonly initOrder: ModuleNode[] = [];
 	private readonly inFlight = new Map<ModuleNode, Promise<void>>();
+	private readonly ownClasses = new Map<
+		ModuleNode,
+		{ owned: Class<any>[]; services: Set<Class<any>> }
+	>();
+	private readonly wired: WiredListener[] = [];
 	private shutdownPromise: Promise<void> | undefined;
 
 	public constructor(private readonly moduleGraph: ModuleGraph) {}
@@ -95,6 +103,11 @@ export class Kernel {
 			}
 			const { services } = node.props;
 			const defs = typeof services === 'function' ? services(config) : (services ?? []);
+			const serviceClasses = defs.filter((d): d is Class<any> => typeof d === 'function');
+			this.ownClasses.set(node, {
+				owned: [...serviceClasses, ...(node.props.controllers ?? [])],
+				services: new Set(serviceClasses)
+			});
 			for (const def of defs) {
 				registered.push({ name: Container.register(node, def, config), scope: scopeOf(def) });
 			}
@@ -160,12 +173,18 @@ export class Kernel {
 	private async runInit(node: ModuleNode): Promise<void> {
 		for (const imported of node.imports) await this.initModule(imported);
 		const instance = this.moduleInstance(node);
+		const own = this.ownClasses.get(node);
+		if (own) this.wired.push(...wireEventListeners(node, own.owned, own.services));
 		await ModuleContext.run(node, () => instance.onInit());
 		this.initialised.add(node);
 		this.initOrder.push(node);
 	}
 
 	private async runShutdown(): Promise<void> {
+		for (const { event, wrapper } of this.wired.splice(0)) {
+			EventBus.instance.removeListener(event, wrapper);
+		}
+
 		const targets = [
 			...Container.constructed()
 				.map(({ name, instance, owner }) => ({ label: `service ${name}`, instance, owner }))

@@ -37,6 +37,7 @@ export {
 	DuplicateGlobalServiceError,
 	ElysiumError,
 	EnvironmentSkippedModuleError,
+	EventListenerNotSupportedError,
 	InvalidModuleError,
 	InvalidModuleConfigError,
 	MissingModuleConfigError,
