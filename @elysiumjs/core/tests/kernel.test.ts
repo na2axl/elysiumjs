@@ -55,6 +55,25 @@ describe('Kernel', () => {
 	beforeEach(reset);
 	afterEach(reset);
 
+	it("registers itself as the global 'elysium.kernel' service", async () => {
+		@Module.register({})
+		class Solo extends Module {}
+		const kernel = new Kernel(buildModuleGraph([Solo]));
+		await kernel.register();
+		expect(Service.get<Kernel>('elysium.kernel')).toBe(kernel);
+		expect(Service.get<Kernel>('elysium.kernel').graph).toBe(kernel.graph);
+	});
+
+	it("re-registers 'elysium.kernel' after a container reset without a duplicate error", async () => {
+		@Module.register({})
+		class Solo extends Module {}
+		await new Kernel(buildModuleGraph([Solo])).register();
+		reset();
+		const second = new Kernel(buildModuleGraph([Solo]));
+		await second.register();
+		expect(Service.get<Kernel>('elysium.kernel')).toBe(second);
+	});
+
 	it('passes the resolved config to a function-form services()', async () => {
 		let received: unknown;
 		type Cfg = { level: string; extra: number };

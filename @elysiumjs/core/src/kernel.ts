@@ -27,6 +27,9 @@ import { selectConfig } from './module-graph';
 import { Service, ServiceScope } from './service';
 import { Symbols } from './utils';
 
+/** The global service name under which the kernel registers itself. */
+export const KERNEL_SERVICE = 'elysium.kernel';
+
 type Registered = { name: string; scope: ServiceScope };
 
 const isConfigurable = (cls: unknown): cls is { config: string; resolveConfig(input?: any): any } =>
@@ -72,6 +75,8 @@ export class Kernel {
 	 */
 	public async register(): Promise<void> {
 		const { graph } = this;
+		// Lets modules reach the graph (e.g. to collect `jobs`) without an Application instance.
+		Service.instance(KERNEL_SERVICE, this);
 		Container.setVisibility(graph);
 		Container.setModuleInitHook((node) =>
 			this.initialised.has(node) ? undefined : this.initModule(node)
