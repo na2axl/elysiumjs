@@ -27,6 +27,7 @@ import { Container } from '../src/container';
 import * as Env from '../src/env';
 import { Event } from '../src/event';
 import { Http } from '../src/http';
+import { Kernel } from '../src/kernel';
 import { Middleware } from '../src/middleware';
 import { Module } from '../src/module';
 import { ModuleContext } from '../src/module-context';
@@ -840,6 +841,73 @@ describe('Application class', () => {
 
 			release();
 			await running;
+		});
+	});
+
+	describe('help and shutdown robustness', () => {
+		it('should print help of a boot command without booting eagerly', async () => {
+			const bootSpy = spyOn(Kernel.prototype, 'bootEager');
+
+			class BootHelpCommand extends Command {
+				public static readonly command = 'boot:help';
+				public static readonly boot = true;
+				public async run() {}
+				public async help() {
+					return 'boot help text';
+				}
+			}
+
+			@Module.register({ commands: [BootHelpCommand] })
+			class BootHelpModule extends Module {}
+
+			@Application.register({ modules: [BootHelpModule] })
+			class HelpApp extends Application {}
+
+			await new HelpApp().run(['help', 'boot:help']);
+
+			expect(bootSpy).not.toHaveBeenCalled();
+			bootSpy.mockRestore();
+		});
+
+		it('should shut the kernel down before disabling the app context on stop', async () => {
+			@Application.register({ server: { port: 0 } })
+			class OrderApp extends Application {}
+
+			const instance = new OrderApp();
+			await serve(instance);
+			const order: string[] = [];
+			const storage = (instance as any)._appContextStorage;
+			spyOn(storage, 'disable').mockImplementation(() => {
+				order.push('disable');
+			});
+			const shutdown = instance.kernel.shutdown.bind(instance.kernel);
+			spyOn(instance.kernel, 'shutdown').mockImplementation(async () => {
+				order.push('shutdown');
+				await shutdown();
+			});
+
+			await instance.elysia.stop();
+			await nextTick();
+			await nextTick();
+
+			expect(order).toEqual(['shutdown', 'disable']);
+		});
+
+		it('should shut the kernel down and exit 1 on a signal when stop() rejects', async () => {
+			@Application.register({ server: { port: 0 } })
+			class StopApp extends Application {}
+
+			const instance = new StopApp();
+			await serve(instance);
+			spyOn(instance.elysia, 'stop').mockRejectedValue(new Error('stop failed'));
+			const shutdownSpy = spyOn(instance.kernel, 'shutdown');
+
+			process.emit('SIGTERM');
+			await nextTick();
+			await nextTick();
+
+			expect(shutdownSpy).toHaveBeenCalled();
+			expect(process.exit).toHaveBeenCalledWith(1);
 		});
 	});
 

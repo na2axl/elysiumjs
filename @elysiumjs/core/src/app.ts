@@ -330,12 +330,23 @@ export abstract class Application extends InteractsWithConsole {
 
 	private installSignalHandlers(): void {
 		this.removeSignalHandlers();
-		const onSignal = () => {
+		const onSignal = async () => {
 			this.removeSignalHandlers();
-			Promise.resolve()
-				.then(() => this.#elysia?.stop())
-				.then(() => this.#kernel?.shutdown())
-				.finally(() => this.exit(0));
+			let code = 0;
+			try {
+				await this.#elysia?.stop();
+			} catch (error) {
+				code = 1;
+				this.error(error instanceof Error ? error.message : String(error));
+			} finally {
+				try {
+					await this.#kernel?.shutdown();
+				} catch (error) {
+					code = 1;
+					this.error(error instanceof Error ? error.message : String(error));
+				}
+				this.exit(code);
+			}
 		};
 		this.#onSignal = onSignal;
 		process.on('SIGINT', onSignal);
@@ -355,9 +366,13 @@ export abstract class Application extends InteractsWithConsole {
 	 * Builds a command inside its owning module: lazily by default, after an eager boot
 	 * when the command sets `boot`.
 	 */
-	private async prepareCommand({ item, module }: { item: CommandClass; module: ModuleNode }) {
-		await this.bootKernel(item.boot);
-		if (!item.boot) return this.kernel.prepare(item, module);
+	private async prepareCommand(
+		{ item, module }: { item: CommandClass; module: ModuleNode },
+		forHelp = false
+	) {
+		const eager = item.boot && !forHelp;
+		await this.bootKernel(eager);
+		if (!eager) return this.kernel.prepare(item, module);
 		return ModuleContext.run(module, () => Service.make(item));
 	}
 
@@ -382,7 +397,7 @@ export abstract class Application extends InteractsWithConsole {
 			return this.exit(1);
 		}
 
-		const command = await this.prepareCommand(found);
+		const command = await this.prepareCommand(found, true);
 		this.write(await ModuleContext.run(found.module, () => command.help()));
 		await this.kernel.shutdown();
 		return this.exit(0);
@@ -502,9 +517,9 @@ export abstract class Application extends InteractsWithConsole {
 			.onStop(async (elysia) => {
 				await this.onStop(elysia as unknown as Elysia<Route>);
 				Event.emit('elysium:server:stop', elysia, this);
-				this._appContextStorage.disable();
 				this.removeSignalHandlers();
 				await this.#kernel?.shutdown();
+				this._appContextStorage.disable();
 			});
 	}
 
