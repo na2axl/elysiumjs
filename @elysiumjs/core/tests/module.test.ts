@@ -12,268 +12,106 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ModuleProps } from '../src/module.ts';
+import { describe, expect, it } from 'bun:test';
 
-import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
-import * as E from 'elysia';
-
-import * as M from '../src/middleware.ts';
-import { Module } from '../src/module.ts';
+import { InvalidModuleError, MissingModuleConfigError } from '../src/errors.ts';
+import { getModuleProps, isConfiguredModule, Module } from '../src/module.ts';
 import { Symbols } from '../src/utils.ts';
 
-// Mock Elysia
-const mockElysia = {
-	decorate: mock(),
-	use: mock().mockResolvedValue({}),
-	name: 'test-module',
-	onBeforeHandle: mock(),
-	onAfterHandle: mock(),
-	onAfterResponse: mock()
-};
-
-// Mock console.log and console.error to prevent actual console output
-const originalConsoleLog = console.log;
-const originalConsoleError = console.error;
-const originalProcessExit = process.exit;
-
 describe('Module', () => {
-	beforeEach(() => {
-		console.log = mock();
-		console.error = mock();
-		process.exit = mock() as any;
-		mock.restore();
-	});
+	describe('@Module.register', () => {
+		it('stores the props as metadata', () => {
+			class Ctl {}
+			const props = { controllers: [Ctl], prefix: '/x' as const };
 
-	afterEach(() => {
-		console.log = originalConsoleLog;
-		console.error = originalConsoleError;
-		process.exit = originalProcessExit;
-		mock.restore();
-	});
+			@Module.register(props)
+			class TestModule extends Module {}
 
-	describe('@Module.register decorator', () => {
-		it('should set metadata on the target class', () => {
-			// Create a test module class
+			expect(Reflect.getMetadata(Symbols.module, TestModule)).toEqual(props);
+			expect(getModuleProps(TestModule)).toEqual(props);
+		});
+
+		it('does not create an Elysia plugin', () => {
 			@Module.register()
 			class TestModule extends Module {}
 
-			// Check if metadata was set correctly
-			const handleModule = Reflect.getMetadata(Symbols.elysiaPlugin, TestModule);
-			expect(handleModule).toBeDefined();
-			expect(typeof handleModule).toBe('function');
-		});
-
-		it('should set metadata with controllers if provided', () => {
-			// Create mock controller classes
-			class Controller1 {}
-			class Controller2 {}
-
-			// Create a test module class with controllers
-			const moduleProps: ModuleProps = {
-				controllers: [Controller1, Controller2]
-			};
-
-			@Module.register(moduleProps)
-			class TestModule extends Module {}
-
-			// Check if metadata was set correctly
-			const handleModule = Reflect.getMetadata(Symbols.elysiaPlugin, TestModule);
-			expect(handleModule).toBeDefined();
-			expect(typeof handleModule).toBe('function');
+			expect(Reflect.getMetadata(Symbols.elysiaPlugin, TestModule)).toBeUndefined();
+			expect(getModuleProps(TestModule)).toEqual({});
 		});
 	});
 
-	describe('Module initialization', () => {
-		it('should initialize a module with no controllers', async () => {
-			// @ts-expect-error Mocking headaches
-			const elysiaSpy = spyOn(E, 'Elysia').mockReturnValueOnce(mockElysia);
-
-			// Create a test module class
-			@Module.register()
-			class TestModule extends Module {}
-
-			// Get the handleModule function
-			const handleModule = Reflect.getMetadata(Symbols.elysiaPlugin, TestModule);
-
-			// Create a module instance
-			const moduleInstance = new TestModule();
-
-			const applyMiddlewaresSpy = spyOn(M, 'applyMiddlewares');
-
-			// Call the handleModule function
-			await handleModule(moduleInstance);
-
-			// Check if Elysia was instantiated with the correct parameters
-			expect(elysiaSpy).toHaveBeenCalledWith({ name: 'TestModule' });
-
-			// Check if the module was decorated
-			expect(mockElysia.decorate).toHaveBeenCalledWith('module', moduleInstance);
-
-			// Check if applyMiddlewares was called
-			expect(applyMiddlewaresSpy).toHaveBeenCalledWith([], mockElysia);
-
-			// Check if no controllers were processed
-			expect(mockElysia.use).not.toHaveBeenCalled();
-		});
-
-		it('should initialize a module with controllers', async () => {
-			// @ts-expect-error Mocking headaches
-			const elysiaSpy = spyOn(E, 'Elysia').mockReturnValueOnce(mockElysia);
-
-			// Create mock controller classes with Elysia plugins
-			class Controller1 {}
-			class Controller2 {}
-
-			// Create mock Elysia plugins for controllers
-			const mockPlugin1 = mock().mockResolvedValue({});
-			const mockPlugin2 = mock().mockResolvedValue({});
-
-			// Set metadata on controllers
-			Reflect.defineMetadata(Symbols.elysiaPlugin, mockPlugin1, Controller1);
-			Reflect.defineMetadata(Symbols.elysiaPlugin, mockPlugin2, Controller2);
-
-			// Create a test module class with controllers
-			@Module.register({
-				controllers: [Controller1, Controller2]
-			})
-			class TestModule extends Module {}
-
-			// Get the handleModule function
-			const handleModule = Reflect.getMetadata(Symbols.elysiaPlugin, TestModule);
-
-			// Create a module instance
-			const moduleInstance = new TestModule();
-
-			const applyMiddlewaresSpy = spyOn(M, 'applyMiddlewares');
-
-			// Call the handleModule function
-			await handleModule(moduleInstance);
-
-			// Check if Elysia was instantiated with the correct parameters
-			expect(elysiaSpy).toHaveBeenCalledWith({ name: 'TestModule' });
-
-			// Check if the module was decorated
-			expect(mockElysia.decorate).toHaveBeenCalledWith('module', moduleInstance);
-
-			// Check if applyMiddlewares was called
-			expect(applyMiddlewaresSpy).toHaveBeenCalledWith([], mockElysia);
-
-			// Check if controllers were processed
-			expect(mockPlugin1).toHaveBeenCalled();
-			expect(mockPlugin2).toHaveBeenCalled();
-			expect(mockElysia.use).toHaveBeenCalledTimes(2);
-		});
-
-		it('should throw an error for invalid controllers', async () => {
-			// Create a mock controller class without an Elysia plugin
-			class InvalidController {}
-
-			expect(Reflect.getMetadata(Symbols.elysiaPlugin, InvalidController)).toBeUndefined();
-
-			// Create a test module class with an invalid controller
-			@Module.register({
-				controllers: [InvalidController]
-			})
-			class TestModule extends Module {}
-
-			// Get the handleModule function
-			const handleModule = Reflect.getMetadata(Symbols.elysiaPlugin, TestModule);
-
-			// Create a module instance
-			const moduleInstance = new TestModule();
-
-			// Call the handleModule function
-			await handleModule(moduleInstance);
-
-			// Check if an error was logged and process.exit was called
-			expect(console.error).toHaveBeenCalledWith(
-				expect.stringContaining(
-					`Invalid controller class InvalidController registered in module TestModule`
-				)
-			);
-			expect(process.exit).toHaveBeenCalledWith(1);
-		});
-
-		it('should apply middlewares to the module', async () => {
-			// @ts-expect-error Mocking headaches
-			const elysiaSpy = spyOn(E, 'Elysia').mockReturnValueOnce(mockElysia);
-
-			// Create mock middleware classes
-			class Middleware1 {}
-			class Middleware2 {}
-
-			// Create a test module class with middlewares
-			@Module.register()
-			class TestModule extends Module {}
-
-			// Set middlewares metadata on the module class
-			Reflect.defineMetadata(Symbols.middlewares, [Middleware1, Middleware2], TestModule);
-
-			// Get the handleModule function
-			const handleModule = Reflect.getMetadata(Symbols.elysiaPlugin, TestModule);
-
-			// Create a module instance
-			const moduleInstance = new TestModule();
-
-			const applyMiddlewaresSpy = spyOn(M, 'applyMiddlewares');
-
-			// Call the handleModule function
-			await handleModule(moduleInstance);
-
-			// Check if applyMiddlewares was called with the middlewares
-			expect(applyMiddlewaresSpy).toHaveBeenCalledWith([Middleware1, Middleware2], mockElysia);
+	describe('getModuleProps', () => {
+		it('throws InvalidModuleError on an undecorated class', () => {
+			class Plain extends Module {}
+			expect(() => getModuleProps(Plain)).toThrow(InvalidModuleError);
 		});
 	});
 
-	describe('Lifecycle hooks', () => {
-		it('should call beforeRegister and afterRegister hooks', async () => {
-			// Create a test module class with overridden lifecycle hooks
+	describe('hooks', () => {
+		it('default to no-ops', async () => {
 			@Module.register()
-			class TestModule extends Module {
-				public beforeRegister = mock();
-				public afterRegister = mock();
+			class TestModule extends Module {}
+			const m = new TestModule();
+
+			expect(await m.onInit()).toBeUndefined();
+			expect(await m.onDestroy()).toBeUndefined();
+			expect(await m.onServe({} as any)).toBeUndefined();
+		});
+	});
+
+	describe('Module.configurable', () => {
+		type Cfg = { url: string; opts: { a: number; b: number } };
+
+		@Module.register()
+		class XModule extends Module.configurable<Cfg>({
+			defaults: { opts: { a: 1, b: 2 } },
+			required: ['url']
+		}) {}
+
+		it('with() returns a configured module', () => {
+			const cm = XModule.with({ url: 'u' });
+			expect(isConfiguredModule(cm)).toBe(true);
+			expect(cm.module).toBe(XModule);
+			expect(cm.config).toEqual({ url: 'u' });
+		});
+
+		it('isConfiguredModule rejects other values', () => {
+			expect(isConfiguredModule(XModule)).toBe(false);
+			expect(isConfiguredModule(null)).toBe(false);
+			expect(isConfiguredModule({})).toBe(false);
+		});
+
+		it('config token reflects the subclass name', () => {
+			expect(XModule.config).toBe('elysium.module.XModule.config');
+		});
+
+		it('resolveConfig deep-merges defaults', () => {
+			const resolved = XModule.resolveConfig({ url: 'u', opts: { a: 9 } as any });
+			expect(resolved).toEqual({ url: 'u', opts: { a: 9, b: 2 } });
+		});
+
+		it('resolveConfig does not mutate its input or the defaults', () => {
+			const input = { url: 'u' } as Partial<Cfg>;
+			XModule.resolveConfig(input);
+			expect(input).toEqual({ url: 'u' });
+			XModule.resolveConfig({ url: 'w', opts: { a: 5 } as any });
+			expect(XModule.resolveConfig({ url: 'v' }).opts).toEqual({ a: 1, b: 2 });
+		});
+
+		it('resolveConfig throws listing missing required keys', () => {
+			try {
+				XModule.resolveConfig({});
+				throw new Error('should have thrown');
+			} catch (e) {
+				expect(e).toBeInstanceOf(MissingModuleConfigError);
+				expect((e as MissingModuleConfigError).keys).toEqual(['url']);
 			}
-
-			// Create a mock controller class with an Elysia plugin
-			class Controller {}
-			const mockPlugin = mock().mockResolvedValue({});
-			Reflect.defineMetadata(Symbols.elysiaPlugin, mockPlugin, Controller);
-
-			// Set controllers for the module
-			Reflect.defineMetadata(
-				Symbols.elysiaPlugin,
-				Reflect.getMetadata(Symbols.elysiaPlugin, TestModule),
-				TestModule
-			);
-
-			// Create a module instance
-			const moduleInstance = new TestModule();
-
-			// Mock the app function to call beforeRegister and afterRegister
-			const mockApp = async () => {
-				moduleInstance.beforeRegister();
-				const result = await mockPlugin(moduleInstance);
-				moduleInstance.afterRegister();
-				return result;
-			};
-
-			// Call the mock app function
-			await mockApp();
-
-			// Check if lifecycle hooks were called
-			expect(moduleInstance.beforeRegister).toHaveBeenCalled();
-			expect(moduleInstance.afterRegister).toHaveBeenCalled();
-			// expect(moduleInstance.beforeRegister).toHaveBeenCalledBefore(moduleInstance.afterRegister);
 		});
 
-		it('should have default empty implementations for lifecycle hooks', () => {
-			// Create a module instance
-			class TestModule extends Module {}
-			const moduleInstance = new TestModule();
-
-			// Call the lifecycle hooks
-			expect(() => moduleInstance.beforeRegister()).not.toThrow();
-			expect(() => moduleInstance.afterRegister()).not.toThrow();
+		it('instance config getter reads the kernel-set metadata', () => {
+			const m = new XModule();
+			Reflect.defineMetadata(Symbols.moduleConfig, { url: 'z' }, m);
+			expect(m.config).toEqual({ url: 'z' });
 		});
 	});
 });

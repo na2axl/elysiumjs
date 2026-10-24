@@ -81,6 +81,8 @@ export function deepMerge<T extends Record<string, any | any[]>>(target: T, ...s
 			if (isObject(source[key])) {
 				if (!target[key]) {
 					Object.assign(target, { [key]: source[key] });
+				} else {
+					deepMerge(target[key], source[key]);
 				}
 			} else if (Array.isArray(source[key])) {
 				if (!Array.isArray(target[key])) {
