@@ -17,9 +17,10 @@ import { afterEach, describe, expect, it, spyOn } from 'bun:test';
 
 import { HeraclesWorkCommand } from '../src/commands';
 import { HeraclesModule } from '../src/heracles.module';
+import { Heracles } from '../src/heracles';
 import { Job } from '../src/job';
 import { Queue } from '../src/queue';
-import { DuplicateJobError, JobRegistry } from '../src/registry';
+import { DuplicateJobError, JobRegistry, QUEUES_SERVICE } from '../src/registry';
 import { RedisWorker } from '../src/workers/redis.worker';
 
 @Service.register({ global: false })
@@ -32,6 +33,7 @@ let seen: string | undefined;
 @Job.register({ name: 'SendInvoiceJob' })
 class SendInvoiceJob extends Job {
 	protected async execute(): Promise<void> {
+		await Bun.sleep(0);
 		seen = Service.get<Secret>(Secret)?.value;
 	}
 }
@@ -53,6 +55,7 @@ class LegacyModule extends Module {}
 class StubTransport {
 	constructor(_mode: unknown, _options?: unknown) {}
 	public onMessage(_handler: unknown): void {}
+	public async stop(): Promise<void> {}
 }
 
 const JOB = 'elysium.heracles.job.SendInvoiceJob';
@@ -74,8 +77,13 @@ describe('HeraclesModule', () => {
 			],
 			{ cwd: `${import.meta.dir}/..`, stdout: 'pipe', stderr: 'pipe' }
 		);
-		const out = await new Response(proc.stdout).text();
-		await proc.exited;
+		const [out, err, code] = await Promise.all([
+			new Response(proc.stdout).text(),
+			new Response(proc.stderr).text(),
+			proc.exited
+		]);
+		if (code !== 0) throw new Error(`import check exited with ${code}: ${err}`);
+		expect(code).toBe(0);
 		expect(JSON.parse(out.trim().split('\n').pop()!)).toEqual([]);
 	});
 
@@ -131,7 +139,40 @@ describe('HeraclesModule', () => {
 			modules: [HeraclesModule.with({ queues: { 'module-test-q': { transport: StubTransport as any } } })],
 			boot: 'eager'
 		});
+		await app.get(QUEUES_SERVICE);
 		expect(Queue.exists('module-test-q')).toBe(true);
+		await app.shutdown();
+		app = undefined;
+		expect(Queue.exists('module-test-q')).toBe(false);
+	});
+
+	it('lets a module that does not import HeraclesModule dispatch on a lazy boot', async () => {
+		const sent: unknown[] = [];
+		class SendingTransport {
+			constructor(_mode: unknown, _options?: unknown) {}
+			public onMessage(_handler: unknown): void {}
+			public async send(event: unknown): Promise<void> {
+				sent.push(event);
+			}
+			public async stop(): Promise<void> {}
+		}
+
+		@Module.register({ jobs: [SendInvoiceJob], services: [Secret] })
+		class UserModule extends Module {}
+
+		app = await Application.testing({
+			modules: [
+				UserModule,
+				HeraclesModule.with({
+					queues: { default: { transport: SendingTransport as any } }
+				})
+			]
+		});
+		expect(Queue.exists('default')).toBe(false);
+		await Heracles.dispatch(SendInvoiceJob, []);
+		expect(Queue.exists('default')).toBe(true);
+		expect(JobRegistry.get(JOB)).toBeDefined();
+		expect(sent.length).toBe(1);
 	});
 
 	it('clears the registry on destroy', async () => {
@@ -145,21 +186,21 @@ describe('HeraclesModule', () => {
 		expect(JobRegistry.get(JOB)).toBeUndefined();
 	});
 
-	it('runs a job inside its owning module context', async () => {
+	it('runs a job inside its owning module context, across awaits', async () => {
 		app = await Application.testing({
 			modules: [HeraclesModule, BillingModule],
 			boot: 'eager'
 		});
 		seen = undefined;
 		const worker = new RedisWorker('default', { id: 'w1' }) as any;
-		let queued: Job | undefined;
+		let queued: unknown;
 		worker.sendJobStatusUpdate = async () => {};
 		worker.addJob = async (job: Job) => {
-			queued = job;
+			queued = { job, retries: 0 };
 		};
+		worker.queues.set('default', { activeJobs: new Map(), jobs: [] });
 		await worker.handleProcessJob('job_1', 'dispatch_1', JOB, [], 'default', {});
-		expect(queued).toBeDefined();
-		await queued!.run();
+		await worker.processJobInternal(queued, 'default');
 		expect(seen).toBe('module-private');
 	});
 

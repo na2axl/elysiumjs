@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { ModuleNode } from '@elysiumjs/core';
 import type { JobClass } from '../job';
 import type { JobDispatchOptions } from '../queue';
 import type { TransportEvent } from '../transport';
@@ -26,6 +27,9 @@ import { RedisTransport } from '../transports/redis.transport';
 import { JobRegistry } from '../registry';
 import { getJobMetadata } from '../utils';
 import { BaseWorker } from './base.worker';
+
+/** The module that owns each job instance, so it runs in that module's context. */
+const jobOwners = new WeakMap<Job, ModuleNode>();
 
 /**
  * Job batch for processing
@@ -415,7 +419,10 @@ export class RedisWorker extends BaseWorker<RedisTransport> {
 		);
 
 		try {
-			await queuedJob.job.run();
+			const owner = jobOwners.get(queuedJob.job);
+			await (owner
+				? ModuleContext.run(owner, () => queuedJob.job.run())
+				: queuedJob.job.run());
 
 			// Handle job result
 			if (queuedJob.job.status === JobStatus.COMPLETED) {
@@ -653,8 +660,7 @@ export class RedisWorker extends BaseWorker<RedisTransport> {
 				entry.module,
 				() => new (WithId(entry.jobClass, jobId, dispatchId))(...(args || []))
 			);
-			const run = job.run.bind(job);
-			job.run = () => ModuleContext.run(entry.module, run);
+			jobOwners.set(job, entry.module);
 			job.queueName = queueName;
 
 			// Parse job options

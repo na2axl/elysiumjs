@@ -46,7 +46,7 @@ export {
 	ServiceNotVisibleError
 } from './errors';
 export { needsDefaultAlias, runAll } from './connections';
-export { Kernel } from './kernel';
+export { Kernel, KERNEL_SERVICE } from './kernel';
 export { type ConfiguredModule, type ModuleClass, type ModuleProps, Module } from './module';
 export { ModuleContext } from './module-context';
 export { type ModuleGraph, type ModuleNode } from './module-graph';

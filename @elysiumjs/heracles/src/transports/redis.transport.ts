@@ -14,7 +14,7 @@
 
 import type { JobStatusInfo, Transport, TransportEvent } from '../transport';
 
-import { InteractsWithConsole, Redis } from '@elysiumjs/core';
+import { InteractsWithConsole, Redis, Service } from '@elysiumjs/core';
 import { RedisClient } from 'bun';
 import { uid } from 'radash';
 
@@ -175,13 +175,17 @@ export class RedisTransport extends InteractsWithConsole implements Transport {
 	 */
 	private async initializeClients(): Promise<void> {
 		// Main command client with auto-pipelining
-		this.commandClient = await Redis.getConnection(this.options.connection).duplicate();
+		// Resolved asynchronously: on a lazy boot the connection may not be built yet
+		const connection = await Service.resolve<RedisClient>(
+			Redis.getConnectionName(this.options.connection)
+		);
+		this.commandClient = await connection.duplicate();
 
 		// Subscriber client (pub/sub takes over connection)
-		this.subscriberClient = await Redis.getConnection(this.options.connection).duplicate();
+		this.subscriberClient = await connection.duplicate();
 
 		// Publisher client for sending notifications
-		this.publisherClient = await Redis.getConnection(this.options.connection).duplicate();
+		this.publisherClient = await connection.duplicate();
 
 		// Set up connection event handlers
 		this.setupConnectionHandlers();

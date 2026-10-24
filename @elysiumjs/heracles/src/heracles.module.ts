@@ -17,11 +17,11 @@ import type { Job, JobClass } from './job';
 import type { QueueOptions } from './queue';
 import type { JobRegistryEntry } from './registry';
 
-import { Module, Service } from '@elysiumjs/core';
+import { ElysiumError, KERNEL_SERVICE, Module, Service } from '@elysiumjs/core';
 
 import { HeraclesCleanCommand, HeraclesListCommand, HeraclesWorkCommand } from './commands';
 import { Queue } from './queue';
-import { DuplicateJobError, JobRegistry } from './registry';
+import { DuplicateJobError, JobRegistry, QUEUES_SERVICE } from './registry';
 import { getJobMetadata } from './utils';
 
 /**
@@ -34,20 +34,48 @@ export type HeraclesModuleConfig = {
 };
 
 /**
+ * The queues created from the module configuration. Built on first use; stops and removes
+ * the queues it created when the app shuts down.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class ConfiguredQueues {
+	public readonly queues: readonly Queue[];
+
+	constructor(config: NonNullable<HeraclesModuleConfig['queues']>) {
+		this.queues = Object.entries(config).map(([name, options]) => Queue.get(name, options));
+	}
+
+	public async onDestroy(): Promise<void> {
+		for (const queue of this.queues) {
+			await queue.stop();
+			Queue.remove(queue.name);
+		}
+	}
+}
+
+/**
  * Collects the jobs that loaded modules declare in their `jobs` lists, runs each job inside
  * its owning module's context, and provides the Heracles commands.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 @Module.register<HeraclesModuleConfig>({
-	commands: [HeraclesCleanCommand, HeraclesListCommand, HeraclesWorkCommand]
+	commands: [HeraclesCleanCommand, HeraclesListCommand, HeraclesWorkCommand],
+	services: (config) => [
+		{ name: QUEUES_SERVICE, global: true, factory: () => new ConfiguredQueues(config.queues ?? {}) }
+	]
 })
 export class HeraclesModule extends Module.configurable<HeraclesModuleConfig>({
 	defaults: { queues: {} }
 }) {
-	/** Builds the job registry and creates the configured queues. */
+	/** Builds the job registry. Queues are created by the {@link ConfiguredQueues} service. */
 	public override onInit(): void {
 		const entries = new Map<string, JobRegistryEntry>();
-		const kernel = Service.get<Kernel>('elysium.kernel')!;
+		const kernel = Service.get<Kernel>(KERNEL_SERVICE);
+		if (!kernel) {
+			throw new ElysiumError(
+				`HeraclesModule needs the "${KERNEL_SERVICE}" service, which the kernel registers when it boots.`
+			);
+		}
 
 		for (const { item, module } of kernel.graph.collect('jobs')) {
 			const jobClass = item as JobClass<Job>;
@@ -61,10 +89,6 @@ export class HeraclesModule extends Module.configurable<HeraclesModuleConfig>({
 		}
 
 		JobRegistry.set(entries);
-
-		for (const [name, options] of Object.entries(this.config.queues ?? {})) {
-			Queue.get(name, options);
-		}
 	}
 
 	/** Clears the module-level job registry. */

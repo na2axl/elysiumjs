@@ -36,6 +36,9 @@ export class DuplicateJobError extends ElysiumError {
  */
 export type JobRegistryEntry = { jobClass: JobClass<Job>; module: ModuleNode };
 
+/** The name of the global service that creates the configured queues. */
+export const QUEUES_SERVICE = 'heracles.queues';
+
 let entries = new Map<string, JobRegistryEntry>();
 
 /**

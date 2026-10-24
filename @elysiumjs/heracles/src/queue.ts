@@ -149,6 +149,14 @@ export class Queue extends InteractsWithConsole {
 	private static queues: Map<string, Queue> = new Map();
 
 	/**
+	 * Removes a queue from the registry. The caller is responsible for stopping it.
+	 * @param name The name of the queue.
+	 */
+	public static remove(name: string): void {
+		this.queues.delete(name);
+	}
+
+	/**
 	 * Checks whether a queue exists.
 	 * @param name The name of the queue.
 	 * @returns `true` if the queue exists, `false` otherwise.

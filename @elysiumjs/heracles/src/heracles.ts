@@ -15,9 +15,11 @@
 import type { Job, JobClass } from './job';
 import type { JobDispatchId, JobDispatchOptions } from './queue';
 
+import { Service } from '@elysiumjs/core';
 import { uid } from 'radash';
 
 import { Queue } from './queue';
+import { QUEUES_SERVICE } from './registry';
 import { getJobMetadata } from './utils';
 
 export namespace Heracles {
@@ -43,6 +45,10 @@ export namespace Heracles {
 		if (!metadata.queue) {
 			throw new Error(`Job ${jobClass.name} is not registered with a queue`);
 		}
+
+		// Configured queues are created by the 'heracles.queues' service; resolving it also
+		// initialises HeraclesModule, which works on a lazy boot too.
+		if (Service.exists(QUEUES_SERVICE)) await Service.resolve(QUEUES_SERVICE);
 
 		if (!Queue.exists(metadata.queue)) {
 			throw new Error(
