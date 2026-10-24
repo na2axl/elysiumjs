@@ -10,7 +10,19 @@ bun install @elysiumjs/styx
 
 ## Usage
 
-The `styx` command needs to be run inside an Elysium.js project.
+The `styx` command needs to be run inside an Elysium.js project. It loads `src/app.ts` (or `index.ts`) and starts the exported `Application` subclass.
+
+Add `StyxModule` to the modules of your application to get the commands below. It is only active in development (`NODE_ENV=development`, the default), so the `make:*` and `module:*` commands are absent in production. The `migration:*` commands come from your database module (`DrizzleModule`) and stay available in production.
+
+```ts
+import { Application } from '@elysiumjs/core';
+import { StyxModule } from '@elysiumjs/styx';
+
+@Application.register({
+	modules: [StyxModule /* , your other modules */]
+})
+export class App extends Application {}
+```
 
 To create new items:
 

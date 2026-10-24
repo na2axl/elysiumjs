@@ -10,26 +10,29 @@ bun add @elysiumjs/plugin-sentry
 
 ## Usage
 
+Add `SentryModule` to your application:
+
 ```ts
 import { Application } from '@elysiumjs/core';
-import { plugin as sentry } from '@elysiumjs/plugin-sentry';
+import { SentryModule } from '@elysiumjs/plugin-sentry';
 
 @Application.register({
-	// Your other app options
-	plugins: [
-		sentry({
+	modules: [
+		SentryModule.with({
 			serverName: 'my-app',
 			dsn: 'https://<key>@sentry.io/<project>'
 		})
-		// Your other plugins
+		// Your other modules
 	]
 })
 class MyApp extends Application {}
 ```
 
+The `dsn` can also come from the `SENTRY_DSN` environment variable. Boot fails when neither is set.
+
 ## Configuration
 
-This plugin forwards all options to the Sentry initialization method. You can find the full list of options [here](https://docs.sentry.io/platforms/javascript/guides/bun/configuration/options/).
+The module forwards all options to the Sentry initialization method. You can find the full list of options [here](https://docs.sentry.io/platforms/javascript/guides/bun/configuration/options/).
 
 ## License
 

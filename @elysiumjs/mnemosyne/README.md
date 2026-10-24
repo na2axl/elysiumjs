@@ -1,6 +1,6 @@
 # @elysiumjs/mnemosyne
 
-Database and caching for Elysium.js applications.
+Database abstractions and caching for Elysium.js applications.
 
 ## Installation
 
@@ -10,23 +10,26 @@ bun add @elysiumjs/mnemosyne
 
 ## Usage
 
+`MnemosyneModule` provides the caches (`Cache.redis` and `Cache.memory`). Database driver modules such as `DrizzleModule` from `@elysiumjs/mnemosyne-drizzle` import it for you, so you only add it yourself when you want to configure the caches or use them without a database:
+
 ```ts
-import { Database, Model, Repository } from '@elysiumjs/mnemosyne';
-import { Service, ServiceScope } from '@elysiumjs/core';
-import { uuid, varchar } from 'drizzle-orm/pg-core';
+import { Application, RedisModule } from '@elysiumjs/core';
+import { MnemosyneModule } from '@elysiumjs/mnemosyne';
 
-// Define a model
-class UserModel extends Model('users', {
-	id: uuid().primaryKey().defaultRandom(),
-	name: varchar({ length: 255 }).notNull(),
-}) {
-	public static readonly supportTenancy = true;
-}
-
-// Create a repository
-@Service.register({ name: 'UserRepository', scope: ServiceScope.SINGLETON })
-class UserRepository extends Repository(UserModel) {}
+@Application.register({
+	modules: [
+		RedisModule.with({
+			default: 'cache',
+			connections: { cache: { url: process.env.REDIS_URL! } }
+		}),
+		// Opt out of a cache with `redis: false` or `memory: false`.
+		MnemosyneModule.with({ cache: { memory: { ttl: 60_000, lruSize: 5000 } } })
+	]
+})
+export class App extends Application {}
 ```
+
+Models and repositories are built with a driver package. See [`@elysiumjs/mnemosyne-drizzle`](../mnemosyne-drizzle/README.md).
 
 ## License
 

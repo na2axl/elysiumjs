@@ -20,7 +20,32 @@ bun add @elysiumjs/heracles
 
 ## Quick Start
 
-### 1. Create a Job
+### 1. Register the Module
+
+Queues are declared on `HeraclesModule`. The Redis transport reads its connection from a `RedisModule`.
+
+```typescript
+import { Application, RedisModule } from '@elysiumjs/core';
+import { HeraclesModule, RedisTransport } from '@elysiumjs/heracles';
+
+@Application.register({
+	modules: [
+		RedisModule.with({
+			default: 'cache',
+			connections: { cache: { url: process.env.REDIS_URL! } }
+		}),
+		HeraclesModule.with({
+			queues: {
+				emails: { transport: RedisTransport }
+			}
+		}),
+		MainModule
+	]
+})
+export class App extends Application {}
+```
+
+### 2. Create a Job
 
 ```typescript
 import { Job } from '@elysiumjs/heracles';
@@ -51,25 +76,33 @@ export class SendEmailJob extends Job {
 }
 ```
 
-### 2. Dispatch a Job
+List the job in the `jobs` of the module that owns it. Heracles collects the jobs of every loaded module:
 
 ```typescript
-import { Heracles, Queue, RedisTransport } from '@elysiumjs/heracles';
+import { Module } from '@elysiumjs/core';
 
 import { SendEmailJob } from './jobs/send-email.job';
 
-// Configure the queue with Redis transport
-const emailQueue = Queue.get('emails', {
-	transport: RedisTransport,
-	transportOptions: {
-		connection: 'default'
-	}
-});
+@Module.register({
+	jobs: [SendEmailJob]
+})
+export class MainModule extends Module {}
+```
 
-// Dispatch a job
+### 3. Dispatch a Job
+
+A process that only dispatches jobs (such as your web server) must start the queue's transport first:
+
+```typescript
+import { Service } from '@elysiumjs/core';
+import { Heracles, Queue } from '@elysiumjs/heracles';
+
+// For example in a module's `onServe` hook:
+await Service.resolve('heracles.queues'); // creates the configured queues
+await Queue.get('emails').start();
+
 await Heracles.dispatch(SendEmailJob, ['user@example.com', 'Welcome!', 'Welcome to our platform!']);
 
-// Dispatch with options
 await Heracles.dispatch(
 	SendEmailJob,
 	['user@example.com', 'Welcome!', 'Welcome to our platform!'],
@@ -81,9 +114,9 @@ await Heracles.dispatch(
 );
 ```
 
-### 3. Start Workers
+### 4. Start Workers
 
-You can use [`styx`](https://www.npmjs.com/package/@elysiumjs/styx) to launch Heracles workers through the CLI:
+Add `StyxModule` to your application, then use `styx` to launch Heracles workers (`heracles:work` boots every module before it runs):
 
 ```bash
 # Start a Redis worker for the 'emails' queue with concurrency of 3 jobs
@@ -98,7 +131,6 @@ Or programmatically:
 ```typescript
 import { RedisWorker } from '@elysiumjs/heracles';
 
-// Create and start a Redis worker
 const worker = new RedisWorker('default', { id: 'worker-1' });
 await worker.createQueue({ name: 'emails', concurrency: 3 });
 await worker.start();
@@ -108,26 +140,30 @@ await worker.start();
 
 ### Queue Options
 
+Each entry of `queues` accepts the queue options:
+
 ```typescript
-const queue = Queue.get('emails', {
-	// Maximum number of concurrent jobs to process in this queue
-	concurrency: 5,
+HeraclesModule.with({
+	queues: {
+		emails: {
+			// Maximum number of concurrent jobs to process in this queue
+			concurrency: 5,
 
-	// Maximum number of retries for failed jobs
-	maxRetries: 3,
+			// Maximum number of retries for failed jobs
+			maxRetries: 3,
 
-	// Delay in milliseconds between retries
-	retryDelay: 5000,
+			// Delay in milliseconds between retries
+			retryDelay: 5000,
 
-	// Whether to pause processing when an error occurs
-	pauseOnError: false,
+			// Whether to pause processing when an error occurs
+			pauseOnError: false,
 
-	// Redis transport configuration
-	transport: RedisTransport,
-
-	// Transport-specific options
-	transportOptions: {
-		connection: 'default'
+			// Transport class and its options
+			transport: RedisTransport,
+			transportOptions: {
+				connection: 'default'
+			}
+		}
 	}
 });
 ```
@@ -138,50 +174,25 @@ Heracles has a bundled Redis transport layer for job distribution, enabling dist
 
 #### 1. Configure Redis Connection
 
-First, configure a Redis connection in your Elysium.js application:
-
-```typescript
-import { Redis } from '@elysiumjs/core';
-
-// Register a Redis connection
-Redis.registerConnection('default', {
-	url: 'redis://localhost:6379'
-	// Other Redis options
-});
-```
-
-Or during the Application registration:
-
-```typescript
-import { Application } from '@elysiumjs/core';
-
-@Application.register({
-	redis: {
-		default: 'jobs',
-		connections: {
-			jobs: { url: 'redis://localhost:6379' }
-		}
-	}
-	// ...other configurations...
-})
-export class App extends Application {}
-```
+Declare the connection with `RedisModule` in your application (see step 1 above). `connection: 'default'` resolves to the connection named by `RedisModule`'s `default`.
 
 #### 2. Configure Queues with Redis Transport
 
 ```typescript
-import { Queue, RedisTransport } from '@elysiumjs/heracles';
-
-const queue = Queue.get('emails', {
-	transport: RedisTransport,
-	transportOptions: {
-		connection: 'default', // Redis connection name
-		keyPrefix: 'myapp:jobs', // Prefix for Redis keys (default: 'elysium:heracles')
-		consumerGroup: 'workers', // Redis consumer group name (default: 'workers')
-		statusTTL: 86400, // Job status TTL in seconds (default: 86400 - 24 hours)
-		cleanupCompletedJobs: true, // Auto-cleanup completed jobs (default: true)
-		completedJobRetention: 3600, // Time to retain completed jobs in seconds (default: 3600 - 1 hour)
-		maxStreamSize: 1000 // Maximum stream size (default: 1000)
+HeraclesModule.with({
+	queues: {
+		emails: {
+			transport: RedisTransport,
+			transportOptions: {
+				connection: 'default', // Redis connection name
+				keyPrefix: 'myapp:jobs', // Prefix for Redis keys (default: 'elysium:heracles')
+				consumerGroup: 'workers', // Redis consumer group name (default: 'workers')
+				statusTTL: 86400, // Job status TTL in seconds (default: 86400 - 24 hours)
+				cleanupCompletedJobs: true, // Auto-cleanup completed jobs (default: true)
+				completedJobRetention: 3600, // Time to retain completed jobs in seconds (default: 3600 - 1 hour)
+				maxStreamSize: 1000 // Maximum stream size (default: 1000)
+			}
+		}
 	}
 });
 ```

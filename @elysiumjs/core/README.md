@@ -42,40 +42,39 @@ export class UserController {
 }
 ```
 
-Create a module class:
+Create a module class. A module is the only way to register anything in an Elysium.js app:
+controllers, commands, jobs and services are all declared by the module that owns them.
 
 ```typescript
 import { Module } from '@elysiumjs/core';
 
 import { UserController } from './controllers/http/user.controller';
+import { UserService } from './services/user.service';
 
 @Module.register({
+	services: [UserService],
 	controllers: [UserController]
 })
-export class MainModule extends Module {
-	public constructor() {
-		super();
-	}
-
-	public async beforeRegister(): Promise<void> {
-		console.log('Module is being registered');
-	}
-
-	public async afterRegister(): Promise<void> {
-		console.log('Module registered successfully');
-	}
-}
+export class MainModule extends Module {}
 ```
 
-Create an application class:
+Create an application class. Modules that need configuration are bound to it with `with()`:
 
 ```typescript
-import { Application } from '@elysiumjs/core';
+import { Application, RedisModule } from '@elysiumjs/core';
+import { HermesModule } from '@elysiumjs/hermes';
 
 import { MainModule } from './main.module';
 
 @Application.register({
-	modules: [MainModule],
+	modules: [
+		HermesModule.with({ level: 'debug', format: 'pretty' }),
+		RedisModule.with({
+			default: 'cache',
+			connections: { cache: { url: process.env.REDIS_URL! } }
+		}),
+		MainModule
+	],
 	server: {
 		name: 'Elysium',
 		port: 3000
@@ -91,7 +90,7 @@ import 'reflect-metadata'; // <- IMPORTANT TO ADD THIS LINE IN THE ENTRYPOINT FI
 
 import { App } from './app';
 
-new App();
+await App.start();
 ```
 
 Start the server:
@@ -105,6 +104,15 @@ Or, if using `styx`, run:
 ```bash
 bun styx serve
 ```
+
+## Migrating from the pre-module API
+
+- The `database`, `redis`, `wamp` and `elysium:hermes` keys of `@Application.register()` are gone. Add `DrizzleModule.with()`, `RedisModule.with()`, `WampModule.with()` and `HermesModule.with()` to `modules` instead.
+- `plugins` no longer takes package plugins. Add the package's module (for example `SentryModule`) to `modules`.
+- Importing a file no longer registers its commands or services. List commands in a module's `commands`, services in `services`, and jobs in `jobs`.
+- `new App()` is replaced by `await App.start()`. `Application.testing()` boots a module graph for tests.
+- The `beforeRegister` and `afterRegister` module hooks are replaced by `onInit`, `onServe` and `onDestroy`.
+- Jobs and workers moved to `@elysiumjs/heracles`; `WorkerPool` is removed.
 
 ## Documentation
 

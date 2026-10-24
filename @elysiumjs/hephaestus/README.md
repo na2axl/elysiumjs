@@ -1,15 +1,29 @@
 # @elysiumjs/hephaestus
 
-To install dependencies:
+Build tooling for Elysium.js applications: standalone binaries, Docker images and embedded assets.
+
+## Installation
 
 ```bash
-bun install
+bun add -D @elysiumjs/hephaestus
 ```
 
-To run:
+## Usage
 
-```bash
-bun run index.ts
+Add `HephaestusModule` to the modules of your application. It provides the Hephaestus commands to `styx`.
+
+```ts
+import { Application } from '@elysiumjs/core';
+import { HephaestusModule } from '@elysiumjs/hephaestus';
+
+@Application.register({
+	modules: [HephaestusModule /* , your other modules */]
+})
+export class App extends Application {}
 ```
 
-This project was created using `bun init` in bun v1.2.16. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
+Then run `bun styx list` to see the available commands.
+
+## License
+
+This project is licensed under the Apache License, Version 2.0. See the [LICENSE](../../LICENSE) file for more info.
