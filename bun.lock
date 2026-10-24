@@ -108,7 +108,7 @@
     },
     "@elysiumjs/mnemosyne": {
       "name": "@elysiumjs/mnemosyne",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "dependencies": {
         "cache-manager": "^7.2.3",
         "cacheable": "^2.0.3",
@@ -125,13 +125,16 @@
     },
     "@elysiumjs/mnemosyne-drizzle": {
       "name": "@elysiumjs/mnemosyne-drizzle",
-      "version": "0.1.2",
+      "version": "0.1.4",
       "dependencies": {
         "drizzle-orm": "^0.45.1",
+        "prompts": "^2.4.2",
+        "radash": "catalog:",
       },
       "devDependencies": {
         "@elysiumjs/core": "workspace:*",
         "@elysiumjs/mnemosyne": "workspace:*",
+        "@types/prompts": "^2.4.9",
       },
       "peerDependencies": {
         "@elysiumjs/core": "workspace:^",
@@ -154,15 +157,13 @@
     },
     "@elysiumjs/styx": {
       "name": "@elysiumjs/styx",
-      "version": "0.7.2",
+      "version": "0.7.1",
       "bin": {
         "styx": "dist/styx.js",
       },
       "devDependencies": {
         "@elysiumjs/core": "workspace:*",
         "@elysiumjs/heracles": "workspace:*",
-        "@elysiumjs/mnemosyne": "workspace:*",
-        "@elysiumjs/mnemosyne-drizzle": "workspace:*",
         "@types/prompts": "^2.4.9",
         "@types/string-template": "^1.0.7",
         "prompts": "^2.4.2",
@@ -172,8 +173,6 @@
       "peerDependencies": {
         "@elysiumjs/core": "workspace:^",
         "@elysiumjs/heracles": "workspace:^",
-        "@elysiumjs/mnemosyne": "workspace:^",
-        "@elysiumjs/mnemosyne-drizzle": "workspace:^",
       },
     },
     "create-elysium": {
@@ -195,6 +194,7 @@
       "name": "example",
       "dependencies": {
         "@elysiumjs/core": "workspace:^",
+        "@elysiumjs/heracles": "workspace:^",
         "@elysiumjs/hermes": "workspace:^",
         "@elysiumjs/mnemosyne-drizzle": "workspace:^",
         "@elysiumjs/styx": "workspace:^",

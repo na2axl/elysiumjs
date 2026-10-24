@@ -20,10 +20,12 @@
 			"outputs": ["dist/**/*.d.ts"]
 		},
 		"test": {
+			"dependsOn": ["^build"],
 			"inputs": ["src/**/*.ts", "tests/**/*.ts", "package.json"],
 			"outputs": []
 		},
 		"test:coverage": {
+			"dependsOn": ["^build"],
 			"inputs": ["src/**/*.ts", "tests/**/*.ts", "package.json"],
 			"outputs": ["coverage/**"]
 		},
