@@ -16,8 +16,10 @@ import type { AnyElysia } from 'elysia';
 import type { Class } from 'type-fest';
 import type { Context } from './http';
 import type { LoggerInterface } from './logger';
+import type { ModuleNode } from './module-graph';
 
 import { Application } from './app';
+import { ModuleContext } from './module-context';
 import { Service } from './service';
 import { Symbols } from './utils';
 
@@ -27,29 +29,46 @@ import { Symbols } from './utils';
  * @param middlewares The list of middleware instances to execute.
  * @param context The context to pass to each middleware.
  * @param method The method to call on each middleware.
+ * @param node The module the middlewares belong to. The chain runs in its context.
  */
 export const executeMiddlewareChain = (
 	middlewares: Middleware[],
 	context: any,
-	method: Exclude<keyof Middleware, 'guards'>
+	method: Exclude<keyof Middleware, 'guards'>,
+	node: ModuleNode | null = null
 ): Promise<any> => {
+	const chain = async () => {
+		for (const middleware of middlewares) {
+			const result = await middleware[method](context);
+			if (result !== undefined) {
+				return result; // Stop the chain if middleware returns a value
+			}
+		}
+	};
+
 	return Application.context.run(
 		new Map([
 			['tenant', context.tenant],
 			['http:context', context]
 		]),
-		async () => {
-			for (const middleware of middlewares) {
-				try {
-					const result = await middleware[method](context);
-					if (result !== undefined) {
-						return result; // Stop the chain if middleware returns a value
-					}
-				} catch (error) {
-					throw error; // Stop the chain and propagate the error
-				}
-			}
-		}
+		() => (node ? ModuleContext.run(node, chain) : chain())
+	);
+};
+
+/**
+ * Builds middleware instances in the context of a module.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param middlewares The middleware classes.
+ * @param node The owning module, or `null` to build them with global visibility only.
+ */
+export const makeMiddlewares = (
+	middlewares: Class<Middleware>[],
+	node: ModuleNode | null
+): Middleware[] => {
+	return middlewares.map((middleware) =>
+		node
+			? ModuleContext.run(node, () => Service.make<Middleware>(middleware))
+			: Service.make<Middleware>(middleware)
 	);
 };
 
@@ -58,28 +77,33 @@ export const executeMiddlewareChain = (
  * @author Axel Nana <axel.nana@workbud.com>
  * @param middlewares The list of middlewares to apply.
  * @param plugin The Elysia plugin instance.
+ * @param node The module the middlewares belong to, or `null` for application-level middlewares.
  */
-export const applyMiddlewares = (middlewares: Class<Middleware>[], plugin: AnyElysia) => {
-	const mi = middlewares.map((middleware) => Service.make<Middleware>(middleware));
+export const applyMiddlewares = (
+	middlewares: Class<Middleware>[],
+	plugin: AnyElysia,
+	node: ModuleNode | null
+) => {
+	const mi = makeMiddlewares(middlewares, node);
 
 	plugin.onRequest((c) => {
-		return executeMiddlewareChain(mi, c, 'onRequest');
+		return executeMiddlewareChain(mi, c, 'onRequest', node);
 	});
 
 	plugin.onTransform((c) => {
-		return executeMiddlewareChain(mi, c, 'onTransform');
+		return executeMiddlewareChain(mi, c, 'onTransform', node);
 	});
 
 	plugin.onBeforeHandle((c) => {
-		return executeMiddlewareChain(mi, c, 'onBeforeHandle');
+		return executeMiddlewareChain(mi, c, 'onBeforeHandle', node);
 	});
 
 	plugin.onAfterHandle((c) => {
-		return executeMiddlewareChain(mi, c, 'onAfterHandle');
+		return executeMiddlewareChain(mi, c, 'onAfterHandle', node);
 	});
 
 	plugin.onAfterResponse((c) => {
-		return executeMiddlewareChain(mi, c, 'onAfterResponse');
+		return executeMiddlewareChain(mi, c, 'onAfterResponse', node);
 	});
 };
 

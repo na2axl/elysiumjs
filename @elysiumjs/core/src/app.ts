@@ -15,10 +15,11 @@
 import type { ElysiaSwaggerConfig } from '@elysiajs/swagger';
 import type { AnyElysia, ElysiaConfig, ErrorContext, TSchema } from 'elysia';
 import type { CommandClass } from './command';
-import type { Route } from './http';
+import type { ElysiaApp, Route } from './http';
 import type { ConfiguredModule, ModuleClass } from './module';
 import type { ModuleNode } from './module-graph';
 import type { TestingApp, TestingOptions } from './testing';
+import type { ElysiaPlugin } from './utils';
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 
@@ -30,7 +31,7 @@ import { first } from 'radash';
 import { getCommandName } from './command';
 import { ConsoleFormat, InteractsWithConsole } from './console';
 import { initEnv } from './env';
-import { ElysiumError } from './errors';
+import { ElysiumError, InvalidControllerError } from './errors';
 import { Event } from './event';
 import { Kernel } from './kernel';
 import { applyMiddlewares } from './middleware';
@@ -88,6 +89,9 @@ export type AppProps = {
 	 */
 	plugins?: ElysiumPlugin[];
 };
+
+/** An error raised while handling a request, as given to the Elysia error hook. */
+type ServerError = ErrorContext & { code: string | number; error: any };
 
 /**
  * Type for the application context.
@@ -403,7 +407,8 @@ export abstract class Application extends InteractsWithConsole {
 	}
 
 	/**
-	 * Starts the server on the specified port.
+	 * Starts the server: boots the kernel, builds the root Elysia app, lets modules hook into it,
+	 * mounts their controllers and listens.
 	 */
 	private async commandServe(): Promise<void> {
 		const { server, swagger, plugins } = this.props();
@@ -427,53 +432,62 @@ export abstract class Application extends InteractsWithConsole {
 			this.#elysia.use(swaggerPlugin(swagger));
 		}
 
-		if (plugins && plugins.length > 0) {
-			this.debug('Registering plugins...');
-			for (const plugin of plugins) {
-				this.#elysia.use(await plugin(this));
-			}
+		for (const plugin of plugins ?? []) {
+			this.#elysia.use(await plugin(this));
 		}
 
+		this.setupServerHooks();
+
+		const middlewares = Reflect.getMetadata(Symbols.middlewares, this.constructor) ?? [];
+		applyMiddlewares(middlewares, this.#elysia, null);
+
+		await this.serveModules();
+
+		Event.emit('elysium:server:after-init', this, this);
+
+		this.#elysia.listen(server?.port ?? (parseInt(process.env.PORT!, 10) || 3000));
+	}
+
+	/** Lets every module hook into the root app, then mounts the controllers of each module. */
+	private async serveModules(): Promise<void> {
+		const { nodes } = this.kernel.graph;
+
+		for (const node of nodes) {
+			const instance = this.kernel.moduleInstance(node);
+			await ModuleContext.run(node, () => instance.onServe(this.#elysia));
+		}
+
+		for (const node of nodes) {
+			if (node.props.controllers?.length) {
+				this.debug(`Mounting module ${node.id}...`);
+				this.#elysia.use(await this.mountModule(node));
+			}
+		}
+	}
+
+	/** Builds the Elysia plugin of a module: its middlewares and the plugins of its controllers. */
+	private async mountModule(node: ModuleNode): Promise<ElysiaApp> {
+		const app: ElysiaApp = new Elysia({ name: node.id, prefix: node.props.prefix });
+
+		const middlewares = Reflect.getMetadata(Symbols.middlewares, node.moduleClass) ?? [];
+		applyMiddlewares(middlewares, app, node);
+
+		for (const controller of node.props.controllers ?? []) {
+			const plugin: ElysiaPlugin | undefined = Reflect.getMetadata(
+				Symbols.elysiaPlugin,
+				controller
+			);
+			if (!plugin) throw new InvalidControllerError(controller.name, node.id);
+			app.use(await plugin(node));
+		}
+
+		return app;
+	}
+
+	/** Registers the error handler and the start and stop hooks of the root app. */
+	private setupServerHooks(): void {
 		this.#elysia
-			.onError({ as: 'global' }, async (e) => {
-				if (await this.onError(e)) {
-					Event.emit('elysium:error', e);
-					this.trace({
-						name: 'HttpError',
-						message: 'Unexpected error while handling HTTP request',
-						// @ts-expect-error The stack property may not exist in the error.
-						stack: e.error.stack,
-						...e.error
-					});
-
-					let data = {};
-
-					if (typeof e.code === 'number') {
-						return e.error.response;
-					} else {
-						switch (e.code) {
-							case 'VALIDATION': {
-								data = {
-									scope: e.error.type,
-									code: e.error.message
-								};
-								break;
-							}
-							case 'INTERNAL_SERVER_ERROR': {
-								data = {
-									message: e.error.message
-								};
-								break;
-							}
-						}
-					}
-
-					return {
-						type: e.code,
-						data
-					};
-				}
-			})
+			.onError({ as: 'global' }, (e) => this.handleServerError(e as ServerError))
 			.onStart(async (elysia) => {
 				await this.onStart(elysia as unknown as Elysia<Route>);
 				Event.emit('elysium:server:start', elysia, this);
@@ -485,14 +499,33 @@ export abstract class Application extends InteractsWithConsole {
 				this.removeSignalHandlers();
 				await this.#kernel?.shutdown();
 			});
+	}
 
-		const middlewares = Reflect.getMetadata(Symbols.middlewares, this.constructor) ?? [];
-		applyMiddlewares(middlewares, this.#elysia);
+	/** Turns an error raised while handling a request into the response sent to the client. */
+	private async handleServerError(e: ServerError) {
+		if (!(await this.onError(e))) return;
 
-		Event.emit('elysium:server:after-init', this, this);
+		Event.emit('elysium:error', e);
+		this.trace({
+			name: 'HttpError',
+			message: 'Unexpected error while handling HTTP request',
+			stack: e.error.stack,
+			...e.error
+		});
 
-		// Register the server
-		this.#elysia.listen(server?.port ?? (parseInt(process.env.PORT!, 10) || 3000));
+		if (typeof e.code === 'number') return e.error.response;
+
+		let data = {};
+		switch (e.code) {
+			case 'VALIDATION':
+				data = { scope: e.error.type, code: e.error.message };
+				break;
+			case 'INTERNAL_SERVER_ERROR':
+				data = { message: e.error.message };
+				break;
+		}
+
+		return { type: e.code, data };
 	}
 
 	/**

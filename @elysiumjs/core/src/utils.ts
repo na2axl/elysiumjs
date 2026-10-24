@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import type { Elysia } from 'elysia';
+import type { ModuleNode } from './module-graph';
 
 import { isObject } from 'radash';
 
@@ -62,7 +63,8 @@ export function currentEnvironment(): string {
 
 export const nextTick = () => new Promise((resolve) => process.nextTick(resolve));
 
-export type ElysiaPlugin = () => Promise<Elysia>;
+/** The factory stored on a controller class; builds its Elysia plugin in a module's context. */
+export type ElysiaPlugin = (node: ModuleNode) => Promise<Elysia>;
 
 /**
  * Copies plain objects and arrays recursively. Everything else (primitives, class

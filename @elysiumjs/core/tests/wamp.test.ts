@@ -20,6 +20,7 @@ import { last } from 'radash';
 
 import { Event } from '../src/event';
 import { nextTick, Symbols } from '../src/utils';
+import { testNode } from './module-node';
 import { Wamp } from '../src/wamp';
 
 // Mock Wampy
@@ -96,7 +97,7 @@ describe('Wamp', () => {
 			const plugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestWampController);
 
 			// Call the plugin function
-			const app = await plugin();
+			const app = await plugin(testNode());
 
 			// Check if an Elysia app was created
 			expect(app).toBeInstanceOf(Elysia);
@@ -117,7 +118,7 @@ describe('Wamp', () => {
 			const plugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestWampController);
 
 			// Call the plugin function
-			await plugin();
+			await plugin(testNode());
 
 			// Check if Wampy was called with the correct options
 			// @ts-expect-error Mocking headaches
@@ -145,7 +146,7 @@ describe('Wamp', () => {
 			const plugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestWampController);
 
 			// Call the plugin function
-			const app: Elysia = await plugin();
+			const app: Elysia = await plugin(testNode());
 
 			// Trigger the onStart event
 			await app.event.start?.[0].fn(app);
@@ -173,7 +174,7 @@ describe('Wamp', () => {
 			const plugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestWampController);
 
 			// Call the plugin function
-			const app: Elysia = await plugin();
+			const app: Elysia = await plugin(testNode());
 			app.listen(3131);
 			await nextTick();
 
@@ -200,7 +201,7 @@ describe('Wamp', () => {
 			const plugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestWampController);
 
 			// Call the plugin function
-			const app: Elysia = await plugin();
+			const app: Elysia = await plugin(testNode());
 			app.listen(3131);
 			await nextTick();
 
@@ -253,7 +254,7 @@ describe('Wamp', () => {
 			const plugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestWampController);
 
 			// Call the plugin function
-			const app: Elysia = await plugin();
+			const app: Elysia = await plugin(testNode());
 			app.listen(3131);
 			await nextTick();
 
@@ -284,7 +285,7 @@ describe('Wamp', () => {
 			const plugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestWampController);
 
 			// Call the plugin function
-			const app: Elysia = await plugin();
+			const app: Elysia = await plugin(testNode());
 			app.listen(3131);
 			await nextTick();
 
@@ -357,7 +358,7 @@ describe('Wamp', () => {
 			const plugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestWampController);
 
 			// Call the plugin function
-			const app: Elysia = await plugin();
+			const app: Elysia = await plugin(testNode());
 
 			// Trigger the onStart event
 			await app.event.start?.[0].fn(app);
@@ -467,7 +468,7 @@ describe('Wamp', () => {
 			const plugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestWampController);
 
 			// Call the plugin function
-			await plugin();
+			await plugin(testNode());
 
 			const wampyArgs: any = last((Wampy as Mock<any>).mock.calls[0]);
 

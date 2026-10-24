@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import type { Class, Primitive } from 'type-fest';
+import type { ModuleNode } from './module-graph';
 
 import { Elysia } from 'elysia';
 import { omit } from 'radash';
@@ -20,6 +21,7 @@ import { omit } from 'radash';
 import Wampy from 'wampy';
 
 import { Event } from './event';
+import { ModuleContext } from './module-context';
 import { Service } from './service';
 import { nextTick, Symbols } from './utils';
 
@@ -469,20 +471,20 @@ export namespace Wamp {
 	 */
 	export const controller = (options: WampProps) => {
 		return function (target: Class<any>) {
-			async function handleWamp(): Promise<Elysia> {
-				// TODO: Use the logger service here
-				console.log(
-					`Registering Wamp controller for connection ${options.connection} using ${target.name}`
-				);
+			async function handleWamp(node: ModuleNode): Promise<Elysia> {
 				await nextTick();
 
-				const controller = Service.make(target);
+				const controller = ModuleContext.run(node, () => Service.make(target));
+				const inModule =
+					(handler: (...args: any[]) => any) =>
+					(...args: any[]) =>
+						ModuleContext.run(node, () => handler.apply(controller, args));
 
 				const metadata = Reflect.getMetadata(Symbols.wamp, target) ?? {};
 
 				const w = Wamp.getConnection(options.connection ?? 'default');
 
-				const app = new Elysia();
+				const app = new Elysia({ name: `${node.id}:${target.name}` });
 
 				app.onStart(async (_) => {
 					const registrations: WampRegistration[] = metadata.registrations ?? [];
@@ -491,7 +493,7 @@ export namespace Wamp {
 					for (const registration of registrations) {
 						w.register(
 							registration.topic,
-							registration.handler.bind(controller),
+							inModule(registration.handler),
 							registration.options
 						).then((r: { topic: string; requestId: string; registrationId: string }) => {
 							// TODO: Use the logger service here
@@ -502,7 +504,7 @@ export namespace Wamp {
 					for (const subscription of subscriptions) {
 						w.subscribe(
 							subscription.topic,
-							subscription.handler.bind(controller),
+							inModule(subscription.handler),
 							subscription.options
 						).then(
 							(s: {

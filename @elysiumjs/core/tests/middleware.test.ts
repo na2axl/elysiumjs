@@ -19,8 +19,10 @@ import { Elysia } from 'elysia';
 
 import { Application } from '../src/app';
 import * as M from '../src/middleware';
+import { ModuleContext } from '../src/module-context';
 import { Service } from '../src/service';
 import { Symbols } from '../src/utils';
+import { testNode } from './module-node';
 
 const mockRun = mock((_map: Map<string, any>, callback: Function) => callback());
 mock.module('../src/app', () => ({
@@ -286,86 +288,56 @@ describe('Middleware', () => {
 	});
 
 	describe('applyMiddlewares', () => {
-		it('should apply middlewares to an Elysia plugin', () => {
-			// Create a mock Elysia plugin
-			const plugin = {
-				onBeforeHandle: mock(),
-				onAfterHandle: mock(),
-				onAfterResponse: mock()
-			} as unknown as Elysia<Route>;
+		const hooks = ['onRequest', 'onTransform', 'onBeforeHandle', 'onAfterHandle', 'onAfterResponse'];
 
-			// Mock Service.make to return middleware instances
-			const middleware1 = new TestMiddleware1();
-			const middleware2 = new TestMiddleware2();
-			const makeSpy = spyOn(Service, 'make')
-				.mockReturnValueOnce(middleware1)
-				.mockReturnValueOnce(middleware2);
+		it('should build the middlewares in the module context and register every hook', () => {
+			const plugin = Object.fromEntries(hooks.map((h) => [h, mock()])) as unknown as Elysia;
+			const node = testNode();
+			const seen: unknown[] = [];
+			const makeSpy = spyOn(Service, 'make').mockImplementation(((cls: any) => {
+				seen.push(ModuleContext.current());
+				return new cls();
+			}) as never);
 
-			// Apply middlewares
-			M.applyMiddlewares([TestMiddleware1, TestMiddleware2], plugin);
+			M.applyMiddlewares([TestMiddleware1, TestMiddleware2], plugin as never, node);
 
-			// Check if Service.make was called for each middleware
 			expect(makeSpy).toHaveBeenCalledWith(TestMiddleware1);
 			expect(makeSpy).toHaveBeenCalledWith(TestMiddleware2);
-
-			// Check if plugin hooks were registered
-			expect(plugin.onBeforeHandle).toHaveBeenCalled();
-			expect(plugin.onAfterHandle).toHaveBeenCalled();
-			expect(plugin.onAfterResponse).toHaveBeenCalled();
+			expect(seen).toEqual([node, node]);
+			for (const hook of hooks) expect((plugin as any)[hook]).toHaveBeenCalled();
 		});
 
-		it('should execute the middleware chain when plugin hooks are triggered', async () => {
-			// Create a mock Elysia plugin with hook callbacks
-			let beforeHandleCallback: (ctx: Context) => Promise<any>;
-			let afterHandleCallback: (ctx: Context) => Promise<any>;
-			let afterResponseCallback: (ctx: Context) => Promise<any>;
+		it('should build middlewares without a module context for application middlewares', () => {
+			const plugin = Object.fromEntries(hooks.map((h) => [h, mock()])) as unknown as Elysia;
+			const seen: unknown[] = [];
+			spyOn(Service, 'make').mockImplementation(((cls: any) => {
+				seen.push(ModuleContext.current());
+				return new cls();
+			}) as never);
 
-			const plugin = {
-				onBeforeHandle: mock((callback) => {
-					beforeHandleCallback = callback;
-				}),
-				onAfterHandle: mock((callback) => {
-					afterHandleCallback = callback;
-				}),
-				onAfterResponse: mock((callback) => {
-					afterResponseCallback = callback;
-				})
-			} as unknown as Elysia;
+			M.applyMiddlewares([TestMiddleware1], plugin as never, null);
 
-			const executeMiddlewareChainSpy = spyOn(M, 'executeMiddlewareChain');
+			expect(seen).toEqual([undefined]);
+		});
 
-			// Mock Service.make to return middleware instances
-			const middleware1 = new TestMiddleware1();
-			const middleware2 = new TestMiddleware2();
-			const makeSpy = spyOn(Service, 'make')
-				.mockReturnValueOnce(middleware1)
-				.mockReturnValueOnce(middleware2);
+		it('should run each hook chain in the module context', async () => {
+			const callbacks: Record<string, (ctx: Context) => Promise<any>> = {};
+			const plugin = Object.fromEntries(
+				hooks.map((h) => [h, mock((cb) => void (callbacks[h] = cb))])
+			) as unknown as Elysia;
+			const node = testNode();
+			const seen: unknown[] = [];
 
-			// Apply middlewares
-			M.applyMiddlewares([TestMiddleware1, TestMiddleware2], plugin as unknown as Elysia<Route>);
+			class ProbeMiddleware extends M.Middleware {
+				public onBeforeHandle() {
+					seen.push(ModuleContext.current());
+				}
+			}
 
-			// Trigger the hooks
-			await beforeHandleCallback!(mockContext);
-			await afterHandleCallback!(mockContext);
-			await afterResponseCallback!(mockContext);
+			M.applyMiddlewares([ProbeMiddleware], plugin as never, node);
+			await callbacks.onBeforeHandle(mockContext);
 
-			// Check if executeMiddlewareChain was called for each hook
-			expect(executeMiddlewareChainSpy).toHaveBeenCalledTimes(3);
-			expect(executeMiddlewareChainSpy).toHaveBeenCalledWith(
-				[middleware1, middleware2],
-				mockContext,
-				'onBeforeHandle'
-			);
-			expect(executeMiddlewareChainSpy).toHaveBeenCalledWith(
-				[middleware1, middleware2],
-				mockContext,
-				'onAfterHandle'
-			);
-			expect(executeMiddlewareChainSpy).toHaveBeenCalledWith(
-				[middleware1, middleware2],
-				mockContext,
-				'onAfterResponse'
-			);
+			expect(seen).toEqual([node]);
 		});
 	});
 

@@ -19,13 +19,14 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 
 import { Value } from '@sinclair/typebox/value';
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
-import { t } from 'elysia';
+import { Elysia, t } from 'elysia';
 
 import { Application } from '../src/app';
 import { Command } from '../src/command';
 import { Container } from '../src/container';
 import * as Env from '../src/env';
 import { Event } from '../src/event';
+import { Http } from '../src/http';
 import { Middleware } from '../src/middleware';
 import { Module } from '../src/module';
 import { ModuleContext } from '../src/module-context';
@@ -73,6 +74,9 @@ describe('Application class', () => {
 		servers.push(app.elysia);
 	};
 
+	/** Lets the after-response hooks of a handled request finish before the test is cleaned up. */
+	const settle = () => new Promise((resolve) => setImmediate(resolve));
+
 	beforeEach(() => {
 		signalListeners.SIGINT = process.listeners('SIGINT');
 		signalListeners.SIGTERM = process.listeners('SIGTERM');
@@ -90,6 +94,7 @@ describe('Application class', () => {
 	});
 
 	afterEach(async () => {
+		await settle();
 		for (const signal of ['SIGINT', 'SIGTERM'] as const) {
 			for (const listener of process.listeners(signal)) {
 				if (!signalListeners[signal].includes(listener)) process.off(signal, listener);
@@ -676,10 +681,9 @@ describe('Application class', () => {
 		});
 	});
 
-	// The serve tests below are rewritten with the serve rework.
 	describe('serve', () => {
 		it('should handle the serve command', async () => {
-			@Application.register({ server: { port: 3131 }, modules: [], swagger: false })
+			@Application.register({ server: { port: 0 }, modules: [], swagger: false })
 			class TestApp extends Application {}
 
 			Event.on('elysium:server:after-init', async (e) => {
@@ -689,13 +693,272 @@ describe('Application class', () => {
 			const instance = new TestApp();
 			await serve(instance);
 
-			expect(instance.elysia.listen).toHaveBeenCalledWith(3131);
+			expect(instance.elysia.listen).toHaveBeenCalledWith(0);
+		});
+
+		it('should serve a controller with its module private service, in the module context', async () => {
+			@Service.register()
+			class PrivateService {
+				value = 'from-a';
+			}
+
+			let seen: string | undefined;
+
+			@Http.controller({ path: '/a' })
+			class AController {
+				@Http.get({ path: '/x' })
+				x() {
+					seen = ModuleContext.current()?.id;
+					return { value: Service.make(PrivateService).value };
+				}
+			}
+
+			@Module.register({ services: [PrivateService], controllers: [AController] })
+			class A extends Module {}
+
+			@Application.register({ server: { port: 0 }, modules: [A], swagger: false })
+			class TestApp extends Application {}
+
+			const instance = new TestApp();
+			await serve(instance);
+
+			const response = await instance.elysia.handle(new Request('http://localhost/a/x'));
+			expect(response.status).toBe(200);
+			expect(await response.json()).toEqual({ value: 'from-a' });
+			expect(seen).toBe('A');
+		});
+
+		it('should inject module services in route parameters and keep the context in generators', async () => {
+			@Service.register()
+			class Greeter {
+				hello = 'hi';
+			}
+
+			const seen: (string | undefined)[] = [];
+
+			@Http.controller({ path: '/p' })
+			class PController {
+				@Http.get({ path: '/inject' })
+				inject(@Service.inject(Greeter) greeter: Greeter) {
+					return greeter.hello;
+				}
+
+				@Http.get({ path: '/stream' })
+				async *stream() {
+					seen.push(ModuleContext.current()?.id);
+					await Promise.resolve();
+					seen.push(ModuleContext.current()?.id);
+					yield 'a';
+				}
+			}
+
+			@Module.register({ services: [Greeter], controllers: [PController] })
+			class A extends Module {}
+
+			@Application.register({ server: { port: 0 }, modules: [A], swagger: false })
+			class TestApp extends Application {}
+
+			const instance = new TestApp();
+			await serve(instance);
+
+			const injected = await instance.elysia.handle(new Request('http://localhost/p/inject'));
+			expect(await injected.text()).toBe('hi');
+
+			const streamed = await instance.elysia.handle(new Request('http://localhost/p/stream'));
+			await streamed.text();
+			expect(seen).toEqual(['A', 'A']);
+		});
+
+		it('should prefix the controllers of a module with its prefix', async () => {
+			@Http.controller({ path: '/x' })
+			class XController {
+				@Http.get({ path: '/' })
+				x() {
+					return 'ok';
+				}
+			}
+
+			@Module.register({ controllers: [XController], prefix: '/api' })
+			class A extends Module {}
+
+			@Application.register({ server: { port: 0 }, modules: [A], swagger: false })
+			class TestApp extends Application {}
+
+			const instance = new TestApp();
+			await serve(instance);
+
+			const response = await instance.elysia.handle(new Request('http://localhost/api/x'));
+			expect(response.status).toBe(200);
+			expect(await response.text()).toBe('ok');
+		});
+
+		it('should build module middlewares with access to the module services', async () => {
+			@Service.register()
+			class Secret {
+				value = 'secret';
+			}
+
+			let built: string | undefined;
+
+			class GuardMiddleware extends Middleware {
+				constructor() {
+					super();
+					built = Service.make(Secret).value;
+				}
+
+				public onBeforeHandle(ctx: any) {
+					ctx.set.headers['x-guard'] = ModuleContext.current()?.id;
+				}
+			}
+
+			@Http.controller({ path: '/g' })
+			class GController {
+				@Http.get({ path: '/' })
+				get() {
+					return 'ok';
+				}
+			}
+
+			@Middleware.register(GuardMiddleware)
+			@Module.register({ services: [Secret], controllers: [GController] })
+			class A extends Module {}
+
+			@Application.register({ server: { port: 0 }, modules: [A], swagger: false })
+			class TestApp extends Application {}
+
+			const instance = new TestApp();
+			await serve(instance);
+
+			const response = await instance.elysia.handle(new Request('http://localhost/g'));
+			expect(built).toBe('secret');
+			expect(response.headers.get('x-guard')).toBe('A');
+		});
+
+		it('should call onServe with the root app, imports first, before controllers mount', async () => {
+			const order: string[] = [];
+			const apps: unknown[] = [];
+
+			@Http.controller({ path: '/c' })
+			class CController {
+				@Http.get({ path: '/' })
+				get() {
+					return 'ok';
+				}
+			}
+
+			@Module.register()
+			class Base extends Module {
+				onServe(app: any) {
+					order.push(`Base:${ModuleContext.current()?.id}`);
+					apps.push(app);
+				}
+			}
+
+			@Module.register({ imports: [Base], controllers: [CController] })
+			class Feature extends Module {
+				onServe(app: any) {
+					order.push(`Feature:${ModuleContext.current()?.id}`);
+					apps.push(app);
+					order.push(`routes:${app.routes.length}`);
+				}
+			}
+
+			@Application.register({ server: { port: 0 }, modules: [Feature], swagger: false })
+			class TestApp extends Application {}
+
+			const instance = new TestApp();
+			await serve(instance);
+
+			expect(order).toEqual(['Base:Base', 'Feature:Feature', 'routes:0']);
+			expect(apps[0]).toBe(instance.elysia);
+			expect(apps[1]).toBe(instance.elysia);
+			expect(instance.elysia.routes.length).toBeGreaterThan(0);
+		});
+
+		it('should not listen and should exit 1 when the eager boot fails', async () => {
+			@Service.register()
+			class Broken {
+				onInit() {
+					throw new Error('boot failed');
+				}
+			}
+
+			@Module.register({ services: [Broken] })
+			class A extends Module {}
+
+			@Application.register({ server: { port: 0 }, modules: [A], swagger: false })
+			class TestApp extends Application {}
+
+			const listenSpy = spyOn(Elysia.prototype, 'listen');
+			const instance = new TestApp();
+			await instance.run(['serve']);
+
+			expect(listenSpy).not.toHaveBeenCalled();
+			expect(process.exit).toHaveBeenCalledWith(1);
+			expect(errors).toContain('boot failed');
+		});
+
+		it('should exit 1 without listening when onServe throws', async () => {
+			@Module.register()
+			class A extends Module {
+				onServe() {
+					throw new Error('serve hook failed');
+				}
+			}
+
+			@Application.register({ server: { port: 0 }, modules: [A], swagger: false })
+			class TestApp extends Application {}
+
+			const listenSpy = spyOn(Elysia.prototype, 'listen');
+			await new TestApp().run(['serve']);
+
+			expect(listenSpy).not.toHaveBeenCalled();
+			expect(process.exit).toHaveBeenCalledWith(1);
+			expect(errors).toContain('serve hook failed');
+		});
+
+		it('should reject a listed controller that is not decorated', async () => {
+			class NotAController {}
+
+			@Module.register({ controllers: [NotAController] })
+			class A extends Module {}
+
+			@Application.register({ server: { port: 0 }, modules: [A], swagger: false })
+			class TestApp extends Application {}
+
+			await new TestApp().run(['serve']);
+
+			expect(process.exit).toHaveBeenCalledWith(1);
+			expect(errors).toContain('NotAController');
+		});
+
+		it('should shut the kernel down when the server stops', async () => {
+			const destroyed: string[] = [];
+
+			@Service.register()
+			class Tracked {
+				onDestroy() {
+					destroyed.push('Tracked');
+				}
+			}
+
+			@Module.register({ services: [Tracked] })
+			class A extends Module {}
+
+			@Application.register({ server: { port: 0 }, modules: [A], swagger: false })
+			class TestApp extends Application {}
+
+			const instance = new TestApp();
+			await serve(instance);
+			await instance.elysia.stop();
+
+			expect(destroyed).toEqual(['Tracked']);
 		});
 	});
 
 	describe('lifecycle hooks', () => {
 		it('should call onStart when the server starts', async () => {
-			@Application.register()
+			@Application.register({ server: { port: 0 } })
 			class TestApp extends Application {
 				protected async onStart(): Promise<void> {}
 			}
@@ -713,7 +976,7 @@ describe('Application class', () => {
 		});
 
 		it('should call onStop when the server stops', async () => {
-			@Application.register()
+			@Application.register({ server: { port: 0 } })
 			class TestApp extends Application {
 				protected async onStop(): Promise<void> {}
 			}
@@ -725,17 +988,25 @@ describe('Application class', () => {
 			const instance = new TestApp();
 			await serve(instance);
 
-			await nextTick();
-			process.emit('SIGINT');
-			await nextTick();
-			await nextTick();
+			await instance.elysia.stop();
 
 			expect(onStopSpy).toHaveBeenCalledWith(instance.elysia);
 			expect(emitSpy).toHaveBeenCalledWith('elysium:server:stop', instance.elysia, instance);
 		});
 
 		it('should call onError when an error occurs', async () => {
-			@Application.register()
+			@Http.controller({ path: '/' })
+			class FailingController {
+				@Http.get({ path: '/' })
+				fail() {
+					throw new Error('Test error');
+				}
+			}
+
+			@Module.register({ controllers: [FailingController] })
+			class A extends Module {}
+
+			@Application.register({ server: { port: 0 }, modules: [A], swagger: false })
 			class TestApp extends Application {
 				protected async onError(): Promise<boolean> {
 					return true;
@@ -749,21 +1020,10 @@ describe('Application class', () => {
 			const instance = new TestApp();
 			await serve(instance);
 
-			instance.elysia.get('/', ({ error }) => {
-				throw error(500, 'Test error');
-			});
-			instance.elysia.listen(3131);
-
-			const response = await instance.elysia.handle(new Request('http://localhost:3131/'));
-			await nextTick();
+			const response = await instance.elysia.handle(new Request('http://localhost/'));
 
 			expect(response.status).toBe(500);
-			expect(response.json()).toEqual(
-				expect.resolvesTo.objectContaining({
-					type: 'INTERNAL_SERVER_ERROR',
-					data: { message: 'Test error' }
-				})
-			);
+			expect(await response.json()).toMatchObject({ type: 'UNKNOWN' });
 
 			expect(onErrorSpy).toHaveBeenCalledWith(expect.anything());
 			expect(emitSpy).toHaveBeenCalledWith('elysium:error', expect.anything());
@@ -779,7 +1039,7 @@ describe('Application class', () => {
 			class Middleware2 extends Middleware {}
 			const mockMiddlewares = [Middleware1, Middleware2];
 
-			@Application.register()
+			@Application.register({ server: { port: 0 } })
 			class TestApp extends Application {}
 
 			Reflect.defineMetadata(Symbols.middlewares, mockMiddlewares, TestApp);
@@ -787,7 +1047,7 @@ describe('Application class', () => {
 			const instance = new TestApp();
 			await serve(instance);
 
-			expect(applyMiddlewaresSpy).toHaveBeenCalledWith(mockMiddlewares, instance.elysia);
+			expect(applyMiddlewaresSpy).toHaveBeenCalledWith(mockMiddlewares, instance.elysia, null);
 		});
 	});
 });

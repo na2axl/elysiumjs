@@ -22,6 +22,7 @@ import { Http, HttpControllerScope } from '../src/http';
 import * as M from '../src/middleware';
 import { Service } from '../src/service';
 import { nextTick, Symbols } from '../src/utils';
+import { testNode } from './module-node';
 
 describe('Http namespace', () => {
 	afterAll(() => {
@@ -56,23 +57,9 @@ describe('Http namespace', () => {
 			// Get the plugin function
 			const plugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestController);
 
-			// Create a spy on Elysia constructor
-			const elysiaSpy = spyOn(Elysia, 'Elysia').mockReturnValue({
-				decorate: mock(),
-				onBeforeHandle: mock(),
-				onAfterHandle: mock(),
-				onAfterResponse: mock()
-			} as never);
+			const app = await plugin(testNode());
 
-			// Call the plugin function
-			await plugin();
-
-			// Check if Elysia was created with the correct prefix
-			expect(elysiaSpy).toHaveBeenCalledWith(
-				expect.objectContaining({
-					prefix: '/test'
-				})
-			);
+			expect(app.config.prefix).toBe('/test');
 		});
 
 		it('should register the controller in the service container with SERVER scope', async () => {
@@ -85,17 +72,17 @@ describe('Http namespace', () => {
 			})
 			class TestController {}
 
-			const decorateSpy = spyOn(Elysia.Elysia.prototype, 'decorate');
+			const resolveSpy = spyOn(Elysia.Elysia.prototype, 'resolve');
 
 			// Get the plugin function
 			const plugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestController);
 
 			// Call the plugin function
-			await plugin();
+			await plugin(testNode());
 
-			// Check if the controller was registered in the service container
+			// Check if the controller was built once, when the plugin was created
 			expect(makeSpy).toHaveBeenCalledWith(TestController);
-			expect(decorateSpy).toHaveBeenCalledWith('controller', expect.any(Function));
+			expect(resolveSpy).toHaveBeenCalledWith({ as: 'local' }, expect.any(Function));
 		});
 
 		it('should register the controller in the service container with REQUEST scope', async () => {
@@ -113,7 +100,7 @@ describe('Http namespace', () => {
 				}
 			}
 
-			const decorateSpy = spyOn(Elysia.Elysia.prototype, 'decorate');
+			const resolveSpy = spyOn(Elysia.Elysia.prototype, 'resolve');
 			const executeMiddlewareChainSpy = spyOn(M, 'executeMiddlewareChain').mockImplementation(
 				async () => undefined
 			);
@@ -122,11 +109,11 @@ describe('Http namespace', () => {
 			const plugin: ElysiaPlugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestController);
 
 			// Call the plugin function
-			const app = await plugin();
+			const app = await plugin(testNode());
 
 			// Check if the controller was registered in the service container
 			expect(makeSpy).not.toHaveBeenCalledWith(TestController);
-			expect(decorateSpy).toHaveBeenCalledWith('controller', expect.any(Function));
+			expect(resolveSpy).toHaveBeenCalledWith({ as: 'local' }, expect.any(Function));
 
 			// TODO: Properly mock Application.context
 			// app.listen(3131);
@@ -165,12 +152,14 @@ describe('Http namespace', () => {
 			const applyMiddlewaresSpy = spyOn(M, 'applyMiddlewares');
 
 			// Call the plugin function
-			await plugin();
+			const node = testNode();
+			await plugin(node);
 
 			// Check if middlewares were applied
 			expect(applyMiddlewaresSpy).toHaveBeenCalledWith(
 				[TestMiddleware1, TestMiddleware2],
-				expect.any(Elysia.Elysia)
+				expect.any(Elysia.Elysia),
+				node
 			);
 		});
 	});
@@ -555,7 +544,7 @@ describe('Http namespace', () => {
 			const plugin: ElysiaPlugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestController);
 
 			// Call the plugin function
-			const app = await plugin();
+			const app = await plugin(testNode());
 
 			app.listen(3131);
 			await app.handle(new Request('http://localhost:3131/test'));
@@ -643,7 +632,7 @@ describe('Http namespace', () => {
 			const routeSpy = spyOn(Elysia.Elysia.prototype, 'route');
 
 			// Call the plugin function
-			await plugin();
+			await plugin(testNode());
 
 			// Check if routes were registered
 			expect(routeSpy).toHaveBeenCalledTimes(2);

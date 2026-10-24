@@ -24,12 +24,14 @@ import type { Class, MergeDeep } from 'type-fest';
 import type { AppHttpContext } from '.';
 import type { Middleware } from './middleware';
 import type { Module } from './module';
+import type { ModuleNode } from './module-graph';
 
 import { Elysia, sse as esse, t } from 'elysia';
 import { assign, isEmpty, objectify } from 'radash';
 
 import { Application } from './app';
-import { applyMiddlewares, executeMiddlewareChain } from './middleware';
+import { applyMiddlewares, executeMiddlewareChain, makeMiddlewares } from './middleware';
+import { ModuleContext } from './module-context';
 import { Service } from './service';
 import { nextTick, Symbols } from './utils';
 
@@ -211,6 +213,18 @@ export type Context<
 
 export type ElysiaApp = Elysia<Route, Singleton>;
 
+/**
+ * Iterates an async generator with every step running in the context of a module.
+ * The body of a generator runs when it is iterated, not when it is created.
+ */
+async function* iterateInModule<T>(node: ModuleNode, generator: AsyncGenerator<T>) {
+	while (true) {
+		const step = await ModuleContext.run(node, () => generator.next());
+		if (step.done) return;
+		yield step.value;
+	}
+}
+
 const registerHttpRequestHandler = (props: HttpRequestHandlerRegistrationProps) => {
 	const body = Reflect.getMetadata('http:body', props.target, props.propertyKey);
 	const params = Reflect.getMetadata('http:params', props.target, props.propertyKey) ?? [];
@@ -340,26 +354,22 @@ export namespace Http {
 	 */
 	export const controller = (props: HttpControllerProps = { path: '/' }) => {
 		return function (target: Class<any>) {
-			async function handleHttp(): Promise<ElysiaApp> {
-				// TODO: Use the logger service here
-				console.log(`Registering HTTP controller for ${props.path} using ${target.name}`);
+			async function handleHttp(node: ModuleNode): Promise<ElysiaApp> {
 				await nextTick();
 
 				props = assign({ path: '/', scope: HttpControllerScope.SERVER, tags: [] }, props);
 
 				const app: ElysiaApp = new Elysia({
 					prefix: props.path,
-					name: target.name
+					name: `${node.id}:${target.name}`
 				});
 
 				const getController = (() => {
 					if (props.scope === HttpControllerScope.SERVER) {
-						return () => {
-							const controller = Service.make(target);
-							return () => controller;
-						};
+						const controller = ModuleContext.run(node, () => Service.make(target));
+						return () => () => controller;
 					} else if (props.scope === HttpControllerScope.REQUEST) {
-						return () => () => Service.make(target);
+						return () => () => ModuleContext.run(node, () => Service.make(target));
 					} else {
 						throw new Error(`Invalid scope for controller: ${target.name}`);
 					}
@@ -371,12 +381,12 @@ export namespace Http {
 				if (onRequest.handler) {
 					app.onRequest((c: PreContext<Singleton>) => {
 						const controller = getController()();
-						return onRequest.handler.call(controller, c);
+						return ModuleContext.run(node, () => onRequest.handler.call(controller, c));
 					});
 				}
 
 				const middlewares = Reflect.getMetadata(Symbols.middlewares, target) ?? [];
-				applyMiddlewares(middlewares, app);
+				applyMiddlewares(middlewares, app, node);
 
 				const metadata: HttpRequestHandlerMetadata[] =
 					Reflect.getMetadata(Symbols.http, target) ?? [];
@@ -405,13 +415,15 @@ export namespace Http {
 
 						if (!isEmpty(route.customDecorators)) {
 							for (const customDecorator of route.customDecorators) {
-								parameters[customDecorator.index] = await customDecorator.handler(c);
+								parameters[customDecorator.index] = await ModuleContext.run(node, () =>
+									customDecorator.handler(c)
+								);
 							}
 						}
 
 						if (!isEmpty(route.services)) {
 							for (const service of route.services) {
-								parameters[service.index] = Service.get(service.name);
+								parameters[service.index] = ModuleContext.run(node, () => Service.get(service.name));
 							}
 						}
 
@@ -439,14 +451,15 @@ export namespace Http {
 												['http:context', c],
 												['db:tx', tx]
 											]),
-											() => {
-												try {
-													return route.handler.call(c.controller(), ...args) as Promise<TResult>;
-												} catch (e) {
-													tx.rollback();
-													throw e;
-												}
-											}
+											() =>
+												ModuleContext.run(node, () => {
+													try {
+														return route.handler.call(c.controller(), ...args) as Promise<TResult>;
+													} catch (e) {
+														tx.rollback();
+														throw e;
+													}
+												})
 										);
 									});
 								};
@@ -458,7 +471,11 @@ export namespace Http {
 										['tenant', c.tenant as unknown],
 										['http:context', c]
 									]),
-									() => route.handler.call(c.controller(), ...args) as Promise<TResult>
+									() =>
+										ModuleContext.run(
+											node,
+											() => route.handler.call(c.controller(), ...args) as Promise<TResult>
+										)
 								);
 							};
 						};
@@ -469,7 +486,7 @@ export namespace Http {
 								const params = await getParameters(c);
 
 								try {
-									for await (const eachValue of handler(...params) as any) yield eachValue;
+									yield* iterateInModule(node, handler(...params) as AsyncGenerator);
 								} catch (error: any) {
 									yield error;
 								}
@@ -493,7 +510,7 @@ export namespace Http {
 
 						if (isValidator) {
 							return async function (c: Context) {
-								if (await route.body!.validator!.validate(c)) {
+								if (await ModuleContext.run(node, () => route.body!.validator!.validate(c))) {
 									const handler = initTransactedHandler(c);
 									return await handler(...(await getParameters(c)));
 								}
@@ -514,26 +531,29 @@ export namespace Http {
 						(p) => p.schema
 					);
 
-					const mi = route.middlewares.map((middleware) => Service.make<Middleware>(middleware));
+					const mi = makeMiddlewares(route.middlewares, node);
 
 					app.route(route.method, route.path, getHandler(), {
 						// @ts-ignore
 						config: {},
 						async transform(c) {
-							if (isValidator && !(await route.body!.validator!.authorize(c as Context))) {
+							if (
+								isValidator &&
+								!(await ModuleContext.run(node, () => route.body!.validator!.authorize(c as Context)))
+							) {
 								throw c.status(401, 'Unauthorized');
 							}
 
-							return executeMiddlewareChain(mi, c, 'onTransform');
+							return executeMiddlewareChain(mi, c, 'onTransform', node);
 						},
 						beforeHandle(c) {
-							return executeMiddlewareChain(mi, c, 'onBeforeHandle');
+							return executeMiddlewareChain(mi, c, 'onBeforeHandle', node);
 						},
 						afterHandle(c) {
-							return executeMiddlewareChain(mi, c, 'onAfterHandle');
+							return executeMiddlewareChain(mi, c, 'onAfterHandle', node);
 						},
 						afterResponse(c) {
-							return executeMiddlewareChain(mi, c, 'onAfterResponse');
+							return executeMiddlewareChain(mi, c, 'onAfterResponse', node);
 						},
 						detail: {
 							tags: props.tags,

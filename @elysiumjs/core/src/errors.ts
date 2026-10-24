@@ -161,3 +161,19 @@ export class EnvironmentSkippedModuleError extends ElysiumError {
 		);
 	}
 }
+
+/**
+ * Thrown when a class listed in a module's `controllers` is not a decorated controller.
+ *
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class InvalidControllerError extends ElysiumError {
+	constructor(
+		public readonly className: string,
+		public readonly moduleName: string
+	) {
+		super(
+			`${className}, listed in the controllers of ${moduleName}, is not a controller. Decorate it with @Http.controller(), @Websocket.controller() or @Wamp.controller().`
+		);
+	}
+}

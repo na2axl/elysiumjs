@@ -20,6 +20,7 @@ import {
 	DuplicateGlobalServiceError,
 	ElysiumError,
 	EnvironmentSkippedModuleError,
+	InvalidControllerError,
 	InvalidModuleError,
 	MissingModuleConfigError,
 	ModuleCycleError,
@@ -127,5 +128,15 @@ describe('errors', () => {
 		expect(e.skippedModule).toBe('SkipMod');
 		expect(e.environment).toBe('production');
 		for (const s of ['Svc', 'Req', 'SkipMod', 'production']) expect(e.message).toContain(s);
+	});
+
+	it('InvalidControllerError names the class and the module', () => {
+		const e = new InvalidControllerError('Plain', 'Mod');
+		expect(e).toBeInstanceOf(ElysiumError);
+		expect(e.name).toBe('InvalidControllerError');
+		expect(e.className).toBe('Plain');
+		expect(e.moduleName).toBe('Mod');
+		expect(e.message).toContain('Plain');
+		expect(e.message).toContain('Mod');
 	});
 });
