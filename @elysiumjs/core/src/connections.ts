@@ -28,7 +28,7 @@ export function needsDefaultAlias(
 	module: string,
 	config: { default: string; connections: Record<string, unknown> }
 ): boolean {
-	if (!(config.default in config.connections)) {
+	if (!Object.hasOwn(config.connections, config.default)) {
 		throw new InvalidModuleConfigError(
 			module,
 			'default',
@@ -36,7 +36,7 @@ export function needsDefaultAlias(
 		);
 	}
 	if (config.default === DEFAULT) return false;
-	if (DEFAULT in config.connections) {
+	if (Object.hasOwn(config.connections, DEFAULT)) {
 		throw new InvalidModuleConfigError(
 			module,
 			'connections',
