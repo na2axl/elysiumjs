@@ -18,3 +18,4 @@ export { ArgusSDK } from './sdk';
 export { Traced } from './decorators/traced';
 export { withTraceContext } from './correlation';
 export { argusPlugin } from './plugin';
+export { ArgusModule } from './argus.module';

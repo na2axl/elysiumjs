@@ -24,9 +24,7 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "sideEffects": [
-    "./src/sdk.ts"
-  ],
+  "sideEffects": false,
   "scripts": {
     "format": "prettier --write \"./src/**/*.ts\"",
     "clean": "rimraf dist",
