@@ -84,7 +84,7 @@ type Instantiation = { instance: unknown; ready: Promise<void> | undefined };
 const GLOBAL_OWNER = '<global>';
 
 const globalScope = new Map<string, ContainerEntry>();
-const moduleScopes = new Map<string, Map<string, ContainerEntry>>();
+const moduleScopes = new Map<ModuleNode, Map<string, ContainerEntry>>();
 const building: ContainerEntry[] = [];
 const constructedEntries: { entry: ContainerEntry; instance: unknown }[] = [];
 
@@ -290,10 +290,10 @@ export namespace Container {
 			return;
 		}
 
-		let scope = moduleScopes.get(entry.owner.id);
+		let scope = moduleScopes.get(entry.owner);
 		if (!scope) {
 			scope = new Map();
-			moduleScopes.set(entry.owner.id, scope);
+			moduleScopes.set(entry.owner, scope);
 		}
 		if (scope.has(entry.name)) {
 			throw new ElysiumError(
@@ -352,13 +352,13 @@ export namespace Container {
 			entry ? { entry, owner: entry.owner } : null;
 
 		if (from) {
-			const own = moduleScopes.get(from.id)?.get(name);
+			const own = moduleScopes.get(from)?.get(name);
 			if (own) return found(own);
 
 			for (const imported of visibility?.visibleOwners(from) ?? []) {
 				const exported = visibility!.exportsOf(imported);
 				if (exported === true || exported.includes(name)) {
-					const entry = moduleScopes.get(imported.id)?.get(name);
+					const entry = moduleScopes.get(imported)?.get(name);
 					if (entry) return found(entry);
 				}
 			}

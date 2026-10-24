@@ -17,11 +17,7 @@ import type { TestingApp } from '../src/testing';
 import { afterAll, afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
 import { Container } from '../src/container';
-import {
-	InvalidModuleConfigError,
-	ServiceNotFoundError,
-	ServiceNotReadyError
-} from '../src/errors';
+import { InvalidModuleConfigError, ServiceNotFoundError } from '../src/errors';
 import { Redis, RedisModule } from '../src/redis';
 import { createTestingApp } from '../src/testing';
 
@@ -128,9 +124,9 @@ describe('RedisModule', () => {
 		);
 	});
 
-	it('throws ServiceNotReadyError from the sync getter before the first awaited get', async () => {
+	it('serves the sync getter before any awaited get, as the module initialises synchronously', async () => {
 		app = await createTestingApp({ modules: [RedisModule.with(config)] });
-		expect(() => Redis.getConnection('cache')).toThrow(ServiceNotReadyError);
+		expect(Redis.getConnection('cache')).toBe(Redis.getConnection('cache'));
 	});
 
 	it('defaults the default connection to "default"', async () => {

@@ -18,7 +18,12 @@ import type { ConfiguredModule, ModuleClass, ModuleProps } from './module';
 import { isEqual } from 'radash';
 
 import { getCommandName } from './command';
-import { ConflictingModuleConfigError, DuplicateCommandError, ModuleCycleError } from './errors';
+import {
+	ConflictingModuleConfigError,
+	DuplicateCommandError,
+	DuplicateModuleNameError,
+	ModuleCycleError
+} from './errors';
 import { getModuleProps, isConfiguredModule } from './module';
 import { currentEnvironment, Symbols } from './utils';
 
@@ -155,6 +160,15 @@ function commandsOf(props: ModuleProps, environment: string): Class<any>[] {
 	);
 }
 
+function assertUniqueNames(classes: readonly ModuleClass[]) {
+	const seen = new Map<string, ModuleClass>();
+	for (const cls of classes) {
+		const other = seen.get(cls.name);
+		if (other !== undefined && other !== cls) throw new DuplicateModuleNameError(cls.name);
+		seen.set(cls.name, cls);
+	}
+}
+
 function assertUniqueCommands(nodes: readonly ModuleNode[], environment: string) {
 	const seen = new Map<string, string>();
 	for (const node of nodes) {
@@ -181,6 +195,7 @@ const serviceName = (cls: Class<any>): string =>
  * @param rootModules The modules declared by the application.
  * @param environment The active environment.
  * @throws {ModuleCycleError} On an import cycle.
+ * @throws {DuplicateModuleNameError} When two different module classes share a name.
  * @throws {DuplicateCommandError} When two modules register the same command.
  * @author Axel Nana <axel.nana@workbud.com>
  */
@@ -189,6 +204,7 @@ export function buildModuleGraph(
 	environment: string = currentEnvironment()
 ): ModuleGraph {
 	const { records, skipped } = discover(rootModules, environment);
+	assertUniqueNames([...records.keys()]);
 	const rootClasses = rootModules.map(unwrap);
 	const depths = computeDepths(rootClasses, records);
 

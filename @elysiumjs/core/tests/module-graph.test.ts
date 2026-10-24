@@ -12,16 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { describe, expect, it } from 'bun:test';
-
 import type { Container } from '../src/container.ts';
 
+import { describe, expect, it } from 'bun:test';
+
+import { Command } from '../src/command.ts';
 import {
 	ConflictingModuleConfigError,
 	DuplicateCommandError,
+	DuplicateModuleNameError,
 	ModuleCycleError
 } from '../src/errors.ts';
-import { Command } from '../src/command.ts';
 import { buildModuleGraph, selectConfig } from '../src/module-graph.ts';
 import { Module } from '../src/module.ts';
 
@@ -233,6 +234,33 @@ describe('buildModuleGraph', () => {
 	});
 });
 
+describe('module names', () => {
+	const makeNamed = () => {
+		@Module.register()
+		class UsersModule extends Module {}
+		return UsersModule;
+	};
+
+	it('rejects two different modules with the same name', () => {
+		const first = makeNamed();
+		const second = makeNamed();
+		expect(() => buildModuleGraph([first, second], 'development')).toThrow(
+			DuplicateModuleNameError
+		);
+	});
+
+	it('accepts one module class reached through several import paths', () => {
+		@Module.register()
+		class Shared extends Module {}
+		@Module.register({ imports: [Shared] })
+		class Left extends Module {}
+		@Module.register({ imports: [Shared] })
+		class Right extends Module {}
+		const graph = buildModuleGraph([Left, Right, Shared], 'development');
+		expect(ids(graph.nodes).sort()).toEqual(['Left', 'Right', 'Shared']);
+	});
+});
+
 describe('selectConfig', () => {
 	const Base = Module.configurable<{ a?: unknown; b?: number }>();
 
@@ -277,10 +305,7 @@ describe('selectConfig', () => {
 	it('returns the first source when function-form configs tie', () => {
 		@Module.register()
 		class Cfg extends Base {}
-		const graph = buildModuleGraph(
-			[Cfg.with(() => ({ a: 1 })), Cfg.with({ a: 2 })],
-			'development'
-		);
+		const graph = buildModuleGraph([Cfg.with(() => ({ a: 1 })), Cfg.with({ a: 2 })], 'development');
 		expect(typeof selectConfig(graph.node(Cfg)!)!.config).toBe('function');
 	});
 

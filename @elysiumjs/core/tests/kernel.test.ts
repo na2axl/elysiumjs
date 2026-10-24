@@ -213,7 +213,10 @@ describe('Kernel', () => {
 				events.push('destroy:B');
 			}
 		}
-		@Module.register({ imports: [B], services: [{ name: 'a.svc', global: true, factory: () => 2 }] })
+		@Module.register({
+			imports: [B],
+			services: [{ name: 'a.svc', global: true, factory: () => 2 }]
+		})
 		class A extends Module {
 			onInit() {
 				events.push('A');

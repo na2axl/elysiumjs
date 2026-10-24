@@ -370,4 +370,13 @@ describe('Container', () => {
 			);
 		});
 	});
+
+	it('keeps the scopes of two nodes with the same id apart', () => {
+		const first: ModuleNode = { id: 'Users' };
+		const second: ModuleNode = { id: 'Users' };
+		class Private {}
+		Container.register(second, Private, undefined);
+		expect(run(first, () => Service.get(Private))).toBeNull();
+		expect(run(second, () => Service.get(Private))).toBeInstanceOf(Private);
+	});
 });

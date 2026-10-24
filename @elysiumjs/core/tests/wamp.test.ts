@@ -17,11 +17,7 @@ import type { TestingApp } from '../src/testing';
 import { afterAll, afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 import { Elysia } from 'elysia';
 
-import {
-	InvalidModuleConfigError,
-	ServiceNotFoundError,
-	ServiceNotReadyError
-} from '../src/errors';
+import { InvalidModuleConfigError, ServiceNotFoundError } from '../src/errors';
 import { createTestingApp } from '../src/testing';
 import { nextTick, Symbols } from '../src/utils';
 import { Wamp, WampModule } from '../src/wamp';
@@ -120,9 +116,9 @@ describe('WampModule', () => {
 		expect(disconnects.get(clients[0])).toHaveBeenCalledTimes(1);
 	});
 
-	it('throws ServiceNotReadyError from the sync getter before the first awaited get', async () => {
+	it('serves the sync getter before any awaited get, as the module initialises synchronously', async () => {
 		app = await createTestingApp({ modules: [WampModule.with(config)] });
-		expect(() => Wamp.getConnection('other')).toThrow(ServiceNotReadyError);
+		expect(Wamp.getConnection('other')).toBe(Wamp.getConnection('other'));
 	});
 
 	it('defaults the default connection to "default"', async () => {
