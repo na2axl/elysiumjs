@@ -12,19 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { AsyncLocalStorage } from 'node:async_hooks';
-
 import { Application, Service } from '@elysiumjs/core';
 import { getTenancyConfig, getTenancyStrategy } from '@elysiumjs/mnemosyne';
-import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
 import * as pkg from '../src';
 import { Database, DrizzleDatabaseCache, DrizzleModule, DrizzleRLSTenancy, DrizzleSchemaTenancy } from '../src';
 
 const URL = 'postgres://u:p@localhost:5432/db';
-
-/** `Application.testing` has no application; the database helper reads its context storage. */
-const appDouble = { 'elysium.app': { _appContextStorage: new AsyncLocalStorage() } };
 
 const stubClient = () => ({
 	connect: mock(async () => {}),
@@ -40,7 +35,14 @@ describe('DrizzleModule', () => {
 		app = undefined;
 	});
 
-	it('registers nothing when the package is imported', () => {
+	it('registers nothing when the package is imported', async () => {
+		const once = spyOn(Event, 'once');
+		const on = spyOn(Event, 'on');
+		await import('../src/index.ts?fresh-import');
+		expect(once).not.toHaveBeenCalled();
+		expect(on).not.toHaveBeenCalled();
+		once.mockRestore();
+		on.mockRestore();
 		expect(Service.exists('db.connection.default')).toBe(false);
 		expect(Service.exists('mnemosyne.tenancy.config')).toBe(false);
 		expect(typeof pkg.DrizzleModule.with).toBe('function');
@@ -49,7 +51,6 @@ describe('DrizzleModule', () => {
 	it('provides connections, the default alias and the schema strategy by default', async () => {
 		app = await Application.testing({
 			modules: [DrizzleModule.with({ default: 'main', connections: { main: { connection: URL } } })],
-			overrides: appDouble,
 			boot: 'eager'
 		});
 
@@ -92,7 +93,6 @@ describe('DrizzleModule', () => {
 					connections: { default: { connection: URL, cache: { storage: 'memory' } } }
 				})
 			],
-			overrides: appDouble,
 			boot: 'lazy'
 		});
 
@@ -119,7 +119,6 @@ describe('DrizzleModule', () => {
 					connections: { a: { client: used as never }, b: { client: unused as never } }
 				})
 			],
-			overrides: appDouble,
 			boot: 'lazy'
 		});
 		await app.get('db.connection.default');
@@ -148,7 +147,12 @@ describe('migration commands', () => {
 		process.stdout.write = mock(() => true) as never;
 	});
 
-	afterEach(() => {
+	let started: Application | undefined;
+
+	afterEach(async () => {
+		await started?.kernel.shutdown();
+		started = undefined;
+		Service.clear();
 		process.exit = originalExit;
 		process.stderr.write = originalStderr;
 		process.stdout.write = originalStdout;
@@ -163,7 +167,9 @@ describe('migration commands', () => {
 			]
 		})
 		class TestApp extends Application {}
-		return { app: new TestApp(), client };
+		const app = new TestApp();
+		started = app;
+		return { app, client };
 	};
 
 	it('migration:run finds db.connection.default', async () => {

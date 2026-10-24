@@ -81,15 +81,14 @@ export class DrizzleDatabaseCache extends DrizzleCache {
 	 */
 	async #storage(): Promise<Omit<CacheInterface, 'tags'>> {
 		if (this.#cache) return this.#cache;
-		for (;;) {
-			try {
-				this.#cache = createDatabaseCacheStorage({ storage: this.#storageEngine });
-				return this.#cache;
-			} catch (error) {
-				if (!(error instanceof ServiceNotReadyError)) throw error;
-				await Service.resolve(error.service);
-			}
+		try {
+			this.#cache = createDatabaseCacheStorage({ storage: this.#storageEngine });
+		} catch (error) {
+			if (!(error instanceof ServiceNotReadyError)) throw error;
+			await Service.resolve(error.service);
+			this.#cache = createDatabaseCacheStorage({ storage: this.#storageEngine });
 		}
+		return this.#cache;
 	}
 
 	public override strategy(): 'explicit' | 'all' {
