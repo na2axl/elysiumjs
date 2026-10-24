@@ -344,7 +344,31 @@ describe('Kernel', () => {
 
 		await expect(kernel.bootEager()).rejects.toThrow('init failed');
 		await kernel.shutdown();
-		// S4 was never constructed, so it is not destroyed.
-		expect(events).toEqual(['destroy:S3', 'destroy:S2', 'destroy:S1']);
+		// S3 never became live and S4 was never constructed: neither is destroyed.
+		expect(events).toEqual(['destroy:S2', 'destroy:S1']);
+	});
+
+	it('prepare names the command class as requester when a dependency is from a skipped module', async () => {
+		class DevOnlyService {}
+		@Module.register({
+			env: ['development'],
+			services: [DevOnlyService],
+			exports: [DevOnlyService]
+		})
+		class DevModule extends Module {}
+
+		class MyCommand {
+			constructor(@Service.inject('DevOnlyService') public readonly dev: unknown) {}
+		}
+		@Module.register({ imports: [DevModule], commands: [MyCommand as any] })
+		class Home extends Module {}
+
+		const graph = buildModuleGraph([Home], 'production');
+		const kernel = new Kernel(graph);
+		await kernel.register();
+
+		const error = await kernel.prepare(MyCommand, graph.node(Home)!).catch((e) => e);
+		expect(error).toBeInstanceOf(EnvironmentSkippedModuleError);
+		expect(error).toMatchObject({ requester: 'MyCommand', skippedModule: 'DevModule' });
 	});
 });

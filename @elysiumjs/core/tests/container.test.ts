@@ -290,6 +290,20 @@ describe('Container', () => {
 		await expect(run(A, () => Service.resolve(Broken))).rejects.toThrow('boom');
 	});
 
+	it('leaves a service whose onInit failed out of constructed()', async () => {
+		class Broken {
+			async onInit() {
+				throw new Error('boom');
+			}
+		}
+		class Fine {}
+		Container.register(A, Fine, undefined);
+		Container.register(A, Broken, undefined);
+		run(A, () => Service.get(Fine));
+		await expect(run(A, () => Service.resolve(Broken))).rejects.toThrow('boom');
+		expect(Container.constructed().map((c) => c.name)).toEqual(['Fine']);
+	});
+
 	it('resolve rejects with typed errors', async () => {
 		await expect(run(A, () => Service.resolve('Nope'))).rejects.toBeInstanceOf(
 			ServiceNotFoundError

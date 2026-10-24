@@ -84,7 +84,7 @@ const GLOBAL_OWNER = '<global>';
 
 const globalScope = new Map<string, ContainerEntry>();
 const moduleScopes = new Map<string, Map<string, ContainerEntry>>();
-const constructedEntries: { name: string; instance: unknown; owner: ModuleNode | null }[] = [];
+const constructedEntries: { entry: ContainerEntry; instance: unknown }[] = [];
 
 let visibility: VisibilityResolver | null = null;
 let moduleInitHook: ((owner: ModuleNode) => Promise<void> | void) | null = null;
@@ -129,7 +129,7 @@ const instantiate = (entry: ContainerEntry): Instantiation => {
 
 	const instance = inOwnerContext(entry.owner, entry.create);
 	entry.instance = instance;
-	constructedEntries.push({ name: entry.name, instance, owner: entry.owner });
+	constructedEntries.push({ entry, instance });
 
 	const ready = runOnInit(entry, instance);
 	if (ready) {
@@ -405,12 +405,15 @@ export namespace Container {
 		globalScope.clear();
 	};
 
-	/** The singletons built so far, in construction order. Returns a snapshot. */
+	/** The live singletons, in construction order (those whose `onInit` failed are left out). Returns a snapshot. */
 	export const constructed = (): readonly {
 		name: string;
 		instance: unknown;
 		owner: ModuleNode | null;
-	}[] => [...constructedEntries];
+	}[] =>
+		constructedEntries
+			.filter(({ entry }) => !entry.initFailure)
+			.map(({ entry, instance }) => ({ name: entry.name, instance, owner: entry.owner }));
 
 	/** Clears every scope and the construction record. */
 	export function reset(): void {

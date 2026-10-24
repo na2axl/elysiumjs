@@ -131,7 +131,7 @@ export class Kernel {
 		await this.initModule(owner);
 		const dependencies: { name: string }[] = Reflect.getMetadata(Symbols.services, cls) ?? [];
 		for (const { name } of dependencies) {
-			await ModuleContext.run(owner, () => Service.resolve(name));
+			await ModuleContext.run(owner, () => Container.resolve(name, cls.name));
 		}
 		return ModuleContext.run(owner, () => Service.make(cls));
 	}
@@ -165,13 +165,11 @@ export class Kernel {
 			...Container.constructed()
 				.map(({ name, instance, owner }) => ({ label: `service ${name}`, instance, owner }))
 				.reverse(),
-			...[...this.initOrder]
-				.reverse()
-				.map((node) => ({
-					label: `module ${node.id}`,
-					instance: this.instances.get(node),
-					owner: node
-				}))
+			...[...this.initOrder].reverse().map((node) => ({
+				label: `module ${node.id}`,
+				instance: this.instances.get(node),
+				owner: node
+			}))
 		];
 
 		for (const { label, instance, owner } of targets) {
