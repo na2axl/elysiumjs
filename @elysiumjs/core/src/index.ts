@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import 'reflect-metadata';
-
 import type { SingletonBase } from 'elysia';
 
 export { type Elysia, type TSchema, type Static, t } from 'elysia';
@@ -29,6 +27,7 @@ export { Env } from './env';
 export { type EventData, type EventHandler, Event } from './event';
 export { type LoggerInterface, ConsoleLogger } from './logger';
 export { type Context, type Route, HttpControllerScope, Http } from './http';
+export { Metadata } from './metadata';
 export { Middleware } from './middleware';
 export { RequestLoggerMiddleware } from './middlewares/request-logger.middleware';
 export {

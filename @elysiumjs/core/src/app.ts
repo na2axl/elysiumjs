@@ -34,6 +34,7 @@ import { initEnv } from './env';
 import { ElysiumError, InvalidControllerError } from './errors';
 import { Event } from './event';
 import { Kernel } from './kernel';
+import { Metadata } from './metadata';
 import { applyMiddlewares } from './middleware';
 import { ModuleContext } from './module-context';
 import { buildModuleGraph } from './module-graph';
@@ -140,12 +141,12 @@ export abstract class Application extends InteractsWithConsole {
 			let parentMetadata: AppProps | undefined;
 			let proto = Object.getPrototypeOf(target);
 			while (proto && proto !== Object.prototype) {
-				parentMetadata = Reflect.getOwnMetadata(Symbols.app, proto);
+				parentMetadata = Metadata.getOwn(Symbols.app, proto);
 				if (parentMetadata) break;
 				proto = Object.getPrototypeOf(proto);
 			}
 
-			const ownMetadata: AppProps | undefined = Reflect.getOwnMetadata(Symbols.app, target);
+			const ownMetadata: AppProps | undefined = Metadata.getOwn(Symbols.app, target);
 
 			// Modules are concatenated (parent first) and never merged, so that configured modules
 			// keep their config intact.
@@ -168,7 +169,7 @@ export abstract class Application extends InteractsWithConsole {
 			};
 
 			// Store the merged metadata
-			Reflect.defineMetadata(Symbols.app, props, target);
+			Metadata.define(Symbols.app, props, target);
 		};
 	}
 
@@ -178,7 +179,7 @@ export abstract class Application extends InteractsWithConsole {
 	public constructor() {
 		super();
 
-		const { env, debug }: AppProps = Reflect.getMetadata(Symbols.app, this.constructor) ?? {};
+		const { env, debug }: AppProps = Metadata.get(Symbols.app, this.constructor) ?? {};
 		this.#debug = debug ?? false;
 
 		if (env) {
@@ -284,7 +285,7 @@ export abstract class Application extends InteractsWithConsole {
 	}
 
 	private props(): AppProps {
-		return Reflect.getMetadata(Symbols.app, this.constructor) ?? {};
+		return Metadata.get(Symbols.app, this.constructor) ?? {};
 	}
 
 	private async dispatch([action, ...rest]: string[]): Promise<void> {
@@ -460,7 +461,7 @@ export abstract class Application extends InteractsWithConsole {
 
 		this.setupServerHooks();
 
-		const middlewares = Reflect.getMetadata(Symbols.middlewares, this.constructor) ?? [];
+		const middlewares = Metadata.get(Symbols.middlewares, this.constructor) ?? [];
 		applyMiddlewares(middlewares, this.#elysia, null);
 
 		await this.serveModules();
@@ -491,14 +492,11 @@ export abstract class Application extends InteractsWithConsole {
 	private async mountModule(node: ModuleNode): Promise<ElysiaApp> {
 		const app: ElysiaApp = new Elysia({ name: node.id, prefix: node.props.prefix });
 
-		const middlewares = Reflect.getMetadata(Symbols.middlewares, node.moduleClass) ?? [];
+		const middlewares = Metadata.get(Symbols.middlewares, node.moduleClass) ?? [];
 		applyMiddlewares(middlewares, app, node);
 
 		for (const controller of node.props.controllers ?? []) {
-			const plugin: ElysiaPlugin | undefined = Reflect.getMetadata(
-				Symbols.elysiaPlugin,
-				controller
-			);
+			const plugin: ElysiaPlugin | undefined = Metadata.get(Symbols.elysiaPlugin, controller);
 			if (!plugin) throw new InvalidControllerError(controller.name, node.id);
 			app.use(await plugin(node));
 		}

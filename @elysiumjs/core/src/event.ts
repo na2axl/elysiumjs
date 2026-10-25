@@ -16,6 +16,7 @@ import { EventEmitter } from 'node:events';
 
 import { isString } from 'radash';
 
+import { Metadata } from './metadata';
 import { Symbols } from './utils';
 
 /**
@@ -108,7 +109,7 @@ export type EventListenerMeta = {
  * @param cls The class to inspect.
  */
 export function getEventListeners(cls: object): readonly EventListenerMeta[] {
-	return Reflect.getOwnMetadata(Symbols.eventListeners, cls) ?? [];
+	return Metadata.getOwn(Symbols.eventListeners, cls) ?? [];
 }
 
 const recordListener = (
@@ -119,7 +120,7 @@ const recordListener = (
 ): void => {
 	const isStatic = typeof target === 'function';
 	const owner = isStatic ? target : target.constructor;
-	Reflect.defineMetadata(
+	Metadata.define(
 		Symbols.eventListeners,
 		[
 			...getEventListeners(owner),

@@ -19,6 +19,7 @@ import type { LoggerInterface } from './logger';
 import type { ModuleNode } from './module-graph';
 
 import { Application } from './app';
+import { Metadata } from './metadata';
 import { ModuleContext } from './module-context';
 import { Service } from './service';
 import { Symbols } from './utils';
@@ -125,13 +126,13 @@ export abstract class Middleware<TGuards extends string[] = []> {
 			descriptor?: PropertyDescriptor
 		) {
 			if (propertyKey === undefined && descriptor === undefined) {
-				const m = Reflect.getMetadata(Symbols.middlewares, target) ?? [];
+				const m = Metadata.get(Symbols.middlewares, target) ?? [];
 				m.push(...middlewares);
-				Reflect.defineMetadata(Symbols.middlewares, m, target);
+				Metadata.define(Symbols.middlewares, m, target);
 			} else {
-				const m = Reflect.getMetadata(Symbols.middlewares, target, propertyKey!) ?? [];
+				const m = Metadata.get(Symbols.middlewares, target, propertyKey!) ?? [];
 				m.push(...middlewares);
-				Reflect.defineMetadata(Symbols.middlewares, m, target, propertyKey!);
+				Metadata.define(Symbols.middlewares, m, target, propertyKey!);
 			}
 		};
 	}
@@ -144,7 +145,7 @@ export abstract class Middleware<TGuards extends string[] = []> {
 	 */
 	public static guards(guards: string[]): Class<Middleware> {
 		class GuardedMiddleware extends this {}
-		Reflect.defineMetadata(Symbols.middlewareGuards, guards, GuardedMiddleware);
+		Metadata.define(Symbols.middlewareGuards, guards, GuardedMiddleware);
 		return GuardedMiddleware;
 	}
 
@@ -162,7 +163,7 @@ export abstract class Middleware<TGuards extends string[] = []> {
 	 * Gets the list of guards for the middleware.
 	 */
 	public get guards(): TGuards {
-		return Reflect.getMetadata(Symbols.middlewareGuards, this.constructor) ?? [];
+		return Metadata.get(Symbols.middlewareGuards, this.constructor) ?? [];
 	}
 
 	/**

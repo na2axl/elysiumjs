@@ -25,6 +25,7 @@ import {
 	ServiceNotReadyError,
 	ServiceNotVisibleError
 } from './errors';
+import { Metadata } from './metadata';
 import { ModuleContext } from './module-context';
 import { ServiceScope } from './service';
 import { Symbols } from './utils';
@@ -209,7 +210,7 @@ const prepare = async (entry: ContainerEntry, path: readonly ContainerEntry[]): 
 	}
 	if (!entry.cls || ('instance' in entry && entry.scope !== ServiceScope.FACTORY)) return;
 
-	const dependencies: InjectedService[] = Reflect.getMetadata(Symbols.services, entry.cls) ?? [];
+	const dependencies: InjectedService[] = Metadata.get(Symbols.services, entry.cls) ?? [];
 	// Look dependencies up synchronously, in the owner's context.
 	const found = inOwnerContext(entry.owner, () =>
 		dependencies.map((dependency) => Container.lookup(dependency.name, ModuleContext.current()))
@@ -253,7 +254,7 @@ export namespace Container {
 	): string {
 		const isClass = typeof def === 'function';
 		const options: Partial<ServiceFactoryDefinition> = isClass
-			? (Reflect.getMetadata(Symbols.serviceOptions, def) ?? {})
+			? (Metadata.get(Symbols.serviceOptions, def) ?? {})
 			: def;
 		const name = options.name ?? (isClass ? def.name : '');
 		if (overridden.has(name)) return name;
@@ -392,7 +393,7 @@ export namespace Container {
 	 * @throws {ServiceNotFoundError | ServiceNotVisibleError | EnvironmentSkippedModuleError}
 	 */
 	export function make<T>(cls: Class<T>): T {
-		const dependencies: InjectedService[] = Reflect.getMetadata(Symbols.services, cls) ?? [];
+		const dependencies: InjectedService[] = Metadata.get(Symbols.services, cls) ?? [];
 		const params: unknown[] = [];
 		for (const dependency of dependencies) {
 			params[dependency.index] = require(dependency.name, cls.name);

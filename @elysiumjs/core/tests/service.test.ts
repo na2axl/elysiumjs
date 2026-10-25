@@ -16,6 +16,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 
 import { Container } from '../src/container';
 import { DuplicateGlobalServiceError, ServiceNotFoundError } from '../src/errors';
+import { Metadata } from '../src/metadata';
 import { Service, ServiceScope } from '../src/service';
 import { Symbols } from '../src/utils';
 
@@ -36,7 +37,7 @@ describe('Service', () => {
 			expect(Service.exists('custom')).toBe(false);
 			expect(Service.exists(TestService)).toBe(false);
 			expect(Service.keys('*')).toEqual([]);
-			expect(Reflect.getMetadata(Symbols.serviceOptions, TestService)).toEqual({
+			expect(Metadata.get(Symbols.serviceOptions, TestService)).toEqual({
 				name: 'custom',
 				scope: ServiceScope.FACTORY,
 				global: true
@@ -47,7 +48,7 @@ describe('Service', () => {
 			@Service.register()
 			class TestService {}
 
-			expect(Reflect.getMetadata(Symbols.serviceOptions, TestService)).toEqual({});
+			expect(Metadata.get(Symbols.serviceOptions, TestService)).toEqual({});
 		});
 	});
 

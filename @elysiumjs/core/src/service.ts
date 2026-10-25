@@ -17,6 +17,7 @@ import type { Class } from 'type-fest';
 import { isString } from 'radash';
 
 import { Container } from './container';
+import { Metadata } from './metadata';
 import { Symbols } from './utils';
 
 /**
@@ -128,7 +129,7 @@ export namespace Service {
 	 */
 	export const register = (props?: ServiceProps) => {
 		return function (target: ServiceClass) {
-			Reflect.defineMetadata(Symbols.serviceOptions, props ?? {}, target);
+			Metadata.define(Symbols.serviceOptions, props ?? {}, target);
 		};
 	};
 
@@ -139,9 +140,8 @@ export namespace Service {
 	 */
 	export const inject = (service?: string | ServiceClass): ParameterDecorator => {
 		return function (target, propertyKey, parameterIndex) {
-			const services = Reflect.getMetadata(Symbols.services, target, propertyKey!) ?? [];
-			const types: Function[] =
-				Reflect.getMetadata('design:paramtypes', target, propertyKey!) ?? [];
+			const services = Metadata.get(Symbols.services, target, propertyKey!) ?? [];
+			const types: Function[] = Metadata.get('design:paramtypes', target, propertyKey!) ?? [];
 			const name = isString(service) ? service : (service?.name ?? types[parameterIndex].name);
 
 			services.push({
@@ -149,7 +149,7 @@ export namespace Service {
 				index: parameterIndex
 			});
 
-			Reflect.defineMetadata(Symbols.services, services, target, propertyKey!);
+			Metadata.define(Symbols.services, services, target, propertyKey!);
 		};
 	};
 

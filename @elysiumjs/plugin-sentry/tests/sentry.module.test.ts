@@ -16,8 +16,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { Application, Env, MissingModuleConfigError, Module } from '@elysiumjs/core';
-import { Elysia } from 'elysia';
 import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test';
+import { Elysia } from 'elysia';
 
 const init = mock((_options: unknown) => {});
 mock.module('@sentry/bun', () => ({
@@ -44,9 +44,9 @@ describe('SentryModule', () => {
 
 	it('fails at boot when neither config nor SENTRY_DSN provides a dsn', async () => {
 		spyOn(Env, 'get').mockReturnValue(undefined as never);
-		await expect(Application.testing({ modules: [moduleWith({})], boot: 'eager' })).rejects.toBeInstanceOf(
-			MissingModuleConfigError
-		);
+		await expect(
+			Application.testing({ modules: [moduleWith({})], boot: 'eager' })
+		).rejects.toBeInstanceOf(MissingModuleConfigError);
 	});
 
 	it('boots with only SENTRY_DSN set', async () => {
@@ -59,7 +59,7 @@ describe('SentryModule', () => {
 	it('has no bare side-effect imports in its entry point', () => {
 		const source = readFileSync(join(import.meta.dir, '../src/index.ts'), 'utf8');
 		const bare = source.match(/^import\s+['"][^'"]+['"]/gm) ?? [];
-		expect(bare.filter((line) => !line.includes('reflect-metadata'))).toEqual([]);
+		expect(bare).toEqual([]);
 	});
 
 	it('installs the sentry plugin built from the module config on serve', async () => {

@@ -24,6 +24,7 @@ import { Container } from './container';
 import { ConflictingModuleConfigError, ElysiumError } from './errors';
 import { EventBus } from './event';
 import { wireEventListeners } from './event-wiring';
+import { Metadata } from './metadata';
 import { getModuleProps } from './module';
 import { ModuleContext } from './module-context';
 import { selectConfig } from './module-graph';
@@ -42,13 +43,12 @@ const evaluate = (config: unknown): Promise<any> | any =>
 	typeof config === 'function' ? config() : config;
 
 const scopeOf = (def: ServiceDefinition): ServiceScope =>
-	(typeof def === 'function'
-		? Reflect.getMetadata(Symbols.serviceOptions, def)?.scope
-		: def.scope) ?? ServiceScope.SINGLETON;
+	(typeof def === 'function' ? Metadata.get(Symbols.serviceOptions, def)?.scope : def.scope) ??
+	ServiceScope.SINGLETON;
 
 const nameOf = (def: ServiceDefinition): string =>
 	typeof def === 'function'
-		? (Reflect.getMetadata(Symbols.serviceOptions, def)?.name ?? def.name)
+		? (Metadata.get(Symbols.serviceOptions, def)?.name ?? def.name)
 		: def.name;
 
 /**
@@ -98,7 +98,7 @@ export class Kernel {
 		for (const node of graph.nodes) {
 			const config = await this.resolveNodeConfig(node);
 			const instance = ModuleContext.run(node, () => Service.make(node.moduleClass));
-			Reflect.defineMetadata(Symbols.moduleConfig, config, instance);
+			Metadata.define(Symbols.moduleConfig, config, instance);
 			this.instances.set(node, instance);
 
 			const registered: Registered[] = [];
@@ -153,7 +153,7 @@ export class Kernel {
 	 */
 	public async prepare<T>(cls: Class<T>, owner: ModuleNode): Promise<T> {
 		await this.initModule(owner);
-		const dependencies: { name: string }[] = Reflect.getMetadata(Symbols.services, cls) ?? [];
+		const dependencies: { name: string }[] = Metadata.get(Symbols.services, cls) ?? [];
 		for (const { name } of dependencies) {
 			await ModuleContext.run(owner, () => Container.resolve(name, cls.name));
 		}

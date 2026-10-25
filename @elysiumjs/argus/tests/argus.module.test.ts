@@ -16,10 +16,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { Application, MissingModuleConfigError, Module } from '@elysiumjs/core';
-import { Elysia } from 'elysia';
 import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test';
+import { Elysia } from 'elysia';
 
-import { ArgusModule, ArgusSDK, argusPlugin } from '../src';
+import { ArgusModule, argusPlugin, ArgusSDK } from '../src';
 
 const withConfig = (config: Record<string, unknown>) => {
 	@Module.register({ imports: [ArgusModule.with(config as any)] })
@@ -36,7 +36,7 @@ describe('ArgusModule', () => {
 	it('has no bare side-effect imports in its entry point', () => {
 		const source = readFileSync(join(import.meta.dir, '../src/index.ts'), 'utf8');
 		const bare = source.match(/^import\s+['"][^'"]+['"]/gm) ?? [];
-		expect(bare.filter((line) => !line.includes('reflect-metadata'))).toEqual([]);
+		expect(bare).toEqual([]);
 	});
 
 	it('requires a serviceName', async () => {
@@ -110,9 +110,10 @@ describe('ArgusModule', () => {
 			throw new Error('boom');
 		});
 		const shutdown = spyOn(ArgusSDK, 'shutdown').mockResolvedValue(undefined);
-		const app = await Application.testing({ modules: [withConfig({ serviceName: 'svc' })], boot: 'eager' }).catch(
-			() => undefined
-		);
+		const app = await Application.testing({
+			modules: [withConfig({ serviceName: 'svc' })],
+			boot: 'eager'
+		}).catch(() => undefined);
 		await app?.shutdown();
 		expect(shutdown).not.toHaveBeenCalled();
 	});

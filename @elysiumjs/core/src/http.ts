@@ -30,6 +30,7 @@ import { Elysia, sse as esse, t } from 'elysia';
 import { assign, isEmpty, objectify } from 'radash';
 
 import { Application } from './app';
+import { Metadata } from './metadata';
 import { applyMiddlewares, executeMiddlewareChain, makeMiddlewares } from './middleware';
 import { ModuleContext } from './module-context';
 import { Service } from './service';
@@ -238,21 +239,21 @@ async function* iterateInModule<T>(node: ModuleNode, generator: AsyncGenerator<T
 }
 
 const registerHttpRequestHandler = (props: HttpRequestHandlerRegistrationProps) => {
-	const body = Reflect.getMetadata('http:body', props.target, props.propertyKey);
-	const params = Reflect.getMetadata('http:params', props.target, props.propertyKey) ?? [];
-	const query = Reflect.getMetadata('http:query', props.target, props.propertyKey);
-	const rawContext = Reflect.getMetadata('http:rawContext', props.target, props.propertyKey);
+	const body = Metadata.get('http:body', props.target, props.propertyKey);
+	const params = Metadata.get('http:params', props.target, props.propertyKey) ?? [];
+	const query = Metadata.get('http:query', props.target, props.propertyKey);
+	const rawContext = Metadata.get('http:rawContext', props.target, props.propertyKey);
 	const customDecorators =
-		Reflect.getMetadata('http:customDecorators', props.target, props.propertyKey) ?? [];
+		Metadata.get('http:customDecorators', props.target, props.propertyKey) ?? [];
 	const middlewares =
-		Reflect.getMetadata(Symbols.middlewares, props.target, props.propertyKey) ?? [];
-	const services = Reflect.getMetadata(Symbols.services, props.target, props.propertyKey) ?? [];
+		Metadata.get(Symbols.middlewares, props.target, props.propertyKey) ?? [];
+	const services = Metadata.get(Symbols.services, props.target, props.propertyKey) ?? [];
 
 	const { path, method, handler, target, response, operationId, description, transactional } =
 		props;
 
 	const metadata: HttpRequestHandlerMetadata[] =
-		Reflect.getMetadata(Symbols.http, target.constructor) ?? [];
+		Metadata.get(Symbols.http, target.constructor) ?? [];
 
 	metadata.push({
 		path,
@@ -271,7 +272,7 @@ const registerHttpRequestHandler = (props: HttpRequestHandlerRegistrationProps) 
 		transactional
 	});
 
-	Reflect.defineMetadata(Symbols.http, metadata, target.constructor);
+	Metadata.define(Symbols.http, metadata, target.constructor);
 };
 
 /**
@@ -389,7 +390,7 @@ export namespace Http {
 
 				app.resolve({ as: 'local' }, () => ({ controller: getController() }));
 
-				const onRequest = Reflect.getMetadata('http:onRequest', target) ?? {};
+				const onRequest = Metadata.get('http:onRequest', target) ?? {};
 				if (onRequest.handler) {
 					app.onRequest((c: PreContext<Singleton>) => {
 						const controller = getController()();
@@ -397,11 +398,11 @@ export namespace Http {
 					});
 				}
 
-				const middlewares = Reflect.getMetadata(Symbols.middlewares, target) ?? [];
+				const middlewares = Metadata.get(Symbols.middlewares, target) ?? [];
 				applyMiddlewares(middlewares, app, node);
 
 				const metadata: HttpRequestHandlerMetadata[] =
-					Reflect.getMetadata(Symbols.http, target) ?? [];
+					Metadata.get(Symbols.http, target) ?? [];
 
 				for (const route of metadata) {
 					const getParameters = async (c: Context) => {
@@ -581,7 +582,7 @@ export namespace Http {
 				return app;
 			}
 
-			Reflect.defineMetadata(Symbols.elysiaPlugin, handleHttp, target);
+			Metadata.define(Symbols.elysiaPlugin, handleHttp, target);
 		};
 	};
 
@@ -703,9 +704,9 @@ export namespace Http {
 	 */
 	export const onRequest = (): MethodDecorator => {
 		return function (target, _, descriptor) {
-			const metadata = Reflect.getMetadata('http:onRequest', target.constructor) ?? {};
+			const metadata = Metadata.get('http:onRequest', target.constructor) ?? {};
 			metadata.handler = descriptor.value;
-			Reflect.defineMetadata('http:onRequest', metadata, target.constructor);
+			Metadata.define('http:onRequest', metadata, target.constructor);
 		};
 	};
 
@@ -715,7 +716,7 @@ export namespace Http {
 	 */
 	export const context = (): ParameterDecorator => {
 		return function (target, propertyKey, parameterIndex) {
-			Reflect.defineMetadata('http:rawContext', { index: parameterIndex }, target, propertyKey!);
+			Metadata.define('http:rawContext', { index: parameterIndex }, target, propertyKey!);
 		};
 	};
 
@@ -727,9 +728,9 @@ export namespace Http {
 	 */
 	export const param = (slug: string, schema?: TSchema): ParameterDecorator => {
 		return function (target, propertyKey, parameterIndex) {
-			const params = Reflect.getMetadata('http:params', target, propertyKey!) ?? [];
+			const params = Metadata.get('http:params', target, propertyKey!) ?? [];
 			params.push({ slug, schema: schema ?? t.String(), index: parameterIndex });
-			Reflect.defineMetadata('http:params', params, target, propertyKey!);
+			Metadata.define('http:params', params, target, propertyKey!);
 		};
 	};
 
@@ -740,7 +741,7 @@ export namespace Http {
 	 */
 	export const query = (schema?: TSchema): ParameterDecorator => {
 		return function (target, propertyKey, parameterIndex) {
-			Reflect.defineMetadata('http:query', { schema, index: parameterIndex }, target, propertyKey!);
+			Metadata.define('http:query', { schema, index: parameterIndex }, target, propertyKey!);
 		};
 	};
 
@@ -752,14 +753,14 @@ export namespace Http {
 	export const body = (schema?: TSchema | ValidatorClass): ParameterDecorator => {
 		return function (target, propertyKey, parameterIndex) {
 			if (typeof schema === 'function') {
-				Reflect.defineMetadata(
+				Metadata.define(
 					'http:body',
 					{ validator: schema, index: parameterIndex },
 					target,
 					propertyKey!
 				);
 			} else {
-				Reflect.defineMetadata(
+				Metadata.define(
 					'http:body',
 					{ schema, index: parameterIndex },
 					target,
@@ -777,9 +778,9 @@ export namespace Http {
 	export const decorate = (handler: Handler): (() => ParameterDecorator) => {
 		return () => {
 			return function (target, propertyKey, parameterIndex) {
-				const decorators = Reflect.getMetadata('http:customDecorators', target, propertyKey!) ?? [];
+				const decorators = Metadata.get('http:customDecorators', target, propertyKey!) ?? [];
 				decorators.push({ handler, index: parameterIndex });
-				Reflect.defineMetadata('http:customDecorators', decorators, target, propertyKey!);
+				Metadata.define('http:customDecorators', decorators, target, propertyKey!);
 			};
 		};
 	};

@@ -1,5 +1,3 @@
-import 'reflect-metadata';
-
 import type { EventData } from '@elysiumjs/core';
 
 import { Event } from '@elysiumjs/core';

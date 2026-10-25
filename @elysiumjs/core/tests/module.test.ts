@@ -15,6 +15,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { InvalidModuleError, MissingModuleConfigError } from '../src/errors.ts';
+import { Metadata } from '../src/metadata';
 import { getModuleProps, isConfiguredModule, Module } from '../src/module.ts';
 import { Symbols } from '../src/utils.ts';
 
@@ -27,7 +28,7 @@ describe('Module', () => {
 			@Module.register(props)
 			class TestModule extends Module {}
 
-			expect(Reflect.getMetadata(Symbols.module, TestModule)).toEqual(props);
+			expect(Metadata.get(Symbols.module, TestModule)).toEqual(props);
 			expect(getModuleProps(TestModule)).toEqual(props);
 		});
 
@@ -35,7 +36,7 @@ describe('Module', () => {
 			@Module.register()
 			class TestModule extends Module {}
 
-			expect(Reflect.getMetadata(Symbols.elysiaPlugin, TestModule)).toBeUndefined();
+			expect(Metadata.get(Symbols.elysiaPlugin, TestModule)).toBeUndefined();
 			expect(getModuleProps(TestModule)).toEqual({});
 		});
 	});
@@ -123,7 +124,7 @@ describe('Module', () => {
 
 		it('instance config getter reads the kernel-set metadata', () => {
 			const m = new XModule();
-			Reflect.defineMetadata(Symbols.moduleConfig, { url: 'z' }, m);
+			Metadata.define(Symbols.moduleConfig, { url: 'z' }, m);
 			expect(m.config).toEqual({ url: 'z' });
 		});
 	});

@@ -14,6 +14,8 @@
 
 import type { Job, JobClass, JobMetadata } from './job';
 
+import { Metadata } from '@elysiumjs/core';
+
 export namespace Symbols {
 	/**
 	 * Symbol for job metadata
@@ -53,9 +55,9 @@ export namespace Symbols {
  * @returns The job metadata or null if not found
  */
 export const getJobMetadata = <T extends Job>(jobClass: JobClass<T>): JobMetadata | null => {
-	if (!Reflect.hasMetadata(Symbols.job, jobClass)) {
+	if (!Metadata.has(Symbols.job, jobClass)) {
 		return null;
 	}
 
-	return Reflect.getMetadata(Symbols.job, jobClass) as JobMetadata;
+	return Metadata.get(Symbols.job, jobClass) as JobMetadata;
 };

@@ -18,6 +18,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, mock, spyOn } fr
 import { Elysia } from 'elysia';
 
 import { InvalidModuleConfigError, ServiceNotFoundError } from '../src/errors';
+import { Metadata } from '../src/metadata';
 import { createTestingApp } from '../src/testing';
 import { nextTick, Symbols } from '../src/utils';
 import { Wamp, WampModule } from '../src/wamp';
@@ -240,7 +241,7 @@ describe('Wamp controllers', () => {
 			public topic() {}
 		}
 
-		const plugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestWampController);
+		const plugin = Metadata.get(Symbols.elysiaPlugin, TestWampController);
 		const elysia: Elysia = await plugin(testNode());
 		await elysia.event.start?.[0].fn(elysia as any);
 		await nextTick();

@@ -86,8 +86,6 @@ export class App extends Application {}
 Create an entrypoint file:
 
 ```typescript
-import 'reflect-metadata'; // <- IMPORTANT TO ADD THIS LINE IN THE ENTRYPOINT FILE
-
 import { App } from './app';
 
 await App.start();

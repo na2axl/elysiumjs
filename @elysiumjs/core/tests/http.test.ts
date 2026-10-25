@@ -20,6 +20,7 @@ import * as Elysia from 'elysia';
 
 import { Application } from '../src/app';
 import { Http, HttpControllerScope } from '../src/http';
+import { Metadata } from '../src/metadata';
 import { ModuleContext } from '../src/module-context';
 import * as M from '../src/middleware';
 import { Service } from '../src/service';
@@ -44,7 +45,7 @@ describe('Http namespace', () => {
 			class TestController {}
 
 			// Check if metadata was set correctly
-			const plugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestController);
+			const plugin = Metadata.get(Symbols.elysiaPlugin, TestController);
 			expect(plugin).toBeDefined();
 			expect(typeof plugin).toBe('function');
 		});
@@ -57,7 +58,7 @@ describe('Http namespace', () => {
 			class TestController {}
 
 			// Get the plugin function
-			const plugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestController);
+			const plugin = Metadata.get(Symbols.elysiaPlugin, TestController);
 
 			const app = await plugin(testNode());
 
@@ -77,7 +78,7 @@ describe('Http namespace', () => {
 			const resolveSpy = spyOn(Elysia.Elysia.prototype, 'resolve');
 
 			// Get the plugin function
-			const plugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestController);
+			const plugin = Metadata.get(Symbols.elysiaPlugin, TestController);
 
 			// Call the plugin function
 			await plugin(testNode());
@@ -108,7 +109,7 @@ describe('Http namespace', () => {
 			);
 
 			// Get the plugin function
-			const plugin: ElysiaPlugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestController);
+			const plugin: ElysiaPlugin = Metadata.get(Symbols.elysiaPlugin, TestController);
 
 			// Call the plugin function
 			const app = await plugin(testNode());
@@ -142,14 +143,14 @@ describe('Http namespace', () => {
 			class TestController {}
 
 			// Set middlewares metadata
-			Reflect.defineMetadata(
+			Metadata.define(
 				Symbols.middlewares,
 				[TestMiddleware1, TestMiddleware2],
 				TestController
 			);
 
 			// Get the plugin function
-			const plugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestController);
+			const plugin = Metadata.get(Symbols.elysiaPlugin, TestController);
 
 			const applyMiddlewaresSpy = spyOn(M, 'applyMiddlewares');
 
@@ -186,7 +187,7 @@ describe('Http namespace', () => {
 			await nextTick();
 
 			// Check if metadata was set correctly
-			const metadata = Reflect.getMetadata(Symbols.http, TestController);
+			const metadata = Metadata.get(Symbols.http, TestController);
 			expect(metadata).toBeDefined();
 			expect(metadata).toBeArrayOfSize(1);
 			expect(metadata[0].method).toBe('GET');
@@ -208,7 +209,7 @@ describe('Http namespace', () => {
 			await nextTick();
 
 			// Check if metadata was set correctly
-			const metadata = Reflect.getMetadata(Symbols.http, TestController);
+			const metadata = Metadata.get(Symbols.http, TestController);
 			expect(metadata).toBeDefined();
 			expect(metadata).toBeArrayOfSize(1);
 			expect(metadata[0].method).toBe('POST');
@@ -230,7 +231,7 @@ describe('Http namespace', () => {
 			await nextTick();
 
 			// Check if metadata was set correctly
-			const metadata = Reflect.getMetadata(Symbols.http, TestController);
+			const metadata = Metadata.get(Symbols.http, TestController);
 			expect(metadata).toBeDefined();
 			expect(metadata).toBeArrayOfSize(1);
 			expect(metadata[0].method).toBe('PUT');
@@ -252,7 +253,7 @@ describe('Http namespace', () => {
 			await nextTick();
 
 			// Check if metadata was set correctly
-			const metadata = Reflect.getMetadata(Symbols.http, TestController);
+			const metadata = Metadata.get(Symbols.http, TestController);
 			expect(metadata).toBeDefined();
 			expect(metadata).toBeArrayOfSize(1);
 			expect(metadata[0].method).toBe('DELETE');
@@ -274,7 +275,7 @@ describe('Http namespace', () => {
 			await nextTick();
 
 			// Check if metadata was set correctly
-			const metadata = Reflect.getMetadata(Symbols.http, TestController);
+			const metadata = Metadata.get(Symbols.http, TestController);
 			expect(metadata).toBeDefined();
 			expect(metadata).toBeArrayOfSize(1);
 			expect(metadata[0].method).toBe('PATCH');
@@ -296,7 +297,7 @@ describe('Http namespace', () => {
 			await nextTick();
 
 			// Check if metadata was set correctly
-			const metadata = Reflect.getMetadata(Symbols.http, TestController);
+			const metadata = Metadata.get(Symbols.http, TestController);
 			expect(metadata).toBeDefined();
 			expect(metadata).toBeArrayOfSize(1);
 			expect(metadata[0].method).toBe('HEAD');
@@ -318,7 +319,7 @@ describe('Http namespace', () => {
 			await nextTick();
 
 			// Check if metadata was set correctly
-			const metadata = Reflect.getMetadata(Symbols.http, TestController);
+			const metadata = Metadata.get(Symbols.http, TestController);
 			expect(metadata).toBeDefined();
 			expect(metadata).toBeArrayOfSize(1);
 			expect(metadata[0].method).toBe('OPTIONS');
@@ -340,7 +341,7 @@ describe('Http namespace', () => {
 			await nextTick();
 
 			// Check if metadata was set correctly
-			const metadata = Reflect.getMetadata(Symbols.http, TestController);
+			const metadata = Metadata.get(Symbols.http, TestController);
 			expect(metadata).toBeDefined();
 			expect(metadata).toBeArrayOfSize(1);
 			expect(metadata[0].method).toBe('TRACE');
@@ -362,7 +363,7 @@ describe('Http namespace', () => {
 			await nextTick();
 
 			// Check if metadata was set correctly
-			const metadata = Reflect.getMetadata(Symbols.http, TestController);
+			const metadata = Metadata.get(Symbols.http, TestController);
 			expect(metadata).toBeDefined();
 			expect(metadata).toBeArrayOfSize(1);
 			expect(metadata[0].method).toBe('OPTIONS');
@@ -384,7 +385,7 @@ describe('Http namespace', () => {
 			await nextTick();
 
 			// Check if metadata was set correctly
-			const metadata = Reflect.getMetadata(Symbols.http, TestController);
+			const metadata = Metadata.get(Symbols.http, TestController);
 			expect(metadata).toBeDefined();
 			expect(metadata).toBeArrayOfSize(1);
 			expect(metadata[0].method).toBe('elysium:SSE');
@@ -412,7 +413,7 @@ describe('Http namespace', () => {
 			await nextTick();
 
 			// Check if metadata was set correctly
-			const metadata = Reflect.getMetadata('http:body', TestController.prototype, 'createUser');
+			const metadata = Metadata.get('http:body', TestController.prototype, 'createUser');
 			expect(metadata).toBeDefined();
 			expect(metadata.index).toBe(0);
 		});
@@ -432,7 +433,7 @@ describe('Http namespace', () => {
 			await nextTick();
 
 			// Check if metadata was set correctly
-			const metadata = Reflect.getMetadata('http:query', TestController.prototype, 'getUsers');
+			const metadata = Metadata.get('http:query', TestController.prototype, 'getUsers');
 			expect(metadata).toBeDefined();
 			expect(metadata.index).toBe(0);
 		});
@@ -452,7 +453,7 @@ describe('Http namespace', () => {
 			await nextTick();
 
 			// Check if metadata was set correctly
-			const params = Reflect.getMetadata('http:params', TestController.prototype, 'getUser');
+			const params = Metadata.get('http:params', TestController.prototype, 'getUser');
 			expect(params).toBeDefined();
 			expect(params).toBeArrayOfSize(1);
 			expect(params[0].slug).toBe('id');
@@ -474,7 +475,7 @@ describe('Http namespace', () => {
 			await nextTick();
 
 			// Check if metadata was set correctly
-			const metadata = Reflect.getMetadata('http:rawContext', TestController.prototype, 'getUsers');
+			const metadata = Metadata.get('http:rawContext', TestController.prototype, 'getUsers');
 			expect(metadata).toBeDefined();
 			expect(metadata.index).toBe(0);
 		});
@@ -497,7 +498,7 @@ describe('Http namespace', () => {
 			await nextTick();
 
 			// Check if metadata was set correctly
-			const decorators = Reflect.getMetadata(
+			const decorators = Metadata.get(
 				'http:customDecorators',
 				TestController.prototype,
 				'getUsers'
@@ -538,12 +539,12 @@ describe('Http namespace', () => {
 			await nextTick();
 
 			// Check if metadata was set correctly
-			const metadata = Reflect.getMetadata('http:onRequest', TestController);
+			const metadata = Metadata.get('http:onRequest', TestController);
 			expect(metadata).toBeDefined();
 			expect(metadata.handler).toBeDefined();
 
 			// Get the plugin function
-			const plugin: ElysiaPlugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestController);
+			const plugin: ElysiaPlugin = Metadata.get(Symbols.elysiaPlugin, TestController);
 
 			// Call the plugin function
 			const app = await plugin(testNode());
@@ -577,7 +578,7 @@ describe('Http namespace', () => {
 			await nextTick();
 
 			// Get the plugin function
-			const plugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestController);
+			const plugin = Metadata.get(Symbols.elysiaPlugin, TestController);
 
 			// Check if the controller is marked as transactional
 			expect(plugin).toBeDefined();
@@ -598,7 +599,7 @@ describe('Http namespace', () => {
 			await nextTick();
 
 			// Check if metadata was set correctly
-			const metadata = Reflect.getMetadata(Symbols.http, TestController);
+			const metadata = Metadata.get(Symbols.http, TestController);
 			expect(metadata).toBeDefined();
 			expect(metadata).toBeArrayOfSize(1);
 			expect(metadata[0].transactional).toBe(true);
@@ -628,7 +629,7 @@ describe('Http namespace', () => {
 			}
 
 			// Get the plugin function
-			const plugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestController);
+			const plugin = Metadata.get(Symbols.elysiaPlugin, TestController);
 
 			// Create a spy on Elysia.route method
 			const routeSpy = spyOn(Elysia.Elysia.prototype, 'route');
@@ -675,7 +676,7 @@ describe('Http namespace', () => {
 			new TestApp();
 
 			const node = testNode();
-			const plugin: ElysiaPlugin = Reflect.getMetadata(Symbols.elysiaPlugin, TestController);
+			const plugin: ElysiaPlugin = Metadata.get(Symbols.elysiaPlugin, TestController);
 			const app = await plugin(node);
 			const route = app.routes.find((r) => r.path === '/test/stream')!;
 			const handler = route.handler as (c: any) => AsyncGenerator;

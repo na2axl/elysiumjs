@@ -29,7 +29,7 @@ describe('HephaestusModule', () => {
 	it('has no bare side-effect imports in its entry point', () => {
 		const source = readFileSync(join(import.meta.dir, '../src/index.ts'), 'utf8');
 		const bare = source.match(/^import\s+['"][^'"]+['"]/gm) ?? [];
-		expect(bare.filter((line) => !line.includes('reflect-metadata'))).toEqual([]);
+		expect(bare).toEqual([]);
 	});
 
 	it('contributes the three commands to the graph', async () => {

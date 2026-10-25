@@ -36,7 +36,6 @@
     "@elysiajs/openapi": "^1.4.16",
     "elysia": "^1.4.30",
     "radash": "catalog:",
-    "reflect-metadata": "catalog:",
     "wampy": "^8.0.2"
   },
   "trustedDependencies": [

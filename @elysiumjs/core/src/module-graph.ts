@@ -24,6 +24,7 @@ import {
 	DuplicateModuleNameError,
 	ModuleCycleError
 } from './errors';
+import { Metadata } from './metadata';
 import { getModuleProps, isConfiguredModule } from './module';
 import { currentEnvironment, Symbols } from './utils';
 
@@ -184,10 +185,10 @@ function assertUniqueCommands(nodes: readonly ModuleNode[], environment: string)
 }
 
 const isModuleClass = (value: unknown): value is ModuleClass =>
-	typeof value === 'function' && Reflect.getMetadata(Symbols.module, value) !== undefined;
+	typeof value === 'function' && Metadata.get(Symbols.module, value) !== undefined;
 
 const serviceName = (cls: Class<any>): string =>
-	Reflect.getMetadata(Symbols.serviceOptions, cls)?.name ?? cls.name;
+	Metadata.get(Symbols.serviceOptions, cls)?.name ?? cls.name;
 
 /**
  * Builds the module graph from decorator metadata. Pure: constructs nothing.

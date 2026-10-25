@@ -17,6 +17,7 @@ import type { Class } from 'type-fest';
 import { isArray, trim } from 'radash';
 
 import { ConsoleFormat, InteractsWithConsole } from './console';
+import { Metadata } from './metadata';
 import { Symbols } from './utils';
 
 /**
@@ -138,7 +139,7 @@ export type CommandClass<T extends Command = Command> = Class<T> & {
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export function getCommandName(cls: Class<any>): string {
-	const options: { name?: string } | undefined = Reflect.getMetadata(Symbols.command, cls);
+	const options: { name?: string } | undefined = Metadata.get(Symbols.command, cls);
 	return options?.name ?? (cls as unknown as CommandClass).command;
 }
 
@@ -189,7 +190,7 @@ export abstract class Command extends InteractsWithConsole {
 	 */
 	public static register(options: { name?: string } = {}): ClassDecorator {
 		return function (target) {
-			Reflect.defineMetadata(Symbols.command, options, target);
+			Metadata.define(Symbols.command, options, target);
 		} as ClassDecorator;
 	}
 
@@ -201,10 +202,9 @@ export abstract class Command extends InteractsWithConsole {
 	 */
 	public static arg(props: Partial<CommandArgumentProps> = {}): PropertyDecorator {
 		return function (target, propertyKey) {
-			const args: CommandArgumentMetadata[] =
-				Reflect.getMetadata(Symbols.arg, target.constructor) ?? [];
+			const args: CommandArgumentMetadata[] = Metadata.get(Symbols.arg, target.constructor) ?? [];
 
-			const propertyType = Reflect.getMetadata('design:type', target, propertyKey);
+			const propertyType = Metadata.get('design:type', target, propertyKey);
 
 			// Infer argument type from property type if not explicitly specified
 			let inferredType = props.type;
@@ -258,7 +258,7 @@ export abstract class Command extends InteractsWithConsole {
 				propertyKey: propertyKey as string
 			});
 
-			Reflect.defineMetadata(Symbols.arg, args, target.constructor);
+			Metadata.define(Symbols.arg, args, target.constructor);
 		};
 	}
 
@@ -307,7 +307,7 @@ export abstract class Command extends InteractsWithConsole {
 	 * @returns The list of registered arguments.
 	 */
 	protected getArguments(): CommandArgumentMetadata[] {
-		return Reflect.getMetadata(Symbols.arg, this.constructor) || [];
+		return Metadata.get(Symbols.arg, this.constructor) || [];
 	}
 
 	/**

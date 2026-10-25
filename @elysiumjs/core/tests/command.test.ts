@@ -16,6 +16,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, jest, mock, spyO
 
 import { Command, CommandArgumentType, CommandSpinner, getCommandName } from '../src/command';
 import { Container } from '../src/container';
+import { Metadata } from '../src/metadata';
 import { Symbols } from '../src/utils';
 
 // Test Command.arg decorator
@@ -43,7 +44,7 @@ describe('@Command.arg decorator', () => {
 		new TestCommand();
 
 		// Get the metadata
-		const args = Reflect.getMetadata(Symbols.arg, TestCommand);
+		const args = Metadata.get(Symbols.arg, TestCommand);
 
 		// Check if metadata was set correctly
 		expect(args).toBeDefined();
@@ -92,7 +93,7 @@ describe('@Command.arg decorator', () => {
 		new TestCommand();
 
 		// Get the metadata
-		const args = Reflect.getMetadata(Symbols.arg, TestCommand);
+		const args = Metadata.get(Symbols.arg, TestCommand);
 
 		// Check if types were inferred correctly
 		expect(args).toBeArrayOfSize(6);
@@ -116,7 +117,7 @@ describe('@Command.arg decorator', () => {
 		}
 
 		// Get the metadata
-		const args = Reflect.getMetadata(Symbols.arg, TestCommand);
+		const args = Metadata.get(Symbols.arg, TestCommand);
 
 		// Check if property name was used as argument name
 		expect(args).toBeArrayOfSize(1);
@@ -141,7 +142,7 @@ describe('@Command.arg decorator', () => {
 		await command.init();
 
 		// Get the metadata
-		const args = Reflect.getMetadata(Symbols.arg, TestCommand);
+		const args = Metadata.get(Symbols.arg, TestCommand);
 
 		// Check if default value was set correctly
 		expect(args).toBeArrayOfSize(1);
@@ -969,7 +970,7 @@ describe('@Command.register decorator', () => {
 		}
 
 		expect(Container.globalNames()).toEqual(before);
-		expect(Reflect.getMetadata(Symbols.command, MetaCommand)).toEqual({ name: 'meta:cmd' });
+		expect(Metadata.get(Symbols.command, MetaCommand)).toEqual({ name: 'meta:cmd' });
 	});
 
 	it('should resolve the command name from the decorator, then from the static command', () => {

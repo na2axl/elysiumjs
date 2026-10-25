@@ -23,6 +23,7 @@ import { needsDefaultAlias, runAll } from './connections';
 import { Container } from './container';
 import { ServiceNotFoundError } from './errors';
 import { Event } from './event';
+import { Metadata } from './metadata';
 import { Module } from './module';
 import { ModuleContext } from './module-context';
 import { Service } from './service';
@@ -374,7 +375,7 @@ export namespace Wamp {
 					(...args: any[]) =>
 						ModuleContext.run(node, () => handler.apply(controller, args));
 
-				const metadata = Reflect.getMetadata(Symbols.wamp, target) ?? {};
+				const metadata = Metadata.get(Symbols.wamp, target) ?? {};
 
 				const w = Wamp.getConnection(options.connection ?? 'default');
 
@@ -410,7 +411,7 @@ export namespace Wamp {
 				return app;
 			}
 
-			Reflect.defineMetadata(Symbols.elysiaPlugin, handleWamp, target);
+			Metadata.define(Symbols.elysiaPlugin, handleWamp, target);
 		};
 	};
 
@@ -422,7 +423,7 @@ export namespace Wamp {
 	 */
 	export const register = (topic: string, options?: WampRegistrationOptions): MethodDecorator => {
 		return function (target, _propertyKey, descriptor) {
-			const metadata = Reflect.getMetadata(Symbols.wamp, target.constructor) ?? {};
+			const metadata = Metadata.get(Symbols.wamp, target.constructor) ?? {};
 
 			metadata.registrations ??= [];
 			metadata.registrations.push({
@@ -431,7 +432,7 @@ export namespace Wamp {
 				handler: descriptor.value as WampRegistrationHandler
 			});
 
-			Reflect.defineMetadata(Symbols.wamp, metadata, target.constructor);
+			Metadata.define(Symbols.wamp, metadata, target.constructor);
 		};
 	};
 
@@ -443,7 +444,7 @@ export namespace Wamp {
 	 */
 	export const subscribe = (topic: string, options?: WampSubscriptionOptions): MethodDecorator => {
 		return function (target, _propertyKey, descriptor) {
-			const metadata = Reflect.getMetadata(Symbols.wamp, target.constructor) ?? {};
+			const metadata = Metadata.get(Symbols.wamp, target.constructor) ?? {};
 
 			metadata.subscriptions ??= [];
 			metadata.subscriptions.push({
@@ -452,7 +453,7 @@ export namespace Wamp {
 				handler: descriptor.value as WampRegistrationHandler
 			});
 
-			Reflect.defineMetadata(Symbols.wamp, metadata, target.constructor);
+			Metadata.define(Symbols.wamp, metadata, target.constructor);
 		};
 	};
 }

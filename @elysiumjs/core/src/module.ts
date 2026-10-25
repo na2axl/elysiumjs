@@ -19,6 +19,7 @@ import type { Route } from './http';
 import type { ServiceDefinition } from './service';
 
 import { InvalidModuleError, MissingModuleConfigError } from './errors';
+import { Metadata } from './metadata';
 import { deepMerge, Symbols } from './utils';
 
 /**
@@ -85,7 +86,7 @@ export function isConfiguredModule(value: unknown): value is ConfiguredModule<un
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export function getModuleProps(cls: ModuleClass): ModuleProps {
-	const props = Reflect.getMetadata(Symbols.module, cls);
+	const props = Metadata.get(Symbols.module, cls);
 	if (props === undefined) {
 		throw new InvalidModuleError(cls.name);
 	}
@@ -103,7 +104,7 @@ export abstract class Module {
 	 */
 	public static register<TConfig = any>(props: ModuleProps<TConfig> = {}) {
 		return function (target: ModuleClass) {
-			Reflect.defineMetadata(Symbols.module, props, target);
+			Metadata.define(Symbols.module, props, target);
 		};
 	}
 
@@ -152,7 +153,7 @@ export abstract class Module {
 
 			/** The resolved configuration, set by the kernel. */
 			public get config(): TConfig {
-				return Reflect.getMetadata(Symbols.moduleConfig, this);
+				return Metadata.get(Symbols.moduleConfig, this);
 			}
 		}
 

@@ -29,6 +29,7 @@ import * as Env from '../src/env';
 import { Event } from '../src/event';
 import { Http } from '../src/http';
 import { Kernel } from '../src/kernel';
+import { Metadata } from '../src/metadata';
 import { Middleware } from '../src/middleware';
 import { Module } from '../src/module';
 import { ModuleContext } from '../src/module-context';
@@ -51,7 +52,7 @@ describe('@Application.register decorator', () => {
 		})
 		class TestApp extends Application {}
 
-		const metadata = Reflect.getMetadata(Symbols.app, TestApp);
+		const metadata = Metadata.get(Symbols.app, TestApp);
 		expect(metadata).toBeDefined();
 		expect(metadata.debug).toBe(true);
 		expect(metadata.modules).toBeArrayOfSize(0);
@@ -77,9 +78,9 @@ describe('@Application.register merging', () => {
 		@Application.register()
 		class Bare extends Application {}
 
-		expect(Reflect.getMetadata(Symbols.app, WithOpenapi).openapi).toEqual({ path: '/docs' });
-		expect(Reflect.getMetadata(Symbols.app, WithTrue).openapi).toBe(true);
-		const bare = Reflect.getMetadata(Symbols.app, Bare);
+		expect(Metadata.get(Symbols.app, WithOpenapi).openapi).toEqual({ path: '/docs' });
+		expect(Metadata.get(Symbols.app, WithTrue).openapi).toBe(true);
+		const bare = Metadata.get(Symbols.app, Bare);
 		expect(bare.openapi).toBe(false);
 		expect(bare.modules).toEqual([]);
 	});
@@ -91,11 +92,11 @@ describe('@Application.register merging', () => {
 		@Application.register({ debug: true, server: { port: 2 }, openapi: { path: '/d' } })
 		class Child extends Parent {}
 
-		const meta = Reflect.getMetadata(Symbols.app, Child);
+		const meta = Metadata.get(Symbols.app, Child);
 		expect(meta.debug).toBe(true);
 		expect(meta.server).toEqual({ name: 'parent', port: 2 });
 		expect(meta.openapi).toEqual({ path: '/d' });
-		expect(Reflect.getMetadata(Symbols.app, Parent).debug).toBe(false);
+		expect(Metadata.get(Symbols.app, Parent).debug).toBe(false);
 	});
 
 	it('should concatenate modules, parent first, leaving configs intact', () => {
@@ -109,7 +110,7 @@ describe('@Application.register merging', () => {
 		@Application.register({ modules: [b, C] })
 		class Child extends Parent {}
 
-		const modules = Reflect.getMetadata(Symbols.app, Child).modules;
+		const modules = Metadata.get(Symbols.app, Child).modules;
 		expect(modules).toEqual([a, b, C]);
 		expect(modules[0]).toBe(a);
 		expect(modules[1].config).toEqual({ b: 20 });
@@ -127,8 +128,8 @@ describe('@Application.register merging', () => {
 
 		class Plain extends Parent {}
 
-		expect(Reflect.getMetadata(Symbols.app, Child).modules).toHaveLength(1);
-		expect(Reflect.getMetadata(Symbols.app, Plain).modules).toHaveLength(1);
+		expect(Metadata.get(Symbols.app, Child).modules).toHaveLength(1);
+		expect(Metadata.get(Symbols.app, Plain).modules).toHaveLength(1);
 	});
 });
 
@@ -459,7 +460,7 @@ describe('Application class', () => {
 			}
 
 			expect(Container.globalNames()).toEqual(before);
-			expect(Reflect.getMetadata(Symbols.command, Registered)).toEqual({});
+			expect(Metadata.get(Symbols.command, Registered)).toEqual({});
 		});
 
 		it('should run a module command that sees a module-private service', async () => {
@@ -1286,7 +1287,7 @@ describe('Application class', () => {
 			@Application.register({ server: { port: 0 } })
 			class TestApp extends Application {}
 
-			Reflect.defineMetadata(Symbols.middlewares, mockMiddlewares, TestApp);
+			Metadata.define(Symbols.middlewares, mockMiddlewares, TestApp);
 
 			const instance = new TestApp();
 			await serve(instance);

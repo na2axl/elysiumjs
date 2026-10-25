@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Service } from '@elysiumjs/core';
+import { Metadata, Service } from '@elysiumjs/core';
 import { afterAll, afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
 import { Job, JobOverlapBehavior, JobStatus, WithId } from '../src/job';
@@ -36,7 +36,7 @@ describe('Job class', () => {
 				protected async execute(): Promise<void> {}
 			}
 
-			const metadata = Reflect.getMetadata(Symbols.job, DefaultJob);
+			const metadata = Metadata.get(Symbols.job, DefaultJob);
 			expect(metadata).toBeDefined();
 			expect(metadata.name).toBe('elysium.heracles.job.DefaultJob');
 			expect(metadata.queue).toBe('default');
@@ -62,7 +62,7 @@ describe('Job class', () => {
 				protected async execute(): Promise<void> {}
 			}
 
-			const metadata = Reflect.getMetadata(Symbols.job, CustomJob);
+			const metadata = Metadata.get(Symbols.job, CustomJob);
 			expect(metadata.name).toBe('elysium.heracles.job.custom-job');
 			expect(metadata.queue).toBe('high-priority');
 			expect(metadata.priority).toBe(1);

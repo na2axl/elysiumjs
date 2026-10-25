@@ -21,6 +21,7 @@ import type { ModuleNode } from './module-graph';
 import { Elysia } from 'elysia';
 
 import { Event } from './event';
+import { Metadata } from './metadata';
 import { ModuleContext } from './module-context';
 import { Service } from './service';
 import { nextTick, Symbols } from './utils';
@@ -75,7 +76,7 @@ export namespace Websocket {
 
 				const controller = ModuleContext.run(node, () => Service.make(target));
 
-				const metadata = Reflect.getMetadata(Symbols.websocket, target) ?? {};
+				const metadata = Metadata.get(Symbols.websocket, target) ?? {};
 				const inModule =
 					(handler?: (...args: any[]) => any) =>
 					(...args: any[]) =>
@@ -106,7 +107,7 @@ export namespace Websocket {
 				return app;
 			}
 
-			Reflect.defineMetadata(Symbols.elysiaPlugin, handleWebsocket, target);
+			Metadata.define(Symbols.elysiaPlugin, handleWebsocket, target);
 		};
 	};
 
@@ -120,9 +121,9 @@ export namespace Websocket {
 	 */
 	export const onOpen = (): MethodDecorator => {
 		return function (target, _, descriptor) {
-			const metadata = Reflect.getMetadata(Symbols.websocket, target.constructor) ?? {};
+			const metadata = Metadata.get(Symbols.websocket, target.constructor) ?? {};
 			metadata.open = descriptor.value;
-			Reflect.defineMetadata(Symbols.websocket, metadata, target.constructor);
+			Metadata.define(Symbols.websocket, metadata, target.constructor);
 		};
 	};
 
@@ -136,9 +137,9 @@ export namespace Websocket {
 	 */
 	export const onClose = (): MethodDecorator => {
 		return function (target, _, descriptor) {
-			const metadata = Reflect.getMetadata(Symbols.websocket, target.constructor) ?? {};
+			const metadata = Metadata.get(Symbols.websocket, target.constructor) ?? {};
 			metadata.close = descriptor.value;
-			Reflect.defineMetadata(Symbols.websocket, metadata, target.constructor);
+			Metadata.define(Symbols.websocket, metadata, target.constructor);
 		};
 	};
 
@@ -154,10 +155,10 @@ export namespace Websocket {
 	 */
 	export const onMessage = (schema?: TSchema): MethodDecorator => {
 		return function (target, _, descriptor) {
-			const metadata = Reflect.getMetadata(Symbols.websocket, target.constructor) ?? {};
+			const metadata = Metadata.get(Symbols.websocket, target.constructor) ?? {};
 			metadata.message = descriptor.value;
 			metadata.body = schema;
-			Reflect.defineMetadata(Symbols.websocket, metadata, target.constructor);
+			Metadata.define(Symbols.websocket, metadata, target.constructor);
 		};
 	};
 
@@ -171,9 +172,9 @@ export namespace Websocket {
 	 */
 	export const onDrain = (): MethodDecorator => {
 		return function (target, _, descriptor) {
-			const metadata = Reflect.getMetadata(Symbols.websocket, target.constructor) ?? {};
+			const metadata = Metadata.get(Symbols.websocket, target.constructor) ?? {};
 			metadata.drain = descriptor.value;
-			Reflect.defineMetadata(Symbols.websocket, metadata, target.constructor);
+			Metadata.define(Symbols.websocket, metadata, target.constructor);
 		};
 	};
 
@@ -187,9 +188,9 @@ export namespace Websocket {
 	 */
 	export const onError = (): MethodDecorator => {
 		return function (target, _, descriptor) {
-			const metadata = Reflect.getMetadata(Symbols.websocket, target.constructor) ?? {};
+			const metadata = Metadata.get(Symbols.websocket, target.constructor) ?? {};
 			metadata.error = descriptor.value;
-			Reflect.defineMetadata(Symbols.websocket, metadata, target.constructor);
+			Metadata.define(Symbols.websocket, metadata, target.constructor);
 		};
 	};
 }

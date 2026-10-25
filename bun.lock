@@ -60,7 +60,6 @@
         "@elysiajs/openapi": "^1.4.16",
         "elysia": "^1.4.30",
         "radash": "catalog:",
-        "reflect-metadata": "catalog:",
         "wampy": "^8.0.2",
       },
     },
@@ -81,9 +80,8 @@
       "name": "@elysiumjs/heracles",
       "version": "0.6.1",
       "dependencies": {
-        "commander": "^15",
+        "commander": "^15.0.0",
         "radash": "catalog:",
-        "reflect-metadata": "catalog:",
       },
       "devDependencies": {
         "@elysiumjs/core": "workspace:*",
@@ -114,7 +112,6 @@
         "cacheable": "^2.5.0",
         "keyv": "^5.6.0",
         "radash": "catalog:",
-        "reflect-metadata": "catalog:",
       },
       "devDependencies": {
         "@elysiumjs/core": "workspace:*",
@@ -207,7 +204,6 @@
   ],
   "catalog": {
     "radash": "^12.1.1",
-    "reflect-metadata": "^0.2.2",
   },
   "packages": {
     "@babel/code-frame": ["@babel/code-frame@7.29.7", "", { "dependencies": { "@babel/helper-validator-identifier": "^7.29.7", "js-tokens": "^4.0.0", "picocolors": "^1.1.1" } }, "sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw=="],
@@ -789,8 +785,6 @@
     "radash": ["radash@12.1.1", "", {}, "sha512-h36JMxKRqrAxVD8201FrCpyeNuUY9Y5zZwujr20fFO77tpUtGa6EZzfKw/3WaiBX95fq7+MpsuMLNdSnORAwSA=="],
 
     "real-require": ["real-require@1.0.0", "", {}, "sha512-P4nbQYQfePJxRSmY+v/KINxVucm4NF3p3s7pJveMTtom52FR4YGltUQLB8idDXwDDWW+eYrWDFbuzUnjoWHF7g=="],
-
-    "reflect-metadata": ["reflect-metadata@0.2.2", "", {}, "sha512-urBwgfrvVP/eAyXx4hluJivBKzuEbSQs9rKWCrCkbSxNv8mxPcUZKeuoF3Uy4mJl3Lwprp6yy5/39VWigZ4K6Q=="],
 
     "require-directory": ["require-directory@2.1.1", "", {}, "sha512-fGxEI7+wsG9xrvdjsrlmL22OMTTiHRwAMroiEeMgq8gzoLC/PQr7RsRDSTLUg/bZAZtF+TVIkHc6/4RIKrui+Q=="],
 

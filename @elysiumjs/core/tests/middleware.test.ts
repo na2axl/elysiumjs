@@ -18,6 +18,7 @@ import { afterAll, beforeEach, describe, expect, it, jest, mock, spyOn } from 'b
 import { Elysia } from 'elysia';
 
 import { Application } from '../src/app';
+import { Metadata } from '../src/metadata';
 import * as M from '../src/middleware';
 import { ModuleContext } from '../src/module-context';
 import { Service } from '../src/service';
@@ -68,7 +69,7 @@ describe('Middleware', () => {
 			class TestController {}
 
 			// Check if metadata was set correctly
-			const middlewares = Reflect.getMetadata(Symbols.middlewares, TestController);
+			const middlewares = Metadata.get(Symbols.middlewares, TestController);
 			expect(middlewares).toBeDefined();
 			expect(middlewares).toBeArrayOfSize(2);
 			expect(middlewares).toContain(TestMiddleware1);
@@ -83,7 +84,7 @@ describe('Middleware', () => {
 			}
 
 			// Check if metadata was set correctly
-			const middlewares = Reflect.getMetadata(
+			const middlewares = Metadata.get(
 				Symbols.middlewares,
 				TestController.prototype,
 				'testMethod'
@@ -97,13 +98,13 @@ describe('Middleware', () => {
 		it('should append middlewares to existing ones on a class', () => {
 			// Create a test class with existing middlewares
 			class TestController {}
-			Reflect.defineMetadata(Symbols.middlewares, [TestMiddleware1], TestController);
+			Metadata.define(Symbols.middlewares, [TestMiddleware1], TestController);
 
 			// Apply the decorator
 			M.Middleware.register(TestMiddleware2)(TestController);
 
 			// Check if metadata was updated correctly
-			const middlewares = Reflect.getMetadata(Symbols.middlewares, TestController);
+			const middlewares = Metadata.get(Symbols.middlewares, TestController);
 			expect(middlewares).toBeDefined();
 			expect(middlewares).toBeArrayOfSize(2);
 			expect(middlewares).toContain(TestMiddleware1);
@@ -115,7 +116,7 @@ describe('Middleware', () => {
 			class TestController {
 				testMethod() {}
 			}
-			Reflect.defineMetadata(
+			Metadata.define(
 				Symbols.middlewares,
 				[TestMiddleware1],
 				TestController.prototype,
@@ -131,7 +132,7 @@ describe('Middleware', () => {
 			});
 
 			// Check if metadata was updated correctly
-			const middlewares = Reflect.getMetadata(
+			const middlewares = Metadata.get(
 				Symbols.middlewares,
 				TestController.prototype,
 				'testMethod'
@@ -164,7 +165,7 @@ describe('Middleware', () => {
 			expect(middleware).toBeInstanceOf(TestGuardedMiddleware);
 
 			// Verify the metadata was set correctly
-			const metadataGuards = Reflect.getMetadata(Symbols.middlewareGuards, middleware.constructor);
+			const metadataGuards = Metadata.get(Symbols.middlewareGuards, middleware.constructor);
 			expect(metadataGuards).toEqual(guards);
 		});
 
@@ -179,7 +180,7 @@ describe('Middleware', () => {
 			expect(middleware.guards).toEqual([]);
 
 			// Verify that metadata for middleware guards doesn't exist
-			const metadataGuards = Reflect.getMetadata(Symbols.middlewareGuards, middleware.constructor);
+			const metadataGuards = Metadata.get(Symbols.middlewareGuards, middleware.constructor);
 			expect(metadataGuards).toBeUndefined();
 		});
 

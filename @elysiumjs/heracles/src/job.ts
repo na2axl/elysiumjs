@@ -12,11 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import 'reflect-metadata';
-
 import type { Class } from 'type-fest';
 
-import { InteractsWithConsole } from '@elysiumjs/core';
+import { InteractsWithConsole, Metadata } from '@elysiumjs/core';
 import { assign, uid } from 'radash';
 
 import { Symbols } from './utils';
@@ -198,7 +196,7 @@ export abstract class Job extends InteractsWithConsole {
 				retryDelay: options.retryDelay
 			};
 
-			Reflect.defineMetadata(Symbols.job, metadata, target);
+			Metadata.define(Symbols.job, metadata, target);
 		};
 	}
 

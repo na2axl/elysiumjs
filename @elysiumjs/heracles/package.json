@@ -34,8 +34,7 @@
   "license": "Apache-2.0",
   "dependencies": {
     "commander": "^15.0.0",
-    "radash": "catalog:",
-    "reflect-metadata": "catalog:"
+    "radash": "catalog:"
   },
   "devDependencies": {
     "@elysiumjs/core": "workspace:*"

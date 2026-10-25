@@ -19,6 +19,7 @@ import type { ModuleNode } from './module-graph';
 import { Container } from './container';
 import { EventListenerNotSupportedError } from './errors';
 import { EventBus, getEventListeners } from './event';
+import { Metadata } from './metadata';
 import { ModuleContext } from './module-context';
 import { Symbols } from './utils';
 
@@ -32,7 +33,7 @@ export type WiredListener = {
 };
 
 const serviceName = (cls: Class<any>): string =>
-	Reflect.getMetadata(Symbols.serviceOptions, cls)?.name ?? cls.name;
+	Metadata.get(Symbols.serviceOptions, cls)?.name ?? cls.name;
 
 const handlerFor = (
 	node: ModuleNode,
