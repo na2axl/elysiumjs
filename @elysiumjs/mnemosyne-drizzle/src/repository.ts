@@ -16,10 +16,16 @@ import type { IdType, ModelClass } from '@elysiumjs/mnemosyne';
 import type { PgTableWithColumns } from 'drizzle-orm/pg-core';
 import type { DrizzleConnection } from './database';
 
-import { AbstractRepository } from '@elysiumjs/mnemosyne';
+import {
+	AbstractRepository,
+	getCurrentTenant,
+	getTenancyConfig,
+	getTenancyStrategy
+} from '@elysiumjs/mnemosyne';
 import { eq } from 'drizzle-orm';
 
 import { Database } from './database';
+import { DrizzleRLSTenancy } from './tenancy';
 
 // ============================================================================
 // DrizzleRepository Mixin
@@ -46,25 +52,51 @@ export const DrizzleRepository = <
 	type TUpdate = TModel['$inferUpdate'];
 
 	class R extends AbstractRepository<TModel, DrizzleConnection>(model, Database) {
+		/**
+		 * Runs a database operation on the repository connection.
+		 *
+		 * In RLS tenancy mode, an operation that runs outside a transaction is wrapped in one
+		 * scoped to the current tenant (through the tenancy strategy's `withIsolation`), so RLS
+		 * policies apply to it. Inside an open transaction, the operation joins it: transactions
+		 * opened by `Database.transaction` and `@transactional` handlers are already scoped to
+		 * the current tenant.
+		 * @param operation The operation to run with the connection to use.
+		 * @returns The return value of the operation.
+		 */
+		public async withConnection<T>(operation: (db: DrizzleConnection) => Promise<T>): Promise<T> {
+			const name = (this.constructor as typeof R).connection;
+			if (getTenancyConfig().mode !== 'rls' || Database.inTransaction(name)) {
+				return operation(this.db);
+			}
+
+			const strategy = getTenancyStrategy() ?? new DrizzleRLSTenancy();
+			return strategy.withIsolation(
+				Database.getBaseConnection(name),
+				getCurrentTenant() ?? 'public',
+				() => operation(this.db)
+			);
+		}
+
 		public async all(): Promise<TSelect[]> {
-			return await this.db.select().from(model.table);
+			return this.withConnection((db) => db.select().from(model.table));
 		}
 
 		public async paginate(
 			count: number,
 			page: number = 1
 		): Promise<{ page: number; data: TSelect[]; total: number }> {
-			const total = await this.db.$count(model.table);
 			const offset = Math.max(page - 1, 0) * count;
-			return {
+			return this.withConnection(async (db) => ({
 				page,
-				total,
-				data: await this.db.select().from(model.table).offset(offset).limit(count)
-			};
+				total: await db.$count(model.table),
+				data: await db.select().from(model.table).offset(offset).limit(count)
+			}));
 		}
 
 		public async find(id: IdType): Promise<TSelect | null> {
-			const [row] = await this.db.select().from(model.table).where(eq(model.table.id, id));
+			const [row] = await this.withConnection((db) =>
+				db.select().from(model.table).where(eq(model.table.id, id))
+			);
 			return (row ?? null) as TSelect | null;
 		}
 
@@ -72,39 +104,45 @@ export const DrizzleRepository = <
 			column: TKey,
 			value: TSelect[TKey]
 		): Promise<TSelect | null> {
-			const [row] = await this.db.select().from(model.table).where(eq(model.table[column], value));
+			const [row] = await this.withConnection((db) =>
+				db.select().from(model.table).where(eq(model.table[column], value))
+			);
 			return (row ?? null) as TSelect | null;
 		}
 
 		public async insert(data: TInsert): Promise<TSelect> {
-			const [row] = await this.db.insert(model.table).values(data).returning();
+			const [row] = await this.withConnection((db) =>
+				db.insert(model.table).values(data).returning()
+			);
 			return row as TSelect;
 		}
 
 		public async update(id: IdType, data: TUpdate): Promise<TSelect> {
-			const [row] = await this.db
-				.update(model.table)
-				.set(data)
-				.where(eq(model.table.id, id))
-				.returning();
+			const [row] = await this.withConnection((db) =>
+				db.update(model.table).set(data).where(eq(model.table.id, id)).returning()
+			);
 			return row as TSelect;
 		}
 
 		public async updateAll(data: TUpdate): Promise<TSelect[]> {
-			return await this.db.update(model.table).set(data).returning();
+			return this.withConnection((db) => db.update(model.table).set(data).returning());
 		}
 
 		public async delete(id: IdType): Promise<TSelect> {
-			const [row] = await this.db.delete(model.table).where(eq(model.table.id, id)).returning();
+			const [row] = await this.withConnection((db) =>
+				db.delete(model.table).where(eq(model.table.id, id)).returning()
+			);
 			return row as TSelect;
 		}
 
 		public async deleteAll(): Promise<TSelect[]> {
-			return await this.db.delete(model.table).returning();
+			return this.withConnection((db) => db.delete(model.table).returning());
 		}
 
 		public async exists(id: IdType): Promise<boolean> {
-			const count = await this.db.$count(model.table, eq(model.table.id, id));
+			const count = await this.withConnection((db) =>
+				db.$count(model.table, eq(model.table.id, id))
+			);
 			return count > 0;
 		}
 	}

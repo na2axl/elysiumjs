@@ -18,8 +18,13 @@ import type { BunSQLDatabase } from 'drizzle-orm/bun-sql/postgres';
 import type { CacheConfig } from 'drizzle-orm/cache/core/types';
 
 import { Service, ServiceNotReadyError } from '@elysiumjs/core';
-import { AbstractDatabase, createDatabaseCacheStorage } from '@elysiumjs/mnemosyne';
-import { getTableName, is, Table } from 'drizzle-orm';
+import {
+	AbstractDatabase,
+	createDatabaseCacheStorage,
+	getCurrentTenant,
+	getTenancyConfig
+} from '@elysiumjs/mnemosyne';
+import { getTableName, is, sql, Table } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { Cache as DrizzleCache } from 'drizzle-orm/cache/core';
 
@@ -47,6 +52,32 @@ export type DrizzleConnectionProps<
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export type DrizzleConnection = BunSQLDatabase<Record<string, never>> & { $client: Bun.SQL };
+
+// ============================================================================
+// Transaction Tenant
+// ============================================================================
+
+/**
+ * The tenant set on each open transaction by {@link setTransactionTenant}.
+ * @internal
+ */
+export const transactionTenants = new WeakMap<object, string>();
+
+/**
+ * Sets the RLS tenant variable on a transaction, for the rest of that transaction only.
+ * @internal
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param tx The transaction.
+ * @param tenant The tenant identifier.
+ */
+export const setTransactionTenant = async (
+	tx: DrizzleConnection,
+	tenant: string
+): Promise<void> => {
+	const varName = getTenancyConfig().rls?.sessionVariable ?? 'app.current_tenant';
+	await tx.execute(sql`SELECT set_config(${varName}, ${tenant}, true)`);
+	transactionTenants.set(tx, tenant);
+};
 
 // ============================================================================
 // DrizzleDatabaseCache
@@ -189,7 +220,17 @@ class DrizzleDatabase extends AbstractDatabase<DrizzleConnection, DrizzleConnect
 		},
 
 		withTransaction(connection, callback) {
-			return (connection as any).transaction((tx: any) => callback(tx));
+			return connection.transaction(async (tx) => {
+				// In RLS mode, every transaction opened through the database (`Database.transaction`,
+				// `@transactional` handlers) is scoped to the current tenant.
+				if (getTenancyConfig().mode === 'rls') {
+					await setTransactionTenant(
+						tx as unknown as DrizzleConnection,
+						getCurrentTenant() ?? 'public'
+					);
+				}
+				return callback(tx as unknown as DrizzleConnection);
+			});
 		},
 
 		getRawClient(connection) {

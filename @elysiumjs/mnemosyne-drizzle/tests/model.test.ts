@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { Application } from '@elysiumjs/core';
 import { afterAll, afterEach, beforeAll, describe, expect, it, jest, mock, spyOn } from 'bun:test';
 import * as d from 'drizzle-orm/pg-core';
 import { t } from 'elysia';
-
-import { Application } from '@elysiumjs/core';
 
 import { createSchemaFromDrizzle, drizzleAdapter, DrizzleModel } from '../src/model';
 import { pgTable } from '../src/table';
@@ -44,6 +43,12 @@ const mockGetStore = mock(() => mockStore);
 // ============================================================================
 // Mock Application context
 // ============================================================================
+
+const originalContext = Object.getOwnPropertyDescriptor(Application, 'context')!;
+
+afterAll(() => {
+	Object.defineProperty(Application, 'context', originalContext);
+});
 
 beforeAll(() => {
 	Object.defineProperty(Application, 'context', {
@@ -82,24 +87,24 @@ describe('DrizzleModel', () => {
 
 				expect(columns).toBeArrayOfSize(5);
 
-				const idCol = columns.find(c => c.name === 'id');
+				const idCol = columns.find((c) => c.name === 'id');
 				expect(idCol).toBeDefined();
 				expect(idCol!.dataType).toBe('uuid');
 				expect(idCol!.isPrimaryKey).toBe(true);
 				expect(idCol!.hasDefault).toBe(true);
 				expect(idCol!.nullable).toBe(false);
 
-				const nameCol = columns.find(c => c.name === 'name');
+				const nameCol = columns.find((c) => c.name === 'name');
 				expect(nameCol).toBeDefined();
 				expect(nameCol!.dataType).toBe('string');
 				expect(nameCol!.nullable).toBe(false);
 				expect(nameCol!.hasDefault).toBe(false);
 
-				const ageCol = columns.find(c => c.name === 'age');
+				const ageCol = columns.find((c) => c.name === 'age');
 				expect(ageCol).toBeDefined();
 				expect(ageCol!.dataType).toBe('number');
 
-				const confirmedCol = columns.find(c => c.name === 'is_confirmed');
+				const confirmedCol = columns.find((c) => c.name === 'is_confirmed');
 				expect(confirmedCol).toBeDefined();
 				expect(confirmedCol!.dataType).toBe('boolean');
 				expect(confirmedCol!.hasDefault).toBe(true);

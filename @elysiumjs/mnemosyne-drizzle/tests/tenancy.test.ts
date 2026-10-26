@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { afterAll, afterEach, beforeAll, describe, expect, it, jest, mock, spyOn } from 'bun:test';
-import * as d from 'drizzle-orm/pg-core';
-
 import { Application, Service } from '@elysiumjs/core';
+import { afterAll, afterEach, describe, expect, it, jest, mock, spyOn } from 'bun:test';
+import * as d from 'drizzle-orm/pg-core';
 
 import { Database } from '../src/database';
 import { DrizzleModel } from '../src/model';
@@ -36,17 +35,6 @@ import {
 mock.module('drizzle-orm/bun-sql', () => ({
 	drizzle: mock(() => ({ mockDrizzleInstance: true }))
 }));
-
-beforeAll(() => {
-	const mockContext = {
-		getStore: mock(() => new Map()),
-		run: mock((_: any, callback: any) => callback())
-	};
-	Object.defineProperty(Application, 'context', {
-		get: () => mockContext,
-		configurable: true
-	});
-});
 
 // ============================================================================
 // Tests
