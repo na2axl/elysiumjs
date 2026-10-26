@@ -30,20 +30,6 @@ import { ModuleContext } from './module-context';
 import { Service } from './service';
 import { nextTick, Symbols } from './utils';
 
-// FIXME: Temporary solution for Bun to properly fill the protocol field. Remove this once oven-sh/bun#18744 is fixed.
-class WampWebsocket extends WebSocket {
-	public constructor(
-		url: string,
-		private readonly protocols?: string | string[]
-	) {
-		super(url, protocols);
-	}
-
-	public get protocol(): string {
-		return this.protocols?.[0] ?? 'wamp.2.json';
-	}
-}
-
 /**
  * Options used to register a WAMP RPC for invocation.
  * @author Axel Nana <axel.nana@workbud.com>
@@ -309,7 +295,7 @@ export namespace Wamp {
 	 */
 	export const createClient = (name: string, config: WampClientProps): WampClient => {
 		const client = new Wampy(config.url, {
-			ws: WampWebsocket,
+			ws: WebSocket,
 			...omit(config, ['url', 'onOpen']),
 			onError(error) {
 				config.onError?.(error);
