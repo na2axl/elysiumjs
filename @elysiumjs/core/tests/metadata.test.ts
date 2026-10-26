@@ -44,6 +44,23 @@ describe('Metadata', () => {
 			expect(Metadata.get('key', A)).toBe(2);
 		});
 
+		it('should report a key set to undefined as present', () => {
+			class A {}
+			Metadata.define('key', undefined, A);
+
+			expect(Metadata.has('key', A)).toBe(true);
+			expect(Metadata.get('key', A)).toBeUndefined();
+		});
+
+		it('should share values between copies of the module', async () => {
+			const { Metadata: Copy } = await import('../src/metadata.ts?copy');
+			class A {}
+			Metadata.define('key', 'shared', A);
+
+			expect(Copy).not.toBe(Metadata);
+			expect(Copy.get('key', A)).toBe('shared');
+		});
+
 		it('should accept symbol keys', () => {
 			const key = Symbol('key');
 			class A {}
@@ -109,6 +126,57 @@ describe('Metadata', () => {
 			} finally {
 				delete reflect.getMetadata;
 				delete reflect.getOwnMetadata;
+			}
+		});
+
+		it("should read a subclass's foreign value before its parent's own value", () => {
+			class Parent {}
+			class Child extends Parent {}
+			Metadata.define('design:paramtypes', ['parent'], Parent);
+			const reflect = Reflect as unknown as Record<string, unknown>;
+			reflect.getOwnMetadata = (key: string, target: object) =>
+				key === 'design:paramtypes' && target === Child ? ['child'] : undefined;
+
+			try {
+				expect(Metadata.get('design:paramtypes', Child)).toEqual(['child']);
+				expect(Metadata.get('design:paramtypes', Parent)).toEqual(['parent']);
+			} finally {
+				delete reflect.getOwnMetadata;
+			}
+		});
+
+		it('should also give design types to reflect-metadata when it loads later', () => {
+			const defined: unknown[][] = [];
+			const reflect = Reflect as unknown as Record<string, unknown>;
+			reflect.defineMetadata = (...args: unknown[]) => defined.push(args);
+
+			try {
+				class Dependency {}
+
+				@noop
+				class A {
+					constructor(_dependency: Dependency) {}
+				}
+
+				expect(defined).toContainEqual(['design:paramtypes', [Dependency], A, undefined]);
+				expect(Metadata.get('design:paramtypes', A)).toEqual([Dependency]);
+			} finally {
+				delete reflect.defineMetadata;
+			}
+		});
+
+		it('should use reflect-metadata presence checks when it has them', () => {
+			class A {}
+			const reflect = Reflect as unknown as Record<string, unknown>;
+			reflect.getOwnMetadata = () => undefined;
+			reflect.hasOwnMetadata = (key: string, target: object) => key === 'key' && target === A;
+
+			try {
+				expect(Metadata.has('key', A)).toBe(true);
+				expect(Metadata.has('other', A)).toBe(false);
+			} finally {
+				delete reflect.getOwnMetadata;
+				delete reflect.hasOwnMetadata;
 			}
 		});
 
