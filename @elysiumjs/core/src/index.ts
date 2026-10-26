@@ -25,7 +25,7 @@ export {
 export { ConsoleFormat, InteractsWithConsole } from './console';
 export { Env } from './env';
 export { type EventData, type EventHandler, Event } from './event';
-export { type LoggerInterface, ConsoleLogger } from './logger';
+export { type LoggerInterface, ConsoleLogger, getLogger, LOGGER_SERVICE } from './logger';
 export {
 	type Context,
 	type Route,

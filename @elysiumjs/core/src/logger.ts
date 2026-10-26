@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { Service } from './service';
+
 /**
  * Interface for structured application logging.
  *
@@ -72,3 +74,28 @@ export class ConsoleLogger implements LoggerInterface {
 		return new ConsoleLogger({ ...this.context, ...ctx });
 	}
 }
+
+/**
+ * The name of the global service holding the application logger.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export const LOGGER_SERVICE = 'logger';
+
+/**
+ * Resolves the application logger at call time: the `logger` service when one is registered
+ * (e.g. by `@elysiumjs/hermes`), a {@link ConsoleLogger} otherwise or when it cannot be built.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param context Optional context bound to the returned logger, as a child logger.
+ * @returns The application logger, or a child of it when `context` is given.
+ */
+export const getLogger = (context?: Record<string, unknown>): LoggerInterface => {
+	let logger: LoggerInterface | null = null;
+	try {
+		logger = Service.get<LoggerInterface>(LOGGER_SERVICE);
+	} catch {
+		// Logging must not fail because the logger service is not ready or failed to build.
+	}
+
+	const base = logger ?? new ConsoleLogger();
+	return context ? base.child(context) : base;
+};

@@ -19,6 +19,7 @@ import type { LoggerInterface } from './logger';
 import type { ModuleNode } from './module-graph';
 
 import { Application } from './app';
+import { getLogger } from './logger';
 import { Metadata } from './metadata';
 import { ModuleContext } from './module-context';
 import { Service } from './service';
@@ -150,13 +151,12 @@ export abstract class Middleware<TGuards extends string[] = []> {
 	}
 
 	/**
-	 * Structured application logger resolved from the service container.
-	 * Returns a child logger with the middleware class name in context.
+	 * Structured application logger resolved from the service container, falling back to a
+	 * `ConsoleLogger`. Returns a child logger with the middleware class name in context.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 */
 	protected get logger(): LoggerInterface {
-		const base = Service.get<LoggerInterface>('logger')!;
-		return base.child({ middleware: this.constructor.name });
+		return getLogger({ middleware: this.constructor.name });
 	}
 
 	/**

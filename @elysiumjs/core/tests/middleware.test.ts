@@ -13,11 +13,13 @@
 // limitations under the License.
 
 import type { Context, Route } from '../src/http';
+import type { LoggerInterface } from '../src/logger';
 
-import { afterAll, beforeEach, describe, expect, it, jest, mock, spyOn } from 'bun:test';
+import { afterAll, afterEach, beforeEach, describe, expect, it, jest, mock, spyOn } from 'bun:test';
 import { Elysia } from 'elysia';
 
 import { Application } from '../src/app';
+import { ConsoleLogger, LOGGER_SERVICE } from '../src/logger';
 import { Metadata } from '../src/metadata';
 import * as M from '../src/middleware';
 import { ModuleContext } from '../src/module-context';
@@ -369,6 +371,43 @@ describe('Middleware', () => {
 			expect(middleware.onBeforeHandle(mockContext)).toBe('before');
 			expect(middleware.onAfterHandle(mockContext)).toBe('after');
 			expect(middleware.onAfterResponse(mockContext)).toBe('response');
+		});
+	});
+
+	describe('Middleware.logger', () => {
+		class LoggingMiddleware extends M.Middleware {
+			public get log(): LoggerInterface {
+				return this.logger;
+			}
+		}
+
+		afterEach(() => {
+			if (Service.exists(LOGGER_SERVICE)) Service.remove(LOGGER_SERVICE);
+		});
+
+		it('falls back to a ConsoleLogger without a logger service', () => {
+			const consoleInfo = spyOn(console, 'info').mockImplementation(() => {});
+			try {
+				const logger = new LoggingMiddleware().log;
+				expect(logger).toBeInstanceOf(ConsoleLogger);
+
+				logger.info('hello');
+				expect(consoleInfo).toHaveBeenCalledWith('[INFO] hello', {
+					middleware: 'LoggingMiddleware'
+				});
+			} finally {
+				consoleInfo.mockRestore();
+			}
+		});
+
+		it('uses a child of the logger service with the middleware name', () => {
+			const base = new ConsoleLogger();
+			const child = new ConsoleLogger();
+			const childSpy = spyOn(base, 'child').mockReturnValue(child);
+			Service.instance(LOGGER_SERVICE, base);
+
+			expect(new LoggingMiddleware().log).toBe(child);
+			expect(childSpy).toHaveBeenCalledWith({ middleware: 'LoggingMiddleware' });
 		});
 	});
 });
