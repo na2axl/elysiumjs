@@ -101,7 +101,7 @@ export const applyMiddlewares = (
 			// A transform hook stops the request only on a status response; any other value would be
 			// merged into the context and the request would go on.
 			if (result instanceof ElysiaCustomStatusResponse) return result;
-			return c.status(result instanceof Response ? result.status : 200, result);
+			return c.status(result instanceof Response ? result.status : (c.set.status ?? 200), result);
 		});
 	} else {
 		plugin.onRequest((c) => {

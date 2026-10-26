@@ -68,6 +68,10 @@ class HealthController {
 /** Refuses requests with a plain Response, as an auth or maintenance middleware would. */
 class ResponseGuardMiddleware extends Middleware {
 	public onRequest(ctx: Context) {
+		if (ctx.request.headers.get('x-plain')) {
+			ctx.set.status = 403;
+			return 'blocked';
+		}
 		if (!ctx.request.headers.get('authorization')) {
 			return new Response('denied', { status: 401, headers: { 'x-guard': 'yes' } });
 		}
@@ -160,5 +164,9 @@ describe('Websocket controller middlewares', () => {
 
 		const allowed = await post({ authorization: 'Bearer abc' });
 		expect(await allowed.text()).toBe('secret');
+
+		const blocked = await post({ 'x-plain': 'yes' });
+		expect(blocked.status).toBe(403);
+		expect(await blocked.text()).toBe('blocked');
 	});
 });
