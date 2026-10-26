@@ -83,19 +83,21 @@ export const LOGGER_SERVICE = 'logger';
 
 /**
  * Resolves the application logger at call time: the `logger` service when one is registered
- * (e.g. by `@elysiumjs/hermes`), a {@link ConsoleLogger} otherwise or when it cannot be built.
+ * (e.g. by `@elysiumjs/hermes`), a {@link ConsoleLogger} otherwise or when it cannot be built
+ * or fails to create the child logger. Only the global scope is searched, so a module's own
+ * `logger` service never replaces the application logger.
  * @author Axel Nana <axel.nana@workbud.com>
  * @param context Optional context bound to the returned logger, as a child logger.
  * @returns The application logger, or a child of it when `context` is given.
  */
 export const getLogger = (context?: Record<string, unknown>): LoggerInterface => {
-	let logger: LoggerInterface | null = null;
 	try {
-		logger = Container.getGlobal(LOGGER_SERVICE) as LoggerInterface | null;
+		const logger = Container.getGlobal(LOGGER_SERVICE) as LoggerInterface | null;
+		const base = logger ?? new ConsoleLogger();
+		return context ? base.child(context) : base;
 	} catch {
-		// Logging must not fail because the logger service is not ready or failed to build.
+		// Logging must not fail because the logger service is not ready, failed to build, or
+		// failed to create a child logger.
+		return new ConsoleLogger(context);
 	}
-
-	const base = logger ?? new ConsoleLogger();
-	return context ? base.child(context) : base;
 };

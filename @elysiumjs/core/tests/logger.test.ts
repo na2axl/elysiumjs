@@ -67,6 +67,25 @@ describe('getLogger', () => {
 		}
 	});
 
+	it('falls back to a ConsoleLogger child when the logger service fails to make a child', () => {
+		const logger = fakeLogger();
+		logger.child.mockImplementation(() => {
+			throw new Error('broken child');
+		});
+		Service.instance(LOGGER_SERVICE, logger);
+
+		const consoleInfo = spyOn(console, 'info').mockImplementation(() => {});
+		try {
+			const child = getLogger({ component: 'test' });
+			expect(child).toBeInstanceOf(ConsoleLogger);
+
+			child.info('hello');
+			expect(consoleInfo).toHaveBeenCalledWith('[INFO] hello', { component: 'test' });
+		} finally {
+			consoleInfo.mockRestore();
+		}
+	});
+
 	it('uses the logger service name', () => {
 		expect(LOGGER_SERVICE).toBe('logger');
 	});
