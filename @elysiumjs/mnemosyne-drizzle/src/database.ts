@@ -124,6 +124,24 @@ export const assertTransactionTenant = (tx: DrizzleConnection, tenant: string): 
  */
 class DrizzleDatabase extends AbstractDatabase<DrizzleConnection, DrizzleConnectionProps> {
 	/**
+	 * Retrieves the connection with the given name, or the transaction open on it.
+	 *
+	 * In RLS mode, an open transaction bound to a tenant is only returned to work for that tenant,
+	 * the current one (or `public`).
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param name The connection name.
+	 * @returns The connection, or its open transaction.
+	 * @throws {TenantMismatchError} If the open transaction is bound to another tenant.
+	 */
+	public override getConnection(name: string = 'default'): DrizzleConnection {
+		const connection = super.getConnection(name);
+		if (transactionTenants.has(connection) && getTenancyConfig().mode === 'rls') {
+			assertTransactionTenant(connection, getCurrentTenant() ?? 'public');
+		}
+		return connection;
+	}
+
+	/**
 	 * Runs a callback in a transaction, joining the one open on the connection if any.
 	 *
 	 * In RLS mode, a new transaction is bound to the current tenant (or `public`), and an open one
