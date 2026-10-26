@@ -27,12 +27,17 @@ import {
 
 const URL = 'postgres://u:p@localhost:5432/db';
 
-const stubClient = () => ({
-	options: {},
-	connect: mock(async () => {}),
-	begin: mock(async (_callback: unknown) => {}),
-	close: mock(async () => {})
-});
+const stubClient = () =>
+	Object.assign(
+		// Answers the schema check of `migration:run`.
+		mock(async () => [{ schema_exists: true }]),
+		{
+			options: {},
+			connect: mock(async () => {}),
+			begin: mock(async (_callback: unknown) => {}),
+			close: mock(async () => {})
+		}
+	);
 
 describe('DrizzleModule', () => {
 	let app: Awaited<ReturnType<typeof Application.testing>> | undefined;
