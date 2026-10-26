@@ -286,7 +286,7 @@ describe('Middleware', () => {
 	describe('applyMiddlewares', () => {
 		const hooks = ['onRequest', 'onTransform', 'onBeforeHandle', 'onAfterHandle', 'onAfterResponse'];
 
-		it('should build the middlewares in the module context and register every hook', () => {
+		it('should build the middlewares in the module context and register the scoped hooks', () => {
 			const plugin = Object.fromEntries(hooks.map((h) => [h, mock()])) as unknown as Elysia;
 			const node = testNode();
 			const seen: unknown[] = [];
@@ -300,7 +300,45 @@ describe('Middleware', () => {
 			expect(makeSpy).toHaveBeenCalledWith(TestMiddleware1);
 			expect(makeSpy).toHaveBeenCalledWith(TestMiddleware2);
 			expect(seen).toEqual([node, node]);
-			for (const hook of hooks) expect((plugin as any)[hook]).toHaveBeenCalled();
+			for (const hook of hooks.filter((h) => h !== 'onRequest')) {
+				expect((plugin as any)[hook]).toHaveBeenCalled();
+			}
+			// Elysia would run an onRequest hook on every request of the app.
+			expect((plugin as any).onRequest).not.toHaveBeenCalled();
+		});
+
+		it('should run the onRequest chain before the onTransform chain of a module', async () => {
+			const callbacks: Record<string, (ctx: Context) => Promise<any>> = {};
+			const plugin = Object.fromEntries(
+				hooks.map((h) => [h, mock((cb) => void (callbacks[h] = cb))])
+			) as unknown as Elysia;
+			const calls: string[] = [];
+
+			class OrderMiddleware extends M.Middleware {
+				public onRequest() {
+					calls.push('onRequest');
+				}
+				public onTransform() {
+					calls.push('onTransform');
+				}
+			}
+
+			class RejectMiddleware extends M.Middleware {
+				public onRequest() {
+					return 'rejected';
+				}
+				public onTransform() {
+					calls.push('rejected onTransform');
+				}
+			}
+
+			M.applyMiddlewares([OrderMiddleware], plugin as never, testNode());
+			await callbacks.onTransform(mockContext);
+			expect(calls).toEqual(['onRequest', 'onTransform']);
+
+			M.applyMiddlewares([RejectMiddleware], plugin as never, testNode());
+			expect(await callbacks.onTransform(mockContext)).toBe('rejected');
+			expect(calls).toEqual(['onRequest', 'onTransform']);
 		});
 
 		it('should build middlewares without a module context for application middlewares', () => {

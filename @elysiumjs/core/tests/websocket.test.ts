@@ -16,7 +16,9 @@ import type { Elysia } from 'elysia';
 import type { Context } from '../src/http';
 
 import { afterEach, describe, expect, it } from 'bun:test';
+import { Elysia as ElysiaApp } from 'elysia';
 
+import { Http } from '../src/http';
 import { Metadata } from '../src/metadata';
 import { Middleware } from '../src/middleware';
 import { Symbols } from '../src/utils';
@@ -36,6 +38,30 @@ class ChatController {
 	@Websocket.onMessage()
 	public message(ws: any, message: string) {
 		ws.send(`echo:${message}`);
+	}
+}
+
+/** Rejects every request that has no `token` query parameter, before anything else runs. */
+class EarlyTokenMiddleware extends Middleware {
+	public onRequest(ctx: Context) {
+		if (!new URL(ctx.request.url).searchParams.get('token')) return ctx.status(401, 'Unauthorized');
+	}
+}
+
+@Websocket.controller({ path: '/feed' })
+@Middleware.register(EarlyTokenMiddleware)
+class FeedController {
+	@Websocket.onMessage()
+	public message(ws: any, message: string) {
+		ws.send(`feed:${message}`);
+	}
+}
+
+@Http.controller({ path: '/health' })
+class HealthController {
+	@Http.get({ path: '/' })
+	public get() {
+		return 'ok';
 	}
 }
 
@@ -59,7 +85,20 @@ const exchange = (url: string) =>
 			socket.close();
 		};
 		socket.onerror = () => reject(new Error('connection refused'));
+		setTimeout(() => reject(new Error('no echo received')), 1000);
 	});
+
+/** Mounts the feed and health controllers in one module plugin, like the application does. */
+const serveModule = async () => {
+	const node = testNode();
+	const module = new ElysiaApp({ name: node.id });
+	for (const controller of [FeedController, HealthController]) {
+		module.use(await Metadata.get(Symbols.elysiaPlugin, controller)(node));
+	}
+	const app = new ElysiaApp().use(module).listen(0) as unknown as Elysia;
+	servers.push(app);
+	return app.server!.port;
+};
 
 afterEach(async () => {
 	await Promise.all(servers.splice(0).map((server) => server.stop(true)));
@@ -74,5 +113,16 @@ describe('Websocket controller middlewares', () => {
 	it('opens the connection when the controller middlewares pass', async () => {
 		const url = await serve();
 		expect(await exchange(`${url}?token=abc`)).toBe('echo:hi');
+	});
+
+	it('scopes the onRequest middlewares of a websocket controller to its own route', async () => {
+		const port = await serveModule();
+
+		await expect(exchange(`ws://localhost:${port}/feed`)).rejects.toThrow('connection refused');
+		expect(await exchange(`ws://localhost:${port}/feed?token=abc`)).toBe('feed:hi');
+
+		const response = await fetch(`http://localhost:${port}/health`);
+		expect(response.status).toBe(200);
+		expect(await response.text()).toBe('ok');
 	});
 });

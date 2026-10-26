@@ -88,13 +88,25 @@ export const applyMiddlewares = (
 ) => {
 	const mi = makeMiddlewares(middlewares, node);
 
-	plugin.onRequest((c) => {
-		return executeMiddlewareChain(mi, c, 'onRequest', node);
-	});
+	if (node) {
+		// Elysia runs every onRequest hook on every request of the app, whatever plugin registered it.
+		// The onRequest middlewares of a module or a controller run first in its transform hook instead,
+		// which is scoped to its routes.
+		plugin.onTransform(async (c) => {
+			return (
+				(await executeMiddlewareChain(mi, c, 'onRequest', node)) ??
+				executeMiddlewareChain(mi, c, 'onTransform', node)
+			);
+		});
+	} else {
+		plugin.onRequest((c) => {
+			return executeMiddlewareChain(mi, c, 'onRequest', node);
+		});
 
-	plugin.onTransform((c) => {
-		return executeMiddlewareChain(mi, c, 'onTransform', node);
-	});
+		plugin.onTransform((c) => {
+			return executeMiddlewareChain(mi, c, 'onTransform', node);
+		});
+	}
 
 	plugin.onBeforeHandle((c) => {
 		return executeMiddlewareChain(mi, c, 'onBeforeHandle', node);
@@ -168,7 +180,9 @@ export abstract class Middleware<TGuards extends string[] = []> {
 
 	/**
 	 * Called first before everything else. This middleware hook works only when used on
-	 * a controller, a module, or the application.
+	 * a controller, a module, or the application. On the application it runs for every request,
+	 * before routing. On a module or a controller it runs only for its routes, after the body is
+	 * parsed and right before `onTransform`.
 	 * @param _ctx The request context.
 	 */
 	public onRequest(_ctx: Context): any {}
