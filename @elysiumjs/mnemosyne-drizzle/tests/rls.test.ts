@@ -14,11 +14,11 @@
 
 import { Application, Service } from '@elysiumjs/core';
 import { TENANCY_CONFIG_SERVICE, TENANCY_STRATEGY_SERVICE, withTenant } from '@elysiumjs/mnemosyne';
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import * as d from 'drizzle-orm/pg-core';
 
 import * as pkg from '../src';
-import { Database } from '../src/database';
+import { Database, TenantMismatchError } from '../src/database';
 import { DrizzleModel } from '../src/model';
 import { DrizzleRepository } from '../src/repository';
 import { pgTable } from '../src/table';
@@ -90,27 +90,7 @@ describe('RLS isolation', () => {
 			expect([...store.entries()]).toEqual([['tenant', 'outer']]);
 		});
 
-		it('switches the tenant of an open transaction for the callback only', async () => {
-			const strategy = new DrizzleRLSTenancy();
-
-			await withTenant('outer', () =>
-				Database.transaction(() =>
-					strategy.withIsolation(fake.connection, 'inner', async () => {
-						expect(Application.context.getStore()?.get('tenant')).toBe('inner');
-					})
-				)
-			);
-
-			expect(fake.log.map(({ query, params }) => [query, params[1]])).toEqual([
-				['BEGIN', undefined],
-				[SET_TENANT, 'outer'],
-				[SET_TENANT, 'inner'],
-				[SET_TENANT, 'outer'],
-				['COMMIT', undefined]
-			]);
-		});
-
-		it('does not set the tenant again on a transaction already scoped to it', async () => {
+		it('joins an open transaction bound to the same tenant without setting it again', async () => {
 			await withTenant('acme', () =>
 				Database.transaction(() =>
 					new DrizzleRLSTenancy().withIsolation(fake.connection, 'acme', async () => {})
@@ -120,73 +100,181 @@ describe('RLS isolation', () => {
 			expect(fake.log.filter(({ query }) => query === SET_TENANT)).toHaveLength(1);
 		});
 
-		/** Gets the tenant set on the transaction when each select ran. */
-		const tenantsOfSelects = () => {
+		it('rejects another tenant in an open transaction, without setting it', async () => {
+			const callback = mock(async () => {});
+
+			const run = withTenant('outer', () =>
+				Database.transaction(() =>
+					new DrizzleRLSTenancy().withIsolation(fake.connection, 'inner', callback)
+				)
+			);
+
+			expect(run).rejects.toThrow(TenantMismatchError);
+			await run.catch(() => {});
+			expect(callback).not.toHaveBeenCalled();
+			expect(fake.log.map(({ query, params }) => [query, params[1]])).toEqual([
+				['BEGIN', undefined],
+				[SET_TENANT, 'outer'],
+				['ROLLBACK', undefined]
+			]);
+		});
+	});
+
+	describe('transactions bound to one tenant', () => {
+		/** Gets the tenant set on the transaction when each statement other than set_config ran. */
+		const tenantsOfQueries = () => {
 			let tenant: unknown;
 			return fake.log.flatMap(({ query, params }) => {
 				if (query === SET_TENANT) tenant = params[1];
-				return query.startsWith('select')
-					? [[query.includes('where') ? 'find' : 'all', tenant]]
-					: [];
+				return /^select/i.test(query) && query !== SET_TENANT ? [[query, tenant]] : [];
 			});
 		};
+		const tenantsSet = () =>
+			fake.log.filter(({ query }) => query === SET_TENANT).map(({ params }) => params[1]);
 
-		it('runs concurrent switches of one transaction one after the other', async () => {
+		it('names both tenants in the mismatch error', () => {
+			const error = new pkg.TenantMismatchError('a', 'b');
+
+			expect(error).toBeInstanceOf(TenantMismatchError);
+			expect(error.transactionTenant).toBe('a');
+			expect(error.tenant).toBe('b');
+			expect(error.message).toContain('"a"');
+			expect(error.message).toContain('"b"');
+			expect(error.message).toContain('withRLS');
+		});
+
+		it('runs concurrent repository calls of the bound tenant in the transaction', async () => {
 			await withTenant('outer', () =>
 				Database.transaction(() =>
+					Promise.all([new UserRepository().all(), new UserRepository().find(row.id)])
+				)
+			);
+
+			expect(tenantsSet()).toEqual(['outer']);
+			expect(tenantsOfQueries().map(([, tenant]) => tenant)).toEqual(['outer', 'outer']);
+			expect(
+				fake.log.every(({ query, client }) => client === 'tx' || !query.startsWith('select'))
+			).toBe(true);
+		});
+
+		it('rejects concurrent withRLS calls for other tenants in a transaction', async () => {
+			const run = withTenant('outer', () =>
+				Database.transaction(() =>
 					Promise.all([
-						withRLS('a', async () => {
-							await Bun.sleep(5);
-							await new UserRepository().all();
-						}),
-						withRLS('b', async () => {
-							await Bun.sleep(1);
-							await new UserRepository().find(row.id);
-						})
+						withRLS('a', () => new UserRepository().all()),
+						withRLS('b', () => new UserRepository().find(row.id))
 					])
 				)
 			);
 
-			expect(tenantsOfSelects()).toEqual([
-				['all', 'a'],
-				['find', 'b']
-			]);
-			expect(fake.log.filter(({ query }) => query === SET_TENANT).at(-1)!.params[1]).toBe('outer');
+			expect(run).rejects.toThrow(TenantMismatchError);
+			await run.catch(() => {});
+			await Bun.sleep(5);
+			expect(tenantsSet()).toEqual(['outer']);
+			expect(tenantsOfQueries()).toEqual([]);
 		});
 
-		it('keeps repository calls of the transaction out of a concurrent switch', async () => {
-			await withTenant('outer', () =>
+		it('rejects repository calls for other tenants nested in withRLS', async () => {
+			const run = withRLS('admin', () =>
+				Promise.all([
+					withTenant('a', () => new UserRepository().all()),
+					withTenant('b', () => new UserRepository().all())
+				])
+			);
+
+			expect(run).rejects.toThrow(TenantMismatchError);
+			await run.catch(() => {});
+			await Bun.sleep(5);
+			expect(tenantsSet()).toEqual(['admin']);
+			expect(tenantsOfQueries()).toEqual([]);
+		});
+
+		it('rejects withRLS calls for other tenants nested in withRLS', async () => {
+			const run = withTenant('outer', () =>
+				Database.transaction(() =>
+					withRLS('admin', () =>
+						Promise.all([
+							withRLS('a', () => new UserRepository().all()),
+							withRLS('b', () => new UserRepository().all())
+						])
+					)
+				)
+			);
+
+			expect(run).rejects.toThrow(TenantMismatchError);
+			await run.catch(() => {});
+			await Bun.sleep(5);
+			expect(tenantsSet()).toEqual(['outer']);
+			expect(tenantsOfQueries()).toEqual([]);
+		});
+
+		it('runs raw queries of the transaction as its bound tenant', async () => {
+			const run = withTenant('outer', () =>
 				Database.transaction(() =>
 					Promise.all([
-						withRLS('a', async () => {
-							await Bun.sleep(5);
-							await new UserRepository().all();
-						}),
+						withRLS('a', () => new UserRepository().all()),
 						(async () => {
 							await Bun.sleep(1);
-							await new UserRepository().find(row.id);
+							await Database.getConnection().execute('select raw_outer_query');
 						})()
 					])
 				)
 			);
 
-			expect(tenantsOfSelects()).toEqual([
-				['all', 'a'],
-				['find', 'outer']
-			]);
+			expect(run).rejects.toThrow(TenantMismatchError);
+			await run.catch(() => {});
+			await Bun.sleep(5);
+			expect(tenantsSet()).toEqual(['outer']);
+			for (const [, tenant] of tenantsOfQueries()) expect(tenant).toBe('outer');
 		});
 
-		it('runs nested switches inside the one holding the transaction', async () => {
-			await withTenant('outer', () =>
-				Database.transaction(() =>
-					withRLS('a', () => withRLS('b', () => new UserRepository().all()))
+		it('rejects Database.transaction for another tenant in an open transaction', async () => {
+			const run = withTenant('outer', () =>
+				Database.transaction(() => withTenant('other', () => Database.transaction(async () => {})))
+			);
+
+			expect(run).rejects.toThrow(TenantMismatchError);
+			await run.catch(() => {});
+			expect(tenantsSet()).toEqual(['outer']);
+		});
+
+		it('rejects repository calls for another tenant in an open transaction', async () => {
+			const run = withTenant('outer', () =>
+				Database.transaction(() => withTenant('other', () => new UserRepository().all()))
+			);
+
+			expect(run).rejects.toThrow(TenantMismatchError);
+			await run.catch(() => {});
+			expect(tenantsOfQueries()).toEqual([]);
+		});
+
+		it('rejects joining a transaction bound to no tenant', async () => {
+			const run = withTenant('acme', () =>
+				fake.connection.transaction((tx) =>
+					Database.runInTransaction(fake.connection, tx as never, () => new UserRepository().all())
 				)
 			);
 
-			expect(tenantsOfSelects()).toEqual([['all', 'b']]);
+			expect(run).rejects.toThrow(TenantMismatchError);
+			await run.catch(() => {});
+			expect(tenantsOfQueries()).toEqual([]);
 		});
 
-		it('rethrows the error of the callback when the transaction is aborted', async () => {
+		it('rolls back with the error of the callback, without restoring a tenant', async () => {
+			const run = withRLS('a', async () => {
+				throw new Error('boom');
+			});
+
+			expect(run).rejects.toThrow('boom');
+			await run.catch(() => {});
+			expect(fake.log.map(({ query, params }) => [query, params[1]])).toEqual([
+				['BEGIN', undefined],
+				[SET_TENANT, 'a'],
+				['ROLLBACK', undefined]
+			]);
+		});
+
+		it('rethrows the error of a failed statement of the bound tenant', async () => {
 			let aborted = false;
 			fake = fakeConnection((query) => {
 				if (aborted) throw new Error('current transaction is aborted');
@@ -200,24 +288,11 @@ describe('RLS isolation', () => {
 			Service.instance('db.connection.default', fake.connection);
 
 			const run = withTenant('outer', () =>
-				Database.transaction(() => withRLS('a', () => new UserRepository().all()))
+				Database.transaction(() => withRLS('outer', () => new UserRepository().all()))
 			);
 
 			expect(run).rejects.toThrow('relation does not exist');
 			await run.catch(() => {});
-		});
-
-		it('restores the tenant when the callback throws and the transaction goes on', async () => {
-			await withTenant('outer', () =>
-				Database.transaction(async () => {
-					await withRLS('a', async () => {
-						throw new Error('not a database error');
-					}).catch(() => {});
-					await new UserRepository().all();
-				})
-			);
-
-			expect(tenantsOfSelects()).toEqual([['all', 'outer']]);
 		});
 	});
 
