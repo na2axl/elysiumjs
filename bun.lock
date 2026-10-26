@@ -19,7 +19,7 @@
     },
     "@elysiumjs/argus": {
       "name": "@elysiumjs/argus",
-      "version": "0.2.1",
+      "version": "0.2.2",
       "dependencies": {
         "@opentelemetry/api": "^1.10.0",
         "@opentelemetry/exporter-trace-otlp-http": "^0.300.0",
@@ -42,7 +42,7 @@
     },
     "@elysiumjs/cerberus": {
       "name": "@elysiumjs/cerberus",
-      "version": "0.3.1",
+      "version": "0.3.2",
       "dependencies": {
         "@casl/ability": "^7.0.2",
       },
@@ -55,7 +55,7 @@
     },
     "@elysiumjs/core": {
       "name": "@elysiumjs/core",
-      "version": "0.9.0",
+      "version": "0.10.0",
       "dependencies": {
         "@elysiajs/openapi": "^1.4.16",
         "elysia": "^1.4.30",
@@ -65,7 +65,7 @@
     },
     "@elysiumjs/hephaestus": {
       "name": "@elysiumjs/hephaestus",
-      "version": "0.3.1",
+      "version": "0.3.2",
       "dependencies": {
         "zod": "^4.6.7",
       },
@@ -78,7 +78,7 @@
     },
     "@elysiumjs/heracles": {
       "name": "@elysiumjs/heracles",
-      "version": "0.7.1",
+      "version": "0.7.2",
       "dependencies": {
         "commander": "^15.0.0",
         "radash": "catalog:",
@@ -92,7 +92,7 @@
     },
     "@elysiumjs/hermes": {
       "name": "@elysiumjs/hermes",
-      "version": "0.4.1",
+      "version": "0.4.2",
       "dependencies": {
         "pino": "^10.4.0",
         "pino-pretty": "^13.2.0",
@@ -106,7 +106,7 @@
     },
     "@elysiumjs/mnemosyne": {
       "name": "@elysiumjs/mnemosyne",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "dependencies": {
         "cache-manager": "^7.2.9",
         "cacheable": "^2.5.0",
@@ -122,7 +122,7 @@
     },
     "@elysiumjs/mnemosyne-drizzle": {
       "name": "@elysiumjs/mnemosyne-drizzle",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "dependencies": {
         "drizzle-orm": "^1.0.0-rc.5",
         "prompts": "^2.4.2",
@@ -140,7 +140,7 @@
     },
     "@elysiumjs/plugin-sentry": {
       "name": "@elysiumjs/plugin-sentry",
-      "version": "0.2.1",
+      "version": "0.2.2",
       "dependencies": {
         "@elysiajs/opentelemetry": "^1.4.11",
         "@sentry/bun": "^11.9.0",
@@ -154,7 +154,7 @@
     },
     "@elysiumjs/styx": {
       "name": "@elysiumjs/styx",
-      "version": "0.8.1",
+      "version": "0.8.2",
       "bin": {
         "styx": "dist/styx.js",
       },
@@ -174,7 +174,7 @@
     },
     "create-elysium": {
       "name": "create-elysium",
-      "version": "0.2.1",
+      "version": "0.2.2",
       "bin": {
         "create-elysium": "./index.js",
       },

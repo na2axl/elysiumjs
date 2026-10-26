@@ -1,6 +1,6 @@
 {
 	"name": "@elysiumjs/mnemosyne",
-	"version": "0.3.0",
+	"version": "0.3.1",
 	"license": "Apache-2.0",
 	"description": "Database and caching for Elysium.js applications",
 	"private": false,
