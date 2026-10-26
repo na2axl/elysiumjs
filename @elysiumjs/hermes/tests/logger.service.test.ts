@@ -107,11 +107,16 @@ describe('HermesLogger', () => {
 			const baseLogger = new HermesLogger({ level: 'debug' });
 			Service.instance(HermesLogger.name, baseLogger as any);
 
-			const childSpy = spyOn(baseLogger, 'child');
-			const logger = HermesLogger.make('from-service');
+			try {
+				const childSpy = spyOn(baseLogger, 'child');
+				const logger = HermesLogger.make('from-service');
 
-			expect(childSpy).toHaveBeenCalledWith({ name: 'from-service' });
-			expect(logger).toBeInstanceOf(HermesLogger);
+				expect(childSpy).toHaveBeenCalledWith({ name: 'from-service' });
+				expect(logger).toBeInstanceOf(HermesLogger);
+			} finally {
+				// Global services outlive the test file; later files expect none.
+				Service.remove(HermesLogger.name);
+			}
 		});
 	});
 });
