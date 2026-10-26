@@ -66,9 +66,9 @@ const toArray = <T>(value: T | T[] | undefined): T[] =>
 /**
  * Drizzle query cache backed by the framework's cache storage.
  *
- * - Results are cached per connection and tenant: every key starts with the connection name,
- *   result keys include the current tenant (or `public`), and tags are invalidated for the
- *   current tenant. Each connection has its own transaction scope.
+ * - Results are cached per connection and tenant: every key starts with the configured prefix
+ *   (if any) and the connection name, result keys include the current tenant (or `public`), and
+ *   tags are invalidated for the current tenant. Each connection has its own transaction scope.
  * - Invalidation works across application instances sharing the cache store: each table has a
  *   version token in the store, every result records the versions it was read at, and a mutation
  *   replaces the versions of the tables it touches. Table versions are shared by all tenants, as
@@ -94,7 +94,7 @@ export class DrizzleDatabaseCache extends DrizzleCache {
 	#cache?: Omit<CacheInterface, 'tags'>;
 	#cacheStrategy: 'explicit' | 'all';
 	#globalTtl: number;
-	#connectionName: string;
+	#keyPrefix: string;
 
 	/** The transaction open on this cache's connection in the current async context, if any. */
 	#transactionScope = new AsyncLocalStorage<TransactionScope>();
@@ -111,18 +111,20 @@ export class DrizzleDatabaseCache extends DrizzleCache {
 	 * @param globalTtl The default time to live of cached results, in seconds.
 	 * @param storageEngine The cache storage to use.
 	 * @param connectionName The name of the connection, which prefixes every key.
+	 * @param prefix A prefix for every key, before the connection name (empty for none).
 	 */
 	constructor(
 		cacheStrategy: 'explicit' | 'all' = 'explicit',
 		globalTtl: number = DEFAULT_CACHE_TTL,
 		storageEngine: 'redis' | 'memory' = 'redis',
-		connectionName: string = 'default'
+		connectionName: string = 'default',
+		prefix: string = ''
 	) {
 		super();
 		this.#cacheStrategy = cacheStrategy;
 		this.#globalTtl = globalTtl;
 		this.#storageEngine = storageEngine;
-		this.#connectionName = connectionName;
+		this.#keyPrefix = prefix ? `${prefix}:${connectionName}` : connectionName;
 	}
 
 	/**
@@ -303,11 +305,11 @@ export class DrizzleDatabaseCache extends DrizzleCache {
 	/** Gets the key of a query result (or tag) for the connection and the current tenant. */
 	#entryKey(key: string, isTag: boolean): string {
 		const kind = isTag ? 'tag' : 'query';
-		return `${this.#connectionName}:${kind}:${getCurrentTenant() ?? 'public'}:${key}`;
+		return `${this.#keyPrefix}:${kind}:${getCurrentTenant() ?? 'public'}:${key}`;
 	}
 
 	/** Gets the key of the version of a table of the connection. */
 	#versionKey(table: string): string {
-		return `${this.#connectionName}:version:${table}`;
+		return `${this.#keyPrefix}:version:${table}`;
 	}
 }

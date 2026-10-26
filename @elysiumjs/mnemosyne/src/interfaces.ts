@@ -240,6 +240,14 @@ export interface DatabaseCacheConfig {
 	 * The storage engine to use for the cache.
 	 */
 	storage?: 'redis' | 'memory';
+
+	/**
+	 * A prefix for every cache key, before the connection name. Set it when several applications
+	 * or environments share one cache store, so that connections with the same name but different
+	 * databases do not share results.
+	 * @default ''
+	 */
+	prefix?: string;
 }
 
 // ============================================================================

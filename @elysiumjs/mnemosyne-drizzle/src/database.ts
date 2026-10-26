@@ -172,7 +172,8 @@ class DrizzleDatabase extends AbstractDatabase<DrizzleConnection, DrizzleConnect
 									config.cache.strategy,
 									config.cache.ttl,
 									config.cache.storage,
-									name
+									name,
+									config.cache.prefix
 								)
 							: undefined;
 			const connection = drizzle({ ...config, cache }) as DrizzleConnection;
