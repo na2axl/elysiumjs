@@ -43,7 +43,9 @@ export class HermesLogger implements LoggerInterface {
 	private createPinoInstance(): PinoLogger {
 		const options: pino.LoggerOptions = {
 			level: this.config.level,
-			name: this.config.name
+			name: this.config.name,
+			// Elysium logs errors under `error`; pino only serialises `err` by default.
+			serializers: { error: pino.stdSerializers.err }
 		};
 
 		if (this.config.format === 'pretty') {

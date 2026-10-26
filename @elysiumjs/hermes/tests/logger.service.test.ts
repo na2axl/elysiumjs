@@ -14,6 +14,7 @@
 
 import { Service } from '@elysiumjs/core';
 import { beforeEach, describe, expect, it, spyOn } from 'bun:test';
+import pino from 'pino';
 
 import { HermesLogger } from '../src/services/logger.service';
 
@@ -76,6 +77,48 @@ describe('HermesLogger', () => {
 
 		it('should accept undefined context', () => {
 			expect(() => logger.info('no context', undefined)).not.toThrow();
+		});
+	});
+
+	describe('error serialisation', () => {
+		/** Captures the lines written by the logger's underlying pino instance. */
+		const capture = (logger: HermesLogger): Record<string, any>[] => {
+			const lines: Record<string, any>[] = [];
+			(logger as any).pino[pino.symbols.streamSym] = {
+				write: (line: string) => lines.push(JSON.parse(line))
+			};
+			return lines;
+		};
+
+		it('serialises an Error in the `error` field with its message and stack', () => {
+			const logger = new HermesLogger({ level: 'info' });
+			const lines = capture(logger);
+
+			logger.error('failed', { error: new Error('boom'), target: 'x' });
+
+			expect(lines[0].msg).toBe('failed');
+			expect(lines[0].target).toBe('x');
+			expect(lines[0].error).toMatchObject({ type: 'Error', message: 'boom' });
+			expect(lines[0].error.stack).toContain('Error: boom');
+		});
+
+		it('serialises the `error` field on child loggers', () => {
+			const logger = new HermesLogger({ level: 'info' });
+			const lines = capture(logger);
+
+			logger.child({ component: 'test' }).warn('retrying', { error: new Error('boom') });
+
+			expect(lines[0].component).toBe('test');
+			expect(lines[0].error).toMatchObject({ type: 'Error', message: 'boom' });
+		});
+
+		it('keeps a non-Error `error` value as is', () => {
+			const logger = new HermesLogger({ level: 'info' });
+			const lines = capture(logger);
+
+			logger.error('failed', { error: 'plain' });
+
+			expect(lines[0].error).toBe('plain');
 		});
 	});
 
