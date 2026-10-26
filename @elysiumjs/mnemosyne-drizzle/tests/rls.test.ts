@@ -248,6 +248,39 @@ describe('RLS isolation', () => {
 			expect(tenantsOfQueries()).toEqual([]);
 		});
 
+		it('rejects getting the transaction connection for another tenant', async () => {
+			const run = withTenant('outer', () =>
+				Database.transaction(() =>
+					withTenant('b', () => Database.getConnection().execute('select raw_query'))
+				)
+			);
+
+			expect(run).rejects.toThrow(TenantMismatchError);
+			await run.catch(() => {});
+			expect(tenantsOfQueries()).toEqual([]);
+		});
+
+		it('gives the transaction connection to raw queries of its tenant', async () => {
+			await withTenant('outer', () =>
+				Database.transaction(async (tx) => {
+					expect(Database.getConnection()).toBe(tx);
+					await Database.getConnection().execute('select raw_query');
+				})
+			);
+
+			expect(tenantsOfQueries()).toEqual([['select raw_query', 'outer']]);
+		});
+
+		it('gives the transaction connection to any tenant outside RLS mode', async () => {
+			useTenancy({ mode: 'schema' });
+
+			await withTenant('outer', () =>
+				Database.transaction(async (tx) => {
+					expect(withTenant('b', () => Database.getConnection())).toBe(tx);
+				})
+			);
+		});
+
 		it('rejects joining a transaction bound to no tenant', async () => {
 			const run = withTenant('acme', () =>
 				fake.connection.transaction((tx) =>
