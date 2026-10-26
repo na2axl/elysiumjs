@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Module } from '@elysiumjs/core';
+import { LOGGER_SERVICE, Module } from '@elysiumjs/core';
 
 import { HermesLogger } from './services/logger.service';
 import { DEFAULT_CONFIG, type HermesConfig } from './types';
@@ -26,7 +26,7 @@ import { DEFAULT_CONFIG, type HermesConfig } from './types';
 	services: (config) => [
 		{ name: HermesLogger.name, global: true, factory: () => new HermesLogger(config) },
 		{
-			name: 'logger',
+			name: LOGGER_SERVICE,
 			global: true,
 			factory: (_config: unknown, get: <T>(name: string) => T) => get<HermesLogger>(HermesLogger.name)
 		}

@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { describe, expect, it, mock } from 'bun:test';
+import { ConsoleLogger, LOGGER_SERVICE, Service } from '@elysiumjs/core';
+import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
 import { Logged } from '../src/decorators/logged';
 
@@ -190,6 +191,47 @@ describe('@Logged decorator', () => {
 		expect(call[0]).toContain('Error');
 		expect(call[1].error).toBe('fail');
 		expect(call[1].duration).toMatch(/\d+ms/);
+	});
+
+	describe('without a logger property', () => {
+		afterEach(() => {
+			if (Service.exists(LOGGER_SERVICE)) Service.remove(LOGGER_SERVICE);
+		});
+
+		it('falls back to a ConsoleLogger without a logger service', async () => {
+			const consoleDebug = spyOn(console, 'debug').mockImplementation(() => {});
+			try {
+				class MyService {
+					@Logged({ includeArgs: true })
+					async doWork(data: string): Promise<string> {
+						return data;
+					}
+				}
+
+				await new MyService().doWork('x');
+				expect(consoleDebug).toHaveBeenCalledWith('[DEBUG] [MyService.doWork] Entry', {
+					args: ['x']
+				});
+			} finally {
+				consoleDebug.mockRestore();
+			}
+		});
+
+		it('resolves the logger service at call time', async () => {
+			class MyService {
+				@Logged({ includeArgs: true })
+				async doWork(data: string): Promise<string> {
+					return data;
+				}
+			}
+
+			const logger = new ConsoleLogger();
+			const debugSpy = spyOn(logger, 'debug').mockImplementation(() => {});
+			Service.instance(LOGGER_SERVICE, logger);
+
+			await new MyService().doWork('x');
+			expect(debugSpy).toHaveBeenCalledWith('[MyService.doWork] Entry', { args: ['x'] });
+		});
 	});
 
 	it('should handle non-Error throws', async () => {

@@ -15,7 +15,7 @@
 import type { LoggerInterface } from '@elysiumjs/core';
 import type { LogLevel } from '../types';
 
-import { ConsoleLogger } from '@elysiumjs/core';
+import { getLogger } from '@elysiumjs/core';
 
 export interface LoggedOptions {
 	level?: LogLevel;
@@ -42,7 +42,7 @@ export function Logged(options: LoggedOptions = {}): MethodDecorator {
 		const methodName = `${target.constructor.name}.${String(propertyKey)}`;
 
 		descriptor.value = async function (...args: any[]) {
-			const logger: LoggerInterface = (this as any).logger ?? getServiceLogger();
+			const logger: LoggerInterface = (this as any).logger ?? getLogger();
 
 			const startTime = Date.now();
 
@@ -74,13 +74,4 @@ export function Logged(options: LoggedOptions = {}): MethodDecorator {
 
 		return descriptor;
 	};
-}
-
-function getServiceLogger(): LoggerInterface {
-	try {
-		const { Service } = require('@elysiumjs/core');
-		return Service.get('logger') ?? new ConsoleLogger();
-	} catch {
-		return new ConsoleLogger();
-	}
 }
