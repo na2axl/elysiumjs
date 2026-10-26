@@ -1,5 +1,13 @@
 # @elysiumjs/argus
 
+## 0.2.3
+
+### Patch Changes
+
+- [`04773f2`](https://github.com/na2axl/elysiumjs/commit/04773f2acd4ab1c762a80ee903715d90f1c08e21) Thanks [@na2axl](https://github.com/na2axl)! - Ship the type declarations. The packages pointed `types` at `dist/index.d.ts` but their build never wrote it, so TypeScript projects got no types for them.
+- Updated dependencies [[`04773f2`](https://github.com/na2axl/elysiumjs/commit/04773f2acd4ab1c762a80ee903715d90f1c08e21)]:
+  - @elysiumjs/hermes@0.4.3
+
 ## 0.2.2
 
 ### Patch Changes
