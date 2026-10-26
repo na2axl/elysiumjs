@@ -18,7 +18,9 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, mock, spyOn } fr
 
 import { Container } from '../src/container';
 import { InvalidModuleConfigError, ServiceNotFoundError } from '../src/errors';
+import { ConsoleLogger, LOGGER_SERVICE } from '../src/logger';
 import { Redis, RedisModule } from '../src/redis';
+import { Service } from '../src/service';
 import { createTestingApp } from '../src/testing';
 
 const createClient = () => ({ close: mock() });
@@ -177,15 +179,20 @@ describe('RedisModule', () => {
 		clients[0].close.mockImplementation(() => {
 			throw new Error('boom');
 		});
-		const consoleError = spyOn(console, 'error').mockImplementation(() => {});
-		await app.shutdown();
-		app = undefined;
-		// The kernel logs module destroy failures instead of throwing.
-		expect(consoleError).toHaveBeenCalledWith(
-			expect.stringContaining('RedisModule'),
-			expect.objectContaining({ message: 'boom' })
-		);
-		consoleError.mockRestore();
+		const logger = new ConsoleLogger();
+		const errorSpy = spyOn(logger, 'error').mockImplementation(() => {});
+		Service.instance(LOGGER_SERVICE, logger);
+		try {
+			await app.shutdown();
+			app = undefined;
+			// The kernel logs module destroy failures instead of throwing.
+			expect(errorSpy).toHaveBeenCalledWith('Error while destroying', {
+				target: expect.stringContaining('RedisModule'),
+				error: expect.objectContaining({ message: 'boom' })
+			});
+		} finally {
+			if (Service.exists(LOGGER_SERVICE)) Service.remove(LOGGER_SERVICE);
+		}
 		expect(clients[1].close).toHaveBeenCalledTimes(1);
 	});
 });

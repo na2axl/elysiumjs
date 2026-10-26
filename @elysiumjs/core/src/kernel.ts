@@ -24,6 +24,7 @@ import { Container } from './container';
 import { ConflictingModuleConfigError, ElysiumError } from './errors';
 import { EventBus } from './event';
 import { wireEventListeners } from './event-wiring';
+import { getLogger } from './logger';
 import { Metadata } from './metadata';
 import { getModuleProps } from './module';
 import { ModuleContext } from './module-context';
@@ -266,7 +267,7 @@ export class Kernel {
 				const call = () => onDestroy.call(instance);
 				await (owner ? ModuleContext.run(owner, call) : call());
 			} catch (error) {
-				console.error(`Error while destroying ${label}:`, error);
+				getLogger().error('Error while destroying', { target: label, error });
 			}
 		}
 	}

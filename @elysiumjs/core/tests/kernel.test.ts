@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 
 import { Container } from '../src/container';
 import {
@@ -21,6 +21,7 @@ import {
 	MissingModuleConfigError
 } from '../src/errors';
 import { Kernel } from '../src/kernel';
+import { ConsoleLogger, LOGGER_SERVICE } from '../src/logger';
 import { Module } from '../src/module';
 import { ModuleContext } from '../src/module-context';
 import { buildModuleGraph } from '../src/module-graph';
@@ -474,16 +475,17 @@ describe('Kernel', () => {
 		await kernel.register();
 		await kernel.bootEager();
 
-		const original = console.error;
-		const logged: unknown[][] = [];
-		console.error = (...args: unknown[]) => void logged.push(args);
-		try {
-			await kernel.shutdown();
-		} finally {
-			console.error = original;
-		}
+		const logger = new ConsoleLogger();
+		const errorSpy = spyOn(logger, 'error').mockImplementation(() => {});
+		Service.instance(LOGGER_SERVICE, logger);
+
+		await kernel.shutdown();
+
 		expect(events).toEqual(['good']);
-		expect(logged.length).toBeGreaterThan(0);
+		expect(errorSpy).toHaveBeenCalledWith('Error while destroying', {
+			target: 'service Bad',
+			error: expect.objectContaining({ message: 'boom' })
+		});
 	});
 
 	it('after a failing service onInit during bootEager, shutdown destroys only what was constructed, in reverse', async () => {
