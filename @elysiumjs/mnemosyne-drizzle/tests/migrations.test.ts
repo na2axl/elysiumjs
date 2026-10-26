@@ -18,6 +18,10 @@ import { getMigrationName, planMigrations } from '../src/migrations';
 
 const dir = '/app/src/database/migrations';
 
+// Records applied after every migration in these tests was generated.
+const applied = (...names: string[]) =>
+	names.map((name) => ({ name, appliedAt: new Date('2027-01-01T00:00:00Z') }));
+
 describe('getMigrationName', () => {
 	it('should use the file name of a flat migration', () => {
 		expect(getMigrationName(`${dir}/0000_users.sql`)).toBe('0000_users.sql');
@@ -37,7 +41,7 @@ describe('planMigrations', () => {
 			`${dir}/20260101000000_users/migration.sql`
 		];
 
-		expect(planMigrations(files, [])).toEqual({
+		expect(planMigrations(files, applied())).toEqual({
 			pending: [
 				`${dir}/20260101000000_users/migration.sql`,
 				`${dir}/20260102000000_posts/migration.sql`
@@ -49,7 +53,7 @@ describe('planMigrations', () => {
 	it('should skip migrations already applied under their current name', () => {
 		const files = [`${dir}/0000_users.sql`, `${dir}/20260101000000_posts/migration.sql`];
 
-		expect(planMigrations(files, ['0000_users.sql', '20260101000000_posts'])).toEqual({
+		expect(planMigrations(files, applied('0000_users.sql', '20260101000000_posts'))).toEqual({
 			pending: [],
 			renames: []
 		});
@@ -62,7 +66,7 @@ describe('planMigrations', () => {
 			`${dir}/20260101000000_comments/migration.sql`
 		];
 
-		expect(planMigrations(files, ['0000_users.sql', '0001_posts.sql'])).toEqual({
+		expect(planMigrations(files, applied('0000_users.sql', '0001_posts.sql'))).toEqual({
 			pending: [`${dir}/20260101000000_comments/migration.sql`],
 			renames: [
 				{ from: '0000_users.sql', to: '20250301101500_users' },
@@ -74,7 +78,7 @@ describe('planMigrations', () => {
 	it('should match timestamp-prefixed flat migrations whose prefix differs from the folder', () => {
 		const files = [`${dir}/20250301101501_add_users_table/migration.sql`];
 
-		expect(planMigrations(files, ['20250301101459_add_users_table.sql'])).toEqual({
+		expect(planMigrations(files, applied('20250301101459_add_users_table.sql'))).toEqual({
 			pending: [],
 			renames: [
 				{ from: '20250301101459_add_users_table.sql', to: '20250301101501_add_users_table' }
@@ -89,7 +93,7 @@ describe('planMigrations', () => {
 			`${dir}/20250303000000_update/migration.sql`
 		];
 
-		expect(planMigrations(files, ['0000_update.sql', '0001_update.sql'])).toEqual({
+		expect(planMigrations(files, applied('0000_update.sql', '0001_update.sql'))).toEqual({
 			pending: [`${dir}/20250303000000_update/migration.sql`],
 			renames: [
 				{ from: '0000_update.sql', to: '20250301000000_update' },
@@ -101,8 +105,18 @@ describe('planMigrations', () => {
 	it('should not move a record whose flat file is still there', () => {
 		const files = [`${dir}/0000_users.sql`, `${dir}/20260101000000_users/migration.sql`];
 
-		expect(planMigrations(files, ['0000_users.sql'])).toEqual({
+		expect(planMigrations(files, applied('0000_users.sql'))).toEqual({
 			pending: [`${dir}/20260101000000_users/migration.sql`],
+			renames: []
+		});
+	});
+
+	it('should run a new migration that reuses the name of a deleted one', () => {
+		const files = [`${dir}/20260101000000_update/migration.sql`];
+		const records = [{ name: '0003_update.sql', appliedAt: new Date('2025-06-01T00:00:00Z') }];
+
+		expect(planMigrations(files, records)).toEqual({
+			pending: [`${dir}/20260101000000_update/migration.sql`],
 			renames: []
 		});
 	});

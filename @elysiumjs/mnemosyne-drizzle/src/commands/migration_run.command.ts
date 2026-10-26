@@ -113,8 +113,12 @@ export class MigrationRunCommand extends Command {
 			);`;
 			}
 
-			const migrations: { name: string }[] = await sql`SELECT name FROM elysium_migrations;`;
-			const completedMigrations = migrations.map((row) => row.name);
+			const rows: { name: string; applied_at: Date }[] =
+				await sql`SELECT name, applied_at FROM elysium_migrations;`;
+			const completedMigrations = rows.map((row) => ({
+				name: row.name,
+				appliedAt: row.applied_at
+			}));
 
 			const filesIt = new Bun.Glob(`./src/database/migrations/**/*.sql`).scan({
 				absolute: true,
