@@ -60,7 +60,7 @@ export type DrizzleModuleConfig = {
 			...Object.entries(config.connections).map(([name, props]) => ({
 				name: AbstractDatabase.getConnectionName(name),
 				global: true,
-				factory: () => Database.createConnection(props)
+				factory: () => Database.createConnection(props, name)
 			})),
 			...(alias
 				? [
