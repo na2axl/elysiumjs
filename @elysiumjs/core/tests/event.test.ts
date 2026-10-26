@@ -147,6 +147,29 @@ describe('Event namespace', () => {
 		});
 	});
 
+	describe('listen (decorator)', () => {
+		it('records the listener with the given mode', () => {
+			class TestClass {
+				@Event.listen({ event: 'test-on', mode: 'on' })
+				handleOn(_eventData: EventData<any>) {}
+
+				@Event.listen({ event: 'test-once', mode: 'once' })
+				handleOnce(_eventData: EventData<any>) {}
+			}
+
+			expect(getEventListeners(TestClass)).toEqual([
+				{ event: 'test-on', method: 'handleOn', mode: 'on', prepend: false, static: false },
+				{ event: 'test-once', method: 'handleOnce', mode: 'once', prepend: false, static: false }
+			]);
+		});
+
+		it('throws on an unknown mode', () => {
+			expect(() => Event.listen({ event: 'test-event', mode: 'twice' as any })).toThrow(
+				"Unknown mode provided to @listen. Use either 'on' or 'once'."
+			);
+		});
+	});
+
 	describe('once (decorator)', () => {
 		it('only records the listener as class metadata', () => {
 			class TestClass {

@@ -16,6 +16,7 @@ import { EventEmitter } from 'node:events';
 
 import { isString } from 'radash';
 
+import { ElysiumError } from './errors';
 import { Metadata } from './metadata';
 import { Symbols } from './utils';
 
@@ -236,6 +237,7 @@ export namespace Event {
 	/**
 	 * Marks a method as an event listener.
 	 * @param options The decorator options.
+	 * @throws {ElysiumError} If `options.mode` is neither `on` nor `once`.
 	 */
 	export const listen = (options: ListenProps): MethodDecorator => {
 		if (options.mode === 'on') {
@@ -244,9 +246,6 @@ export namespace Event {
 			return once(options);
 		}
 
-		return function (_target, _propertyKey, _descriptor) {
-			// TODO: Use logger service
-			console.error("Unknown mode provided to @listen. Use either 'on' or 'once'.");
-		};
+		throw new ElysiumError("Unknown mode provided to @listen. Use either 'on' or 'once'.");
 	};
 }
