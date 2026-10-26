@@ -455,8 +455,10 @@ export abstract class Application extends InteractsWithConsole {
 
 		Event.emit('elysium:server:before-init', this, this);
 
-		this.#elysia.resolve({ as: 'global' }, ({ request }) => ({
-			tenant: request.headers.get('x-tenant-id') ?? 'public'
+		// Keeps a tenant already resolved by a middleware, which runs before this hook.
+		this.#elysia.resolve({ as: 'global' }, (ctx) => ({
+			tenant:
+				(ctx as { tenant?: string }).tenant ?? ctx.request.headers.get('x-tenant-id') ?? 'public'
 		}));
 
 		if (openapi) {

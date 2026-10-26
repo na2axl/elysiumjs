@@ -1093,6 +1093,42 @@ describe('Application class', () => {
 			expect(response.headers.get('x-guard')).toBe('A');
 		});
 
+		it('should keep the tenant a module middleware resolved from its own header', async () => {
+			class OrganizationMiddleware extends Middleware {
+				public onRequest(ctx: any) {
+					ctx.tenant = ctx.request.headers.get('x-organization-id');
+				}
+
+				public onBeforeHandle(ctx: any) {
+					ctx.set.headers['x-tenant'] = ctx.tenant;
+				}
+			}
+
+			@Http.controller({ path: '/t' })
+			class TController {
+				@Http.get({ path: '/' })
+				get() {
+					return 'ok';
+				}
+			}
+
+			@Middleware.register(OrganizationMiddleware, AfterResponseProbe)
+			@Module.register({ controllers: [TController] })
+			class A extends Module {}
+
+			@Application.register({ server: { port: 0 }, modules: [A], openapi: false })
+			class TestApp extends Application {}
+
+			const instance = new TestApp();
+			await serve(instance);
+
+			afterResponses.push(new Promise<void>((resolve) => afterResponseQueue.push(resolve)));
+			const response = await instance.elysia.handle(
+				new Request('http://localhost/t', { headers: { 'x-organization-id': 'acme' } })
+			);
+			expect(response.headers.get('x-tenant')).toBe('acme');
+		});
+
 		it('should call onServe with the root app, imports first, before controllers mount', async () => {
 			const order: string[] = [];
 			const apps: unknown[] = [];
