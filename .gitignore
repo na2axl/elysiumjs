@@ -53,3 +53,7 @@
 
 # npm credentials
 .npmrc
+
+# Local agent tooling state
+.omc/
+.superpowers/
