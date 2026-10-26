@@ -26,7 +26,13 @@ export { ConsoleFormat, InteractsWithConsole } from './console';
 export { Env } from './env';
 export { type EventData, type EventHandler, Event } from './event';
 export { type LoggerInterface, ConsoleLogger } from './logger';
-export { type Context, type Route, HttpControllerScope, Http } from './http';
+export {
+	type Context,
+	type Route,
+	DATABASE_TRANSACTION_SERVICE,
+	HttpControllerScope,
+	Http
+} from './http';
 export { Metadata } from './metadata';
 export { Middleware } from './middleware';
 export { RequestLoggerMiddleware } from './middlewares/request-logger.middleware';

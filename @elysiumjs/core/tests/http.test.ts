@@ -18,6 +18,7 @@ import type { ElysiaPlugin } from '../src/utils';
 import { afterAll, afterEach, describe, expect, it, mock, spyOn } from 'bun:test';
 import * as Elysia from 'elysia';
 
+import * as pkg from '../src';
 import { Application } from '../src/app';
 import { Http, HttpControllerScope } from '../src/http';
 import { Metadata } from '../src/metadata';
@@ -647,7 +648,8 @@ describe('Http namespace', () => {
 		});
 
 		it('runs a transactional handler through the db.transaction service', async () => {
-			const service = Service.instance('db.transaction', transactionService());
+			expect(pkg.DATABASE_TRANSACTION_SERVICE).toBe('db.transaction');
+			const service = Service.instance(pkg.DATABASE_TRANSACTION_SERVICE, transactionService());
 
 			@Http.controller({ path: '/tx' })
 			class TxController {

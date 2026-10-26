@@ -21,9 +21,9 @@ import { Cache } from './cache';
 
 /**
  * Name of the global service running a callback in a database transaction, registered by driver
- * modules. Used by `@transactional` HTTP handlers.
+ * modules. Used by `@transactional` HTTP handlers; defined by `@elysiumjs/core`.
  */
-export const DATABASE_TRANSACTION_SERVICE = 'db.transaction';
+export { DATABASE_TRANSACTION_SERVICE } from '@elysiumjs/core';
 
 /**
  * Creates a cache storage instance tagged for database use.

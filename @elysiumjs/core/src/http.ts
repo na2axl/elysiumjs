@@ -322,10 +322,11 @@ async function* iterateInScope<T>(
 }
 
 /**
- * Name of the service running a callback in a database transaction. Provided by database modules
- * such as `DrizzleModule`.
+ * Name of the global service running a callback in a database transaction, used by
+ * `@transactional` handlers. Provided by database modules such as `DrizzleModule`.
+ * @author Axel Nana <axel.nana@workbud.com>
  */
-const DATABASE_TRANSACTION_SERVICE = 'db.transaction';
+export const DATABASE_TRANSACTION_SERVICE = 'db.transaction';
 
 /**
  * Runs a callback in a database transaction registered in the application context.
