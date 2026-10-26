@@ -62,7 +62,7 @@ export type MnemosyneModuleConfig = {
 			services.push({
 				name: REDIS_CACHE_SERVICE,
 				global: true,
-				factory: () => makeCacheInterface(new KeyvRedis({ connection: redis.connection }))
+				factory: () => makeCacheInterface(() => new KeyvRedis({ connection: redis.connection }))
 			});
 		}
 
@@ -71,7 +71,9 @@ export type MnemosyneModuleConfig = {
 				name: MEMORY_CACHE_SERVICE,
 				global: true,
 				factory: () =>
-					makeCacheInterface(new KeyvCacheableMemory({ ttl: memory.ttl, lruSize: memory.lruSize }))
+					makeCacheInterface(
+						() => new KeyvCacheableMemory({ ttl: memory.ttl, lruSize: memory.lruSize })
+					)
 			});
 		}
 

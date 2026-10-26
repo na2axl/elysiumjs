@@ -117,21 +117,22 @@ export interface CacheInterface {
 }
 
 /**
- * Makes a cache interface wrapping the given store.
- * @author Axel Nana <axel.nana@workburd.com>
- * @param store The cache storage to use in the interface.
+ * Makes a cache interface over stores built by the given factory.
+ *
+ * Keyv writes its namespace on the store adapter it wraps, so adapters cannot be shared between
+ * namespaces: the last namespace would win for every Keyv using the adapter, and `clear()` would
+ * wipe the other namespaces. The base cache and each tagged cache therefore get their own adapter.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param createStore Creates a new store adapter, called once per namespace.
  * @returns A new `CacheInterface`.
  */
-export const makeCacheInterface = (store: KeyvStoreAdapter): CacheInterface => {
-	const base = createCache({
-		stores: [
-			new Keyv({
-				store,
-				namespace: 'cache'
-			})
-		]
-	}) as Omit<CacheInterface, 'tags'>;
+export const makeCacheInterface = (createStore: () => KeyvStoreAdapter): CacheInterface => {
+	const makeNamespace = (namespace: string) =>
+		createCache({
+			stores: [new Keyv({ store: createStore(), namespace })]
+		}) as Omit<CacheInterface, 'tags'>;
 
+	const base = makeNamespace('cache');
 	const tagsCache = new Map<string, Omit<CacheInterface, 'tags'>>();
 
 	return {
@@ -141,15 +142,7 @@ export const makeCacheInterface = (store: KeyvStoreAdapter): CacheInterface => {
 			let cache = tagsCache.get(namespace);
 
 			if (!cache) {
-				cache = createCache({
-					stores: [
-						new Keyv({
-							store,
-							namespace
-						})
-					]
-				}) as Omit<CacheInterface, 'tags'>;
-
+				cache = makeNamespace(namespace);
 				tagsCache.set(namespace, cache);
 			}
 
