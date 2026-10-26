@@ -98,3 +98,80 @@ const takeMoved = (moved: Map<string, AppliedMigration[]>, name: string): string
 		) ?? -1;
 	return index < 0 ? undefined : records!.splice(index, 1)[0]!.name;
 };
+
+/** Characters that can appear in an unquoted identifier. */
+const IDENTIFIER_CHAR = /[A-Za-z0-9_$]/;
+
+/** The public schema qualifier Drizzle Kit writes before identifiers. */
+const PUBLIC_QUALIFIER = '"public".';
+
+/** Finds the end of a quoted token (`'...'` or `"..."`), where a doubled quote is escaped. */
+const endOfQuoted = (sql: string, start: number, quote: string, backslash: boolean): number => {
+	let i = start + 1;
+	while (i < sql.length) {
+		if (backslash && sql[i] === '\\') i += 2;
+		else if (sql[i] !== quote) i++;
+		else if (sql[i + 1] === quote) i += 2;
+		else return i + 1;
+	}
+	return sql.length;
+};
+
+/** Finds the end of the token starting at `i` that must be kept as is, or -1 if there is none. */
+const endOfVerbatim = (sql: string, i: number): number => {
+	const previous = sql[i - 1] ?? '';
+	if (sql.startsWith('--', i)) {
+		const end = sql.indexOf('\n', i);
+		return end < 0 ? sql.length : end;
+	}
+	if (sql.startsWith('/*', i)) {
+		const end = sql.indexOf('*/', i + 2);
+		return end < 0 ? sql.length : end + 2;
+	}
+	if (sql[i] === "'") {
+		// E'...' strings also escape with backslashes.
+		const escape = /[Ee]/.test(previous) && !IDENTIFIER_CHAR.test(sql[i - 2] ?? '');
+		return endOfQuoted(sql, i, "'", escape);
+	}
+	if (sql[i] === '$' && !IDENTIFIER_CHAR.test(previous)) {
+		const tag = /^\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$/.exec(sql.slice(i, i + 64))?.[0];
+		if (tag) {
+			const end = sql.indexOf(tag, i + tag.length);
+			return end < 0 ? sql.length : end + tag.length;
+		}
+	}
+	return -1;
+};
+
+/**
+ * Removes the `"public".` qualifier Drizzle Kit writes before identifiers, so that a migration
+ * runs in the schema selected by the `search_path` (the tenant schema).
+ *
+ * Only identifier qualifiers are changed: string literals, dollar-quoted bodies (functions, `DO`
+ * blocks), comments and other quoted identifiers are kept as is. Qualifiers inside a `DO` block
+ * are therefore kept: such blocks are not rewritten, since their contents are not parsed here.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param sql The migration SQL.
+ * @returns The SQL without the public schema qualifiers.
+ */
+export const stripPublicSchema = (sql: string): string => {
+	let output = '';
+	let i = 0;
+	while (i < sql.length) {
+		const verbatim = endOfVerbatim(sql, i);
+		if (verbatim >= 0) {
+			output += sql.slice(i, verbatim);
+			i = verbatim;
+		} else if (sql.startsWith(PUBLIC_QUALIFIER, i) && sql[i + PUBLIC_QUALIFIER.length] === '"') {
+			i += PUBLIC_QUALIFIER.length;
+		} else if (sql[i] === '"') {
+			const end = endOfQuoted(sql, i, '"', false);
+			output += sql.slice(i, end);
+			i = end;
+		} else {
+			output += sql[i];
+			i++;
+		}
+	}
+	return output;
+};

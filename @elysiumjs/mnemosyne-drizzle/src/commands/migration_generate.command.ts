@@ -17,7 +17,17 @@ import { exists } from 'node:fs/promises';
 import { Command, CommandArgumentType } from '@elysiumjs/core';
 import prompts from 'prompts';
 
-import { getProjectPath } from './project';
+import { stripPublicSchema } from '../migrations';
+import { getMigrationsPath, getProjectPath } from './project';
+
+/** Lists the SQL files of the migrations directory, as absolute paths. */
+const listSqlFiles = async (migrationsPath: string): Promise<string[]> => {
+	// The directory does not exist before the first migration is generated.
+	if (!(await exists(migrationsPath))) return [];
+	return Array.fromAsync(
+		new Bun.Glob('**/*.sql').scan({ cwd: migrationsPath, absolute: true, onlyFiles: true })
+	);
+};
 
 /**
  * Generates migration files.
@@ -64,18 +74,21 @@ export class MigrationGenerateCommand extends Command {
 		}
 
 		const projectRoot = getProjectPath();
+		const migrationsPath = getMigrationsPath();
 		let schemaPath = `${projectRoot}/src/database/schemas`;
 		if (await exists(`${projectRoot}/src/database/schema.ts`)) {
 			schemaPath = `${projectRoot}/src/database/schema.ts`;
 		}
 
-		await Bun.$`bunx --bun drizzle-kit generate --dialect postgresql --schema ${schemaPath} --out ${projectRoot}/src/database/migrations --name ${this.name}`;
+		const existing = new Set(await listSqlFiles(migrationsPath));
 
-		const sqlFiles = new Bun.Glob(`${projectRoot}/src/database/migrations/**/*.sql`).scan();
-		for await (const path of sqlFiles) {
+		await Bun.$`bunx --bun drizzle-kit generate --dialect postgresql --schema ${schemaPath} --out ${migrationsPath} --name ${this.name}`;
+
+		// Only the migration generated now is rewritten: earlier ones may have been edited by hand.
+		for (const path of await listSqlFiles(migrationsPath)) {
+			if (existing.has(path)) continue;
 			const file = Bun.file(path);
-			const content = await file.text();
-			await file.write(content.replace(/"public"\./gm, ''));
+			await file.write(stripPublicSchema(await file.text()));
 		}
 	}
 }

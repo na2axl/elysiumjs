@@ -14,7 +14,7 @@
 
 import { describe, expect, it } from 'bun:test';
 
-import { getMigrationName, planMigrations } from '../src/migrations';
+import { getMigrationName, planMigrations, stripPublicSchema } from '../src/migrations';
 
 const dir = '/app/src/database/migrations';
 
@@ -119,5 +119,52 @@ describe('planMigrations', () => {
 			pending: [`${dir}/20260101000000_update/migration.sql`],
 			renames: []
 		});
+	});
+});
+
+describe('stripPublicSchema', () => {
+	it('removes the public qualifier from identifiers', () => {
+		expect(
+			stripPublicSchema(
+				'CREATE TABLE "public"."users" ("id" integer);\nALTER TABLE "public"."posts" ADD CONSTRAINT "fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id");'
+			)
+		).toBe(
+			'CREATE TABLE "users" ("id" integer);\nALTER TABLE "posts" ADD CONSTRAINT "fk" FOREIGN KEY ("user_id") REFERENCES "users"("id");'
+		);
+	});
+
+	it('keeps string literals, including escaped quotes', () => {
+		const sql = `INSERT INTO "public"."notes" VALUES ('see "public"."users"', 'it''s "public".x', E'\\' "public".y');`;
+
+		expect(stripPublicSchema(sql)).toBe(
+			`INSERT INTO "notes" VALUES ('see "public"."users"', 'it''s "public".x', E'\\' "public".y');`
+		);
+	});
+
+	it('keeps dollar-quoted bodies such as DO blocks and functions', () => {
+		const sql = [
+			'DO $$ BEGIN',
+			' ALTER TABLE "public"."users" ADD COLUMN "x" int;',
+			'EXCEPTION WHEN duplicate_column THEN null;',
+			'END $$;',
+			'CREATE FUNCTION f() RETURNS int AS $fn$ SELECT count(*) FROM "public"."users" $fn$ LANGUAGE sql;',
+			'CREATE INDEX "i" ON "public"."users" ("x");'
+		].join('\n');
+
+		expect(stripPublicSchema(sql)).toBe(sql.replace('ON "public"."users"', 'ON "users"'));
+	});
+
+	it('keeps comments', () => {
+		const sql = '-- moved from "public"."old"\n/* "public"."a" */ SELECT * FROM "public"."a";';
+
+		expect(stripPublicSchema(sql)).toBe(
+			'-- moved from "public"."old"\n/* "public"."a" */ SELECT * FROM "a";'
+		);
+	});
+
+	it('keeps identifiers that only contain public', () => {
+		const sql = 'SELECT "public_id" FROM "not_public"."t", "x"."public";';
+
+		expect(stripPublicSchema(sql)).toBe(sql);
 	});
 });
