@@ -21,7 +21,7 @@ import type {
 } from 'drizzle-orm/pg-core';
 import type { DrizzleConnection } from './database';
 
-import { getTenancyConfig, withTenant } from '@elysiumjs/mnemosyne';
+import { getTenancyConfig, isValidTenantId, withTenant } from '@elysiumjs/mnemosyne';
 import { sql } from 'drizzle-orm';
 import { getTableConfig, pgPolicy, pgSchema, pgTable } from 'drizzle-orm/pg-core';
 
@@ -40,12 +40,25 @@ const schemaRegistry: Map<string, PgSchema> = new Map();
 // ============================================================================
 
 /**
+ * Throws when a tenant identifier is malformed, so that only well-formed identifiers become
+ * schema names and reach the schema and table caches.
+ * @param tenant The tenant identifier.
+ */
+const assertTenantId = (tenant: string): void => {
+	if (!isValidTenantId(tenant)) {
+		throw new Error(`Invalid tenant identifier: ${JSON.stringify(tenant.slice(0, 64))}`);
+	}
+};
+
+/**
  * Returns the Drizzle `PgSchema` for the given tenant, creating it if needed.
  * @author Axel Nana <axel.nana@workbud.com>
  * @param tenant The tenant identifier.
  * @returns The tenant's PostgreSQL schema.
+ * @throws {Error} If the tenant identifier is malformed.
  */
 export const getTenantSchema = (tenant: string): PgSchema => {
+	assertTenantId(tenant);
 	return schemaRegistry.get(tenant) ?? registerTenantSchema(tenant);
 };
 
@@ -54,8 +67,10 @@ export const getTenantSchema = (tenant: string): PgSchema => {
  * @author Axel Nana <axel.nana@workbud.com>
  * @param tenant The tenant identifier.
  * @returns The newly registered (or existing) `PgSchema`.
+ * @throws {Error} If the tenant identifier is malformed.
  */
 export const registerTenantSchema = (tenant: string): PgSchema => {
+	assertTenantId(tenant);
 	if (schemaRegistry.has(tenant)) {
 		return schemaRegistry.get(tenant)!;
 	}
@@ -75,6 +90,7 @@ export const registerTenantSchema = (tenant: string): PgSchema => {
  * @param tableName The table name.
  * @param columns The column definitions.
  * @returns A tenant-scoped `PgTable`.
+ * @throws {Error} If the tenant identifier is malformed.
  */
 export const wrapTenantSchema = <
 	TTableName extends string,
@@ -84,6 +100,7 @@ export const wrapTenantSchema = <
 	tableName: TTableName,
 	columns: TColumnsMap
 ): PgTable => {
+	assertTenantId(tenant);
 	if (tenant === 'public') {
 		return pgTable(tableName, columns);
 	}

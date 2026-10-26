@@ -158,6 +158,29 @@ export const withTenant = <T>(tenant: string, callback: () => T): T => {
 };
 
 // ============================================================================
+// Tenant Identifiers
+// ============================================================================
+
+/**
+ * The pattern a tenant identifier must match: 1 to 63 ASCII letters, digits, underscores or dashes.
+ *
+ * Tenant identifiers become PostgreSQL schema names in schema mode, and 63 bytes is the PostgreSQL
+ * identifier limit. The pattern leaves out quotes, dots, spaces and other characters that would
+ * need escaping or change how an identifier is read.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export const TENANT_ID_PATTERN = /^[A-Za-z0-9_-]{1,63}$/;
+
+/**
+ * Checks that a tenant identifier is well-formed (see {@link TENANT_ID_PATTERN}). This does not
+ * check that the tenant exists.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param tenant The tenant identifier.
+ * @returns `true` if the identifier is well-formed, `false` otherwise.
+ */
+export const isValidTenantId = (tenant: string): boolean => TENANT_ID_PATTERN.test(tenant);
+
+// ============================================================================
 // TenantMiddleware Base Class
 // ============================================================================
 
@@ -165,7 +188,8 @@ export const withTenant = <T>(tenant: string, callback: () => T): T => {
  * Base class for tenant-aware middleware.
  *
  * The middleware extracts the tenant identifier from an HTTP header and
- * sets `ctx.tenant`. For RLS mode, route handlers should use the driver's
+ * sets `ctx.tenant`. Identifiers must match {@link TENANT_ID_PATTERN} and be accepted by
+ * `validateTenant`, which rejects every tenant unless overridden. For RLS mode, route handlers should use the driver's
  * isolation mechanism to wrap their queries in a tenant-scoped transaction.
  *
  * @example
@@ -200,13 +224,15 @@ export abstract class TenantMiddleware extends Middleware {
 
 	/**
 	 * Validates that a tenant identifier is legitimate.
-	 * Override this to check against your data store.
+	 *
+	 * Rejects every tenant by default: override it to check the tenant against your data store.
+	 * Only identifiers matching {@link TENANT_ID_PATTERN} reach this method.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param _tenant The tenant identifier to validate.
 	 * @returns `true` if the tenant is valid, `false` otherwise.
 	 */
 	protected async validateTenant(_tenant: string): Promise<boolean> {
-		return true;
+		return false;
 	}
 
 	/**
@@ -248,7 +274,7 @@ export abstract class TenantMiddleware extends Middleware {
 			return this.onTenantError('missing', ctx);
 		}
 
-		const isValid = await this.validateTenant(tenantId);
+		const isValid = isValidTenantId(tenantId) && (await this.validateTenant(tenantId));
 		if (!isValid) {
 			return this.onTenantError('invalid', ctx);
 		}
@@ -259,7 +285,8 @@ export abstract class TenantMiddleware extends Middleware {
 }
 
 /**
- * A simple tenant middleware that allows public access by default.
+ * A simple tenant middleware that allows public access by default. Requests naming a tenant are
+ * rejected until `validateTenant` is overridden.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export class SimpleTenantMiddleware extends TenantMiddleware {}
