@@ -137,9 +137,8 @@ export const getTenancyStrategy = (): TenancyStrategy<unknown, unknown> | null =
  * @returns The current tenant identifier, or `null` if not set.
  */
 export const getCurrentTenant = (): string | null => {
-	if (!Application.instance || !Application.context.getStore) {
-		return null;
-	}
+	// `Application.context` falls back to a module-level storage when no application instance
+	// exists (for instance under `Application.testing`), so the tenant is readable there too.
 	const store = Application.context.getStore();
 	return (store?.get('tenant') ?? null) as string | null;
 };

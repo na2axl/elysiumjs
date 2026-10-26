@@ -13,14 +13,19 @@
 // limitations under the License.
 
 import type { TenancyStrategy } from '@elysiumjs/mnemosyne';
-import type { AnyPgColumnBuilder, PgAsyncTransaction, PgSchema, PgTable } from 'drizzle-orm/pg-core';
+import type {
+	AnyPgColumnBuilder,
+	PgAsyncTransaction,
+	PgSchema,
+	PgTable
+} from 'drizzle-orm/pg-core';
 import type { DrizzleConnection } from './database';
 
-import { getTenancyConfig } from '@elysiumjs/mnemosyne';
+import { getTenancyConfig, withTenant } from '@elysiumjs/mnemosyne';
 import { sql } from 'drizzle-orm';
 import { getTableConfig, pgPolicy, pgSchema, pgTable } from 'drizzle-orm/pg-core';
 
-import { Database } from './database';
+import { Database, setTransactionTenant, transactionTenants } from './database';
 import { getTableBuilders } from './table';
 
 // ============================================================================
@@ -101,6 +106,10 @@ export const wrapTenantSchema = <
 
 /**
  * Executes a callback within an RLS-scoped transaction for the given tenant.
+ *
+ * The transaction is registered in the async context, so repositories and
+ * `Database.getConnection()` use it inside the callback. When a transaction is already open on the
+ * connection, the callback runs in it with the tenant switched for its duration.
  * @author Axel Nana <axel.nana@workbud.com>
  * @param tenant The tenant identifier (or `null` for 'public').
  * @param callback The function to execute within the transaction.
@@ -112,15 +121,12 @@ export const withRLS = async <T>(
 	callback: (tx: PgAsyncTransaction<any, any>) => Promise<T>,
 	connectionName: string = 'default'
 ): Promise<T> => {
-	const db = Database.getConnection(connectionName);
-	const config = getTenancyConfig();
-	const varName = config.rls?.sessionVariable ?? 'app.current_tenant';
-	const value = tenant ?? 'public';
-
-	return (db as any).transaction(async (tx: PgAsyncTransaction<any, any>) => {
-		await tx.execute(sql`SELECT set_config(${varName}, ${value}, true)`);
-		return callback(tx);
-	});
+	return new DrizzleRLSTenancy().withIsolation(
+		Database.getBaseConnection(connectionName),
+		tenant ?? 'public',
+		() =>
+			callback(Database.getConnection(connectionName) as unknown as PgAsyncTransaction<any, any>)
+	);
 };
 
 /**
@@ -233,17 +239,56 @@ export class DrizzleRLSTenancy implements TenancyStrategy<PgTable, DrizzleConnec
 		return table;
 	}
 
+	/**
+	 * Runs a callback in a transaction scoped to the given tenant.
+	 *
+	 * The transaction is registered in the async context for the connection, and the tenant set as
+	 * the current tenant, for the duration of the callback. When a transaction is already open on
+	 * the connection, the callback runs in it, with the tenant variable switched for its duration
+	 * and restored afterwards.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param connection The base connection (see `Database.getBaseConnection`).
+	 * @param tenant The tenant identifier.
+	 * @param callback The function to execute within the isolated context.
+	 * @returns The return value of the callback.
+	 */
 	async withIsolation<T>(
 		connection: DrizzleConnection,
 		tenant: string,
 		callback: () => Promise<T>
 	): Promise<T> {
-		const config = getTenancyConfig();
-		const varName = config.rls?.sessionVariable ?? 'app.current_tenant';
+		const active = Database.getActiveTransaction(connection);
+		if (active !== undefined) return switchTenant(active, tenant, callback);
 
-		return (connection as any).transaction(async (tx: PgAsyncTransaction<any, any>) => {
-			await tx.execute(sql`SELECT set_config(${varName}, ${tenant}, true)`);
-			return callback();
+		return connection.transaction(async (tx) => {
+			await setTransactionTenant(tx as unknown as DrizzleConnection, tenant);
+			return withTenant(tenant, () =>
+				Database.runInTransaction(connection, tx as unknown as DrizzleConnection, callback)
+			);
 		});
 	}
 }
+
+/**
+ * Runs a callback in an open transaction with its RLS tenant switched to the given one, then
+ * restores the previous tenant.
+ * @param tx The open transaction.
+ * @param tenant The tenant to switch to.
+ * @param callback The function to run.
+ */
+const switchTenant = async <T>(
+	tx: DrizzleConnection,
+	tenant: string,
+	callback: () => Promise<T>
+): Promise<T> => {
+	const previous = transactionTenants.get(tx);
+	if (previous === tenant) return withTenant(tenant, callback);
+
+	await setTransactionTenant(tx, tenant);
+	try {
+		return await withTenant(tenant, callback);
+	} finally {
+		// An empty tenant matches no row, which is the safe value when none was set before.
+		await setTransactionTenant(tx, previous ?? '');
+	}
+};

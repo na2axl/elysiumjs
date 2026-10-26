@@ -167,10 +167,11 @@ export abstract class AbstractDatabase<TConnection, TConnectionConfig> {
 
 	/**
 	 * Gets the transaction open on a connection in the current async context.
-	 * @param connection The connection.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param connection The connection, as returned by {@link getBaseConnection}.
 	 * @returns The transaction handle, or `undefined` if none is open.
 	 */
-	protected getActiveTransaction(connection: TConnection): TConnection | undefined {
+	public getActiveTransaction(connection: TConnection): TConnection | undefined {
 		const transactions = Application.context.getStore()?.get('db:transactions') as
 			Map<TConnection, TConnection> | undefined;
 		return transactions?.get(connection);
