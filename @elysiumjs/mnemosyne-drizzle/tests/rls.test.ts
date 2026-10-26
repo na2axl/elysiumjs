@@ -119,6 +119,106 @@ describe('RLS isolation', () => {
 
 			expect(fake.log.filter(({ query }) => query === SET_TENANT)).toHaveLength(1);
 		});
+
+		/** Gets the tenant set on the transaction when each select ran. */
+		const tenantsOfSelects = () => {
+			let tenant: unknown;
+			return fake.log.flatMap(({ query, params }) => {
+				if (query === SET_TENANT) tenant = params[1];
+				return query.startsWith('select')
+					? [[query.includes('where') ? 'find' : 'all', tenant]]
+					: [];
+			});
+		};
+
+		it('runs concurrent switches of one transaction one after the other', async () => {
+			await withTenant('outer', () =>
+				Database.transaction(() =>
+					Promise.all([
+						withRLS('a', async () => {
+							await Bun.sleep(5);
+							await new UserRepository().all();
+						}),
+						withRLS('b', async () => {
+							await Bun.sleep(1);
+							await new UserRepository().find(row.id);
+						})
+					])
+				)
+			);
+
+			expect(tenantsOfSelects()).toEqual([
+				['all', 'a'],
+				['find', 'b']
+			]);
+			expect(fake.log.filter(({ query }) => query === SET_TENANT).at(-1)!.params[1]).toBe('outer');
+		});
+
+		it('keeps repository calls of the transaction out of a concurrent switch', async () => {
+			await withTenant('outer', () =>
+				Database.transaction(() =>
+					Promise.all([
+						withRLS('a', async () => {
+							await Bun.sleep(5);
+							await new UserRepository().all();
+						}),
+						(async () => {
+							await Bun.sleep(1);
+							await new UserRepository().find(row.id);
+						})()
+					])
+				)
+			);
+
+			expect(tenantsOfSelects()).toEqual([
+				['all', 'a'],
+				['find', 'outer']
+			]);
+		});
+
+		it('runs nested switches inside the one holding the transaction', async () => {
+			await withTenant('outer', () =>
+				Database.transaction(() =>
+					withRLS('a', () => withRLS('b', () => new UserRepository().all()))
+				)
+			);
+
+			expect(tenantsOfSelects()).toEqual([['all', 'b']]);
+		});
+
+		it('rethrows the error of the callback when the transaction is aborted', async () => {
+			let aborted = false;
+			fake = fakeConnection((query) => {
+				if (aborted) throw new Error('current transaction is aborted');
+				if (query.startsWith('select')) {
+					aborted = true;
+					throw new Error('relation does not exist');
+				}
+				return [];
+			});
+			Service.remove('db.connection.default');
+			Service.instance('db.connection.default', fake.connection);
+
+			const run = withTenant('outer', () =>
+				Database.transaction(() => withRLS('a', () => new UserRepository().all()))
+			);
+
+			expect(run).rejects.toThrow('relation does not exist');
+			await run.catch(() => {});
+		});
+
+		it('restores the tenant when the callback throws and the transaction goes on', async () => {
+			await withTenant('outer', () =>
+				Database.transaction(async () => {
+					await withRLS('a', async () => {
+						throw new Error('not a database error');
+					}).catch(() => {});
+					await new UserRepository().all();
+				})
+			);
+
+			expect(tenantsOfSelects()).toEqual([['all', 'outer']]);
+		});
 	});
 
 	describe('withRLS', () => {
