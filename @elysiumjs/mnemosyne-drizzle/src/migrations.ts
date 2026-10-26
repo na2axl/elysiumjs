@@ -14,6 +14,12 @@
 
 import { basename, dirname } from 'node:path';
 
+/** A migration recorded as applied in `elysium_migrations`. */
+export type AppliedMigration = {
+	name: string;
+	appliedAt: Date;
+};
+
 /** The migrations to run, and the applied records to rename to their new names. */
 export type MigrationPlan = {
 	pending: string[];
@@ -39,26 +45,35 @@ const descriptiveName = (name: string): string =>
 		.slice(1)
 		.join('_');
 
+/** Reads the UTC `YYYYMMDDHHmmss` timestamp that starts a Drizzle Kit 1.0 folder name. */
+const folderTime = (name: string): number | undefined => {
+	const match = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/.exec(name);
+	return match
+		? Date.UTC(+match[1]!, +match[2]! - 1, +match[3]!, +match[4]!, +match[5]!, +match[6]!)
+		: undefined;
+};
+
 /**
  * Decides which migration files to run.
  *
  * `drizzle-kit up` moves each flat `<prefix>_<name>.sql` file into a
- * `<timestamp>_<name>/migration.sql` folder, with a timestamp that differs from the old
- * prefix. An applied record whose flat file is gone is matched, in order, to the folder with
- * the same `<name>`; that folder is not run again and the record is renamed.
+ * `<timestamp>_<name>/migration.sql` folder, where the timestamp is when the migration was
+ * generated. An applied record whose flat file is gone is matched, in order, to a folder with
+ * the same `<name>` generated before the record was applied; that folder is not run again and
+ * the record is renamed. Folders generated later are new migrations and run.
  * @author Axel Nana <axel.nana@workbud.com>
  * @param files The paths of the migration files.
- * @param applied The names of the applied migrations.
+ * @param applied The applied migrations.
  */
-export const planMigrations = (files: string[], applied: string[]): MigrationPlan => {
-	const appliedNames = new Set(applied);
+export const planMigrations = (files: string[], applied: AppliedMigration[]): MigrationPlan => {
+	const appliedNames = new Set(applied.map(({ name }) => name));
 	const fileNames = new Set(files.map(getMigrationName));
 
-	const moved = new Map<string, string[]>();
-	for (const name of [...applied].sort()) {
-		if (!name.endsWith('.sql') || fileNames.has(name)) continue;
-		const key = descriptiveName(name);
-		moved.set(key, [...(moved.get(key) ?? []), name]);
+	const moved = new Map<string, AppliedMigration[]>();
+	for (const record of [...applied].sort((a, b) => a.name.localeCompare(b.name))) {
+		if (!record.name.endsWith('.sql') || fileNames.has(record.name)) continue;
+		const key = descriptiveName(record.name);
+		moved.set(key, [...(moved.get(key) ?? []), record]);
 	}
 
 	const plan: MigrationPlan = { pending: [], renames: [] };
@@ -66,12 +81,20 @@ export const planMigrations = (files: string[], applied: string[]): MigrationPla
 		const name = getMigrationName(file);
 		if (appliedNames.has(name)) continue;
 
-		const from =
-			basename(file) === FOLDER_MIGRATION_FILE
-				? moved.get(descriptiveName(name))?.shift()
-				: undefined;
+		const from = basename(file) === FOLDER_MIGRATION_FILE ? takeMoved(moved, name) : undefined;
 		if (from) plan.renames.push({ from, to: name });
 		else plan.pending.push(file);
 	}
 	return plan;
+};
+
+/** Removes and returns the first moved record that the folder `name` can be the new home of. */
+const takeMoved = (moved: Map<string, AppliedMigration[]>, name: string): string | undefined => {
+	const records = moved.get(descriptiveName(name));
+	const generatedAt = folderTime(name);
+	const index =
+		records?.findIndex(
+			({ appliedAt }) => generatedAt === undefined || generatedAt <= appliedAt.getTime()
+		) ?? -1;
+	return index < 0 ? undefined : records!.splice(index, 1)[0]!.name;
 };

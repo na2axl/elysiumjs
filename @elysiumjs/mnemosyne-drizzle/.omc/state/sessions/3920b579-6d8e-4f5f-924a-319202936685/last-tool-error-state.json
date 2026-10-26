@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"perl -0pi -e 's/\\\\t\\\\t\\\\tconst migrations: \\\\{ name: string \\\\}\\\\[\\\\] = await sql`SELECT name FROM elysium_migrations;`;\\\\n\\\\t\\\\t\\\\tconst completedMigrations = migrations\\\\.map\\\\(\\\\(row\\\\)...",
+  "error": "Exit code 1\n\t\t\t}\n\n\t\t\tconst rows: { name: string; applied_at: Date }[] =\n\t\t\t\tawait sql`SELECT name, applied_at FROM elysium_migrations;`;\n\t\t\tconst completedMigrations = rows.map((row) => ({ name: row.name, appliedAt: row.applied_at }));\n\n\t\t\tconst filesIt = new Bun.Glob(`./src/database/migrations/**/*.sql`).scan({\n\t\t\t\tabsolute: true,\n\t\t\t\tonlyFiles: true\n\t\t\t});\n\n\t\t\tconst files = await Array.fromAsync(filesIt);\n\t\t\tconst { pending: sqlFiles, renames } = planMigrations(files, completedMigrations);\nChe...",
+  "timestamp": "2026-10-26T02:29:07.154Z",
+  "retry_count": 1
+}
