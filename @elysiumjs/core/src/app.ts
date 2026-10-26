@@ -34,6 +34,7 @@ import { initEnv } from './env';
 import { ElysiumError, InvalidControllerError } from './errors';
 import { Event } from './event';
 import { Kernel } from './kernel';
+import { getLogger } from './logger';
 import { Metadata } from './metadata';
 import { applyMiddlewares } from './middleware';
 import { ModuleContext } from './module-context';
@@ -448,8 +449,7 @@ export abstract class Application extends InteractsWithConsole {
 
 		this.#elysia = new Elysia(server).onRequest((c) => {
 			if (this.isDebug) {
-				// TODO: Use the logger service here
-				console.log(c.request.method, c.request.url);
+				getLogger().debug('Incoming request', { method: c.request.method, url: c.request.url });
 			}
 		});
 

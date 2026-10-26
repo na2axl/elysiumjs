@@ -29,6 +29,7 @@ import * as Env from '../src/env';
 import { Event } from '../src/event';
 import { Http } from '../src/http';
 import { Kernel } from '../src/kernel';
+import { ConsoleLogger, LOGGER_SERVICE } from '../src/logger';
 import { Metadata } from '../src/metadata';
 import { Middleware } from '../src/middleware';
 import { Module } from '../src/module';
@@ -928,6 +929,27 @@ describe('Application class', () => {
 			await serve(instance);
 
 			expect(instance.elysia.listen).toHaveBeenCalledWith(0);
+		});
+
+		it('should log incoming requests at debug level in debug mode', async () => {
+			@Application.register({ debug: true, server: { port: 0 }, modules: [], openapi: false })
+			class TestApp extends Application {}
+
+			const instance = new TestApp();
+			await serve(instance);
+
+			const logger = new ConsoleLogger();
+			const debugSpy = spyOn(logger, 'debug').mockImplementation(() => {});
+			Service.instance(LOGGER_SERVICE, logger);
+			try {
+				await instance.elysia.handle(new Request('http://localhost/missing'));
+				expect(debugSpy).toHaveBeenCalledWith('Incoming request', {
+					method: 'GET',
+					url: 'http://localhost/missing'
+				});
+			} finally {
+				Service.remove(LOGGER_SERVICE);
+			}
 		});
 
 		it('should serve a controller with its module private service, in the module context', async () => {
