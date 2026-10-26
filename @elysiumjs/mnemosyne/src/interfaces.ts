@@ -304,9 +304,9 @@ export interface RepositoryInterface<TSelect, TInsert, TUpdate, TId extends IdTy
 	 * Updates a record in the database.
 	 * @param id The id of the record to update.
 	 * @param data The data to update.
-	 * @returns The updated record.
+	 * @returns The updated record, or `null` if no record has that id.
 	 */
-	update(id: TId, data: TUpdate): Promise<TSelect>;
+	update(id: TId, data: TUpdate): Promise<TSelect | null>;
 
 	/**
 	 * Updates all the records in the database.
@@ -318,9 +318,9 @@ export interface RepositoryInterface<TSelect, TInsert, TUpdate, TId extends IdTy
 	/**
 	 * Deletes a record from the database.
 	 * @param id The ID of the record to delete.
-	 * @returns The deleted record.
+	 * @returns The deleted record, or `null` if no record has that id.
 	 */
-	delete(id: TId): Promise<TSelect>;
+	delete(id: TId): Promise<TSelect | null>;
 
 	/**
 	 * Deletes all the records from the database.
