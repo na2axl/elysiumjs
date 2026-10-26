@@ -46,6 +46,8 @@
 
 ### Patch Changes
 
+- [`ea419db`](https://github.com/na2axl/elysiumjs/commit/ea419db) Thanks [@na2axl](https://github.com/na2axl)! - `DrizzleModel()` accepts tables made with `pgTable()` again. Under TypeScript 7 it rejected every concrete table, so models and repositories over them did not typecheck.
+- [`3987671`](https://github.com/na2axl/elysiumjs/commit/3987671) Thanks [@na2axl](https://github.com/na2axl)! - The package only contains its build output, README and changelog. It no longer ships sources, tests or local tool state.
 - Updated dependencies [[`5fef4a7`](https://github.com/na2axl/elysiumjs/commit/5fef4a7199f502fc4fe035299e7670739459a108)]:
   - @elysiumjs/core@0.9.0
   - @elysiumjs/mnemosyne@0.3.0
