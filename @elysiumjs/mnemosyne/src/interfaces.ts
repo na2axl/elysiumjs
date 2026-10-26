@@ -222,7 +222,9 @@ export interface DatabaseCacheConfig {
 	enabled?: boolean;
 
 	/**
-	 * The default TTL for cached data, in seconds.
+	 * The default TTL for cached data, in seconds. Drivers apply it to every cached result that
+	 * does not set its own expiry.
+	 * @default 60
 	 */
 	ttl?: number;
 

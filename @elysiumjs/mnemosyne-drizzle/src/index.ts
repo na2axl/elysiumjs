@@ -24,7 +24,7 @@ export type {
 export { pgTable, getTableBuilders } from './table';
 
 // Re-exports
-export { Database, DrizzleDatabaseCache } from './database';
+export { Database, DEFAULT_CACHE_TTL, DrizzleDatabaseCache } from './database';
 export type { DrizzleConnectionProps, DrizzleConnection } from './database';
 export {
 	DrizzleModel,

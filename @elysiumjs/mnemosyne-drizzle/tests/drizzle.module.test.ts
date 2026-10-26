@@ -142,8 +142,9 @@ describe('DrizzleModule', () => {
 			boot: 'eager'
 		});
 		const cache = new DrizzleDatabaseCache('all', 1, 'memory');
+		expect(await cache.get('k', ['t'], false, true)).toBeUndefined();
 		await cache.put('k', [1], ['t'], false);
-		expect(await cache.get('k')).toEqual([1]);
+		expect(await cache.get('k', ['t'], false, true)).toEqual([1]);
 	});
 
 	it('closes only the connections that were created', async () => {
