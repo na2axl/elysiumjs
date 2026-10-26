@@ -238,6 +238,89 @@ async function* iterateInModule<T>(node: ModuleNode, generator: AsyncGenerator<T
 	}
 }
 
+/**
+ * Iterates a generator inside a scope that stays open until the iteration ends.
+ *
+ * Every step of the generator runs inside `scope`, so it sees the async context the scope sets up.
+ * Callback-style scopes such as database transactions would otherwise end (and commit) as soon as
+ * the generator object is created, before its body has run. The scope ends when the generator is
+ * exhausted, throws, or is closed early; an error raised by the scope itself (such as a failed
+ * commit) is rethrown to the consumer.
+ * @param scope Runs its body inside the scope and settles when the scope ends.
+ * @param start Creates the generator to iterate. Called inside the scope.
+ */
+async function* iterateInScope<T>(
+	scope: (body: () => Promise<void>) => Promise<unknown>,
+	start: () => AsyncGenerator<T>
+): AsyncGenerator<T> {
+	const pending = () => {
+		const deferred = Promise.withResolvers<IteratorResult<T>>();
+		// Rejections reach the consumer through `finished` when nobody waits on this step.
+		deferred.promise.catch(() => {});
+		return deferred;
+	};
+
+	let resume = Promise.withResolvers<boolean>();
+	let deliver = pending();
+
+	const finished = scope(async () => {
+		const generator = start();
+		while (await resume.promise) {
+			resume = Promise.withResolvers();
+			const step = await generator.next();
+			const current = deliver;
+			deliver = pending();
+			current.resolve(step);
+			if (step.done) return;
+		}
+		await generator.return(undefined);
+	});
+	finished.catch((error) => deliver.reject(error));
+
+	let completed = false;
+	try {
+		while (true) {
+			const current = deliver;
+			resume.resolve(true);
+			const step = await current.promise;
+			if (step.done) {
+				completed = true;
+				return;
+			}
+			yield step.value;
+		}
+	} finally {
+		if (!completed) resume.resolve(false);
+		await finished;
+	}
+}
+
+/**
+ * Name of the service running a callback in a database transaction. Provided by database modules
+ * such as `DrizzleModule`.
+ */
+const DATABASE_TRANSACTION_SERVICE = 'db.transaction';
+
+/**
+ * Runs a callback in a database transaction registered in the application context.
+ */
+type TransactionRunner = <T>(callback: () => Promise<T>) => Promise<T>;
+
+/**
+ * Gets the transaction runner provided by the database module.
+ * @throws {Error} If no database module provides one.
+ */
+const getTransactionRunner = (): TransactionRunner => {
+	const runner = Service.get<TransactionRunner>(DATABASE_TRANSACTION_SERVICE);
+	if (!runner) {
+		throw new Error(
+			`Transactional handlers need the "${DATABASE_TRANSACTION_SERVICE}" service. ` +
+				'Import a database module (such as DrizzleModule) in the application.'
+		);
+	}
+	return runner;
+};
+
 const registerHttpRequestHandler = (props: HttpRequestHandlerRegistrationProps) => {
 	const body = Metadata.get('http:body', props.target, props.propertyKey);
 	const params = Metadata.get('http:params', props.target, props.propertyKey) ?? [];
@@ -245,8 +328,7 @@ const registerHttpRequestHandler = (props: HttpRequestHandlerRegistrationProps) 
 	const rawContext = Metadata.get('http:rawContext', props.target, props.propertyKey);
 	const customDecorators =
 		Metadata.get('http:customDecorators', props.target, props.propertyKey) ?? [];
-	const middlewares =
-		Metadata.get(Symbols.middlewares, props.target, props.propertyKey) ?? [];
+	const middlewares = Metadata.get(Symbols.middlewares, props.target, props.propertyKey) ?? [];
 	const services = Metadata.get(Symbols.services, props.target, props.propertyKey) ?? [];
 
 	const { path, method, handler, target, response, operationId, description, transactional } =
@@ -401,8 +483,7 @@ export namespace Http {
 				const middlewares = Metadata.get(Symbols.middlewares, target) ?? [];
 				applyMiddlewares(middlewares, app, node);
 
-				const metadata: HttpRequestHandlerMetadata[] =
-					Metadata.get(Symbols.http, target) ?? [];
+				const metadata: HttpRequestHandlerMetadata[] = Metadata.get(Symbols.http, target) ?? [];
 
 				for (const route of metadata) {
 					const getParameters = async (c: Context) => {
@@ -436,7 +517,9 @@ export namespace Http {
 
 						if (!isEmpty(route.services)) {
 							for (const service of route.services) {
-								parameters[service.index] = ModuleContext.run(node, () => Service.get(service.name));
+								parameters[service.index] = ModuleContext.run(node, () =>
+									Service.get(service.name)
+								);
 							}
 						}
 
@@ -452,54 +535,39 @@ export namespace Http {
 					route.method = isSSE ? 'GET' : route.method;
 
 					const getHandler = () => {
-						const initTransactedHandler = <TResult = unknown, TArgs extends any[] = unknown[]>(
-							c: Context
-						) => {
-							if (isTransactional) {
-								return function (...args: TArgs) {
-									return Service.get<any>('db.connection.default')!.transaction((tx: any) => {
-										return Application.context.run(
-											new Map([
-												['tenant', c.tenant as unknown],
-												['http:context', c],
-												['db:tx', tx]
-											]),
-											() =>
-												ModuleContext.run(node, () => {
-													try {
-														return route.handler.call(c.controller(), ...args) as Promise<TResult>;
-													} catch (e) {
-														tx.rollback();
-														throw e;
-													}
-												})
-										);
-									});
-								};
-							}
+						/**
+						 * Runs `body` with the request entries in the application context, and in a database
+						 * transaction for transactional routes.
+						 */
+						const inRequestScope = async <TResult>(
+							c: Context,
+							body: () => Promise<TResult>
+						): Promise<TResult> =>
+							Application.context.run(
+								new Map([
+									['tenant', c.tenant as unknown],
+									['http:context', c]
+								]),
+								() => (isTransactional ? getTransactionRunner()(body) : body())
+							);
 
-							return function (...args: TArgs) {
-								return Application.context.run(
-									new Map([
-										['tenant', c.tenant as unknown],
-										['http:context', c]
-									]),
-									() =>
-										ModuleContext.run(
-											node,
-											() => route.handler.call(c.controller(), ...args) as Promise<TResult>
-										)
-								);
-							};
+						const callHandler = <TResult>(c: Context, args: unknown[]): TResult =>
+							ModuleContext.run(node, () => route.handler.call(c.controller(), ...args) as TResult);
+
+						const initTransactedHandler = <TResult = unknown>(c: Context) => {
+							return (...args: unknown[]) =>
+								inRequestScope(c, async () => callHandler<Promise<TResult>>(c, args));
 						};
 
 						if (isGenerator) {
 							return async function* (c: Context) {
-								const handler = initTransactedHandler(c);
 								const params = await getParameters(c);
 
 								try {
-									yield* iterateInModule(node, handler(...params) as AsyncGenerator);
+									yield* iterateInScope(
+										(body) => inRequestScope(c, body),
+										() => iterateInModule(node, callHandler<AsyncGenerator>(c, params))
+									);
 								} catch (error: any) {
 									yield error;
 								}
@@ -552,7 +620,9 @@ export namespace Http {
 						async transform(c) {
 							if (
 								isValidator &&
-								!(await ModuleContext.run(node, () => route.body!.validator!.authorize(c as Context)))
+								!(await ModuleContext.run(node, () =>
+									route.body!.validator!.authorize(c as Context)
+								))
 							) {
 								throw c.status(401, 'Unauthorized');
 							}
@@ -760,12 +830,7 @@ export namespace Http {
 					propertyKey!
 				);
 			} else {
-				Metadata.define(
-					'http:body',
-					{ schema, index: parameterIndex },
-					target,
-					propertyKey!
-				);
+				Metadata.define('http:body', { schema, index: parameterIndex }, target, propertyKey!);
 			}
 		};
 	};

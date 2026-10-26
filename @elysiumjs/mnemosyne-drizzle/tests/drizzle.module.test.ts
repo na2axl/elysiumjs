@@ -17,7 +17,13 @@ import { getTenancyConfig, getTenancyStrategy } from '@elysiumjs/mnemosyne';
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
 import * as pkg from '../src';
-import { Database, DrizzleDatabaseCache, DrizzleModule, DrizzleRLSTenancy, DrizzleSchemaTenancy } from '../src';
+import {
+	Database,
+	DrizzleDatabaseCache,
+	DrizzleModule,
+	DrizzleRLSTenancy,
+	DrizzleSchemaTenancy
+} from '../src';
 
 const URL = 'postgres://u:p@localhost:5432/db';
 
@@ -51,7 +57,9 @@ describe('DrizzleModule', () => {
 
 	it('provides connections, the default alias and the schema strategy by default', async () => {
 		app = await Application.testing({
-			modules: [DrizzleModule.with({ default: 'main', connections: { main: { connection: URL } } })],
+			modules: [
+				DrizzleModule.with({ default: 'main', connections: { main: { connection: URL } } })
+			],
 			boot: 'eager'
 		});
 
@@ -79,10 +87,38 @@ describe('DrizzleModule', () => {
 		expect(getTenancyStrategy()).toBeInstanceOf(DrizzleRLSTenancy);
 	});
 
+	it('provides db.transaction, delegating to Database.transaction', async () => {
+		app = await Application.testing({
+			modules: [
+				DrizzleModule.with({ default: 'main', connections: { main: { connection: URL } } })
+			],
+			boot: 'eager'
+		});
+		const transaction = spyOn(Database, 'transaction').mockImplementation((async (
+			callback: (tx: unknown) => Promise<unknown>
+		) => callback('TX')) as never);
+
+		try {
+			const run =
+				Service.get<(cb: () => Promise<unknown>, name?: string) => Promise<unknown>>(
+					'db.transaction'
+				)!;
+
+			expect(await run(async () => 'result')).toBe('result');
+			expect(await run(async () => 'named', 'main')).toBe('named');
+			expect(transaction).toHaveBeenNthCalledWith(1, expect.any(Function), undefined);
+			expect(transaction).toHaveBeenNthCalledWith(2, expect.any(Function), 'main');
+		} finally {
+			transaction.mockRestore();
+		}
+	});
+
 	it('rejects a default that is not a declared connection', async () => {
 		await expect(
 			Application.testing({
-				modules: [DrizzleModule.with({ default: 'nope', connections: { main: { connection: URL } } })]
+				modules: [
+					DrizzleModule.with({ default: 'nope', connections: { main: { connection: URL } } })
+				]
 			})
 		).rejects.toThrow(/nope/);
 	});
@@ -163,9 +199,7 @@ describe('migration commands', () => {
 	const makeApp = () => {
 		const client = stubClient();
 		@Application.register({
-			modules: [
-				DrizzleModule.with({ connections: { default: { client: client as never } } })
-			]
+			modules: [DrizzleModule.with({ connections: { default: { client: client as never } } })]
 		})
 		class TestApp extends Application {}
 		const app = new TestApp();
