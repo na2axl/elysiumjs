@@ -56,6 +56,22 @@ describe('isValidTenantId', () => {
 			expect(isValidTenantId(id)).toBe(false);
 		}
 	});
+
+	it('rejects the names PostgreSQL reserves for system schemas', () => {
+		for (const id of [
+			'pg_catalog',
+			'pg_toast',
+			'PG_temp_1',
+			'pg_',
+			'information_schema',
+			'INFORMATION_SCHEMA'
+		]) {
+			expect(isValidTenantId(id)).toBe(false);
+		}
+		for (const id of ['pgadmin', 'tenant_pg_1', 'information_schema_2']) {
+			expect(isValidTenantId(id)).toBe(true);
+		}
+	});
 });
 
 describe('TenantMiddleware', () => {
