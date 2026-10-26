@@ -9,9 +9,13 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Workerly/elysium"
+    "url": "git+https://github.com/na2axl/elysiumjs.git",
+    "directory": "create-elysium"
   },
-  "homepage": "https://github.com/Workerly/elysium",
+  "homepage": "https://github.com/na2axl/elysiumjs/tree/main/create-elysium#readme",
+  "bugs": {
+    "url": "https://github.com/na2axl/elysiumjs/issues"
+  },
   "scripts": {
     "format": "prettier --write \"./**/*.ts\"",
     "build": "bun build index.ts --outfile=index.js --target bun --minify"

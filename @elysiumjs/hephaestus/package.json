@@ -7,7 +7,8 @@
   "author": "Workbud Technologies Inc.",
   "repository": {
     "type": "git",
-    "url": "https://github.com/workbud/elysium"
+    "url": "git+https://github.com/na2axl/elysiumjs.git",
+    "directory": "@elysiumjs/hephaestus"
   },
   "keywords": [
     "elysium",
@@ -19,7 +20,10 @@
     "compilation",
     "bun"
   ],
-  "homepage": "https://github.com/workbud/elysium",
+  "homepage": "https://github.com/na2axl/elysiumjs/tree/main/@elysiumjs/hephaestus#readme",
+  "bugs": {
+    "url": "https://github.com/na2axl/elysiumjs/issues"
+  },
   "module": "index.ts",
   "type": "module",
   "sideEffects": false,
