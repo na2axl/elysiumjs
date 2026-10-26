@@ -65,7 +65,7 @@ export function Logged(options: LoggedOptions = {}): MethodDecorator {
 			} catch (error) {
 				const duration = Date.now() - startTime;
 				logger.error(`[${methodName}] Error`, {
-					error: error instanceof Error ? error.message : error,
+					error,
 					duration: `${duration}ms`
 				});
 				throw error;

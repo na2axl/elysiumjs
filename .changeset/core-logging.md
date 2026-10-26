@@ -17,4 +17,5 @@ Fixes and additions:
 - A failed WAMP registration or subscription is logged at `error` level and emitted as `elysium:error` with an error naming the topic and the connection, instead of becoming an unhandled rejection.
 - The `elysium:error` emitted for a WAMP client error names the connection and its URL and includes the client's message, with the original error as `cause`.
 - `HermesLogger` serialises an `error` field of the log context like pino's `err` (type, message and stack), so logged errors keep their stack trace. Elysium logs errors under `error`.
-- `@Logged` resolves its fallback logger with `getLogger()`.
+- `@Logged` resolves its fallback logger with `getLogger()`, and logs a thrown error whole under `error` (it logged only its message), so its stack trace is kept.
+- The `elysium:error` emitted when a WAMP connection gives up states the number of attempts actually made (the first one plus the retries), as the logged `attempts` does. It stated `maxRetries` before.

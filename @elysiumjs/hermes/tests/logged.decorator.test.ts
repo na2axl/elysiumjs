@@ -161,6 +161,7 @@ describe('@Logged decorator', () => {
 	});
 
 	it('should log errors with duration', async () => {
+		const thrown = new Error('fail');
 		const errorMock = mock((_msg: string, _ctx: Record<string, unknown>) => {});
 
 		class MyService {
@@ -175,7 +176,7 @@ describe('@Logged decorator', () => {
 
 			@Logged()
 			async failMethod(): Promise<void> {
-				throw new Error('fail');
+				throw thrown;
 			}
 		}
 
@@ -189,7 +190,7 @@ describe('@Logged decorator', () => {
 		expect(errorMock).toHaveBeenCalled();
 		const call = errorMock.mock.calls[0];
 		expect(call[0]).toContain('Error');
-		expect(call[1].error).toBe('fail');
+		expect(call[1].error).toBe(thrown);
 		expect(call[1].duration).toMatch(/\d+ms/);
 	});
 
