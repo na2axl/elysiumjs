@@ -127,9 +127,9 @@ export type WampClientProps = {
 	onChallenge?(method: string, extra: Record<string, unknown>): string | Promise<string>;
 
 	/**
-	 * Callback for handling the WAMP connection open event.
+	 * Called once the first connection is established; not on wampy reconnects.
 	 */
-	onOpen?(): void;
+	onOpen?(): void | Promise<void>;
 
 	/**
 	 * Callback for handling the WAMP connection close event.
@@ -354,8 +354,13 @@ export namespace Wamp {
 				return;
 			}
 
-			// Outside the try, so that a throwing onOpen does not trigger a reconnect.
-			config.onOpen?.();
+			// Outside the retry try, so that a failing onOpen does not trigger a reconnect.
+			if (closed) return;
+			try {
+				await config.onOpen?.();
+			} catch (error) {
+				Event.emit('elysium:error', error);
+			}
 		};
 
 		tryConnect();

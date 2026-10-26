@@ -18,6 +18,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, mock, spyOn } fr
 import { Elysia } from 'elysia';
 
 import { InvalidModuleConfigError, ServiceNotFoundError } from '../src/errors';
+import { Event } from '../src/event';
 import { Metadata } from '../src/metadata';
 import { createTestingApp } from '../src/testing';
 import { nextTick, Symbols } from '../src/utils';
@@ -219,6 +220,52 @@ describe('WampModule', () => {
 
 		expect(onOpen).toHaveBeenCalledTimes(1);
 		expect(WampyMock.mock.calls[0]![1]).not.toHaveProperty('onOpen');
+	});
+
+	it('reports a failing onOpen as an app error instead of throwing', async () => {
+		const errors: unknown[] = [];
+		Event.on('elysium:error', (e) => {
+			errors.push(e.data);
+		});
+		const onOpen = mock(async () => {
+			throw new Error('open handler failed');
+		});
+		app = await createTestingApp({
+			modules: [
+				WampModule.with({ connections: { default: { url: 'ws://d/ws', realm: 'r', onOpen } } })
+			]
+		});
+		await app.get('wamp.connection.default');
+		await Bun.sleep(0);
+
+		expect(onOpen).toHaveBeenCalledTimes(1);
+		expect(errors).toContainEqual(new Error('open handler failed'));
+		Event.off('elysium:error');
+	});
+
+	it('does not call onOpen when shut down while connecting', async () => {
+		const onOpen = mock();
+		let connected!: () => void;
+		WampyMock.mockImplementationOnce(function () {
+			const client = {
+				connect: mock(() => new Promise<void>((resolve) => (connected = resolve))),
+				disconnect: mock(() => Promise.resolve())
+			};
+			clients.push(client);
+			return client;
+		});
+		app = await createTestingApp({
+			modules: [
+				WampModule.with({ connections: { default: { url: 'ws://d/ws', realm: 'r', onOpen } } })
+			]
+		});
+		await app.get('wamp.connection.default');
+		await app.shutdown();
+		app = undefined;
+		connected();
+		await Bun.sleep(0);
+
+		expect(onOpen).not.toHaveBeenCalled();
 	});
 
 	it('requires connections', async () => {
