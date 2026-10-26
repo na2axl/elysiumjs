@@ -7,9 +7,13 @@
   "author": "Workbud Technologies Inc.",
   "repository": {
     "type": "git",
-    "url": "https://github.com/workbud/elysium"
+    "url": "git+https://github.com/na2axl/elysiumjs.git",
+    "directory": "@elysiumjs/core"
   },
-  "homepage": "https://github.com/workbud/elysium",
+  "homepage": "https://github.com/na2axl/elysiumjs/tree/main/@elysiumjs/core#readme",
+  "bugs": {
+    "url": "https://github.com/na2axl/elysiumjs/issues"
+  },
   "scripts": {
     "format": "prettier --write \"./src/**/*.ts\"",
     "clean": "rimraf dist",
