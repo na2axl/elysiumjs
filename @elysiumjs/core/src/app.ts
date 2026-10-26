@@ -96,9 +96,17 @@ type ServerError = ErrorContext & { code: string | number; error: any };
 
 /**
  * Type for the application context.
+ *
+ * - `tenant`: the current tenant.
+ * - `http:context`: the context of the HTTP request being handled.
+ * - `db:transactions`: the open database transactions, keyed by the connection they run on.
+ * - `db:tx`: the transaction open on the default database connection. Kept for existing callers;
+ *   prefer `db:transactions`.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export type AppContext = AsyncLocalStorage<Map<'tenant' | 'http:context' | 'db:tx', unknown>>;
+export type AppContext = AsyncLocalStorage<
+	Map<'tenant' | 'http:context' | 'db:transactions' | 'db:tx', unknown>
+>;
 
 /** Context used when no application instance exists, for instance under `Application.testing`. */
 const fallbackContext: AppContext = new AsyncLocalStorage();

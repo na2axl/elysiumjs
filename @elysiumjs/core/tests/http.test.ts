@@ -21,8 +21,8 @@ import * as Elysia from 'elysia';
 import { Application } from '../src/app';
 import { Http, HttpControllerScope } from '../src/http';
 import { Metadata } from '../src/metadata';
-import { ModuleContext } from '../src/module-context';
 import * as M from '../src/middleware';
+import { ModuleContext } from '../src/module-context';
 import { Service } from '../src/service';
 import { nextTick, Symbols } from '../src/utils';
 import { testNode } from './module-node';
@@ -143,11 +143,7 @@ describe('Http namespace', () => {
 			class TestController {}
 
 			// Set middlewares metadata
-			Metadata.define(
-				Symbols.middlewares,
-				[TestMiddleware1, TestMiddleware2],
-				TestController
-			);
+			Metadata.define(Symbols.middlewares, [TestMiddleware1, TestMiddleware2], TestController);
 
 			// Get the plugin function
 			const plugin = Metadata.get(Symbols.elysiaPlugin, TestController);
@@ -603,6 +599,179 @@ describe('Http namespace', () => {
 			expect(metadata).toBeDefined();
 			expect(metadata).toBeArrayOfSize(1);
 			expect(metadata[0].transactional).toBe(true);
+		});
+	});
+
+	describe('Transactional handlers', () => {
+		const events: string[] = [];
+
+		/** A `db.transaction` service exposing a fake transaction as `db:tx` while it is open. */
+		const transactionService = () =>
+			mock(async (callback: () => Promise<unknown>) => {
+				events.push('begin');
+				const store = new Map(Application.context.getStore());
+				store.set('db:tx', 'TX');
+				try {
+					const result = await Application.context.run(store, callback);
+					events.push('commit');
+					return result;
+				} catch (error) {
+					events.push('rollback');
+					throw error;
+				}
+			});
+
+		const routeOf = async (controller: Function, path: string) => {
+			await nextTick();
+			const plugin: ElysiaPlugin = Metadata.get(Symbols.elysiaPlugin, controller);
+			const app = await plugin(testNode());
+			return app.routes.find((r) => r.path === path)!.handler as (c: any) => any;
+		};
+
+		const context = (controller: Function) => ({
+			controller: () => new (controller as any)(),
+			params: {},
+			tenant: 'acme',
+			set: { headers: {} }
+		});
+
+		const currentEntries = () => {
+			const store = Application.context.getStore();
+			return `${store?.get('tenant')}/${store?.get('db:tx')}`;
+		};
+
+		afterEach(() => {
+			events.length = 0;
+			Service.clear();
+			mock.restore();
+		});
+
+		it('runs a transactional handler through the db.transaction service', async () => {
+			const service = Service.instance('db.transaction', transactionService());
+
+			@Http.controller({ path: '/tx' })
+			class TxController {
+				@Http.get({ path: '/plain', transactional: true })
+				async plain() {
+					events.push(`handler:${currentEntries()}`);
+					return 'done';
+				}
+			}
+
+			const handler = await routeOf(TxController, '/tx/plain');
+			expect(await handler(context(TxController))).toBe('done');
+			expect(service).toHaveBeenCalledTimes(1);
+			expect(events).toEqual(['begin', 'handler:acme/TX', 'commit']);
+		});
+
+		it('fails clearly when no db.transaction service is registered', async () => {
+			@Http.controller({ path: '/tx' })
+			class TxController {
+				@Http.get({ path: '/missing', transactional: true })
+				async missing() {
+					return 'done';
+				}
+			}
+
+			const handler = await routeOf(TxController, '/tx/missing');
+			await expect(handler(context(TxController))).rejects.toThrow(/db\.transaction/);
+		});
+
+		it('keeps the transaction open until a transactional generator is consumed', async () => {
+			Service.instance('db.transaction', transactionService());
+
+			@Http.controller({ path: '/tx' })
+			class TxController {
+				@Http.get({ path: '/stream', transactional: true })
+				async *stream() {
+					events.push(`step1:${currentEntries()}`);
+					yield 1;
+					events.push(`step2:${currentEntries()}`);
+					yield 2;
+				}
+			}
+
+			const handler = await routeOf(TxController, '/tx/stream');
+			const values: unknown[] = [];
+			for await (const value of handler(context(TxController)) as AsyncGenerator) {
+				events.push(`consumed:${value}`);
+				values.push(value);
+			}
+
+			expect(values).toEqual([1, 2]);
+			expect(events).toEqual([
+				'begin',
+				'step1:acme/TX',
+				'consumed:1',
+				'step2:acme/TX',
+				'consumed:2',
+				'commit'
+			]);
+		});
+
+		it('rolls back the transaction of a generator that throws', async () => {
+			Service.instance('db.transaction', transactionService());
+
+			@Http.controller({ path: '/tx' })
+			class TxController {
+				@Http.get({ path: '/failing', transactional: true })
+				async *failing() {
+					yield 1;
+					throw new Error('boom');
+				}
+			}
+
+			const handler = await routeOf(TxController, '/tx/failing');
+			const values: unknown[] = [];
+			for await (const value of handler(context(TxController)) as AsyncGenerator) {
+				values.push(value);
+			}
+
+			expect(values[0]).toBe(1);
+			expect((values[1] as Error).message).toBe('boom');
+			expect(events).toEqual(['begin', 'rollback']);
+		});
+
+		it('ends the transaction of a generator closed early', async () => {
+			Service.instance('db.transaction', transactionService());
+
+			@Http.controller({ path: '/tx' })
+			class TxController {
+				@Http.get({ path: '/early', transactional: true })
+				async *early() {
+					try {
+						yield 1;
+						yield 2;
+					} finally {
+						events.push('cleanup');
+					}
+				}
+			}
+
+			const handler = await routeOf(TxController, '/tx/early');
+			const iterator = handler(context(TxController)) as AsyncGenerator;
+			expect((await iterator.next()).value).toBe(1);
+			await iterator.return(undefined);
+
+			expect(events).toEqual(['begin', 'cleanup', 'commit']);
+		});
+
+		it('exposes the request context to the body of a generator handler', async () => {
+			@Http.controller({ path: '/tx' })
+			class TxController {
+				@Http.get({ path: '/context' })
+				async *context() {
+					yield Application.context.getStore()?.get('tenant');
+				}
+			}
+
+			const handler = await routeOf(TxController, '/tx/context');
+			const values: unknown[] = [];
+			for await (const value of handler(context(TxController)) as AsyncGenerator) {
+				values.push(value);
+			}
+
+			expect(values).toEqual(['acme']);
 		});
 	});
 

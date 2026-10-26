@@ -18,6 +18,7 @@ import type { DrizzleConnection, DrizzleConnectionProps } from './database';
 import { Module, needsDefaultAlias, runAll, Service } from '@elysiumjs/core';
 import {
 	AbstractDatabase,
+	DATABASE_TRANSACTION_SERVICE,
 	MnemosyneModule,
 	TENANCY_CONFIG_SERVICE,
 	TENANCY_STRATEGY_SERVICE
@@ -45,8 +46,8 @@ export type DrizzleModuleConfig = {
 
 /**
  * Declares Drizzle connections as global services named `db.connection.{name}`, plus
- * `db.connection.default` aliasing the configured default, and registers the tenancy config
- * and strategy. Connections are created on first use. Also provides the migration commands.
+ * `db.connection.default` aliasing the configured default, `db.transaction` (used by
+ * `@transactional` handlers), and registers the tenancy config and strategy. Connections are created on first use. Also provides the migration commands.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 @Module.register<DrizzleModuleConfig>({
@@ -71,6 +72,14 @@ export type DrizzleModuleConfig = {
 						}
 					]
 				: []),
+			{
+				name: DATABASE_TRANSACTION_SERVICE,
+				global: true,
+				factory:
+					() =>
+					<T>(callback: () => Promise<T>, connection?: string): Promise<T> =>
+						Database.transaction(() => callback(), connection)
+			},
 			{ name: TENANCY_CONFIG_SERVICE, global: true, factory: () => tenancy },
 			{
 				name: TENANCY_STRATEGY_SERVICE,
