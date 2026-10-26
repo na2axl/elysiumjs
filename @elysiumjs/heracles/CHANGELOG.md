@@ -1,5 +1,12 @@
 # @elysiumjs/heracles
 
+## 0.7.1
+
+### Patch Changes
+
+- Updated dependencies [[`5fef4a7`](https://github.com/na2axl/elysiumjs/commit/5fef4a7199f502fc4fe035299e7670739459a108)]:
+  - @elysiumjs/core@0.9.0
+
 ## 0.7.0
 
 ### Minor Changes
