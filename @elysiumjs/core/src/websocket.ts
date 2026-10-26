@@ -67,6 +67,11 @@ export type WSError = ErrorContext & { error: Readonly<Error> };
 export namespace Websocket {
 	/**
 	 * Marks a class as a websocket controller.
+	 *
+	 * Middlewares registered on the controller run on the upgrade request. `onRequest`, `onTransform`
+	 * and `onBeforeHandle` can refuse the connection by returning a response. `onAfterHandle` and
+	 * `onAfterResponse` run once the socket is upgraded: there is no response to read or replace.
+	 *
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param props The websocket route properties.
 	 */
