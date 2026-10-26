@@ -1,6 +1,6 @@
 {
   "name": "@elysiumjs/core",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "license": "Apache-2.0",
   "description": "A super-charged web framework for Bun, built on top of ElysiaJS.",
   "private": false,
