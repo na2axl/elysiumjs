@@ -101,9 +101,9 @@ export const AbstractRepository = <TModel extends ModelClass, TConnection>(
 		 * Updates a record in the database.
 		 * @param id The id of the record to update.
 		 * @param data The data to update.
-		 * @returns The updated record.
+		 * @returns The updated record, or `null` if no record has that id.
 		 */
-		public abstract update(id: IdType, data: TUpdate): Promise<TSelect>;
+		public abstract update(id: IdType, data: TUpdate): Promise<TSelect | null>;
 
 		/**
 		 * Updates all the records in the database.
@@ -115,9 +115,9 @@ export const AbstractRepository = <TModel extends ModelClass, TConnection>(
 		/**
 		 * Deletes a record from the database.
 		 * @param id The ID of the record to delete.
-		 * @returns The deleted record.
+		 * @returns The deleted record, or `null` if no record has that id.
 		 */
-		public abstract delete(id: IdType): Promise<TSelect>;
+		public abstract delete(id: IdType): Promise<TSelect | null>;
 
 		/**
 		 * Deletes all the records from the database.

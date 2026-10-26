@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import type { IdType, ModelClass } from '@elysiumjs/mnemosyne';
-import type { PgTableWithColumns } from 'drizzle-orm/pg-core';
+import type { PgColumn, PgTable, PgTableWithColumns } from 'drizzle-orm/pg-core';
 import type { DrizzleConnection } from './database';
 
 import {
@@ -35,7 +35,8 @@ import { DrizzleRLSTenancy } from './tenancy';
  * Drizzle-specific repository mixin with concrete CRUD operations.
  *
  * Extends the abstract repository with Drizzle query builder calls
- * for all standard CRUD methods.
+ * for all standard CRUD methods. The model table must have an `id` column, used as the
+ * primary key by `find`, `update`, `delete` and `exists`.
  *
  * @author Axel Nana <axel.nana@workbud.com>
  * @template TModel The model class type.
@@ -43,13 +44,19 @@ import { DrizzleRLSTenancy } from './tenancy';
  * @returns A concrete repository class with CRUD methods.
  */
 export const DrizzleRepository = <
-	TModel extends ModelClass<any, any, any, PgTableWithColumns<any>>
+	TModel extends ModelClass<any, any, any, PgTable & { id: PgColumn }>
 >(
 	model: TModel
 ) => {
 	type TSelect = TModel['$inferSelect'];
 	type TInsert = TModel['$inferInsert'];
 	type TUpdate = TModel['$inferUpdate'];
+
+	/**
+	 * Gets the model table, resolved for the current tenant on each call. Typed loosely for the
+	 * query builders; the `id` column is guaranteed by the `TModel` constraint.
+	 */
+	const table = () => model.table as unknown as PgTableWithColumns<any>;
 
 	class R extends AbstractRepository<TModel, DrizzleConnection>(model, Database) {
 		/**
@@ -78,7 +85,7 @@ export const DrizzleRepository = <
 		}
 
 		public async all(): Promise<TSelect[]> {
-			return this.withConnection((db) => db.select().from(model.table));
+			return this.withConnection((db) => db.select().from(table()));
 		}
 
 		public async paginate(
@@ -88,14 +95,14 @@ export const DrizzleRepository = <
 			const offset = Math.max(page - 1, 0) * count;
 			return this.withConnection(async (db) => ({
 				page,
-				total: await db.$count(model.table),
-				data: await db.select().from(model.table).offset(offset).limit(count)
+				total: await db.$count(table()),
+				data: await db.select().from(table()).offset(offset).limit(count)
 			}));
 		}
 
 		public async find(id: IdType): Promise<TSelect | null> {
 			const [row] = await this.withConnection((db) =>
-				db.select().from(model.table).where(eq(model.table.id, id))
+				db.select().from(table()).where(eq(table().id, id))
 			);
 			return (row ?? null) as TSelect | null;
 		}
@@ -105,44 +112,40 @@ export const DrizzleRepository = <
 			value: TSelect[TKey]
 		): Promise<TSelect | null> {
 			const [row] = await this.withConnection((db) =>
-				db.select().from(model.table).where(eq(model.table[column], value))
+				db.select().from(table()).where(eq(table()[column], value))
 			);
 			return (row ?? null) as TSelect | null;
 		}
 
 		public async insert(data: TInsert): Promise<TSelect> {
-			const [row] = await this.withConnection((db) =>
-				db.insert(model.table).values(data).returning()
-			);
+			const [row] = await this.withConnection((db) => db.insert(table()).values(data).returning());
 			return row as TSelect;
 		}
 
-		public async update(id: IdType, data: TUpdate): Promise<TSelect> {
+		public async update(id: IdType, data: TUpdate): Promise<TSelect | null> {
 			const [row] = await this.withConnection((db) =>
-				db.update(model.table).set(data).where(eq(model.table.id, id)).returning()
+				db.update(table()).set(data).where(eq(table().id, id)).returning()
 			);
-			return row as TSelect;
+			return (row ?? null) as TSelect | null;
 		}
 
 		public async updateAll(data: TUpdate): Promise<TSelect[]> {
-			return this.withConnection((db) => db.update(model.table).set(data).returning());
+			return this.withConnection((db) => db.update(table()).set(data).returning());
 		}
 
-		public async delete(id: IdType): Promise<TSelect> {
+		public async delete(id: IdType): Promise<TSelect | null> {
 			const [row] = await this.withConnection((db) =>
-				db.delete(model.table).where(eq(model.table.id, id)).returning()
+				db.delete(table()).where(eq(table().id, id)).returning()
 			);
-			return row as TSelect;
+			return (row ?? null) as TSelect | null;
 		}
 
 		public async deleteAll(): Promise<TSelect[]> {
-			return this.withConnection((db) => db.delete(model.table).returning());
+			return this.withConnection((db) => db.delete(table()).returning());
 		}
 
 		public async exists(id: IdType): Promise<boolean> {
-			const count = await this.withConnection((db) =>
-				db.$count(model.table, eq(model.table.id, id))
-			);
+			const count = await this.withConnection((db) => db.$count(table(), eq(table().id, id)));
 			return count > 0;
 		}
 	}
