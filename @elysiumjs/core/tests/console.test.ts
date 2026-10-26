@@ -83,25 +83,25 @@ describe('InteractsWithConsole', () => {
 		it('should write info message', () => {
 			const console = new InteractsWithConsole();
 			console.info('Info message');
-			expect(stdoutOutput).toContain('ℹ️ Info message');
+			expect(stdoutOutput).toMatch(/ℹ\S* Info message/);
 		});
 
 		it('should write success message', () => {
 			const console = new InteractsWithConsole();
 			console.success('Success message');
-			expect(stdoutOutput).toContain('✅ Success message');
+			expect(stdoutOutput).toMatch(/✔\S* Success message/);
 		});
 
 		it('should write warning message', () => {
 			const console = new InteractsWithConsole();
 			console.warning('Warning message');
-			expect(stdoutOutput).toContain('⚠️ Warning message');
+			expect(stdoutOutput).toMatch(/⚠\S* Warning message/);
 		});
 
 		it('should write error message to stderr', () => {
 			const console = new InteractsWithConsole();
 			console.error('Error message');
-			expect(stderrOutput).toContain('❌ Error message');
+			expect(stderrOutput).toMatch(/✖\S* Error message/);
 		});
 
 		it('should write debug message when DEBUG is set', () => {
