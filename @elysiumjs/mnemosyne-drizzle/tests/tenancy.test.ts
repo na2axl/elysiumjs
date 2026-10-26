@@ -115,6 +115,24 @@ describe('Tenancy', () => {
 		});
 	});
 
+	describe('malformed tenant identifiers', () => {
+		const cols = { id: d.uuid().primaryKey().defaultRandom() };
+
+		it('are rejected before reaching the schema and table caches', () => {
+			const pgSchemaSpy = spyOn(d, 'pgSchema');
+
+			for (const tenant of ['bad"name', 'a.b', 'x'.repeat(64), '']) {
+				expect(() => getTenantSchema(tenant)).toThrow(/Invalid tenant identifier/);
+				expect(() => registerTenantSchema(tenant)).toThrow(/Invalid tenant identifier/);
+				expect(() => wrapTenantSchema(tenant, 'malformed_test', cols)).toThrow(
+					/Invalid tenant identifier/
+				);
+			}
+
+			expect(pgSchemaSpy).not.toHaveBeenCalled();
+		});
+	});
+
 	describe('DrizzleSchemaTenancy', () => {
 		it('should have mode set to schema', () => {
 			const strategy = new DrizzleSchemaTenancy();
