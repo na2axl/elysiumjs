@@ -313,14 +313,17 @@ export namespace Wamp {
 			...omit(config, ['url', 'onOpen']),
 			onError(error) {
 				config.onError?.(error);
+				const message = `An error occurred in WAMP connection ${name} (${config.url})`;
+				// Typed as an Error by wampy, but not guaranteed to be one at runtime.
+				const reason: unknown = error;
 				Event.emit(
 					'elysium:error',
-					new Error(
-						`An error occurred in WAMP connection ${name} (${config.url}): ${error.message}`,
-						{
-							cause: error
-						}
-					)
+					reason == null
+						? new Error(message)
+						: new Error(
+								`${message}: ${reason instanceof Error ? reason.message : String(reason)}`,
+								{ cause: reason }
+							)
 				);
 			}
 		});

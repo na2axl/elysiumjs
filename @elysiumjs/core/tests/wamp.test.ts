@@ -302,6 +302,37 @@ describe('WampModule', () => {
 		}
 	});
 
+	it('reports non-Error wampy errors as app errors', async () => {
+		const errors: Error[] = [];
+		Event.on('elysium:error', (e) => {
+			errors.push(e.data as Error);
+		});
+		app = await createTestingApp({
+			modules: [
+				WampModule.with({
+					default: 'main',
+					connections: { main: { url: 'ws://main/ws', realm: 'r' } }
+				})
+			]
+		});
+		try {
+			await app.get('wamp.connection.main');
+			const { onError } = WampyMock.mock.calls[0]![1] as any;
+			onError('connection reset');
+			onError(undefined);
+
+			expect(errors).toHaveLength(2);
+			expect(errors[0]!.message).toBe(
+				'An error occurred in WAMP connection main (ws://main/ws): connection reset'
+			);
+			expect(errors[0]!.cause).toBe('connection reset');
+			expect(errors[1]!.message).toBe('An error occurred in WAMP connection main (ws://main/ws)');
+			expect(errors[1]).not.toHaveProperty('cause');
+		} finally {
+			Event.off('elysium:error');
+		}
+	});
+
 	it('stops retrying to connect once shut down', async () => {
 		app = await createTestingApp({
 			modules: [
