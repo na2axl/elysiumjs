@@ -37,7 +37,8 @@ const RedisClientFake = mock(function () {
 			data.set(k, v);
 			return 'OK';
 		},
-		del: async (k: string) => Number(data.delete(k)),
+		del: async (...keys: string[]) => keys.filter((k) => data.delete(k)).length,
+		unlink: async (...keys: string[]) => keys.filter((k) => data.delete(k)).length,
 		exists: async (k: string) => data.has(k),
 		mget: async (...keys: string[]) => keys.map((k) => data.get(k) ?? null),
 		send: async (cmd: string, args: string[]) => {
