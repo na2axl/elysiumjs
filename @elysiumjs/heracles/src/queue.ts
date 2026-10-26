@@ -202,6 +202,9 @@ export class Queue extends InteractsWithConsole {
 	/** The in-flight or settled start of the transport. */
 	private starting: Promise<void> | undefined;
 
+	/** The in-flight stop of the transport, which a later start waits for. */
+	private stopping: Promise<void> | undefined;
+
 	/**
 	 * The transport used by this queue
 	 */
@@ -538,7 +541,9 @@ export class Queue extends InteractsWithConsole {
 
 		if (!this.starting) {
 			const transport = this.transport;
+			const stopping = this.stopping;
 			this.starting = (async () => {
+				await stopping?.catch(() => {});
 				await transport.start();
 				this.info(`Queue '${this.name}' transport started`);
 			})().catch((error) => {
@@ -552,17 +557,28 @@ export class Queue extends InteractsWithConsole {
 	}
 
 	/**
-	 * Stop the queue's transport.
+	 * Stop the queue's transport. A start requested while the stop is in flight runs after it.
 	 *
 	 * @returns A promise that resolves when the transport has stopped.
 	 */
 	public async stop(): Promise<void> {
-		if (this.transport) {
-			const pending = this.starting;
-			this.starting = undefined;
-			await pending?.catch(() => {});
-			await this.transport.stop();
+		if (!this.transport) return;
+
+		const transport = this.transport;
+		const pending = [this.starting, this.stopping];
+		this.starting = undefined;
+
+		const stopping = (async () => {
+			for (const previous of pending) await previous?.catch(() => {});
+			await transport.stop();
 			this.info(`Queue '${this.name}' transport stopped`);
+		})();
+
+		this.stopping = stopping;
+		try {
+			await stopping;
+		} finally {
+			if (this.stopping === stopping) this.stopping = undefined;
 		}
 	}
 

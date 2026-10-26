@@ -272,6 +272,28 @@ describe('Queue', () => {
 			await queue.stop();
 			expect(transport.stop).toHaveBeenCalled();
 		});
+
+		it('should leave the transport running when start is called during a stop', async () => {
+			const name = uniqueQueueName();
+			const queue = Queue.get(name, { transport: MockTransport });
+			const transport = (queue as any).transport as MockTransport;
+
+			const events: string[] = [];
+			transport.start.mockImplementation(async () => {
+				events.push('start');
+			});
+			transport.stop.mockImplementation(async () => {
+				await Bun.sleep(5);
+				events.push('stop');
+			});
+
+			await queue.start();
+			const stopping = queue.stop();
+			const starting = queue.start();
+			await Promise.all([stopping, starting]);
+
+			expect(events).toEqual(['start', 'stop', 'start']);
+		});
 	});
 
 	describe('getOptions / updateOptions', () => {
