@@ -135,6 +135,57 @@ describe('DrizzleDatabaseCache', () => {
 			});
 		});
 
+		it('keeps the caches of connections with the same name apart by prefix', async () => {
+			const staging = new DrizzleDatabaseCache('all', 60, 'memory', 'default', 'staging');
+			const production = new DrizzleDatabaseCache('all', 60, 'memory', 'default', 'production');
+			await query(staging, 'k', ['users'], () => ['staging']);
+			await query(production, 'k', ['users'], () => ['production']);
+
+			await production.onMutate({ tables: ['users'] });
+
+			expect(await staging.get('k', ['users'], false, true)).toEqual(['staging']);
+			expect(await production.get('k', ['users'], false, true)).toBeUndefined();
+		});
+
+		it('writes the prefix before the connection name in every key', async () => {
+			const set = spyOn(storage, 'set');
+			const mset = spyOn(storage, 'mset');
+			try {
+				await query(
+					new DrizzleDatabaseCache('all', 60, 'memory', 'main', 'app1'),
+					'k',
+					['users'],
+					() => [1]
+				);
+
+				expect(set.mock.calls.at(-1)![0]).toBe('app1:main:query:public:k');
+				expect((mset.mock.calls.at(-1)![0] as { key: string }[])[0]!.key).toBe(
+					'app1:main:version:users'
+				);
+			} finally {
+				set.mockRestore();
+				mset.mockRestore();
+			}
+		});
+
+		it('uses the configured prefix of a connection', async () => {
+			const fake = fakeSql(() => [{ id: 1 }]);
+			const connect = (prefix: string) =>
+				Database.createConnection(
+					{
+						client: fake.client as never,
+						cache: { strategy: 'all', storage: 'memory', prefix }
+					},
+					'default'
+				);
+
+			await connect('one').select().from(posts);
+			await connect('two').select().from(posts);
+			await connect('one').select().from(posts);
+
+			expect(fake.log.filter(({ query }) => query.startsWith('select'))).toHaveLength(2);
+		});
+
 		it('names the cache of a connection after it', async () => {
 			const fake = fakeSql(() => [{ id: 1 }]);
 			const connect = (name: string) =>
