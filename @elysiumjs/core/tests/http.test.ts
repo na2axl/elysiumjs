@@ -120,17 +120,17 @@ describe('Http namespace', () => {
 			expect(makeSpy).not.toHaveBeenCalledWith(TestController);
 			expect(resolveSpy).toHaveBeenCalledWith({ as: 'local' }, expect.any(Function));
 
-			// TODO: Properly mock Application.context
-			// app.listen(3131);
-			// await app.handle(new Request('http://localhost:3131/test'));
-			// app.stop();
+			// A REQUEST-scoped controller is built for each request.
+			const response = await app.handle(new Request('http://localhost/test'));
 
-			// expect(makeSpy).toHaveBeenLastCalledWith(TestController);
-			// expect(executeMiddlewareChainSpy).toHaveBeenCalledWith(
-			// 	[],
-			// 	expect.any(Object),
-			// 	'onBeforeHandle'
-			// );
+			expect(await response.text()).toBe('test');
+			expect(makeSpy).toHaveBeenLastCalledWith(TestController);
+			expect(executeMiddlewareChainSpy).toHaveBeenCalledWith(
+				[],
+				expect.any(Object),
+				'onBeforeHandle',
+				expect.any(Object)
+			);
 		});
 
 		it('should apply middlewares to the Elysia app', async () => {
