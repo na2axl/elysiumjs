@@ -19,7 +19,7 @@
 		"clean": "rimraf dist",
 		"build": "bun run clean && tsc && bun run build:minify",
 		"build:minify": "bun scripts/minify.ts",
-		"typecheck": "tsc --noEmit",
+		"typecheck": "tsc --noEmit && tsc -p tsconfig.types.json",
 		"prepublishOnly": "bun run build",
 		"test": "bun test",
 		"test:coverage": "bun test --coverage"

@@ -13,7 +13,8 @@
 // limitations under the License.
 
 import type { ColumnMetadata, ModelAdapter } from '@elysiumjs/mnemosyne';
-import type { PgColumn, PgTableWithColumns, TableConfig } from 'drizzle-orm/pg-core';
+import type { InferInsertModel, InferSelectModel } from 'drizzle-orm';
+import type { PgColumn, PgTable, PgTableWithColumns } from 'drizzle-orm/pg-core';
 
 import { AbstractModel, createSchemaFromModel } from '@elysiumjs/mnemosyne';
 import { getTableConfig } from 'drizzle-orm/pg-core';
@@ -152,15 +153,15 @@ export interface DrizzleModelOptions {
  * @param options Model configuration options.
  * @returns A model class with Drizzle-backed static metadata.
  */
-export const DrizzleModel = <TTable extends PgTableWithColumns<TableConfig>>(
+export const DrizzleModel = <TTable extends PgTable>(
 	table: TTable,
 	options?: DrizzleModelOptions
 ) => {
 	const config = getTableConfig(table);
 	const builders = getTableBuilders(table);
 
-	type TSelect = TTable['$inferSelect'];
-	type TInsert = TTable['$inferInsert'];
+	type TSelect = InferSelectModel<TTable>;
+	type TInsert = InferInsertModel<TTable>;
 
 	const Base = AbstractModel(config.name, builders ?? {}, drizzleAdapter, table);
 
