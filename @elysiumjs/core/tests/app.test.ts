@@ -212,6 +212,8 @@ describe('Application class', () => {
 		}
 
 		Event.off('elysium:app:launched');
+		Event.off('elysium:server:before-init');
+		Event.off('elysium:server:after-init');
 		process.exit = originalExit;
 		process.stdout.write = originalStdoutWrite;
 		process.stderr.write = originalStderrWrite;
@@ -1132,7 +1134,8 @@ describe('Application class', () => {
 			const instance = new TestApp();
 			await instance.run(['serve']);
 
-			expect(listenSpy?.mock.calls ?? []).toHaveLength(0);
+			// The boot fails before the server is built, so there is nothing that could listen.
+			expect(listenSpy).toBeUndefined();
 			expect(process.exit).toHaveBeenCalledWith(1);
 			expect(errors).toContain('boot failed');
 		});
