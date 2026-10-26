@@ -309,7 +309,7 @@ export namespace Wamp {
 	export const createClient = (name: string, config: WampClientProps): WampClient => {
 		const client = new Wampy(config.url, {
 			ws: WampWebsocket,
-			...omit(config, ['url']),
+			...omit(config, ['url', 'onOpen']),
 			onError(error) {
 				config.onError?.(error);
 				// TODO: Add more details like controller name and url
@@ -351,7 +351,11 @@ export namespace Wamp {
 						new Error(`Failed to establish WAMP connection ${name} after ${maxRetries} attempts`)
 					);
 				}
+				return;
 			}
+
+			// Outside the try, so that a throwing onOpen does not trigger a reconnect.
+			config.onOpen?.();
 		};
 
 		tryConnect();

@@ -207,6 +207,20 @@ describe('WampModule', () => {
 		consoleError.mockRestore();
 	});
 
+	it('calls onOpen once connected, without passing it to wampy', async () => {
+		const onOpen = mock();
+		app = await createTestingApp({
+			modules: [
+				WampModule.with({ connections: { default: { url: 'ws://d/ws', realm: 'r', onOpen } } })
+			]
+		});
+		await app.get('wamp.connection.default');
+		await Bun.sleep(0);
+
+		expect(onOpen).toHaveBeenCalledTimes(1);
+		expect(WampyMock.mock.calls[0]![1]).not.toHaveProperty('onOpen');
+	});
+
 	it('requires connections', async () => {
 		await expect(createTestingApp({ modules: [WampModule.with({})] })).rejects.toThrow(
 			/connections/
