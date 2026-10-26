@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import { Command, CommandArgumentType } from '@elysiumjs/core';
+import { isValidTenantId } from '@elysiumjs/mnemosyne';
 import prompts from 'prompts';
 
 import { Database } from '../database';
@@ -49,7 +50,23 @@ export class MigrationRunCommand extends Command {
 	})
 	private fresh: boolean = false;
 
+	@Command.arg({
+		name: 'create-schema',
+		description: 'Create the tenant schema without asking when it does not exist.',
+		type: CommandArgumentType.BOOLEAN,
+		default: false
+	})
+	private createSchema: boolean = false;
+
 	public async run(): Promise<void> {
+		if (!isValidTenantId(this.tenant)) {
+			this.error(
+				`Invalid tenant ${this.bold(this.tenant)}: use 1 to 63 letters, digits, underscores or ` +
+					'dashes, not starting with pg_ and other than information_schema.'
+			);
+			return process.exit(1);
+		}
+
 		if (!Database.connectionExists(this.connection)) {
 			this.error(`Connection ${this.bold(this.connection)} does not exist.`);
 			return process.exit(1);
@@ -57,14 +74,22 @@ export class MigrationRunCommand extends Command {
 
 		const sql = Database.getConnection(this.connection).$client;
 		await sql.connect();
+		try {
+			// Decide everything that needs the user before opening the transaction, so that no
+			// prompt keeps it (and its lock) open.
+			if (!this.fresh && !(await this.ensureSchemaChoice(sql))) return process.exit(1);
 
-		// Decide everything that needs the user before opening the transaction, so that no prompt
-		// keeps it (and its lock) open.
-		if (!this.fresh && !(await this.ensureSchemaChoice(sql))) {
+			await this.migrate(sql);
+		} finally {
 			await sql.close();
-			return process.exit(1);
 		}
+	}
 
+	/**
+	 * Runs the pending migrations in one transaction.
+	 * @param sql The client.
+	 */
+	private async migrate(sql: Bun.SQL): Promise<void> {
 		await sql.begin(async (sql: Bun.SQL) => {
 			// Serialises concurrent runs for the same tenant: the lock is released at commit.
 			await sql`SELECT pg_advisory_xact_lock(hashtext(${`elysium_migrations:${this.tenant}`}))`;
@@ -127,15 +152,13 @@ export class MigrationRunCommand extends Command {
 
 			s.complete(`Migrations for tenant ${this.bold(this.tenant)} applied successfully.`);
 		});
-
-		await sql.close();
 	}
 
 	/**
-	 * Checks that the tenant schema exists, or that it may be created. Asks the user when the
-	 * schema is missing and a terminal is attached; without one, the schema is created.
+	 * Checks that the tenant schema exists, or that it may be created: with `--create-schema`, or
+	 * when the user agrees. Without a terminal to ask, a missing schema is an error.
 	 * @param sql The client.
-	 * @returns `false` if the user declined to create the schema.
+	 * @returns `false` if the schema must not be created.
 	 */
 	private async ensureSchemaChoice(sql: Bun.SQL): Promise<boolean> {
 		const [{ schema_exists }] = await sql`SELECT EXISTS (
@@ -143,11 +166,14 @@ export class MigrationRunCommand extends Command {
 			  FROM information_schema.schemata
 			 WHERE schema_name = ${this.tenant}
 		) AS schema_exists;`;
-		if (schema_exists) return true;
+		if (schema_exists || this.createSchema) return true;
 
 		if (!process.stdin.isTTY) {
-			this.info(`Schema ${this.bold(this.tenant)} does not exist. Creating it.`);
-			return true;
+			this.error(
+				`Schema ${this.bold(this.tenant)} does not exist. Run again with --create-schema to ` +
+					'create it.'
+			);
+			return false;
 		}
 
 		const answers = await prompts(

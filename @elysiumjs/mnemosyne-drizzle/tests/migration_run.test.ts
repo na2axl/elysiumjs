@@ -132,15 +132,21 @@ describe('migration:run', () => {
 		for (const signal of ['SIGINT', 'SIGTERM'] as const) process.removeAllListeners(signal);
 	});
 
-	const run = async (schemaExists: boolean, args: string[] = []) => {
+	const run = async (
+		schemaExists: boolean,
+		args: string[] = [],
+		tenant = 'acme',
+		setup: (fake: ReturnType<typeof fakeBunSql>) => void = () => {}
+	) => {
 		const fake = fakeBunSql(schemaExists);
+		setup(fake);
 		@Application.register({
 			modules: [DrizzleModule.with({ connections: { default: { client: fake.client as never } } })]
 		})
 		class TestApp extends Application {}
 		const app = new TestApp();
 		started = app;
-		await app.run(['migration:run', '--tenant', 'acme', ...args]);
+		await app.run(['migration:run', '--tenant', tenant, ...args]);
 		return fake;
 	};
 
@@ -199,12 +205,52 @@ describe('migration:run', () => {
 		expect(process.exit).toHaveBeenCalledWith(1);
 	});
 
-	it('creates a missing schema without prompting when there is no TTY', async () => {
+	it('fails without a TTY when the schema is missing and --create-schema is not given', async () => {
 		process.stdin.isTTY = false;
 
-		const { statements } = await run(false);
+		const { statements, client } = await run(false);
+
+		expect(client.begin).not.toHaveBeenCalled();
+		expect(statements.map(({ text }) => text)).not.toContain('CREATE SCHEMA IF NOT EXISTS "acme";');
+		expect(output).toContain('--create-schema');
+		expect(process.exit).toHaveBeenCalledWith(1);
+		expect(client.close).toHaveBeenCalled();
+	});
+
+	it('creates a missing schema without prompting with --create-schema', async () => {
+		process.stdin.isTTY = true;
+		// Would decline if the user were asked.
+		prompts.inject([false]);
+
+		const { statements } = await run(false, ['--create-schema']);
 
 		expect(statements.map(({ text }) => text)).toContain('CREATE SCHEMA IF NOT EXISTS "acme";');
-		expect(output).toContain('Creating it');
+		expect(process.exit).not.toHaveBeenCalledWith(1);
+	});
+
+	it.each(['a"b', 'pg_catalog', 'information_schema', 'x'.repeat(64)])(
+		'rejects the malformed tenant %p before connecting',
+		async (tenant) => {
+			const { client, statements } = await run(true, [], tenant);
+
+			expect(client.connect).not.toHaveBeenCalled();
+			expect(statements).toEqual([]);
+			expect(output).toContain('Invalid tenant');
+			expect(process.exit).toHaveBeenCalledWith(1);
+		}
+	);
+
+	it('closes the client when the transaction fails', async () => {
+		let client: ReturnType<typeof fakeBunSql>['client'];
+
+		await run(true, [], 'acme', (fake) => {
+			client = fake.client;
+			fake.client.begin = mock(async () => {
+				throw new Error('connection lost');
+			});
+		}).catch(() => {});
+
+		expect(client!.begin).toHaveBeenCalled();
+		expect(client!.close).toHaveBeenCalled();
 	});
 });
