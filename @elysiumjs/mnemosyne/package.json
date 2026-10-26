@@ -21,7 +21,9 @@
 		"build:ts": "tsc",
 		"build": "bun run clean && bun run build:js && bun run build:ts",
 		"typecheck": "tsc --noEmit",
-		"prepublishOnly": "bun run build"
+		"prepublishOnly": "bun run build",
+		"test": "bun test",
+		"test:coverage": "bun test --coverage"
 	},
 	"keywords": [
 		"elysium",

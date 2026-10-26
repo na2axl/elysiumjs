@@ -20,7 +20,9 @@
 		"build": "bun run clean && tsc && bun run build:minify",
 		"build:minify": "bun scripts/minify.ts",
 		"typecheck": "tsc --noEmit",
-		"prepublishOnly": "bun run build"
+		"prepublishOnly": "bun run build",
+		"test": "bun test",
+		"test:coverage": "bun test --coverage"
 	},
 	"keywords": [
 		"elysium",
