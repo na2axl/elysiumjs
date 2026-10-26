@@ -16,6 +16,7 @@ import type { DatabaseCacheConfig, DatabaseDriver } from '@elysiumjs/mnemosyne';
 import type { DrizzleConfig } from 'drizzle-orm';
 import type { BunSQLDatabase } from 'drizzle-orm/bun-sql/postgres';
 
+import { ElysiumError } from '@elysiumjs/core';
 import { AbstractDatabase, getCurrentTenant, getTenancyConfig } from '@elysiumjs/mnemosyne';
 import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
@@ -54,25 +55,59 @@ export type DrizzleConnection = BunSQLDatabase<Record<string, never>> & { $clien
 // ============================================================================
 
 /**
- * The tenant set on each open transaction by {@link setTransactionTenant}.
- * @internal
+ * Thrown in RLS mode when work for one tenant would join a transaction bound to another.
+ *
+ * A transaction is bound to the tenant set when it is opened, for its whole life. Work for another
+ * tenant must run outside the transaction, or in its own `withRLS()` before the transaction opens.
+ * @author Axel Nana <axel.nana@workbud.com>
  */
-export const transactionTenants = new WeakMap<object, string>();
+export class TenantMismatchError extends ElysiumError {
+	/**
+	 * @param transactionTenant The tenant the open transaction is bound to, or `null` if none.
+	 * @param tenant The tenant of the work that tried to join it.
+	 */
+	constructor(
+		public readonly transactionTenant: string | null,
+		public readonly tenant: string
+	) {
+		super(
+			`Cannot run work for tenant "${tenant}" in a transaction bound to ` +
+				(transactionTenant === null ? 'no tenant' : `tenant "${transactionTenant}"`) +
+				'. Run it outside the transaction, or in its own withRLS() before opening the transaction.'
+		);
+	}
+}
+
+/** The tenant each open transaction is bound to, set by {@link bindTransactionTenant}. */
+const transactionTenants = new WeakMap<object, string>();
 
 /**
- * Sets the RLS tenant variable on a transaction, for the rest of that transaction only.
+ * Binds a transaction to a tenant: sets the RLS tenant variable for the rest of the transaction.
  * @internal
  * @author Axel Nana <axel.nana@workbud.com>
- * @param tx The transaction.
+ * @param tx The transaction, just opened.
  * @param tenant The tenant identifier.
  */
-export const setTransactionTenant = async (
+export const bindTransactionTenant = async (
 	tx: DrizzleConnection,
 	tenant: string
 ): Promise<void> => {
 	const varName = getTenancyConfig().rls?.sessionVariable ?? 'app.current_tenant';
 	await tx.execute(sql`SELECT set_config(${varName}, ${tenant}, true)`);
 	transactionTenants.set(tx, tenant);
+};
+
+/**
+ * Checks that work for a tenant may join an open transaction: it must be bound to that tenant.
+ * @internal
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param tx The open transaction.
+ * @param tenant The tenant of the work.
+ * @throws {TenantMismatchError} If the transaction is bound to another tenant, or to none.
+ */
+export const assertTransactionTenant = (tx: DrizzleConnection, tenant: string): void => {
+	const bound = transactionTenants.get(tx);
+	if (bound !== tenant) throw new TenantMismatchError(bound ?? null, tenant);
 };
 
 // ============================================================================
@@ -88,6 +123,28 @@ export const setTransactionTenant = async (
  * @author Axel Nana <axel.nana@workbud.com>
  */
 class DrizzleDatabase extends AbstractDatabase<DrizzleConnection, DrizzleConnectionProps> {
+	/**
+	 * Runs a callback in a transaction, joining the one open on the connection if any.
+	 *
+	 * In RLS mode, a new transaction is bound to the current tenant (or `public`), and an open one
+	 * is only joined when it is bound to the current tenant.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param callback The function to run with the transaction.
+	 * @param name The connection name.
+	 * @returns The return value of the callback.
+	 * @throws {TenantMismatchError} If the open transaction is bound to another tenant.
+	 */
+	public override async transaction<T>(
+		callback: (tx: DrizzleConnection) => Promise<T>,
+		name: string = 'default'
+	): Promise<T> {
+		if (getTenancyConfig().mode === 'rls') {
+			const active = this.getActiveTransaction(this.getBaseConnection(name));
+			if (active !== undefined) assertTransactionTenant(active, getCurrentTenant() ?? 'public');
+		}
+		return super.transaction(callback, name);
+	}
+
 	/**
 	 * Creates a Drizzle connection from its properties. Used by the `DrizzleModule` to build
 	 * the `db.connection.{name}` services.
@@ -135,7 +192,7 @@ class DrizzleDatabase extends AbstractDatabase<DrizzleConnection, DrizzleConnect
 				// In RLS mode, every transaction opened through the database (`Database.transaction`,
 				// `@transactional` handlers) is scoped to the current tenant.
 				if (getTenancyConfig().mode === 'rls') {
-					await setTransactionTenant(
+					await bindTransactionTenant(
 						tx as unknown as DrizzleConnection,
 						getCurrentTenant() ?? 'public'
 					);

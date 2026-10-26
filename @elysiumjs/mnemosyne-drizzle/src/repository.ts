@@ -64,9 +64,9 @@ export const DrizzleRepository = <
 		 *
 		 * In RLS tenancy mode, an operation that runs outside a transaction is wrapped in one
 		 * scoped to the current tenant (through the tenancy strategy's `withIsolation`), so RLS
-		 * policies apply to it. Inside an open transaction, the operation joins it, under the
-		 * current tenant, and waits for tenant switches running on that transaction (see
-		 * `DrizzleRLSTenancy.withIsolation`).
+		 * policies apply to it. Inside an open transaction, the operation joins it when the
+		 * transaction is bound to the current tenant, and throws `TenantMismatchError` otherwise
+		 * (see `DrizzleRLSTenancy.withIsolation`).
 		 * @param operation The operation to run with the connection to use.
 		 * @returns The return value of the operation.
 		 */

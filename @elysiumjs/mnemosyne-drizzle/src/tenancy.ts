@@ -21,13 +21,11 @@ import type {
 } from 'drizzle-orm/pg-core';
 import type { DrizzleConnection } from './database';
 
-import { AsyncLocalStorage } from 'node:async_hooks';
-
 import { getTenancyConfig, isValidTenantId, withTenant } from '@elysiumjs/mnemosyne';
 import { sql } from 'drizzle-orm';
 import { getTableConfig, pgPolicy, pgSchema, pgTable } from 'drizzle-orm/pg-core';
 
-import { Database, setTransactionTenant, transactionTenants } from './database';
+import { assertTransactionTenant, bindTransactionTenant, Database } from './database';
 import { getTableBuilders } from './table';
 
 // ============================================================================
@@ -128,12 +126,14 @@ export const wrapTenantSchema = <
  *
  * The transaction is registered in the async context, so repositories and
  * `Database.getConnection()` use it inside the callback. When a transaction is already open on the
- * connection, the callback runs in it with the tenant switched for its duration.
+ * connection, the callback joins it if it is bound to the same tenant. Work for several tenants
+ * (such as an admin fan-out) must use one `withRLS()` per tenant, outside any transaction.
  * @author Axel Nana <axel.nana@workbud.com>
  * @param tenant The tenant identifier (or `null` for 'public').
  * @param callback The function to execute within the transaction.
  * @param connectionName The database connection name.
  * @returns The return value of the callback.
+ * @throws {TenantMismatchError} If the open transaction is bound to another tenant.
  */
 export const withRLS = async <T>(
 	tenant: string | null,
@@ -247,16 +247,16 @@ export class DrizzleRLSTenancy implements TenancyStrategy<PgTable, DrizzleConnec
 	/**
 	 * Runs a callback in a transaction scoped to the given tenant.
 	 *
-	 * The transaction is registered in the async context for the connection, and the tenant set as
-	 * the current tenant, for the duration of the callback. When a transaction is already open on
-	 * the connection, the callback runs in it, with the tenant variable switched for its duration
-	 * and restored afterwards. Callbacks run this way on the same transaction run one at a time,
-	 * so that concurrent ones never see each other's tenant.
+	 * The transaction is bound to the tenant for its whole life, registered in the async context
+	 * for the connection, and the tenant set as the current tenant, for the duration of the
+	 * callback. When a transaction is already open on the connection, the callback joins it, which
+	 * is only allowed when that transaction is bound to the same tenant.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param connection The base connection (see `Database.getBaseConnection`).
 	 * @param tenant The tenant identifier.
 	 * @param callback The function to execute within the isolated context.
 	 * @returns The return value of the callback.
+	 * @throws {TenantMismatchError} If the open transaction is bound to another tenant.
 	 */
 	async withIsolation<T>(
 		connection: DrizzleConnection,
@@ -264,72 +264,16 @@ export class DrizzleRLSTenancy implements TenancyStrategy<PgTable, DrizzleConnec
 		callback: () => Promise<T>
 	): Promise<T> {
 		const active = Database.getActiveTransaction(connection);
-		if (active !== undefined) return switchTenant(active, tenant, callback);
+		if (active !== undefined) {
+			assertTransactionTenant(active, tenant);
+			return withTenant(tenant, callback);
+		}
 
 		return connection.transaction(async (tx) => {
-			await setTransactionTenant(tx as unknown as DrizzleConnection, tenant);
+			await bindTransactionTenant(tx as unknown as DrizzleConnection, tenant);
 			return withTenant(tenant, () =>
 				Database.runInTransaction(connection, tx as unknown as DrizzleConnection, callback)
 			);
 		});
 	}
 }
-
-/** The end of the last tenant switch queued on each open transaction. */
-const switchQueues = new WeakMap<object, Promise<void>>();
-
-/** The transactions whose tenant switches are held by the current async context. */
-const heldSwitches = new AsyncLocalStorage<ReadonlySet<object>>();
-
-/**
- * Runs a callback once every tenant switch queued before it on the transaction has ended, and
- * holds the transaction until the callback ends. Switches nested in the callback run right away.
- * @param tx The open transaction.
- * @param callback The function to run.
- */
-const withSwitchLock = async <T>(tx: DrizzleConnection, callback: () => Promise<T>): Promise<T> => {
-	const held = heldSwitches.getStore();
-	if (held?.has(tx)) return callback();
-
-	const queued = switchQueues.get(tx);
-	const { promise: ended, resolve: end } = Promise.withResolvers<void>();
-	switchQueues.set(tx, ended);
-	try {
-		await queued;
-		return await heldSwitches.run(new Set([...(held ?? []), tx]), callback);
-	} finally {
-		end();
-	}
-};
-
-/**
- * Runs a callback in an open transaction with its RLS tenant switched to the given one, then
- * restores the previous tenant.
- * @param tx The open transaction.
- * @param tenant The tenant to switch to.
- * @param callback The function to run.
- */
-const switchTenant = <T>(
-	tx: DrizzleConnection,
-	tenant: string,
-	callback: () => Promise<T>
-): Promise<T> =>
-	withSwitchLock(tx, async () => {
-		const previous = transactionTenants.get(tx);
-		if (previous === tenant) return withTenant(tenant, callback);
-
-		// An empty tenant matches no row, which is the safe value when none was set before.
-		const restore = () => setTransactionTenant(tx, previous ?? '');
-		await setTransactionTenant(tx, tenant);
-		let result: T;
-		try {
-			result = await withTenant(tenant, callback);
-		} catch (error) {
-			// After a failed statement, PostgreSQL rejects every statement until the transaction
-			// ends, so the restore fails too: rethrow the error of the callback, not that one.
-			await restore().catch(() => transactionTenants.delete(tx));
-			throw error;
-		}
-		await restore();
-		return result;
-	});
