@@ -50,3 +50,6 @@
 
 # Turborepo
 .turbo
+
+# npm credentials
+.npmrc
