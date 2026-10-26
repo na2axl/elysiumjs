@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Service } from './service';
+import { Container } from './container';
 
 /**
  * Interface for structured application logging.
@@ -91,7 +91,7 @@ export const LOGGER_SERVICE = 'logger';
 export const getLogger = (context?: Record<string, unknown>): LoggerInterface => {
 	let logger: LoggerInterface | null = null;
 	try {
-		logger = Service.get<LoggerInterface>(LOGGER_SERVICE);
+		logger = Container.getGlobal(LOGGER_SERVICE) as LoggerInterface | null;
 	} catch {
 		// Logging must not fail because the logger service is not ready or failed to build.
 	}

@@ -16,7 +16,12 @@ import type { LoggerInterface } from '../src/logger';
 
 import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
+import { Container } from '../src/container';
+import { Kernel } from '../src/kernel';
 import { ConsoleLogger, getLogger, LOGGER_SERVICE } from '../src/logger';
+import { Module } from '../src/module';
+import { ModuleContext } from '../src/module-context';
+import { buildModuleGraph } from '../src/module-graph';
 import { Service } from '../src/service';
 
 const fakeLogger = (): LoggerInterface & { child: ReturnType<typeof mock> } => {
@@ -35,6 +40,31 @@ const fakeLogger = (): LoggerInterface & { child: ReturnType<typeof mock> } => {
 describe('getLogger', () => {
 	afterEach(() => {
 		if (Service.exists(LOGGER_SERVICE)) Service.remove(LOGGER_SERVICE);
+	});
+
+	it('resolves the global logger service, not one a module declares', async () => {
+		const moduleLogger = fakeLogger();
+		@Module.register({ services: [{ name: LOGGER_SERVICE, factory: () => moduleLogger }] })
+		class WithOwnLogger extends Module {}
+
+		const graph = buildModuleGraph([WithOwnLogger], 'test');
+		const kernel = new Kernel(graph);
+		try {
+			await kernel.register();
+			await kernel.initModule(graph.node(WithOwnLogger)!);
+			const globalLogger = fakeLogger();
+			Service.instance(LOGGER_SERVICE, globalLogger);
+
+			ModuleContext.run(graph.node(WithOwnLogger)!, () => {
+				expect(Service.get(LOGGER_SERVICE)).toBe(moduleLogger);
+				expect(getLogger()).toBe(globalLogger);
+			});
+		} finally {
+			Container.reset();
+			Container.setVisibility(null);
+			Container.setModuleInitHook(null);
+			Container.setSkippedLookup(null);
+		}
 	});
 
 	it('uses the logger service name', () => {

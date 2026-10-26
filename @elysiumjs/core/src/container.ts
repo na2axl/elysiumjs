@@ -379,6 +379,16 @@ export namespace Container {
 	}
 
 	/**
+	 * Gets a service of the global scope, ignoring the services of the current module context.
+	 * @returns The service, or `null` if there is no global service with that name.
+	 * @throws {ServiceNotReadyError} If the service or its module is still initialising.
+	 */
+	export function getGlobal(name: string): unknown {
+		const entry = globalScope.get(name);
+		return entry ? entryValue(entry) : null;
+	}
+
+	/**
 	 * Like {@link get}, but awaits the `onInit` of the service and of its owning module.
 	 * @throws {ServiceNotFoundError | ServiceNotVisibleError | EnvironmentSkippedModuleError}
 	 */
