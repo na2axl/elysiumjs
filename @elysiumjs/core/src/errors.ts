@@ -160,7 +160,7 @@ export class ServiceNotReadyError extends ElysiumError {
 	) {
 		const where = owner ? ` Its module ${owner} initialises asynchronously.` : '';
 		super(
-			`Service "${service}" is not ready yet.${where} Use "await Service.resolve()" to await it, or set "static boot = true" on the command to initialise every module before it runs.`
+			`Service "${service}" is not ready yet.${where} Use "await Service.resolve()" to wait for it. In a command, set "static boot = true" to initialise every module before it runs.`
 		);
 	}
 }
