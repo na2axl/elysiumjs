@@ -238,21 +238,34 @@ async function* iterateInModule<T>(node: ModuleNode, generator: AsyncGenerator<T
 	}
 }
 
+/** Thrown inside the scope of a generator closed before its end, so that the scope fails. */
+const cancellation = new Error('The stream was closed before its end.');
+
 /**
  * Iterates a generator inside a scope that stays open until the iteration ends.
  *
  * Every step of the generator runs inside `scope`, so it sees the async context the scope sets up.
  * Callback-style scopes such as database transactions would otherwise end (and commit) as soon as
- * the generator object is created, before its body has run. The scope ends when the generator is
- * exhausted, throws, or is closed early; an error raised by the scope itself (such as a failed
- * commit) is rethrown to the consumer.
+ * the generator object is created, before its body has run. The scope ends successfully when the
+ * generator is exhausted. It fails when the generator throws, or is cancelled: closed early by the
+ * consumer, or `signal` aborted (the client disconnected), even while a step is still running.
+ * Transactions therefore roll back unless the whole stream was sent. An error raised by the scope
+ * itself (such as a failed commit) is rethrown to the consumer.
  * @param scope Runs its body inside the scope and settles when the scope ends.
  * @param start Creates the generator to iterate. Called inside the scope.
+ * @param signal Aborted when the stream is cancelled, such as `request.signal`.
  */
 async function* iterateInScope<T>(
 	scope: (body: () => Promise<void>) => Promise<unknown>,
-	start: () => AsyncGenerator<T>
+	start: () => AsyncGenerator<T>,
+	signal?: AbortSignal
 ): AsyncGenerator<T> {
+	const cancelled = Promise.withResolvers<never>();
+	cancelled.promise.catch(() => {});
+	const cancel = () => cancelled.reject(cancellation);
+	if (signal?.aborted) cancel();
+	signal?.addEventListener('abort', cancel, { once: true });
+
 	const pending = () => {
 		const deferred = Promise.withResolvers<IteratorResult<T>>();
 		// Rejections reach the consumer through `finished` when nobody waits on this step.
@@ -265,15 +278,22 @@ async function* iterateInScope<T>(
 
 	const finished = scope(async () => {
 		const generator = start();
-		while (await resume.promise) {
-			resume = Promise.withResolvers();
-			const step = await generator.next();
-			const current = deliver;
-			deliver = pending();
-			current.resolve(step);
-			if (step.done) return;
+		try {
+			while (await Promise.race([resume.promise, cancelled.promise])) {
+				resume = Promise.withResolvers();
+				const step = await Promise.race([generator.next(), cancelled.promise]);
+				const current = deliver;
+				deliver = pending();
+				current.resolve(step);
+				if (step.done) return;
+			}
+		} catch (error) {
+			// A running step cannot be interrupted: the generator is closed once it settles.
+			if (error === cancellation) generator.return(undefined).catch(() => {});
+			throw error;
 		}
 		await generator.return(undefined);
+		throw cancellation;
 	});
 	finished.catch((error) => deliver.reject(error));
 
@@ -282,7 +302,10 @@ async function* iterateInScope<T>(
 		while (true) {
 			const current = deliver;
 			resume.resolve(true);
-			const step = await current.promise;
+			const step = await current.promise.catch((error) => {
+				if (error === cancellation) return { done: true, value: undefined } as const;
+				throw error;
+			});
 			if (step.done) {
 				completed = true;
 				return;
@@ -290,8 +313,11 @@ async function* iterateInScope<T>(
 			yield step.value;
 		}
 	} finally {
+		signal?.removeEventListener('abort', cancel);
 		if (!completed) resume.resolve(false);
-		await finished;
+		await finished.catch((error) => {
+			if (error !== cancellation) throw error;
+		});
 	}
 }
 
@@ -566,7 +592,8 @@ export namespace Http {
 								try {
 									yield* iterateInScope(
 										(body) => inRequestScope(c, body),
-										() => iterateInModule(node, callHandler<AsyncGenerator>(c, params))
+										() => iterateInModule(node, callHandler<AsyncGenerator>(c, params)),
+										c.request?.signal
 									);
 								} catch (error: any) {
 									yield error;
