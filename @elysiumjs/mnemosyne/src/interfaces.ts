@@ -32,9 +32,10 @@ export interface DatabaseDriver<TConnection = unknown, TConnectionConfig = unkno
 	/**
 	 * Creates a new database connection from the given configuration.
 	 * @param config The connection configuration.
+	 * @param name The name of the connection, when the driver scopes resources by connection.
 	 * @returns A new database connection.
 	 */
-	createConnection(config: TConnectionConfig): TConnection;
+	createConnection(config: TConnectionConfig, name?: string): TConnection;
 
 	/**
 	 * Executes a callback within a database transaction.

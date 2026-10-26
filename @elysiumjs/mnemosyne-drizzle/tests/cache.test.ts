@@ -101,6 +101,55 @@ describe('DrizzleDatabaseCache', () => {
 		});
 	});
 
+	describe('connection isolation', () => {
+		it('never serves the rows cached for one connection to another', async () => {
+			const main = new DrizzleDatabaseCache('all', 60, 'memory', 'main');
+			const replica = new DrizzleDatabaseCache('all', 60, 'memory', 'analytics');
+
+			await query(main, 'k', ['users'], () => ['main']);
+
+			expect(await replica.get('k', ['users'], false, true)).toBeUndefined();
+		});
+
+		it('keeps the table versions of each connection apart', async () => {
+			const main = new DrizzleDatabaseCache('all', 60, 'memory', 'main');
+			const other = new DrizzleDatabaseCache('all', 60, 'memory', 'other');
+			await query(main, 'k', ['users'], () => ['main']);
+			await query(other, 'k', ['users'], () => ['other']);
+
+			await other.onMutate({ tables: ['users'] });
+
+			expect(await main.get('k', ['users'], false, true)).toEqual(['main']);
+			expect(await other.get('k', ['users'], false, true)).toBeUndefined();
+		});
+
+		it('does not bypass the cache of a connection with no open transaction', async () => {
+			const main = new DrizzleDatabaseCache('all', 60, 'memory', 'main');
+			const other = new DrizzleDatabaseCache('all', 60, 'memory', 'other');
+			await query(other, 'k', ['users'], () => ['other']);
+
+			await main.trackTransaction(async () => {
+				expect(await other.get('k', ['users'], false, true)).toEqual(['other']);
+				await other.onMutate({ tables: ['users'] });
+				expect(await other.get('k', ['users'], false, true)).toBeUndefined();
+			});
+		});
+
+		it('names the cache of a connection after it', async () => {
+			const fake = fakeSql(() => [{ id: 1 }]);
+			const connect = (name: string) =>
+				Database.createConnection(
+					{ client: fake.client as never, cache: { strategy: 'all', storage: 'memory' } },
+					name
+				);
+
+			await connect('main').select().from(posts);
+			await connect('other').select().from(posts);
+
+			expect(fake.log.filter(({ query }) => query.startsWith('select'))).toHaveLength(2);
+		});
+	});
+
 	describe('invalidation', () => {
 		it('is seen by every instance sharing the cache store', async () => {
 			const first = new DrizzleDatabaseCache('all', 60, 'memory');

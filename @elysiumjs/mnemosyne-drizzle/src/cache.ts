@@ -49,9 +49,6 @@ type Pending = { signature: string; versionKeys: string[]; at: number };
 /** Tables and tags mutated inside a transaction, invalidated once it commits. */
 type TransactionScope = { tables: Set<string>; tags: Set<string> };
 
-/** The transaction scope of the current async context, if any. */
-const transactionScope = new AsyncLocalStorage<TransactionScope>();
-
 /** The symbol under which Drizzle stores the schema of a table. */
 const TABLE_SCHEMA = Symbol.for('drizzle:Schema');
 
@@ -69,8 +66,9 @@ const toArray = <T>(value: T | T[] | undefined): T[] =>
 /**
  * Drizzle query cache backed by the framework's cache storage.
  *
- * - Results are cached per tenant: the key includes the current tenant (or `public`), and tags
- *   are invalidated for the current tenant.
+ * - Results are cached per connection and tenant: every key starts with the connection name,
+ *   result keys include the current tenant (or `public`), and tags are invalidated for the
+ *   current tenant. Each connection has its own transaction scope.
  * - Invalidation works across application instances sharing the cache store: each table has a
  *   version token in the store, every result records the versions it was read at, and a mutation
  *   replaces the versions of the tables it touches. Table versions are shared by all tenants, as
@@ -96,6 +94,10 @@ export class DrizzleDatabaseCache extends DrizzleCache {
 	#cache?: Omit<CacheInterface, 'tags'>;
 	#cacheStrategy: 'explicit' | 'all';
 	#globalTtl: number;
+	#connectionName: string;
+
+	/** The transaction open on this cache's connection in the current async context, if any. */
+	#transactionScope = new AsyncLocalStorage<TransactionScope>();
 
 	/**
 	 * The versions read by `get` for each missed key, oldest first, checked by the following `put`.
@@ -108,16 +110,19 @@ export class DrizzleDatabaseCache extends DrizzleCache {
 	 * @param cacheStrategy Whether queries are cached only when they opt in (`explicit`), or always.
 	 * @param globalTtl The default time to live of cached results, in seconds.
 	 * @param storageEngine The cache storage to use.
+	 * @param connectionName The name of the connection, which prefixes every key.
 	 */
 	constructor(
 		cacheStrategy: 'explicit' | 'all' = 'explicit',
 		globalTtl: number = DEFAULT_CACHE_TTL,
-		storageEngine: 'redis' | 'memory' = 'redis'
+		storageEngine: 'redis' | 'memory' = 'redis',
+		connectionName: string = 'default'
 	) {
 		super();
 		this.#cacheStrategy = cacheStrategy;
 		this.#globalTtl = globalTtl;
 		this.#storageEngine = storageEngine;
+		this.#connectionName = connectionName;
 	}
 
 	/**
@@ -149,7 +154,7 @@ export class DrizzleDatabaseCache extends DrizzleCache {
 	 */
 	public async trackTransaction<T>(run: () => Promise<T>): Promise<T> {
 		const scope: TransactionScope = { tables: new Set(), tags: new Set() };
-		const result = await transactionScope.run(scope, run);
+		const result = await this.#transactionScope.run(scope, run);
 		await this.#invalidate([...scope.tables], [...scope.tags]);
 		return result;
 	}
@@ -160,7 +165,7 @@ export class DrizzleDatabaseCache extends DrizzleCache {
 		isTag: boolean = false,
 		autoInvalidate?: boolean
 	): Promise<any[] | undefined> {
-		if (transactionScope.getStore()) return undefined;
+		if (this.#transactionScope.getStore()) return undefined;
 
 		const storage = await this.#storage();
 		const entryKey = this.#entryKey(key, isTag);
@@ -197,7 +202,7 @@ export class DrizzleDatabaseCache extends DrizzleCache {
 		isTag: boolean,
 		config?: CacheConfig
 	): Promise<void> {
-		if (transactionScope.getStore()) return;
+		if (this.#transactionScope.getStore()) return;
 
 		const entryKey = this.#entryKey(key, isTag);
 		const pending = this.#live(entryKey);
@@ -230,7 +235,7 @@ export class DrizzleDatabaseCache extends DrizzleCache {
 		const tables = toArray<string | Table>(params.tables).map(tableKey);
 		const tags = toArray(params.tags);
 
-		const scope = transactionScope.getStore();
+		const scope = this.#transactionScope.getStore();
 		if (scope) {
 			for (const table of tables) scope.tables.add(table);
 			for (const tag of tags) scope.tags.add(tag);
@@ -295,13 +300,14 @@ export class DrizzleDatabaseCache extends DrizzleCache {
 		return this.#globalTtl * 1000;
 	}
 
-	/** Gets the key of a query result (or tag) for the current tenant. */
+	/** Gets the key of a query result (or tag) for the connection and the current tenant. */
 	#entryKey(key: string, isTag: boolean): string {
-		return `${isTag ? 'tag' : 'query'}:${getCurrentTenant() ?? 'public'}:${key}`;
+		const kind = isTag ? 'tag' : 'query';
+		return `${this.#connectionName}:${kind}:${getCurrentTenant() ?? 'public'}:${key}`;
 	}
 
-	/** Gets the key of the version of a table. */
+	/** Gets the key of the version of a table of the connection. */
 	#versionKey(table: string): string {
-		return `version:${table}`;
+		return `${this.#connectionName}:version:${table}`;
 	}
 }

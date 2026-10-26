@@ -93,24 +93,29 @@ class DrizzleDatabase extends AbstractDatabase<DrizzleConnection, DrizzleConnect
 	 * the `db.connection.{name}` services.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param props The connection properties.
+	 * @param name The name of the connection, which scopes its query cache.
 	 * @returns A new connection.
 	 */
-	public createConnection(props: DrizzleConnectionProps): DrizzleConnection {
-		return this.driver.createConnection(props);
+	public createConnection(
+		props: DrizzleConnectionProps,
+		name: string = 'default'
+	): DrizzleConnection {
+		return this.driver.createConnection(props, name);
 	}
 
 	protected driver: DatabaseDriver<DrizzleConnection, DrizzleConnectionProps> = {
-		createConnection(config) {
+		createConnection(config, name: string = 'default') {
 			const cache =
 				config.cache === undefined
 					? undefined
 					: config.cache === true
-						? new DrizzleDatabaseCache()
+						? new DrizzleDatabaseCache(undefined, undefined, undefined, name)
 						: config.cache.enabled !== false
 							? new DrizzleDatabaseCache(
 									config.cache.strategy,
 									config.cache.ttl,
-									config.cache.storage
+									config.cache.storage,
+									name
 								)
 							: undefined;
 			const connection = drizzle({ ...config, cache }) as DrizzleConnection;
