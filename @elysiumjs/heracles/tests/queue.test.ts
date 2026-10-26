@@ -294,6 +294,26 @@ describe('Queue', () => {
 
 			expect(events).toEqual(['start', 'stop', 'start']);
 		});
+
+		it('should not start twice when a failed start settles behind a newer one', async () => {
+			const name = uniqueQueueName();
+			const queue = Queue.get(name, { transport: MockTransport });
+			const transport = (queue as any).transport as MockTransport;
+
+			transport.start.mockImplementationOnce(async () => {
+				await Bun.sleep(5);
+				throw new Error('start failed');
+			});
+
+			const failing = queue.start().catch(() => {});
+			const stopping = queue.stop();
+			const second = queue.start();
+			await failing;
+			const third = queue.start();
+			await Promise.all([stopping, second, third]);
+
+			expect(transport.start).toHaveBeenCalledTimes(2);
+		});
 	});
 
 	describe('getOptions / updateOptions', () => {

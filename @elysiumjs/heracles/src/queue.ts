@@ -542,15 +542,16 @@ export class Queue extends InteractsWithConsole {
 		if (!this.starting) {
 			const transport = this.transport;
 			const stopping = this.stopping;
-			this.starting = (async () => {
+			const starting: Promise<void> = (async () => {
 				await stopping?.catch(() => {});
 				await transport.start();
 				this.info(`Queue '${this.name}' transport started`);
 			})().catch((error) => {
-				// Let a later call retry.
-				this.starting = undefined;
+				// Let a later call retry, unless a stop or a newer start has replaced this one.
+				if (this.starting === starting) this.starting = undefined;
 				throw error;
 			});
+			this.starting = starting;
 		}
 
 		return this.starting;
