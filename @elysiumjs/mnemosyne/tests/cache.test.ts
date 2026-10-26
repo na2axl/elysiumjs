@@ -42,7 +42,11 @@ const RedisClientFake = mock(function () {
 		mget: async (...keys: string[]) => keys.map((k) => data.get(k) ?? null),
 		send: async (cmd: string, args: string[]) => {
 			if (cmd === 'UNLINK') return Number(data.delete(args[0]));
-			if (cmd === 'SCAN') return ['0', [...data.keys()]];
+			if (cmd === 'SCAN') {
+				const pattern = args[args.indexOf('MATCH') + 1] ?? '*';
+				const regex = new RegExp(`^${pattern.split('*').map(RegExp.escape).join('.*')}$`);
+				return ['0', [...data.keys()].filter((key) => regex.test(key))];
+			}
 			if (cmd === 'FLUSHDB') return data.clear();
 			return null;
 		}
@@ -502,4 +506,67 @@ describe('Cache namespacing and tagging', () => {
 		expect(keyvSpy).not.toHaveBeenCalled();
 		expect(createCache).not.toHaveBeenCalled();
 	});
+});
+
+describe('Cache namespace isolation', () => {
+	for (const name of ['memory', 'redis'] as const) {
+		describe(`Cache.${name}`, () => {
+			beforeEach(() => {
+				mock.restore();
+			});
+
+			it('keeps base and tagged entries apart', async () => {
+				const base = Cache[name];
+				const tagged = base.tags(`isolation-${name}`);
+
+				await base.set('shared-key', 'base');
+				await tagged.set('shared-key', 'tagged');
+
+				expect(await base.get<string>('shared-key')).toBe('base');
+				expect(await tagged.get<string>('shared-key')).toBe('tagged');
+			});
+
+			it('still reads base entries written before a tagged cache was created', async () => {
+				const base = Cache[name];
+				await base.set('before-tags', 'base');
+
+				base.tags(`late-${name}`);
+
+				expect(await base.get<string>('before-tags')).toBe('base');
+			});
+
+			it('clears only its own namespace', async () => {
+				const base = Cache[name];
+				const first = base.tags(`clear-a-${name}`);
+				const second = base.tags(`clear-b-${name}`);
+
+				await base.set('kept', 'base');
+				await first.set('kept', 'first');
+				await second.set('kept', 'second');
+
+				await first.clear();
+
+				expect(await first.get('kept')).toBeUndefined();
+				expect(await base.get<string>('kept')).toBe('base');
+				expect(await second.get<string>('kept')).toBe('second');
+
+				await base.clear();
+
+				expect(await base.get('kept')).toBeUndefined();
+				expect(await second.get<string>('kept')).toBe('second');
+			});
+
+			it('deletes only its own keys', async () => {
+				const base = Cache[name];
+				const tagged = base.tags(`del-${name}`);
+
+				await base.set('deleted', 'base');
+				await tagged.set('deleted', 'tagged');
+				await tagged.del('deleted');
+
+				expect(await tagged.get('deleted')).toBeUndefined();
+				expect(await base.get<string>('deleted')).toBe('base');
+			});
+		});
+	}
 });
