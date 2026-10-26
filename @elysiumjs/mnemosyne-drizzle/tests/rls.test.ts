@@ -17,11 +17,12 @@ import { TENANCY_CONFIG_SERVICE, TENANCY_STRATEGY_SERVICE, withTenant } from '@e
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import * as d from 'drizzle-orm/pg-core';
 
+import * as pkg from '../src';
 import { Database } from '../src/database';
 import { DrizzleModel } from '../src/model';
 import { DrizzleRepository } from '../src/repository';
 import { pgTable } from '../src/table';
-import { DrizzleRLSTenancy, withRLS } from '../src/tenancy';
+import { DrizzleRLSTenancy, getSessionTenant, withRLS } from '../src/tenancy';
 import { fakeConnection } from './fake-sql';
 
 const SET_TENANT = 'SELECT set_config($1, $2, true)';
@@ -141,6 +142,46 @@ describe('RLS isolation', () => {
 
 			expect(fake.log[1]!.params).toEqual(['app.current_tenant', 'public']);
 		});
+	});
+
+	describe('getSessionTenant', () => {
+		it('reads the tenant from the first row of the result', async () => {
+			fake = fakeConnection(() => [{ tenant: 'acme' }]);
+			Service.remove('db.connection.default');
+			Service.instance('db.connection.default', fake.connection);
+
+			expect(await getSessionTenant()).toBe('acme');
+			expect(fake.log[0]).toEqual({
+				client: 'root',
+				query: 'SELECT current_setting($1, true) as tenant',
+				params: ['app.current_tenant']
+			});
+		});
+
+		it('returns null when the variable is not set', async () => {
+			fake = fakeConnection(() => [{ tenant: null }]);
+			Service.remove('db.connection.default');
+			Service.instance('db.connection.default', fake.connection);
+
+			expect(await getSessionTenant()).toBeNull();
+		});
+
+		it('reads the variable on the open transaction', async () => {
+			fake = fakeConnection((query) =>
+				query.includes('current_setting') ? [{ tenant: 'tx' }] : []
+			);
+			Service.remove('db.connection.default');
+			Service.instance('db.connection.default', fake.connection);
+
+			expect(await withTenant('tx', () => Database.transaction(() => getSessionTenant()))).toBe(
+				'tx'
+			);
+			expect(fake.log.at(-2)!.client).toBe('tx');
+		});
+	});
+
+	it('no longer exports setConnectionTenant, which leaked tenants across pooled connections', () => {
+		expect('setConnectionTenant' in pkg).toBe(false);
 	});
 
 	describe('Database.transaction', () => {

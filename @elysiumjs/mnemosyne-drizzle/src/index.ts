@@ -41,7 +41,6 @@ export {
 	registerTenantSchema,
 	getTenantSchema,
 	withRLS,
-	setConnectionTenant,
 	getSessionTenant,
 	createRLSPolicy
 } from './tenancy';

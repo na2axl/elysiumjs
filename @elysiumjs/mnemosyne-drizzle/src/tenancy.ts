@@ -130,25 +130,8 @@ export const withRLS = async <T>(
 };
 
 /**
- * Sets the current tenant on a persistent database connection (session-level).
- * @author Axel Nana <axel.nana@workbud.com>
- * @param tenant The tenant identifier (or `null` for 'public').
- * @param connectionName The database connection name.
- */
-export const setConnectionTenant = async (
-	tenant: string | null,
-	connectionName: string = 'default'
-): Promise<void> => {
-	const db = Database.getConnection(connectionName);
-	const config = getTenancyConfig();
-	const varName = config.rls?.sessionVariable ?? 'app.current_tenant';
-	const value = tenant ?? 'public';
-
-	await (db as any).execute(sql`SELECT set_config(${varName}, ${value}, false)`);
-};
-
-/**
- * Reads the current tenant from the PostgreSQL session variable.
+ * Reads the current tenant from the PostgreSQL tenant variable, on the open transaction when
+ * there is one.
  * @author Axel Nana <axel.nana@workbud.com>
  * @param connectionName The database connection name.
  * @returns The current tenant identifier, or `null`.
@@ -160,8 +143,11 @@ export const getSessionTenant = async (
 	const config = getTenancyConfig();
 	const varName = config.rls?.sessionVariable ?? 'app.current_tenant';
 
-	const result = await (db as any).execute(sql`SELECT current_setting(${varName}, true) as tenant`);
-	return (result as any)?.rows?.[0]?.tenant ?? null;
+	// Bun SQL returns the rows as an array, not as a `{ rows }` result.
+	const [row] = (await db.execute(
+		sql`SELECT current_setting(${varName}, true) as tenant`
+	)) as unknown as Array<{ tenant: string | null }>;
+	return row?.tenant || null;
 };
 
 /**
