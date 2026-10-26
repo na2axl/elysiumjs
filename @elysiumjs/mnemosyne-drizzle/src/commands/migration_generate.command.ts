@@ -12,32 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { existsSync } from 'node:fs';
 import { exists } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
 
 import { Command, CommandArgumentType } from '@elysiumjs/core';
 import prompts from 'prompts';
 
-/**
- * Gets the root path of the Elysium.js project: the closest parent holding an `.elysiumrc`.
- * @author Axel Nana <axel.nana@workbud.com>
- */
-const getProjectPath = () => {
-	const startPath = process.cwd();
-	let dir = startPath;
-
-	while (true) {
-		if (existsSync(join(dir, '.elysiumrc'))) return dir;
-
-		const parentDir = dirname(dir);
-		if (dir === parentDir) break;
-
-		dir = parentDir;
-	}
-
-	return startPath;
-};
+import { getProjectPath } from './project';
 
 /**
  * Generates migration files.

@@ -17,6 +17,7 @@ import prompts from 'prompts';
 
 import { Database } from '../database';
 import { getMigrationName, planMigrations } from '../migrations';
+import { getMigrationsPath } from './project';
 
 /**
  * Execute migration files.
@@ -57,61 +58,32 @@ export class MigrationRunCommand extends Command {
 		const sql = Database.getConnection(this.connection).$client;
 		await sql.connect();
 
+		// Decide everything that needs the user before opening the transaction, so that no prompt
+		// keeps it (and its lock) open.
+		if (!this.fresh && !(await this.ensureSchemaChoice(sql))) {
+			await sql.close();
+			return process.exit(1);
+		}
+
 		await sql.begin(async (sql: Bun.SQL) => {
+			// Serialises concurrent runs for the same tenant: the lock is released at commit.
+			await sql`SELECT pg_advisory_xact_lock(hashtext(${`elysium_migrations:${this.tenant}`}))`;
+
 			if (this.fresh) {
 				await sql`DROP SCHEMA IF EXISTS ${sql(this.tenant)} CASCADE;`;
-				await sql`CREATE SCHEMA ${sql(this.tenant)};`;
 			}
+			await sql`CREATE SCHEMA IF NOT EXISTS ${sql(this.tenant)};`;
 
-			const [{ schema_exists }] = await sql`SELECT EXISTS (
-			SELECT schema_name
-			  FROM information_schema.schemata
-			 WHERE schema_name = ${this.tenant}
-		) AS schema_exists;`;
+			await sql`SET LOCAL search_path TO ${sql(this.tenant)}`;
 
-			if (!schema_exists) {
-				const answers = await prompts(
-					[
-						{
-							type: 'confirm',
-							name: 'create',
-							message: `Schema ${this.tenant} does not exist. Do you want to create it?`,
-							initial: true
-						}
-					],
-					{
-						onCancel: () => {
-							this.error('Operation cancelled.');
-							process.exit(0);
-						}
-					}
-				);
-
-				if (answers.create) {
-					await sql`CREATE SCHEMA ${sql(this.tenant)};`;
-				} else {
-					this.error(`Schema ${this.bold(this.tenant)} creation cancelled.`);
-					return process.exit(1);
-				}
-			}
-
-			await sql`SET search_path TO ${sql(this.tenant)};`;
-
-			const [{ table_exists }] = await sql`SELECT EXISTS (
-			SELECT *
-			  FROM information_schema.tables
-			 WHERE table_name = 'elysium_migrations'
-			   AND table_schema = ${this.tenant}
-		) AS table_exists;`;
-
-			if (!table_exists) {
-				await sql`CREATE TABLE elysium_migrations (
+			await sql`CREATE TABLE IF NOT EXISTS elysium_migrations (
 				id SERIAL PRIMARY KEY,
 				name TEXT NOT NULL,
 				batch INTEGER NOT NULL,
 				applied_at TIMESTAMP NOT NULL
 			);`;
-			}
+			// Also added to tables created by earlier versions.
+			await sql`CREATE UNIQUE INDEX IF NOT EXISTS elysium_migrations_name_unique ON elysium_migrations (name);`;
 
 			const rows: { name: string; applied_at: Date }[] =
 				await sql`SELECT name, applied_at FROM elysium_migrations;`;
@@ -120,7 +92,8 @@ export class MigrationRunCommand extends Command {
 				appliedAt: row.applied_at
 			}));
 
-			const filesIt = new Bun.Glob(`./src/database/migrations/**/*.sql`).scan({
+			const filesIt = new Bun.Glob('**/*.sql').scan({
+				cwd: getMigrationsPath(),
 				absolute: true,
 				onlyFiles: true
 			});
@@ -156,5 +129,48 @@ export class MigrationRunCommand extends Command {
 		});
 
 		await sql.close();
+	}
+
+	/**
+	 * Checks that the tenant schema exists, or that it may be created. Asks the user when the
+	 * schema is missing and a terminal is attached; without one, the schema is created.
+	 * @param sql The client.
+	 * @returns `false` if the user declined to create the schema.
+	 */
+	private async ensureSchemaChoice(sql: Bun.SQL): Promise<boolean> {
+		const [{ schema_exists }] = await sql`SELECT EXISTS (
+			SELECT schema_name
+			  FROM information_schema.schemata
+			 WHERE schema_name = ${this.tenant}
+		) AS schema_exists;`;
+		if (schema_exists) return true;
+
+		if (!process.stdin.isTTY) {
+			this.info(`Schema ${this.bold(this.tenant)} does not exist. Creating it.`);
+			return true;
+		}
+
+		const answers = await prompts(
+			[
+				{
+					type: 'confirm',
+					name: 'create',
+					message: `Schema ${this.tenant} does not exist. Do you want to create it?`,
+					initial: true
+				}
+			],
+			{
+				onCancel: () => {
+					this.error('Operation cancelled.');
+					process.exit(0);
+				}
+			}
+		);
+
+		if (!answers.create) {
+			this.error(`Schema ${this.bold(this.tenant)} creation cancelled.`);
+			return false;
+		}
+		return true;
 	}
 }
