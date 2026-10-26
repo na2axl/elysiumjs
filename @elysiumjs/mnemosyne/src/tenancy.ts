@@ -162,14 +162,15 @@ export const withTenant = <T>(tenant: string, callback: () => T): T => {
 // ============================================================================
 
 /**
- * The pattern a tenant identifier must match: 1 to 63 ASCII letters, digits, underscores or dashes.
+ * The pattern a tenant identifier must match: 1 to 63 ASCII letters, digits, underscores or dashes,
+ * not starting with `pg_` and other than `information_schema` (in any case).
  *
  * Tenant identifiers become PostgreSQL schema names in schema mode, and 63 bytes is the PostgreSQL
  * identifier limit. The pattern leaves out quotes, dots, spaces and other characters that would
- * need escaping or change how an identifier is read.
+ * need escaping or change how an identifier is read, and the names of PostgreSQL system schemas.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export const TENANT_ID_PATTERN = /^[A-Za-z0-9_-]{1,63}$/;
+export const TENANT_ID_PATTERN = /^(?!pg_)(?!information_schema$)[a-z0-9_-]{1,63}$/i;
 
 /**
  * Checks that a tenant identifier is well-formed (see {@link TENANT_ID_PATTERN}). This does not
