@@ -22,6 +22,7 @@ import { Elysia } from 'elysia';
 
 import { Event } from './event';
 import { Metadata } from './metadata';
+import { applyMiddlewares } from './middleware';
 import { ModuleContext } from './module-context';
 import { Service } from './service';
 import { nextTick, Symbols } from './utils';
@@ -91,10 +92,11 @@ export namespace Websocket {
 
 				const app = new Elysia({ name: `${node.id}:${target.name}` });
 
-				// TODO: Add middlewares here
+				// The middleware hooks run on the upgrade request, so they can reject the connection.
+				const middlewares = Metadata.get(Symbols.middlewares, target) ?? [];
+				applyMiddlewares(middlewares, app, node);
+
 				app.ws(props.path, {
-					// TODO: beforeHandle
-					// TODO: afterHandle
 					open,
 					close,
 					message,
