@@ -16,7 +16,17 @@ import type { CacheInterface } from '@elysiumjs/mnemosyne';
 
 import { Application } from '@elysiumjs/core';
 import { Cache, MnemosyneModule, withTenant } from '@elysiumjs/mnemosyne';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from 'bun:test';
+import {
+	afterAll,
+	afterEach,
+	beforeAll,
+	beforeEach,
+	describe,
+	expect,
+	it,
+	setSystemTime,
+	spyOn
+} from 'bun:test';
 import { eq } from 'drizzle-orm';
 import * as d from 'drizzle-orm/pg-core';
 
@@ -135,6 +145,63 @@ describe('DrizzleDatabaseCache', () => {
 			await cache.put('k', ['stale'], ['users'], false);
 
 			expect(await cache.get('k', ['users'], false, true)).toBeUndefined();
+		});
+
+		it.each([
+			['the newer query', 'puts first'],
+			['the older query', 'puts first']
+		])('never stores rows read before a mutation when %s %s', async (first) => {
+			const cache = new DrizzleDatabaseCache('all', 60, 'memory');
+
+			// A slow query misses before a mutation, a fast one after it.
+			await cache.get('k', ['users'], false, true);
+			await cache.onMutate({ tables: ['users'] });
+			await cache.get('k', ['users'], false, true);
+
+			const puts = first === 'the newer query' ? [['new'], ['old']] : [['old'], ['new']];
+			for (const rows of puts) await cache.put('k', rows, ['users'], false);
+
+			expect(await cache.get('k', ['users'], false, true)).not.toEqual(['old']);
+		});
+
+		it('stores the rows of concurrent queries read at the same versions', async () => {
+			const cache = new DrizzleDatabaseCache('all', 60, 'memory');
+
+			await cache.get('k', ['users'], false, true);
+			await cache.get('k', ['users'], false, true);
+			await cache.put('k', ['rows'], ['users'], false);
+			await cache.put('k', ['rows'], ['users'], false);
+
+			expect(await cache.get('k', ['users'], false, true)).toEqual(['rows']);
+		});
+
+		it('forgets the misses of failed queries once they are older than the TTL', async () => {
+			const cache = new DrizzleDatabaseCache('all', 5, 'memory');
+
+			try {
+				// The query fails: `put` is never called for this miss.
+				await cache.get('k', ['users'], false, true);
+				await cache.onMutate({ tables: ['users'] });
+				setSystemTime(new Date(Date.now() + 6000));
+
+				await query(cache, 'k', ['users'], () => ['rows']);
+			} finally {
+				setSystemTime();
+			}
+
+			expect(await cache.get('k', ['users'], false, true)).toEqual(['rows']);
+		});
+
+		it('bounds the number of keys waiting for their result', async () => {
+			const cache = new DrizzleDatabaseCache('all', 60, 'memory');
+
+			// Failed queries on many keys, the first one among them.
+			for (let i = 0; i <= 1000; i++) await cache.get(`k${i}`, ['users'], false, true);
+			await cache.onMutate({ tables: ['users'] });
+
+			await query(cache, 'k0', ['users'], () => ['rows']);
+
+			expect(await cache.get('k0', ['users'], false, true)).toEqual(['rows']);
 		});
 
 		it('keeps queries that opted out of auto invalidation', async () => {

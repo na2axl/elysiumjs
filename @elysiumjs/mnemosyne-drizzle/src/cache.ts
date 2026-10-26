@@ -34,11 +34,17 @@ export const DEFAULT_CACHE_TTL = 60;
  */
 const VERSION_TTL = 24 * 60 * 60 * 1000;
 
-/** Most results of a key kept waiting for their `put` before the oldest is dropped. */
+/** Most misses of a key kept waiting for their `put` before the oldest is dropped. */
 const MAX_PENDING_PER_KEY = 16;
+
+/** Most keys with misses waiting for their `put` before the least recent is dropped. */
+const MAX_PENDING_KEYS = 1000;
 
 /** A cached query result, with the table versions it was read at. */
 type Entry = { v: string; r: unknown[] };
+
+/** A cache miss waiting for the result of its query. */
+type Pending = { signature: string; versionKeys: string[]; at: number };
 
 /** Tables and tags mutated inside a transaction, invalidated once it commits. */
 type TransactionScope = { tables: Set<string>; tags: Set<string> };
@@ -69,7 +75,10 @@ const toArray = <T>(value: T | T[] | undefined): T[] =>
  *   version token in the store, every result records the versions it was read at, and a mutation
  *   replaces the versions of the tables it touches. Table versions are shared by all tenants, as
  *   a mutation made for one tenant can change rows other tenants read (shared tables, RLS
- *   bypass). Nothing is tracked in the process, and every key is written with a TTL.
+ *   bypass). Every key is written with a TTL.
+ * - A result is only stored when the table versions are still the ones its query started at, and
+ *   every concurrent miss of the key read the same versions: Drizzle does not pair a `put` with its
+ *   `get`, so a result that may predate a mutation is never stored.
  * - Inside a transaction, the cache is neither read nor written, since the transaction may read
  *   its own uncommitted changes. Tables mutated in a transaction are invalidated once it commits,
  *   and not at all when it rolls back.
@@ -89,10 +98,11 @@ export class DrizzleDatabaseCache extends DrizzleCache {
 	#globalTtl: number;
 
 	/**
-	 * The versions read by `get` for each missed key, oldest first, used by the following `put`.
-	 * Entries are removed by `put`; the list of a key is capped so failed queries do not grow it.
+	 * The versions read by `get` for each missed key, oldest first, checked by the following `put`.
+	 * Misses are removed by `put`, and dropped once older than the TTL (failed queries never call
+	 * `put`). Both the misses of a key and the number of keys are capped.
 	 */
-	#pending = new Map<string, string[]>();
+	#pending = new Map<string, Pending[]>();
 
 	/**
 	 * @param cacheStrategy Whether queries are cached only when they opt in (`explicit`), or always.
@@ -176,8 +186,7 @@ export class DrizzleDatabaseCache extends DrizzleCache {
 		const cached = entry as Entry | undefined;
 		if (cached !== undefined && cached.v === signature) return cached.r;
 
-		const pending = [...(this.#pending.get(entryKey) ?? []), signature];
-		this.#pending.set(entryKey, pending.slice(-MAX_PENDING_PER_KEY));
+		this.#remember(entryKey, { signature, versionKeys, at: Date.now() });
 		return undefined;
 	}
 
@@ -191,14 +200,23 @@ export class DrizzleDatabaseCache extends DrizzleCache {
 		if (transactionScope.getStore()) return;
 
 		const entryKey = this.#entryKey(key, isTag);
-		// Store the result with the versions read before the query ran: if a mutation happened
-		// meanwhile, the result is already outdated and must not match the current versions.
-		const [signature, ...rest] = this.#pending.get(entryKey) ?? [];
+		const pending = this.#live(entryKey);
+		// Drizzle does not say which `get` this result belongs to. When the waiting misses read
+		// different versions, a result may predate a mutation, so none of them is stored.
+		if (pending.length === 0 || new Set(pending.map((miss) => miss.signature)).size > 1) {
+			this.#pending.delete(entryKey);
+			return;
+		}
+		const [miss, ...rest] = pending;
 		if (rest.length > 0) this.#pending.set(entryKey, rest);
 		else this.#pending.delete(entryKey);
-		if (signature === undefined) return;
 
+		// A mutation since the query started makes the result outdated.
 		const storage = await this.#storage();
+		const current = await storage.mget<string>(miss!.versionKeys);
+		if (current.join('|') !== miss!.signature) return;
+
+		const signature = miss!.signature;
 		const ttl = await this.#ttl(storage, entryKey, config);
 		if (ttl <= 0) return;
 
@@ -220,6 +238,22 @@ export class DrizzleDatabaseCache extends DrizzleCache {
 		}
 
 		await this.#invalidate(tables, tags);
+	}
+
+	/** Records a miss of a key, as the most recently used key. */
+	#remember(entryKey: string, miss: Pending): void {
+		const pending = [...this.#live(entryKey), miss].slice(-MAX_PENDING_PER_KEY);
+		this.#pending.delete(entryKey);
+		this.#pending.set(entryKey, pending);
+		while (this.#pending.size > MAX_PENDING_KEYS) {
+			this.#pending.delete(this.#pending.keys().next().value!);
+		}
+	}
+
+	/** Gets the misses of a key that are not older than the TTL. */
+	#live(entryKey: string): Pending[] {
+		const since = Date.now() - this.#globalTtl * 1000;
+		return (this.#pending.get(entryKey) ?? []).filter((miss) => miss.at >= since);
 	}
 
 	/** Replaces the versions of the given tables, and deletes the given tags for the tenant. */
