@@ -20,6 +20,7 @@ import * as Elysia from 'elysia';
 
 import * as pkg from '../src';
 import { Application } from '../src/app';
+import { Event } from '../src/event';
 import { Http, HttpControllerScope } from '../src/http';
 import { Metadata } from '../src/metadata';
 import * as M from '../src/middleware';
@@ -784,6 +785,87 @@ describe('Http namespace', () => {
 
 			expect((await next).done).toBe(true);
 			expect(events).toEqual(['begin', 'rollback']);
+		});
+
+		it('closes an idle generator before rolling back when the client disconnects', async () => {
+			Service.instance('db.transaction', transactionService());
+
+			@Http.controller({ path: '/tx' })
+			class TxController {
+				@Http.get({ path: '/idle', transactional: true })
+				async *idle() {
+					try {
+						yield 1;
+						yield 2;
+					} finally {
+						await Bun.sleep(5);
+						events.push('cleanup');
+					}
+				}
+			}
+
+			const handler = await routeOf(TxController, '/tx/idle');
+			const disconnect = new AbortController();
+			const iterator = handler({
+				...context(TxController),
+				request: new Request('http://localhost/tx/idle', { signal: disconnect.signal })
+			}) as AsyncGenerator;
+			expect((await iterator.next()).value).toBe(1);
+
+			disconnect.abort();
+			await Bun.sleep(30);
+
+			expect(events).toEqual(['begin', 'cleanup', 'rollback']);
+			await iterator.return(undefined);
+		});
+
+		it('reports errors of a generator closed after a disconnect during a step', async () => {
+			Service.instance('db.transaction', transactionService());
+			const errors: unknown[] = [];
+			Event.on('elysium:error', (event: { data: unknown }) => {
+				errors.push(event.data);
+			});
+			const gate = Promise.withResolvers<void>();
+
+			@Http.controller({ path: '/tx' })
+			class TxController {
+				@Http.get({ path: '/busy', transactional: true })
+				async *busy() {
+					yield 1;
+					try {
+						await gate.promise;
+						yield 2;
+					} finally {
+						events.push('cleanup');
+						throw new Error('cleanup failed');
+					}
+				}
+			}
+
+			const handler = await routeOf(TxController, '/tx/busy');
+			const disconnect = new AbortController();
+			const iterator = handler({
+				...context(TxController),
+				request: new Request('http://localhost/tx/busy', { signal: disconnect.signal })
+			}) as AsyncGenerator;
+			expect((await iterator.next()).value).toBe(1);
+
+			const next = iterator.next();
+			await Bun.sleep(5);
+			disconnect.abort();
+			expect((await next).done).toBe(true);
+			expect(events).toEqual(['begin', 'rollback']);
+
+			gate.resolve();
+			await Bun.sleep(10);
+
+			try {
+				expect(events).toEqual(['begin', 'rollback', 'cleanup']);
+				expect(errors).toHaveLength(1);
+				expect((errors[0] as Error).message).toBe('cleanup failed');
+			} finally {
+				Event.off('elysium:error');
+			}
 		});
 
 		it('exposes the request context to the body of a generator handler', async () => {

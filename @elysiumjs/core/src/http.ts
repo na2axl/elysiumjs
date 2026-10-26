@@ -30,6 +30,7 @@ import { Elysia, sse as esse, t } from 'elysia';
 import { assign, isEmpty, objectify } from 'radash';
 
 import { Application } from './app';
+import { Event } from './event';
 import { Metadata } from './metadata';
 import { applyMiddlewares, executeMiddlewareChain, makeMiddlewares } from './middleware';
 import { ModuleContext } from './module-context';
@@ -278,18 +279,27 @@ async function* iterateInScope<T>(
 
 	const finished = scope(async () => {
 		const generator = start();
+		let stepping = false;
 		try {
 			while (await Promise.race([resume.promise, cancelled.promise])) {
 				resume = Promise.withResolvers();
+				stepping = true;
 				const step = await Promise.race([generator.next(), cancelled.promise]);
+				stepping = false;
 				const current = deliver;
 				deliver = pending();
 				current.resolve(step);
 				if (step.done) return;
 			}
 		} catch (error) {
-			// A running step cannot be interrupted: the generator is closed once it settles.
-			if (error === cancellation) generator.return(undefined).catch(() => {});
+			if (error !== cancellation) throw error;
+			// A running step cannot be interrupted: the generator is closed once it settles,
+			// after the scope ends. Otherwise it is closed now, inside the scope.
+			if (stepping) {
+				generator.return(undefined).catch((error) => Event.emit('elysium:error', error));
+			} else {
+				await generator.return(undefined);
+			}
 			throw error;
 		}
 		await generator.return(undefined);
