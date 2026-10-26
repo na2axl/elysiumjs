@@ -24,10 +24,14 @@
   "bugs": {
     "url": "https://github.com/na2axl/elysiumjs/issues"
   },
-  "module": "index.ts",
+  "module": "dist/index.js",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "CHANGELOG.md"
+  ],
   "sideEffects": false,
   "scripts": {
     "format": "prettier --write \"./src/**/*.ts\"",

@@ -35,6 +35,10 @@
   "module": "dist/index.js",
   "type": "module",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "CHANGELOG.md"
+  ],
   "sideEffects": [
     "./src/index.ts"
   ],

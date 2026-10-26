@@ -39,6 +39,10 @@
   "type": "module",
   "sideEffects": false,
   "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "CHANGELOG.md"
+  ],
   "dependencies": {
     "@casl/ability": "^7.0.2"
   },

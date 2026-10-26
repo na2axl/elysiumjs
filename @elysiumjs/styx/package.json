@@ -40,6 +40,11 @@
   },
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "stubs",
+    "CHANGELOG.md"
+  ],
   "devDependencies": {
     "@elysiumjs/core": "workspace:*",
     "@elysiumjs/heracles": "workspace:*",
