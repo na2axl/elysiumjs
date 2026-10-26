@@ -12,21 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { CacheInterface, DatabaseCacheConfig, DatabaseDriver } from '@elysiumjs/mnemosyne';
+import type { DatabaseCacheConfig, DatabaseDriver } from '@elysiumjs/mnemosyne';
 import type { DrizzleConfig } from 'drizzle-orm';
 import type { BunSQLDatabase } from 'drizzle-orm/bun-sql/postgres';
-import type { CacheConfig } from 'drizzle-orm/cache/core/types';
 
-import { Service, ServiceNotReadyError } from '@elysiumjs/core';
-import {
-	AbstractDatabase,
-	createDatabaseCacheStorage,
-	getCurrentTenant,
-	getTenancyConfig
-} from '@elysiumjs/mnemosyne';
-import { getTableName, is, sql, Table } from 'drizzle-orm';
+import { AbstractDatabase, getCurrentTenant, getTenancyConfig } from '@elysiumjs/mnemosyne';
+import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
-import { Cache as DrizzleCache } from 'drizzle-orm/cache/core';
+
+import { DrizzleDatabaseCache } from './cache';
+
+export { DEFAULT_CACHE_TTL, DrizzleDatabaseCache } from './cache';
 
 // ============================================================================
 // Types
@@ -80,105 +76,6 @@ export const setTransactionTenant = async (
 };
 
 // ============================================================================
-// DrizzleDatabaseCache
-// ============================================================================
-
-/**
- * Drizzle query cache backed by the framework's cache storage.
- *
- * Extends the Drizzle `Cache` base class and implements the
- * framework's `DatabaseCacheStrategy` interface so that query
- * results can be transparently cached and invalidated.
- *
- * @author Axel Nana <axel.nana@workbud.com>
- */
-export class DrizzleDatabaseCache extends DrizzleCache {
-	#storageEngine: 'redis' | 'memory';
-	#cache?: Omit<CacheInterface, 'tags'>;
-	private usedTablesPerKey: Record<string, string[]> = {};
-
-	constructor(
-		private readonly cacheStrategy: 'explicit' | 'all' = 'explicit',
-		private readonly globalTtl: number = 1,
-		storageEngine: 'redis' | 'memory' = 'redis'
-	) {
-		super();
-		this.#storageEngine = storageEngine;
-	}
-
-	/**
-	 * Resolves the cache storage on first use rather than at construction, so that a connection
-	 * can be built before the module providing the cache has finished initialising.
-	 */
-	async #storage(): Promise<Omit<CacheInterface, 'tags'>> {
-		if (this.#cache) return this.#cache;
-		try {
-			this.#cache = createDatabaseCacheStorage({ storage: this.#storageEngine });
-		} catch (error) {
-			if (!(error instanceof ServiceNotReadyError)) throw error;
-			await Service.resolve(error.service);
-			this.#cache = createDatabaseCacheStorage({ storage: this.#storageEngine });
-		}
-		return this.#cache;
-	}
-
-	public override strategy(): 'explicit' | 'all' {
-		return this.cacheStrategy;
-	}
-
-	public override async get(key: string): Promise<any[] | undefined> {
-		return (await (await this.#storage()).get<any[]>(key)) ?? undefined;
-	}
-
-	public override async put(
-		key: string,
-		response: any,
-		tables: string[],
-		_isTag: boolean,
-		config?: CacheConfig
-	): Promise<void> {
-		await (await this.#storage()).set(key, response, (config?.ex ?? this.globalTtl) * 1000);
-		for (const table of tables) {
-			const keys = this.usedTablesPerKey[table];
-			if (keys === undefined) {
-				this.usedTablesPerKey[table] = [key];
-			} else {
-				keys.push(key);
-			}
-		}
-	}
-
-	public override async onMutate(params: {
-		tags?: string | string[];
-		tables?: string | string[] | Table<any> | Table<any>[];
-	}): Promise<void> {
-		const tagsArray = params.tags ? (Array.isArray(params.tags) ? params.tags : [params.tags]) : [];
-		const tablesArray = params.tables
-			? Array.isArray(params.tables)
-				? params.tables
-				: [params.tables]
-			: [];
-		const keysToDelete = new Set<string>();
-
-		for (const table of tablesArray) {
-			const tableName = is(table, Table) ? getTableName(table as Table) : (table as string);
-			const keys = this.usedTablesPerKey[tableName] ?? [];
-			for (const key of keys) keysToDelete.add(key);
-		}
-
-		if (keysToDelete.size > 0 || tagsArray.length > 0) {
-			const cache = await this.#storage();
-			await cache.mdel(tagsArray);
-			await cache.mdel([...keysToDelete]);
-			for (const table of tablesArray) {
-				const tableName = is(table, Table) ? getTableName(table as Table) : (table as string);
-				this.usedTablesPerKey[tableName] = [];
-			}
-		}
-	}
-}
-
-// ============================================================================
 // DrizzleDatabase
 // ============================================================================
 
@@ -216,7 +113,16 @@ class DrizzleDatabase extends AbstractDatabase<DrizzleConnection, DrizzleConnect
 									config.cache.storage
 								)
 							: undefined;
-			return drizzle({ ...config, cache }) as DrizzleConnection;
+			const connection = drizzle({ ...config, cache }) as DrizzleConnection;
+			if (cache === undefined) return connection;
+
+			// Transactions share the connection's cache: bypass it inside them, and invalidate
+			// what they mutate once they commit.
+			const transaction = connection.transaction.bind(connection);
+			return Object.assign(connection, {
+				transaction: ((callback, txConfig) =>
+					cache.trackTransaction(() => transaction(callback, txConfig))) as typeof transaction
+			});
 		},
 
 		withTransaction(connection, callback) {

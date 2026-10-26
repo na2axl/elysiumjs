@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Application, Service } from '@elysiumjs/core';
 import { afterAll, afterEach, describe, expect, it, jest, mock, spyOn } from 'bun:test';
 import * as d from 'drizzle-orm/pg-core';
 
-import { Database } from '../src/database';
-import { DrizzleModel } from '../src/model';
 import { pgTable } from '../src/table';
 import {
 	createRLSPolicy,
@@ -27,14 +24,6 @@ import {
 	registerTenantSchema,
 	wrapTenantSchema
 } from '../src/tenancy';
-
-// ============================================================================
-// Mock setup
-// ============================================================================
-
-mock.module('drizzle-orm/bun-sql', () => ({
-	drizzle: mock(() => ({ mockDrizzleInstance: true }))
-}));
 
 // ============================================================================
 // Tests
