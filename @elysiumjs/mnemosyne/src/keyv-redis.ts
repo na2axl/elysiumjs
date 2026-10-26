@@ -55,7 +55,7 @@ export class KeyvRedis extends EventEmitter implements KeyvStoreAdapter {
 		clearBatchSize?: number;
 
 		/**
-		 * Enable Unlink instead of using Del for clearing keys. This is more performant but may not be supported by all Redis versions.
+		 * Use UNLINK instead of DEL to delete keys. UNLINK frees memory in the background (Redis 4+).
 		 */
 		useUnlink?: boolean;
 
@@ -141,7 +141,9 @@ export class KeyvRedis extends EventEmitter implements KeyvStoreAdapter {
 
 	public async setMany(values: Array<KeyvEntry>): Promise<void> {
 		const client = await this.getClient();
-		// TODO: Use MULTI when available in Bun
+		// Bun's RedisClient has no MULTI support, and sending a raw MULTI on the shared,
+		// auto-pipelined client would wrap other callers' commands in the transaction. The SETs
+		// are pipelined instead, without atomicity.
 		const multi = [];
 
 		for (const { key, value, ttl } of values) {
@@ -161,8 +163,7 @@ export class KeyvRedis extends EventEmitter implements KeyvStoreAdapter {
 	public async delete(key: string): Promise<boolean> {
 		const client = await this.getClient();
 		key = this.createKeyPrefix(key, this.#namespace);
-		// TODO: Use UNLINK when available in Bun
-		const deleted = await (this.#useUnlink ? client.send('UNLINK', [key]) : client.del(key));
+		const deleted = await this.#remove(client, [key]);
 
 		return deleted > 0;
 	}
@@ -179,7 +180,6 @@ export class KeyvRedis extends EventEmitter implements KeyvStoreAdapter {
 			let cursor = '0';
 			const batchSize = this.#clearBatchSize;
 			const match = this.#namespace ? `${this.#namespace}${this.#keyPrefixSeparator}*` : '*';
-			const deletePromises = [];
 
 			do {
 				const result = await client.send('SCAN', [
@@ -204,10 +204,8 @@ export class KeyvRedis extends EventEmitter implements KeyvStoreAdapter {
 					keys = keys.filter((key: string) => !key.includes(this.#keyPrefixSeparator));
 				}
 
-				deletePromises.push(keys.map((key: string) => client.del(key)));
+				if (keys.length > 0) await this.#remove(client, keys);
 			} while (cursor !== '0');
-
-			await Promise.all(deletePromises);
 		} catch (error) {
 			this.emit('error', error);
 		}
@@ -221,6 +219,7 @@ export class KeyvRedis extends EventEmitter implements KeyvStoreAdapter {
 
 	public async hasMany(keys: string[]): Promise<boolean[]> {
 		const client = await this.getClient();
+		// Pipelined rather than in a MULTI, which Bun's RedisClient does not support.
 		const multi = [];
 
 		for (const key of keys) {
@@ -249,30 +248,22 @@ export class KeyvRedis extends EventEmitter implements KeyvStoreAdapter {
 	}
 
 	public async deleteMany(keys: string[]): Promise<boolean> {
+		if (keys.length === 0) return false;
+
 		const client = await this.getClient();
-		let result = false;
+		const prefixedKeys = keys.map((key) => this.createKeyPrefix(key, this.#namespace));
 
-		// TODO: Use MULTI when available in Bun
-		const multi = [];
+		return (await this.#remove(client, prefixedKeys)) > 0;
+	}
 
-		for (const key of keys) {
-			const prefixedKey = this.createKeyPrefix(key, this.#namespace);
-			if (this.#useUnlink) {
-				multi.push(client.send('UNLINK', [prefixedKey]));
-			} else {
-				multi.push(client.del(prefixedKey));
-			}
-		}
-
-		const results = await Promise.all(multi);
-
-		for (const deleted of results) {
-			if (typeof deleted === 'number' && deleted > 0) {
-				result = true;
-			}
-		}
-
-		return result;
+	/**
+	 * Deletes keys in a single command, with UNLINK or DEL depending on the options.
+	 * @param client The Redis client.
+	 * @param keys The keys to delete, already prefixed.
+	 * @returns The number of keys deleted.
+	 */
+	#remove(client: Bun.RedisClient, keys: string[]): Promise<number> {
+		return this.#useUnlink ? client.unlink(...keys) : client.del(...keys);
 	}
 
 	public async *iterator<Value>(
