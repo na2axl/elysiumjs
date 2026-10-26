@@ -25,15 +25,8 @@ import { Service } from '../src/service';
 import { Symbols } from '../src/utils';
 import { testNode } from './module-node';
 
-const mockRun = mock((_map: Map<string, any>, callback: Function) => callback());
-mock.module('../src/app', () => ({
-	Application: {
-		...Application,
-		context: {
-			run: mockRun
-		}
-	}
-}));
+// Spy on the real store: mocking '../src/app' would leak into the test files run after this one.
+const mockRun = spyOn(Application.context, 'run');
 
 describe('Middleware', () => {
 	// Create test middleware classes
