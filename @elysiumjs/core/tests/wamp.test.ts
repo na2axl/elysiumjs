@@ -265,7 +265,7 @@ describe('WampModule', () => {
 				error
 			});
 			expect(errors).toContainEqual(
-				new Error('Failed to establish WAMP connection default after 1 attempts')
+				new Error('Failed to establish WAMP connection default after 2 attempts')
 			);
 		} finally {
 			Event.off('elysium:error');

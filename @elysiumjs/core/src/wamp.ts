@@ -354,15 +354,16 @@ export namespace Wamp {
 					retryCount++;
 					timer = setTimeout(tryConnect, retryInterval);
 				} else {
+					const attempts = retryCount + 1;
 					getLogger().error('Failed to connect to WAMP server, giving up', {
 						connection: name,
-						attempts: retryCount + 1,
+						attempts,
 						maxRetries,
 						error
 					});
 					Event.emit(
 						'elysium:error',
-						new Error(`Failed to establish WAMP connection ${name} after ${maxRetries} attempts`)
+						new Error(`Failed to establish WAMP connection ${name} after ${attempts} attempts`)
 					);
 				}
 				return;
