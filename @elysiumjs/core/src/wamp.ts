@@ -23,6 +23,7 @@ import { needsDefaultAlias, runAll } from './connections';
 import { Container } from './container';
 import { ServiceNotFoundError } from './errors';
 import { Event } from './event';
+import { getLogger } from './logger';
 import { Metadata } from './metadata';
 import { Module } from './module';
 import { ModuleContext } from './module-context';
@@ -312,8 +313,15 @@ export namespace Wamp {
 			...omit(config, ['url', 'onOpen']),
 			onError(error) {
 				config.onError?.(error);
-				// TODO: Add more details like controller name and url
-				Event.emit('elysium:error', new Error(`An error occurred in WAMP connection ${name}`));
+				Event.emit(
+					'elysium:error',
+					new Error(
+						`An error occurred in WAMP connection ${name} (${config.url}): ${error.message}`,
+						{
+							cause: error
+						}
+					)
+				);
 			}
 		});
 
@@ -335,17 +343,23 @@ export namespace Wamp {
 			if (closed) return;
 			try {
 				await client.connect();
-			} catch (e) {
-				console.error(
-					`Failed to connect to WAMP server (attempt ${retryCount + 1}/${maxRetries}):`,
-					e
-				);
-
+			} catch (error) {
 				if (retryCount < maxRetries) {
+					getLogger().warn('Failed to connect to WAMP server, retrying', {
+						connection: name,
+						attempt: retryCount + 1,
+						maxRetries,
+						error
+					});
 					retryCount++;
 					timer = setTimeout(tryConnect, retryInterval);
 				} else {
-					console.error(`Max retry attempts (${maxRetries}) reached. Giving up.`);
+					getLogger().error('Failed to connect to WAMP server, giving up', {
+						connection: name,
+						attempts: retryCount + 1,
+						maxRetries,
+						error
+					});
 					Event.emit(
 						'elysium:error',
 						new Error(`Failed to establish WAMP connection ${name} after ${maxRetries} attempts`)
@@ -386,7 +400,8 @@ export namespace Wamp {
 
 				const metadata = Metadata.get(Symbols.wamp, target) ?? {};
 
-				const w = Wamp.getConnection(options.connection ?? 'default');
+				const connection = options.connection ?? 'default';
+				const w = Wamp.getConnection(connection);
 
 				const app = new Elysia({ name: `${node.id}:${target.name}` });
 
@@ -394,26 +409,51 @@ export namespace Wamp {
 					const registrations: WampRegistration[] = metadata.registrations ?? [];
 					const subscriptions: WampSubscription[] = metadata.subscriptions ?? [];
 
-					for (const registration of registrations) {
-						w.register(
-							registration.topic,
-							inModule(registration.handler),
-							registration.options
-						).then((r) => {
-							// TODO: Use the logger service here
-							console.log(`Registered ${registration.topic} with id ${r.registrationId}`);
-						});
+					for (const { topic, handler, options } of registrations) {
+						w.register(topic, inModule(handler), options).then(
+							(r) => {
+								getLogger().info('Registered WAMP RPC', {
+									connection,
+									topic,
+									registrationId: r.registrationId
+								});
+							},
+							(error) => {
+								getLogger().error('Failed to register WAMP RPC', { connection, topic, error });
+								Event.emit(
+									'elysium:error',
+									new Error(`Failed to register WAMP RPC ${topic} on connection ${connection}`, {
+										cause: error
+									})
+								);
+							}
+						);
 					}
 
-					for (const subscription of subscriptions) {
-						w.subscribe(
-							subscription.topic,
-							inModule(subscription.handler),
-							subscription.options
-						).then((s) => {
-							// TODO: Use the logger service here
-							console.log(`Subscribed ${subscription.topic} with id ${s.subscriptionId}`);
-						});
+					for (const { topic, handler, options } of subscriptions) {
+						w.subscribe(topic, inModule(handler), options).then(
+							(s) => {
+								getLogger().info('Subscribed to WAMP topic', {
+									connection,
+									topic,
+									subscriptionId: s.subscriptionId
+								});
+							},
+							(error) => {
+								getLogger().error('Failed to subscribe to WAMP topic', {
+									connection,
+									topic,
+									error
+								});
+								Event.emit(
+									'elysium:error',
+									new Error(
+										`Failed to subscribe to WAMP topic ${topic} on connection ${connection}`,
+										{ cause: error }
+									)
+								);
+							}
+						);
 					}
 				});
 
