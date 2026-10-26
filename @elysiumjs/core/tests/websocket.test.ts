@@ -65,6 +65,24 @@ class HealthController {
 	}
 }
 
+/** Refuses requests with a plain Response, as an auth or maintenance middleware would. */
+class ResponseGuardMiddleware extends Middleware {
+	public onRequest(ctx: Context) {
+		if (!ctx.request.headers.get('authorization')) {
+			return new Response('denied', { status: 401, headers: { 'x-guard': 'yes' } });
+		}
+	}
+}
+
+@Http.controller({ path: '/secret' })
+@Middleware.register(ResponseGuardMiddleware)
+class SecretController {
+	@Http.post({ path: '/' })
+	public post() {
+		return 'secret';
+	}
+}
+
 const servers: Elysia[] = [];
 
 /** Builds the controller plugin and serves it on a random port. */
@@ -92,7 +110,7 @@ const exchange = (url: string) =>
 const serveModule = async () => {
 	const node = testNode();
 	const module = new ElysiaApp({ name: node.id });
-	for (const controller of [FeedController, HealthController]) {
+	for (const controller of [FeedController, HealthController, SecretController]) {
 		module.use(await Metadata.get(Symbols.elysiaPlugin, controller)(node));
 	}
 	const app = new ElysiaApp().use(module).listen(0) as unknown as Elysia;
@@ -124,5 +142,23 @@ describe('Websocket controller middlewares', () => {
 		const response = await fetch(`http://localhost:${port}/health`);
 		expect(response.status).toBe(200);
 		expect(await response.text()).toBe('ok');
+	});
+
+	it('stops the request when a controller onRequest middleware returns a Response', async () => {
+		const port = await serveModule();
+		const post = (headers: Record<string, string> = {}) =>
+			fetch(`http://localhost:${port}/secret`, {
+				method: 'POST',
+				body: '{}',
+				headers: { 'content-type': 'application/json', ...headers }
+			});
+
+		const denied = await post();
+		expect(denied.status).toBe(401);
+		expect(denied.headers.get('x-guard')).toBe('yes');
+		expect(await denied.text()).toBe('denied');
+
+		const allowed = await post({ authorization: 'Bearer abc' });
+		expect(await allowed.text()).toBe('secret');
 	});
 });

@@ -18,6 +18,8 @@ import type { Context } from './http';
 import type { LoggerInterface } from './logger';
 import type { ModuleNode } from './module-graph';
 
+import { ElysiaCustomStatusResponse } from 'elysia';
+
 import { Application } from './app';
 import { getLogger } from './logger';
 import { Metadata } from './metadata';
@@ -93,10 +95,13 @@ export const applyMiddlewares = (
 		// The onRequest middlewares of a module or a controller run first in its transform hook instead,
 		// which is scoped to its routes.
 		plugin.onTransform(async (c) => {
-			return (
-				(await executeMiddlewareChain(mi, c, 'onRequest', node)) ??
-				executeMiddlewareChain(mi, c, 'onTransform', node)
-			);
+			const result = await executeMiddlewareChain(mi, c, 'onRequest', node);
+			if (result === undefined) return executeMiddlewareChain(mi, c, 'onTransform', node);
+
+			// A transform hook stops the request only on a status response; any other value would be
+			// merged into the context and the request would go on.
+			if (result instanceof ElysiaCustomStatusResponse) return result;
+			return c.status(result instanceof Response ? result.status : 200, result);
 		});
 	} else {
 		plugin.onRequest((c) => {
@@ -182,7 +187,8 @@ export abstract class Middleware<TGuards extends string[] = []> {
 	 * Called first before everything else. This middleware hook works only when used on
 	 * a controller, a module, or the application. On the application it runs for every request,
 	 * before routing. On a module or a controller it runs only for its routes, after the body is
-	 * parsed and right before `onTransform`.
+	 * parsed and right before its own `onTransform`: reject early on the application instead to skip
+	 * parsing. A returned value stops the request and is sent as the response.
 	 * @param _ctx The request context.
 	 */
 	public onRequest(_ctx: Context): any {}

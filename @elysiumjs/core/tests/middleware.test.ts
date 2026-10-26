@@ -337,7 +337,11 @@ describe('Middleware', () => {
 			expect(calls).toEqual(['onRequest', 'onTransform']);
 
 			M.applyMiddlewares([RejectMiddleware], plugin as never, testNode());
-			expect(await callbacks.onTransform(mockContext)).toBe('rejected');
+			const status = mock((code: number, body: unknown) => ({ code, body }));
+			expect(await callbacks.onTransform({ ...mockContext, status } as never)).toEqual({
+				code: 200,
+				body: 'rejected'
+			});
 			expect(calls).toEqual(['onRequest', 'onTransform']);
 		});
 
