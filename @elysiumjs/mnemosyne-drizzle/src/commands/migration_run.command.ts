@@ -12,22 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { basename, dirname } from 'node:path';
-
 import { Command, CommandArgumentType } from '@elysiumjs/core';
 import prompts from 'prompts';
-import { alphabetical } from 'radash';
 
 import { Database } from '../database';
-
-/**
- * Gets the name under which a migration file is tracked. Drizzle Kit 1.0 stores each migration
- * as `<folder>/migration.sql`, in which case the folder name identifies the migration.
- * @author Axel Nana <axel.nana@workbud.com>
- * @param path The path of the migration file.
- */
-const getMigrationName = (path: string) =>
-	basename(path) === 'migration.sql' ? basename(dirname(path)) : basename(path);
+import { getMigrationName, planMigrations } from '../migrations';
 
 /**
  * Execute migration files.
@@ -133,10 +122,12 @@ export class MigrationRunCommand extends Command {
 			});
 
 			const files = await Array.fromAsync(filesIt);
-			const sqlFiles = alphabetical(
-				files.filter((file) => !completedMigrations.includes(getMigrationName(file))),
-				(file) => file
-			);
+			const { pending: sqlFiles, renames } = planMigrations(files, completedMigrations);
+
+			for (const { from, to } of renames) {
+				await sql`UPDATE elysium_migrations SET name = ${to} WHERE name = ${from};`;
+				this.info(`Migration ${this.bold(from)} is now tracked as ${this.bold(to)}.`);
+			}
 
 			if (sqlFiles.length === 0) {
 				this.success('No new migrations to apply.');
