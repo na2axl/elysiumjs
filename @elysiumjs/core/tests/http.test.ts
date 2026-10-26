@@ -732,7 +732,7 @@ describe('Http namespace', () => {
 			expect(events).toEqual(['begin', 'rollback']);
 		});
 
-		it('ends the transaction of a generator closed early', async () => {
+		it('rolls back the transaction of a generator closed early', async () => {
 			Service.instance('db.transaction', transactionService());
 
 			@Http.controller({ path: '/tx' })
@@ -753,7 +753,35 @@ describe('Http namespace', () => {
 			expect((await iterator.next()).value).toBe(1);
 			await iterator.return(undefined);
 
-			expect(events).toEqual(['begin', 'cleanup', 'commit']);
+			expect(events).toEqual(['begin', 'cleanup', 'rollback']);
+		});
+
+		it('rolls back when the client disconnects while the handler is waiting', async () => {
+			Service.instance('db.transaction', transactionService());
+
+			@Http.controller({ path: '/tx' })
+			class TxController {
+				@Http.get({ path: '/stuck', transactional: true })
+				async *stuck() {
+					yield 1;
+					await new Promise(() => {});
+				}
+			}
+
+			const handler = await routeOf(TxController, '/tx/stuck');
+			const disconnect = new AbortController();
+			const iterator = handler({
+				...context(TxController),
+				request: new Request('http://localhost/tx/stuck', { signal: disconnect.signal })
+			}) as AsyncGenerator;
+			expect((await iterator.next()).value).toBe(1);
+
+			const next = iterator.next();
+			await Bun.sleep(5);
+			disconnect.abort();
+
+			expect((await next).done).toBe(true);
+			expect(events).toEqual(['begin', 'rollback']);
 		});
 
 		it('exposes the request context to the body of a generator handler', async () => {
