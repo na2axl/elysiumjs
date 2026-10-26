@@ -18,7 +18,8 @@
     "prepublishOnly": "bun run build",
     "example:optimized": "bun run examples/optimized_example.ts",
     "example:worker": "bun run examples/redis_worker_example.ts",
-    "example:comprehensive": "bun run examples/heracles_comprehensive.ts"
+    "example:comprehensive": "bun run examples/heracles_comprehensive.ts",
+    "test:coverage": "bun test --coverage"
   },
   "keywords": [
     "elysium",
