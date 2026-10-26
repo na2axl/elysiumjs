@@ -1,6 +1,6 @@
 {
   "name": "@elysiumjs/styx",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "license": "Apache-2.0",
   "description": "The CLI tool for the Elysium.js framework.",
   "private": false,
