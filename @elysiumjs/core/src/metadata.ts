@@ -46,7 +46,7 @@ const findOwn = (key: MetadataKey, target: object, propertyKey: PropertyKey): Fo
 	if (!getOwn) return undefined;
 	const hasOwn = foreign('hasOwnMetadata');
 	const value = getOwn(key, target, propertyKey);
-	const present = hasOwn ? hasOwn(key, target, propertyKey) : value !== undefined;
+	const present = value !== undefined || Boolean(hasOwn?.(key, target, propertyKey));
 	return present ? { value } : undefined;
 };
 
