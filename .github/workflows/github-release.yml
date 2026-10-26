@@ -1,0 +1,26 @@
+name: GitHub Release
+
+# Run after approving the staged npm versions (`npm stage approve`).
+on:
+  workflow_dispatch:
+
+jobs:
+  github-release:
+    name: GitHub Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.3"
+
+      - name: Tag and release published versions
+        run: scripts/github-release.sh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
