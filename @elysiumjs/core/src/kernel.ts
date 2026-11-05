@@ -213,15 +213,22 @@ export class Kernel {
 	private initOwn(node: ModuleNode): Promise<void> | undefined {
 		const instance = this.moduleInstance(node);
 		const own = this.ownClasses.get(node);
-		if (own) this.wired.push(...wireEventListeners(node, own.owned, own.services));
+		// Wired before onInit, which may emit events; removed again when it fails, so that a
+		// retried initialisation does not wire them twice.
+		const listeners = own ? wireEventListeners(node, own.owned, own.services) : [];
+		this.wired.push(...listeners);
+		const fail = (error: unknown): never => {
+			this.initialising.delete(node);
+			this.unwire(listeners);
+			throw error;
+		};
 		// While onInit runs, the module's own services resolve without re-entering init.
 		this.initialising.add(node);
 		let result: unknown;
 		try {
 			result = ModuleContext.run(node, () => instance.onInit());
 		} catch (error) {
-			this.initialising.delete(node);
-			throw error;
+			fail(error);
 		}
 		const done = () => {
 			this.initialising.delete(node);
@@ -229,10 +236,7 @@ export class Kernel {
 			this.initOrder.push(node);
 		};
 		if (typeof (result as { then?: unknown } | null)?.then === 'function') {
-			return Promise.resolve(result).then(done, (error) => {
-				this.initialising.delete(node);
-				throw error;
-			});
+			return Promise.resolve(result).then(done, fail);
 		}
 		done();
 		return undefined;
@@ -265,6 +269,14 @@ export class Kernel {
 		pending.catch(() => this.rejected.add(node));
 		this.inFlight.set(node, pending);
 		return false;
+	}
+
+	/** Removes event listeners wired by {@link initOwn}. */
+	private unwire(listeners: readonly WiredListener[]): void {
+		const removed = new Set(listeners);
+		for (const { event, wrapper } of listeners) EventBus.instance.removeListener(event, wrapper);
+		const kept = this.wired.filter((listener) => !removed.has(listener));
+		this.wired.splice(0, this.wired.length, ...kept);
 	}
 
 	private async runShutdown(): Promise<void> {

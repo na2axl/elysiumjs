@@ -26,7 +26,7 @@ import { Application } from '../src/app';
 import { Command } from '../src/command';
 import { Container } from '../src/container';
 import * as Env from '../src/env';
-import { Event } from '../src/event';
+import { Event, EventBus } from '../src/event';
 import { Http } from '../src/http';
 import { Kernel } from '../src/kernel';
 import { ConsoleLogger, LOGGER_SERVICE } from '../src/logger';
@@ -1078,6 +1078,38 @@ describe('Application class', () => {
 				await Promise.all([instance.boot(), instance.boot()]);
 
 				expect(calls).toEqual(['module', 'module', 'service']);
+				await instance.kernel.shutdown();
+			});
+
+			it('wires the event listeners of a retried module once', async () => {
+				let failures = 1;
+				const received: unknown[] = [];
+
+				@Service.register()
+				class Listener {
+					@Event.on({ event: 'retry:evt' })
+					public handle(e: unknown) {
+						received.push(e);
+					}
+				}
+
+				@Module.register({ services: [Listener] })
+				class ListeningModule extends Module {
+					public async onInit() {
+						await nextTick();
+						if (failures-- > 0) throw new Error('module failed');
+					}
+				}
+
+				@Application.register({ modules: [ListeningModule], openapi: false })
+				class ListeningApp extends Application {}
+
+				const instance = new ListeningApp();
+				await instance.build();
+				await expect(instance.boot()).rejects.toThrow('module failed');
+				await instance.boot();
+
+				expect(EventBus.instance.listenerCount('retry:evt')).toBe(1);
 				await instance.kernel.shutdown();
 			});
 
