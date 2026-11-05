@@ -41,6 +41,9 @@ jobs:
       - name: Lint
         run: bun run lint
 
+      - name: Portability
+        run: bun run check:portability
+
   # Late stage: build + test, needs services
   test:
     name: Build & Test

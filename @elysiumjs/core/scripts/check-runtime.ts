@@ -13,10 +13,7 @@
 // limitations under the License.
 
 /**
- * Gate for running core outside Bun (Cloudflare Workers first):
- *
- * 1. The core bundle never touches the `Bun` global: host APIs come from a runtime package.
- * 2. The bundle loads and boots an application under Node.js, where `Bun` does not exist.
+ * Gate for running core outside Bun (Cloudflare Workers first): the core bundle loads and boots an application under Node.js, where `Bun` does not exist.
  */
 
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -52,15 +49,6 @@ try {
 	}
 
 	const bundle = await Bun.file(join(outdir, 'index.js')).text();
-	const bunReferences = bundle
-		.split('\n')
-		.map((line, index) => ({ line: line.trim(), number: index + 1 }))
-		.filter(({ line }) => /\bBun\b/.test(line));
-	if (bunReferences.length > 0) {
-		for (const { line, number } of bunReferences) console.error(`index.js:${number}: ${line}`);
-		throw new Error('The core bundle uses the Bun global.');
-	}
-
 	// Elysia and the other dependencies resolve from core's node_modules.
 	const entry = join(root, `.runtime-check-${process.pid}.mjs`);
 	await Bun.write(join(root, `.runtime-check-${process.pid}.bundle.mjs`), bundle);
@@ -91,7 +79,7 @@ console.log(core.InteractsWithConsole.name, 'loaded and booted under Node.js', p
 		await rm(join(root, `.runtime-check-${process.pid}.bundle.mjs`), { force: true });
 	}
 
-	console.log('Runtime check passed: core does not use the Bun global.');
+	console.log('Runtime check passed: core boots under Node.js.');
 } finally {
 	await rm(outdir, { recursive: true, force: true });
 }
