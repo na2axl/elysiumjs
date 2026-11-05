@@ -17,7 +17,7 @@ import type { JobDispatchOptions } from '../queue';
 import type { Transport } from '../transport';
 import type { QueuedJob, QueueState, Worker, WorkerInfo, WorkerQueueOptions } from '../worker';
 
-import { InteractsWithConsole } from '@elysiumjs/core';
+import { InteractsWithConsole, Runtime } from '@elysiumjs/core';
 import { sort, uid } from 'radash';
 
 import { JobStatus } from '../job';
@@ -772,7 +772,7 @@ export abstract class BaseWorker<TTransport extends Transport>
 		}
 
 		if (states.some((q) => q.jobs.length > 0)) {
-			await Bun.sleep(10);
+			await Runtime.get().sleep(10);
 			setImmediate(() => this.processQueueJobs(queueName));
 		}
 	}

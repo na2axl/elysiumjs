@@ -11,27 +11,18 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+import type { RedisClientFactory, RedisConnection } from './connection';
 
 import { Module, needsDefaultAlias, runAll, Service, ServiceNotFoundError } from '@elysiumjs/core';
 import { omit } from 'radash';
+
+import { bunRedis } from './connection';
 
 /**
  * Properties used to create a new redis connection.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export type RedisConnectionProps = Bun.RedisOptions & { url: string };
-
-/**
- * Creates the client of a redis connection.
- * @author Axel Nana <axel.nana@workbud.com>
- */
-export type RedisClientFactory = (
-	url: string,
-	options: Omit<RedisConnectionProps, 'url'>
-) => unknown;
-
-/** Creates a client with Bun's built-in Redis client. */
-const bunClient: RedisClientFactory = (url, options) => new Bun.RedisClient(url, options);
+export type RedisConnectionProps = { url: string } & Record<string, unknown>;
 
 /**
  * Configuration of the {@link RedisModule}.
@@ -42,8 +33,8 @@ export type RedisModuleConfig = {
 	default: string;
 
 	/**
-	 * Creates the client of a connection. Defaults to `Bun.RedisClient`; pass another factory
-	 * on runtimes without it.
+	 * Creates the client of a connection. Defaults to {@link bunRedis}; pass another factory
+	 * to plug in any other Redis client.
 	 */
 	client?: RedisClientFactory;
 
@@ -66,11 +57,11 @@ export namespace Redis {
 	 * Retrieves the client for a redis connection declared by the {@link RedisModule}.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param name The name of the connection.
-	 * @returns The Bun.RedisClient for the connection with the given name.
+	 * @returns The {@link RedisConnection} for the connection with the given name.
 	 * @throws {ServiceNotFoundError} If no connection with that name is declared.
 	 */
 	export const getConnection = (name: string = 'default') => {
-		const client = Service.get<Bun.RedisClient>(getConnectionName(name));
+		const client = Service.get<RedisConnection>(getConnectionName(name));
 		if (client === null) throw new ServiceNotFoundError(getConnectionName(name));
 		return client;
 	};
@@ -107,7 +98,7 @@ export namespace Redis {
 			...Object.entries(config.connections).map(([name, props]) => ({
 				name: Redis.getConnectionName(name),
 				global: true,
-				factory: () => (config.client ?? bunClient)(props.url, omit(props, ['url']))
+				factory: () => (config.client ?? bunRedis)(props.url, omit(props, ['url']))
 			})),
 			...(alias
 				? [
@@ -115,7 +106,7 @@ export namespace Redis {
 							name: Redis.getConnectionName('default'),
 							global: true,
 							factory: (_config: unknown, get: <T>(name: string) => T) =>
-								get<Bun.RedisClient>(Redis.getConnectionName(config.default))
+								get<RedisConnection>(Redis.getConnectionName(config.default))
 						}
 					]
 				: [])
@@ -132,7 +123,7 @@ export class RedisModule extends Module.configurable<RedisModuleConfig>({
 		await runAll(
 			names
 				.filter((name) => Service.isConstructed(name))
-				.map((name) => () => Service.get<{ close(): unknown }>(name)?.close())
+				.map((name) => () => Service.get<RedisConnection>(name)?.close())
 		);
 	}
 }

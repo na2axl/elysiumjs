@@ -22,7 +22,7 @@ import { KeyvRedis } from '../src/keyv-redis';
 const fakeClient = () => {
 	const data = new Map<string, string>();
 	const remove = (...keys: string[]) => keys.filter((key) => data.delete(key)).length;
-	const client = {
+	const client: any = {
 		data,
 		set: mock(async (key: string, value: string) => {
 			data.set(key, value);
@@ -31,6 +31,7 @@ const fakeClient = () => {
 		del: mock(async (...keys: string[]) => remove(...keys)),
 		unlink: mock(async (...keys: string[]) => remove(...keys)),
 		send: mock(async (command: string, args: string[]) => {
+			if (command === 'UNLINK') return client.unlink(...args);
 			if (command !== 'SCAN') return null;
 			const prefix = args[args.indexOf('MATCH') + 1]!.replace(/\*$/, '');
 			return ['0', [...data.keys()].filter((key) => key.startsWith(prefix))];
@@ -64,7 +65,7 @@ describe('KeyvRedis', () => {
 
 			expect(await store().delete('a')).toBe(true);
 			expect(client.unlink).toHaveBeenCalledWith('ns::a');
-			expect(client.send).not.toHaveBeenCalled();
+			expect(client.send).toHaveBeenCalledWith('UNLINK', ['ns::a']);
 		});
 
 		it('uses DEL when unlink is disabled', async () => {

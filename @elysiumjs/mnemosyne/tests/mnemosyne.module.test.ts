@@ -178,7 +178,8 @@ describe('MnemosyneModule', () => {
 
 	it('disconnect leaves the shared redis client open', async () => {
 		app = await Application.testing({ modules: [redis, MnemosyneModule] });
-		const client = (await app.get('redis.connection.cache')) as { close: ReturnType<typeof mock> };
+		await app.get('redis.connection.cache');
+		const client = ClientMock.mock.results[0]!.value as { close: ReturnType<typeof mock> };
 		const adapter = new KeyvRedis({ connection: 'cache' });
 
 		await adapter.set('a', 'b');

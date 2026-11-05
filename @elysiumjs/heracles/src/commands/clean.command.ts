@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { RedisConnection } from '@elysiumjs/redis';
+
 import { Command, CommandArgumentType, Service } from '@elysiumjs/core';
 import { Redis } from '@elysiumjs/redis';
 
@@ -102,14 +104,14 @@ export class HeraclesCleanCommand extends Command {
 			}
 
 			// Resolved asynchronously: the app may be booted lazily, so the client may not exist yet
-			const redisClient = await Service.resolve<Bun.RedisClient>(
+			const redisClient = await Service.resolve<RedisConnection>(
 				Redis.getConnectionName(this.redis)
 			);
 
 			// Get queues to process
 			if (this.queues.length === 0) {
 				// Find all streams with the given prefix
-				const keys = await redisClient.keys(`${this.keyPrefix}:stream:*`);
+				const keys = (await redisClient.send('KEYS', [`${this.keyPrefix}:stream:*`])) as string[];
 				this.queues = keys.map((key: string) => key.replace(`${this.keyPrefix}:stream:`, ''));
 			}
 
@@ -139,9 +141,9 @@ export class HeraclesCleanCommand extends Command {
 				const streamKey = `${this.keyPrefix}:stream:${queue}`;
 
 				// Get stream info
-				let streamLength;
+				let streamLength = 0;
 				try {
-					streamLength = await redisClient.send('XLEN', [streamKey]);
+					streamLength = (await redisClient.send('XLEN', [streamKey])) as number;
 
 					if (this.verbose) {
 						spinner.pause(`\nQueue: ${queue}`);
@@ -173,12 +175,16 @@ export class HeraclesCleanCommand extends Command {
 					// Find completed jobs
 					if (this.retention > 0) {
 						// Find status entries for completed/failed jobs
-						const statusKeys = await redisClient.keys(`${this.keyPrefix}:status:${queue}:*`);
-						const completedIds = [];
+						const statusKeys = (await redisClient.send('KEYS', [
+							`${this.keyPrefix}:status:${queue}:*`
+						])) as string[];
+						const completedIds: string[] = [];
 
 						for (const statusKey of statusKeys) {
-							const status = await redisClient.send('HGET', [statusKey, 'status']);
-							const updatedAt = await redisClient.send('HGET', [statusKey, 'updatedAt']);
+							const status = (await redisClient.send('HGET', [statusKey, 'status'])) as
+								string | null;
+							const updatedAt = (await redisClient.send('HGET', [statusKey, 'updatedAt'])) as
+								string | null;
 
 							if (
 								(status === JobStatus.COMPLETED ||
@@ -188,23 +194,24 @@ export class HeraclesCleanCommand extends Command {
 								parseInt(updatedAt) < Date.now() - this.retention * 1000
 							) {
 								// Extract job ID from status key
-								const jobId = statusKey.split(':').pop();
+								const jobId = statusKey.split(':').pop() ?? '';
 
 								// Check if the status has a messageId field (direct link to stream entry)
-								const messageId = await redisClient.send('HGET', [statusKey, 'messageId']);
+								const messageId = (await redisClient.send('HGET', [statusKey, 'messageId'])) as
+									string | null;
 
 								if (messageId) {
 									// We have a direct reference to the message ID
 									completedIds.push(messageId);
 								} else {
 									// Fall back to searching the stream
-									const messages = await redisClient.send('XRANGE', [
+									const messages = (await redisClient.send('XRANGE', [
 										streamKey,
 										'-',
 										'+',
 										'COUNT',
 										'1000'
-									]);
+									])) as Array<[string, string[]]>;
 
 									for (const [msgId, fields] of messages) {
 										// Check if this message is for the completed job
