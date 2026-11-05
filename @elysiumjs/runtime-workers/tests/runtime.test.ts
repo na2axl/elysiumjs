@@ -15,7 +15,7 @@
 import type { AnyElysia } from 'elysia';
 
 import { RuntimeNotSupportedError } from '@elysiumjs/core';
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, spyOn } from 'bun:test';
 
 import { createRuntime, runtime } from '../src';
 
@@ -50,5 +50,23 @@ describe('createRuntime', () => {
 
 	it('sleeps with a timer', async () => {
 		await expect(runtime.sleep(1)).resolves.toBeUndefined();
+	});
+});
+
+describe('argv, write and terminal', () => {
+	it('implements argv, write and terminal', () => {
+		expect(runtime.argv()).toEqual([]);
+		expect(runtime.terminal()).toBeUndefined();
+		const log = spyOn(console, 'log').mockImplementation(() => {});
+		const error = spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			runtime.write('stdout', 'out');
+			runtime.write('stderr', 'err');
+			expect(log).toHaveBeenCalledWith('out');
+			expect(error).toHaveBeenCalledWith('err');
+		} finally {
+			log.mockRestore();
+			error.mockRestore();
+		}
 	});
 });

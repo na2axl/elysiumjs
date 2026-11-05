@@ -47,6 +47,12 @@ export const createRuntime = (options: WorkersRuntimeOptions = {}): Runtime => (
 		);
 	},
 	exit() {},
+	argv: () => [],
+	write(stream, text) {
+		if (stream === 'stderr') console.error(text);
+		else console.log(text);
+	},
+	terminal: () => undefined,
 	onShutdown() {
 		return () => {};
 	}

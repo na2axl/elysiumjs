@@ -31,6 +31,21 @@ export const runtime: Runtime = {
 	exit(code) {
 		process.exit(code);
 	},
+	argv: () => process.argv.slice(2),
+	write(stream, text) {
+		process[stream].write(text);
+	},
+	terminal: () => ({
+		input: process.stdin,
+		output: process.stdout,
+		setRawMode: (on) => process.stdin.setRawMode?.(on),
+		clear: () => void process.stdout.write('\x1Bc'),
+		moveCursor: (x, y) => void process.stdout.moveCursor?.(x, y),
+		clearLine: () => {
+			process.stdout.clearLine?.(0);
+			process.stdout.cursorTo?.(0);
+		}
+	}),
 	onShutdown(handler) {
 		for (const signal of SIGNALS) process.on(signal, handler);
 		return () => {

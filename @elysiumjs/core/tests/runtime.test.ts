@@ -15,7 +15,7 @@
 import type { AnyElysia } from 'elysia';
 import type { Runtime as RuntimePort } from '../src/runtime';
 
-import { afterEach, describe, expect, it, mock } from 'bun:test';
+import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
 import { Application } from '../src/app';
 import { Env } from '../src/env';
@@ -34,6 +34,9 @@ const fakeRuntime = (env: Record<string, string | undefined> = {}) => {
 		serve: mock((_app: AnyElysia, _port: number) => {}),
 		exit: mock((_code: number) => {}),
 		onShutdown: mock((_handler: () => void) => removeShutdownHandler),
+		argv: () => [] as readonly string[],
+		write: mock((_stream: 'stdout' | 'stderr', _text: string) => {}),
+		terminal: () => undefined,
 		removeShutdownHandler
 	} satisfies RuntimePort & Record<string, unknown>;
 };
@@ -76,10 +79,16 @@ describe('currentEnvironment', () => {
 	});
 
 	it('defaults to development when unset or when no runtime is set', () => {
-		Runtime.use(fakeRuntime({}));
-		expect(currentEnvironment()).toBe('development');
-		Runtime.reset();
-		expect(currentEnvironment()).toBe('development');
+		const original = process.env.NODE_ENV;
+		delete process.env.NODE_ENV;
+		try {
+			Runtime.use(fakeRuntime({}));
+			expect(currentEnvironment()).toBe('development');
+			Runtime.reset();
+			expect(currentEnvironment()).toBe('development');
+		} finally {
+			process.env.NODE_ENV = original;
+		}
 	});
 });
 
@@ -133,5 +142,27 @@ describe('Application runtime option', () => {
 		await app.run(['list']);
 		expect(runtime.removeShutdownHandler).toHaveBeenCalled();
 		expect(runtime.exit).toHaveBeenCalledWith(0);
+	});
+});
+
+describe('host APIs through the runtime', () => {
+	it('run() reads argv from the runtime', async () => {
+		@Application.register({ runtime: { ...testRuntime, argv: () => ['list'] } })
+		class App extends Application {}
+		const app = new App();
+		const dispatch = spyOn(app as any, 'dispatch').mockResolvedValue(undefined);
+		await app.run();
+		expect(dispatch).toHaveBeenCalledWith(['list']);
+	});
+
+	it('currentEnvironment falls back to process NODE_ENV without a runtime', () => {
+		const original = process.env.NODE_ENV;
+		process.env.NODE_ENV = 'staging';
+		try {
+			Runtime.reset();
+			expect(currentEnvironment()).toBe('staging');
+		} finally {
+			process.env.NODE_ENV = original;
+		}
 	});
 });

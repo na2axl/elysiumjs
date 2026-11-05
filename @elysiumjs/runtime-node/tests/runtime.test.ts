@@ -61,3 +61,27 @@ describe('runtime', () => {
 		expect(process.listeners('SIGTERM')).not.toContain(handler);
 	});
 });
+
+describe('terminal and streams', () => {
+	it('implements argv, write and terminal', () => {
+		expect(runtime.argv()).toEqual(process.argv.slice(2));
+		const original = process.stdout.write;
+		const chunks: string[] = [];
+		process.stdout.write = ((text: string) => (
+			chunks.push(text),
+			true
+		)) as typeof process.stdout.write;
+		try {
+			runtime.write('stdout', 'hi');
+		} finally {
+			process.stdout.write = original;
+		}
+		expect(chunks).toEqual(['hi']);
+		const terminal = runtime.terminal();
+		expect(terminal?.input).toBe(process.stdin);
+		expect(terminal?.output).toBe(process.stdout);
+		expect(terminal?.clear).toBeFunction();
+		expect(terminal?.moveCursor).toBeFunction();
+		expect(terminal?.clearLine).toBeFunction();
+	});
+});

@@ -309,7 +309,7 @@ export abstract class Application extends InteractsWithConsole {
 	 * @param argv The command line arguments, without the executable and script.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 */
-	public async run(argv: string[] = process.argv.slice(2)): Promise<void> {
+	public async run(argv: readonly string[] = Runtime.get().argv()): Promise<void> {
 		this.installSignalHandlers();
 		try {
 			const { modules } = this.props();
@@ -335,7 +335,7 @@ export abstract class Application extends InteractsWithConsole {
 		return buildModuleGraph(modules ?? [], environment);
 	}
 
-	private async dispatch([action, ...rest]: string[]): Promise<void> {
+	private async dispatch([action, ...rest]: readonly string[]): Promise<void> {
 		switch (action) {
 			case undefined:
 				this.commandDescribe();

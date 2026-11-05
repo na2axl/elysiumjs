@@ -15,6 +15,8 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
 import { ConsoleFormat, InteractsWithConsole } from '../src/console';
+import { Runtime, RuntimeNotSupportedError } from '../src/runtime';
+import { testRuntime } from './test-runtime';
 
 describe('InteractsWithConsole', () => {
 	// Mock process.stdout and process.stderr
@@ -66,7 +68,7 @@ describe('InteractsWithConsole', () => {
 
 		it('should write to specified output stream', () => {
 			const console = new InteractsWithConsole();
-			console.write('Error message', true, process.stderr);
+			console.write('Error message', true, 'stderr');
 			expect(stderrOutput).toBe('Error message\n');
 			expect(stdoutOutput).toBe('');
 		});
@@ -525,5 +527,36 @@ describe('InteractsWithConsole', () => {
 				'No options provided'
 			);
 		});
+	});
+});
+
+describe('InteractsWithConsole through the runtime', () => {
+	afterEach(() => Runtime.use(testRuntime));
+
+	it('writes through Runtime.write', () => {
+		const write = mock((_stream: 'stdout' | 'stderr', _text: string) => {});
+		Runtime.use({ ...testRuntime, write });
+		const console = new InteractsWithConsole();
+		console.info('hello');
+		console.error('boom');
+		expect(write.mock.calls[0]?.[0]).toBe('stdout');
+		expect(write.mock.calls[1]?.[0]).toBe('stderr');
+		expect(write.mock.calls[1]?.[1]).toContain('boom');
+	});
+
+	it('interactive prompts throw RuntimeNotSupportedError without a terminal', async () => {
+		Runtime.use({ ...testRuntime, name: 'headless', terminal: () => undefined });
+		class Probe extends InteractsWithConsole {
+			public ask = () => this.prompt('q');
+			public askPassword = () => this.promptPassword('q');
+		}
+		const probe = new Probe();
+		expect(() => probe.clear()).toThrow(RuntimeNotSupportedError);
+		expect(() => probe.moveCursor(1, 1)).toThrow(RuntimeNotSupportedError);
+		expect(() => probe.clearLine()).toThrow(RuntimeNotSupportedError);
+		await expect(probe.ask()).rejects.toThrow(
+			'Interactive console is not supported on the headless runtime.'
+		);
+		await expect(probe.askPassword()).rejects.toThrow(RuntimeNotSupportedError);
 	});
 });

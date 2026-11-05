@@ -924,7 +924,7 @@ export namespace Http {
 		...rest
 	}: RequestHandlerDecoratorProps & { method: HTTPMethod }): MethodDecorator => {
 		return function (target, propertyKey, descriptor) {
-			process.nextTick(() => {
+			queueMicrotask(() => {
 				registerHttpRequestHandler({
 					path,
 					handler: descriptor.value as HttpRequestHandler,
