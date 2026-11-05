@@ -112,6 +112,26 @@ A CLI command boots lazily: running `app:cmd` initialises the command's own modu
 - **Use `static boot = true`** on a command that needs every module initialised before it runs (workers, servers). It initialises every module and builds every service first.
 - Service factories receive a synchronous `get`; it may only read services whose owning modules initialise synchronously, otherwise it throws `ServiceNotReadyError`.
 
+## Runtimes
+
+Core never calls a host API directly. Environment variables, timers, the HTTP server, process exit, shutdown signals and Redis clients go through the current `Runtime`, detected on first use:
+
+| Runtime | Detected when | Notes |
+| --- | --- | --- |
+| `bunRuntime` | the `Bun` global exists | Everything, including `RedisModule` (`Bun.RedisClient`) |
+| `createWorkersRuntime()` | `navigator.userAgent` is `Cloudflare-Workers` | Env from `process.env` (`nodejs_compat`) or the `env` option; no `serve`, exit or signals (export the app's `fetch`); no `RedisModule` |
+| `nodeRuntime` | otherwise | Like Bun, without `RedisModule` |
+
+Replace it with `Runtime.use(runtime)`, for instance in tests or to pass a Worker's bindings:
+
+```ts
+import { createWorkersRuntime, Runtime } from '@elysiumjs/core';
+
+Runtime.use(createWorkersRuntime({ env: { NODE_ENV: 'production' } }));
+```
+
+`bun run check:runtime` bundles core and fails if it reaches the `Bun` global outside the Bun runtime, then loads the bundle under Node.js.
+
 ## Migrating from the pre-module API
 
 - The `database`, `redis`, `wamp` and `elysium:hermes` keys of `@Application.register()` are gone. Add `DrizzleModule.with()`, `RedisModule.with()`, `WampModule.with()` and `HermesModule.with()` to `modules` instead.

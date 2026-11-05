@@ -18,6 +18,7 @@ import { needsDefaultAlias, runAll } from './connections';
 import { Container } from './container';
 import { ServiceNotFoundError } from './errors';
 import { Module } from './module';
+import { Runtime } from './runtime';
 import { Service } from './service';
 
 /**
@@ -94,7 +95,8 @@ export namespace Redis {
 			...Object.entries(config.connections).map(([name, props]) => ({
 				name: Redis.getConnectionName(name),
 				global: true,
-				factory: () => new Bun.RedisClient(props.url, omit(props, ['url']))
+				factory: () =>
+					Runtime.get().createRedisClient(props.url, omit(props, ['url'])) as Bun.RedisClient
 			})),
 			...(alias
 				? [

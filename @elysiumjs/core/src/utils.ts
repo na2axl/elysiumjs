@@ -17,6 +17,8 @@ import type { ModuleNode } from './module-graph';
 
 import { isObject } from 'radash';
 
+import { Runtime } from './runtime';
+
 export namespace Symbols {
 	export const app = Symbol('elysium:Application');
 
@@ -58,7 +60,7 @@ export namespace Symbols {
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export function currentEnvironment(): string {
-	return Bun.env.NODE_ENV ?? 'development';
+	return Runtime.get().env().NODE_ENV ?? 'development';
 }
 
 export const nextTick = () => new Promise((resolve) => process.nextTick(resolve));

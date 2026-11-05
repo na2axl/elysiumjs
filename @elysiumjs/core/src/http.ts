@@ -34,6 +34,7 @@ import { Event } from './event';
 import { Metadata } from './metadata';
 import { applyMiddlewares, executeMiddlewareChain, makeMiddlewares } from './middleware';
 import { ModuleContext } from './module-context';
+import { Runtime } from './runtime';
 import { Service } from './service';
 import { nextTick, Symbols } from './utils';
 
@@ -622,7 +623,7 @@ export namespace Http {
 
 								while (true) {
 									yield esse(await handler(...(await getParameters(c))));
-									await Bun.sleep(10);
+									await Runtime.get().sleep(10);
 								}
 							};
 						}

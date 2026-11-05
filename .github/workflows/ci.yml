@@ -33,6 +33,9 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
+      - name: Core runs outside Bun
+        run: bun run --cwd @elysiumjs/core check:runtime
+
       - name: Lint
         run: bun run lint
 

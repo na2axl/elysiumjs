@@ -39,6 +39,7 @@ import { Metadata } from './metadata';
 import { applyMiddlewares } from './middleware';
 import { ModuleContext } from './module-context';
 import { buildModuleGraph } from './module-graph';
+import { Runtime } from './runtime';
 import { Service } from './service';
 import { createTestingApp } from './testing';
 import { deepMerge, Symbols } from './utils';
@@ -121,7 +122,7 @@ export abstract class Application extends InteractsWithConsole {
 	#elysia: Elysia<Route>;
 	#debug: boolean;
 	#kernel: Kernel | undefined;
-	#onSignal: (() => void) | undefined;
+	#removeShutdownHandler: (() => void) | undefined;
 
 	private readonly _appContextStorage: AppContext = new AsyncLocalStorage();
 
@@ -191,8 +192,9 @@ export abstract class Application extends InteractsWithConsole {
 		const { env, debug }: AppProps = Metadata.get(Symbols.app, this.constructor) ?? {};
 		this.#debug = debug ?? false;
 
+		const runtimeEnv = Runtime.get().env();
 		if (env) {
-			const rawEnv = Value.Convert(env, Value.Clone(Bun.env));
+			const rawEnv = Value.Convert(env, Value.Clone(runtimeEnv));
 
 			if (this.#debug && !Value.Check(env, rawEnv)) {
 				const error = Value.Errors(env, rawEnv).First();
@@ -201,7 +203,7 @@ export abstract class Application extends InteractsWithConsole {
 
 			initEnv(Value.Clean(env, rawEnv) as Record<string, unknown>);
 		} else {
-			initEnv(Bun.env);
+			initEnv(runtimeEnv);
 		}
 
 		Service.remove('elysium.app');
@@ -328,14 +330,12 @@ export abstract class Application extends InteractsWithConsole {
 	/** Exits the process, after detaching the signal handlers. */
 	private exit(code: number): void {
 		this.removeSignalHandlers();
-		return process.exit(code);
+		return Runtime.get().exit(code);
 	}
 
 	private removeSignalHandlers(): void {
-		if (!this.#onSignal) return;
-		process.off('SIGINT', this.#onSignal);
-		process.off('SIGTERM', this.#onSignal);
-		this.#onSignal = undefined;
+		this.#removeShutdownHandler?.();
+		this.#removeShutdownHandler = undefined;
 	}
 
 	private installSignalHandlers(): void {
@@ -358,9 +358,7 @@ export abstract class Application extends InteractsWithConsole {
 				this.exit(code);
 			}
 		};
-		this.#onSignal = onSignal;
-		process.on('SIGINT', onSignal);
-		process.on('SIGTERM', onSignal);
+		this.#removeShutdownHandler = Runtime.get().onShutdown(onSignal);
 	}
 
 	/** The commands available in the module graph, with their owning module. */
@@ -478,7 +476,8 @@ export abstract class Application extends InteractsWithConsole {
 
 		Event.emit('elysium:server:after-init', this, this);
 
-		this.#elysia.listen(server?.port ?? (parseInt(process.env.PORT!, 10) || 3000));
+		const runtime = Runtime.get();
+		runtime.serve(this.#elysia, server?.port ?? (parseInt(runtime.env().PORT ?? '', 10) || 3000));
 	}
 
 	/** Lets every module hook into the root app, then mounts the controllers of each module. */

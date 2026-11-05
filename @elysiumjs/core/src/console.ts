@@ -14,8 +14,6 @@
 
 import type { WriteStream } from 'node:tty';
 
-import * as readline from 'node:readline';
-
 import { isEmpty, omit } from 'radash';
 
 /**
@@ -39,19 +37,25 @@ export enum ConsoleFormat {
 }
 
 /**
+ * Loads `node:readline` when a prompt needs it, so that runtimes without the module
+ * (Cloudflare Workers) can still load the console.
+ */
+const loadReadline = () => import('node:readline');
+
+/**
  * A map of console format codes to ANSI escape codes.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 const formatMap: Record<ConsoleFormat, string> = {
-	[ConsoleFormat.BLACK]: Bun.color('black', 'ansi') || Bun.color('black', 'ansi-256') || '',
-	[ConsoleFormat.RED]: Bun.color('red', 'ansi') || Bun.color('red', 'ansi-256') || '',
-	[ConsoleFormat.GREEN]: Bun.color('green', 'ansi') || Bun.color('green', 'ansi-256') || '',
-	[ConsoleFormat.YELLOW]: Bun.color('yellow', 'ansi') || Bun.color('yellow', 'ansi-256') || '',
-	[ConsoleFormat.BLUE]: Bun.color('blue', 'ansi') || Bun.color('blue', 'ansi-256') || '',
-	[ConsoleFormat.MAGENTA]: Bun.color('magenta', 'ansi') || Bun.color('magenta', 'ansi-256') || '',
-	[ConsoleFormat.CYAN]: Bun.color('cyan', 'ansi') || Bun.color('cyan', 'ansi-256') || '',
-	[ConsoleFormat.WHITE]: Bun.color('white', 'ansi') || Bun.color('white', 'ansi-256') || '',
-	[ConsoleFormat.GRAY]: Bun.color('gray', 'ansi') || Bun.color('gray', 'ansi-256') || '',
+	[ConsoleFormat.BLACK]: '\x1b[30m',
+	[ConsoleFormat.RED]: '\x1b[91m',
+	[ConsoleFormat.GREEN]: '\x1b[32m',
+	[ConsoleFormat.YELLOW]: '\x1b[93m',
+	[ConsoleFormat.BLUE]: '\x1b[94m',
+	[ConsoleFormat.MAGENTA]: '\x1b[95m',
+	[ConsoleFormat.CYAN]: '\x1b[96m',
+	[ConsoleFormat.WHITE]: '\x1b[97m',
+	[ConsoleFormat.GRAY]: '\x1b[37m',
 	[ConsoleFormat.BOLD]: '\x1b[1m',
 	[ConsoleFormat.UNDERLINE]: '\x1b[4m',
 	[ConsoleFormat.ITALIC]: '\x1b[3m',
@@ -357,6 +361,7 @@ export class InteractsWithConsole {
 	 * @returns The user's input.
 	 */
 	protected async prompt(question: string, defaultValue?: string): Promise<string> {
+		const readline = await loadReadline();
 		const rl = readline.createInterface({
 			input: process.stdin,
 			output: process.stdout
@@ -379,6 +384,7 @@ export class InteractsWithConsole {
 	 */
 	protected async promptPassword(question: string): Promise<string> {
 		// Create readline interface
+		const readline = await loadReadline();
 		const rl = readline.createInterface({
 			input: process.stdin,
 			output: process.stdout

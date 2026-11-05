@@ -23,7 +23,8 @@
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "bun run build",
     "test": "bun test",
-    "test:coverage": "bun test --coverage"
+    "test:coverage": "bun test --coverage",
+    "check:runtime": "bun scripts/check-runtime.ts"
   },
   "keywords": [
     "elysium",
