@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Command, CommandArgumentType } from '@elysiumjs/core';
+import { Command, CommandArgumentType, Runtime } from '@elysiumjs/core';
 import { Redis } from '@elysiumjs/redis';
 
 import { RedisWorker } from '../workers/redis.worker';
@@ -114,7 +114,7 @@ export class HeraclesWorkCommand extends Command {
 		// Ensure Redis connection exists
 		if (!Redis.connectionExists(this.redis)) {
 			this.error(`Redis connection "${this.redis}" does not exist`);
-			process.exit(1);
+			Runtime.get().exit(1);
 		}
 
 		const worker = new RedisWorker(this.redis, { id: this.id });
@@ -142,11 +142,10 @@ export class HeraclesWorkCommand extends Command {
 				this.write(`Worker "${worker.id}" stopped successfully`);
 			}
 
-			process.exit(0);
+			Runtime.get().exit(0);
 		};
 
-		process.on('SIGINT', cleanup);
-		process.on('SIGTERM', cleanup);
+		Runtime.get().onShutdown(cleanup);
 
 		// Start worker
 		await worker.start();

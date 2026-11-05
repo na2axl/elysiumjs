@@ -14,7 +14,7 @@
 
 import type { RedisConnection } from '@elysiumjs/redis';
 
-import { Command, CommandArgumentType, Service } from '@elysiumjs/core';
+import { Command, CommandArgumentType, Runtime, Service } from '@elysiumjs/core';
 import { Redis } from '@elysiumjs/redis';
 
 import { JobStatus } from '../job';
@@ -100,7 +100,7 @@ export class HeraclesCleanCommand extends Command {
 			// Ensure Redis connection exists
 			if (!Redis.connectionExists(this.redis)) {
 				this.error(`Redis connection '${this.redis}' does not exist`);
-				process.exit(1);
+				Runtime.get().exit(1);
 			}
 
 			// Resolved asynchronously: the app may be booted lazily, so the client may not exist yet
@@ -297,7 +297,7 @@ export class HeraclesCleanCommand extends Command {
 			spinner.complete('Cleanup operation completed');
 		} catch (error: any) {
 			this.trace(error, 'Error cleaning up Redis streams');
-			process.exit(1);
+			Runtime.get().exit(1);
 		}
 	}
 }
