@@ -14,7 +14,7 @@
 
 import { relative, resolve, sep } from 'node:path';
 
-/** An npm package name, optionally scoped. Dot-only segments are refused separately. */
+/** An npm package name, optionally scoped. No part may start with a dot. */
 const PACKAGE_NAME = /^(?:@([a-z0-9-~][a-z0-9-._~]*)\/)?([a-z0-9-~][a-z0-9-._~]*)$/;
 
 /** A module name: it becomes a folder, a file and a class name. */
@@ -55,10 +55,8 @@ export const validateProjectName = (name: string): string => {
 			'use lower-case letters, digits, "-", "_", "." or "~", optionally under an @scope/'
 		);
 	}
-	const [, scope, directory] = match;
-	if ([scope, directory].some((part) => part !== undefined && /^\.+$/.test(part))) {
-		throw new InvalidNameError('project', name, 'a name cannot be "." or ".."');
-	}
+	// The pattern refuses a leading dot, so `.`, `..` and `a/..` never get here.
+	const [, , directory] = match;
 	return directory!;
 };
 
