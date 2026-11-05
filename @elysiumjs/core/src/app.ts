@@ -76,6 +76,7 @@ export type AppProps = {
 	/**
 	 * The runtime the application runs on, from `@elysiumjs/runtime-bun`, `@elysiumjs/runtime-node`
 	 * or `@elysiumjs/runtime-workers`. Can be omitted when `Runtime.use()` was called before.
+	 * The runtime is process-wide: when several applications are constructed, the last one wins.
 	 */
 	runtime?: RuntimePort;
 

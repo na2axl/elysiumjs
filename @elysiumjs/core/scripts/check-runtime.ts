@@ -69,7 +69,7 @@ try {
 		`
 const core = await import('./.runtime-check-${process.pid}.bundle.mjs');
 if (core.Runtime.find() !== undefined) throw new Error('Core must not pick a runtime by itself.');
-const runtime = { name: 'check', env: () => process.env, sleep: async () => {}, serve() {}, exit() {}, onShutdown: () => () => {} };
+const runtime = { name: 'check', env: () => process.env, sleep: async () => {}, serve() {}, exit() {}, onShutdown: () => () => {}, argv: () => [], write() {}, terminal: () => undefined };
 class App extends core.Application {}
 core.Application.register({ runtime, modules: [] })(App);
 process.env.ELYSIUM_RUNTIME_CHECK = 'ok';

@@ -64,6 +64,8 @@ describe('argv, write and terminal', () => {
 			runtime.write('stderr', 'err');
 			expect(log).toHaveBeenCalledWith('out');
 			expect(error).toHaveBeenCalledWith('err');
+			runtime.write('stdout', 'out\n');
+			expect(log).toHaveBeenLastCalledWith('out');
 		} finally {
 			log.mockRestore();
 			error.mockRestore();

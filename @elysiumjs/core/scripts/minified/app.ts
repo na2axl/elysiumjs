@@ -87,7 +87,10 @@ const runtime = {
 	sleep: async () => {},
 	serve() {},
 	exit() {},
-	onShutdown: () => () => {}
+	onShutdown: () => () => {},
+	argv: () => [] as string[],
+	write() {},
+	terminal: () => undefined
 };
 
 @Application.register({ runtime, modules: [ReportModule], openapi: false })

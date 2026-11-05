@@ -49,8 +49,10 @@ export const createRuntime = (options: WorkersRuntimeOptions = {}): Runtime => (
 	exit() {},
 	argv: () => [],
 	write(stream, text) {
-		if (stream === 'stderr') console.error(text);
-		else console.log(text);
+		// console adds its own newline.
+		const line = text.endsWith('\n') ? text.slice(0, -1) : text;
+		if (stream === 'stderr') console.error(line);
+		else console.log(line);
 	},
 	terminal: () => undefined,
 	onShutdown() {

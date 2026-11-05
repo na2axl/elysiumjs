@@ -87,7 +87,8 @@ describe('currentEnvironment', () => {
 			Runtime.reset();
 			expect(currentEnvironment()).toBe('development');
 		} finally {
-			process.env.NODE_ENV = original;
+			if (original === undefined) delete process.env.NODE_ENV;
+			else process.env.NODE_ENV = original;
 		}
 	});
 });
@@ -162,7 +163,8 @@ describe('host APIs through the runtime', () => {
 			Runtime.reset();
 			expect(currentEnvironment()).toBe('staging');
 		} finally {
-			process.env.NODE_ENV = original;
+			if (original === undefined) delete process.env.NODE_ENV;
+			else process.env.NODE_ENV = original;
 		}
 	});
 });
