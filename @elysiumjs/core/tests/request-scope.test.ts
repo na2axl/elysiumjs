@@ -121,6 +121,95 @@ describe('Request scope', () => {
 		});
 	});
 
+	describe('async onInit', () => {
+		let inits = 0;
+		let failuresLeft = 0;
+
+		@Service.register({ scope: ServiceScope.REQUEST })
+		class Tx {
+			public ready = false;
+
+			public async onInit() {
+				inits++;
+				await tick();
+				if (failuresLeft > 0) {
+					failuresLeft--;
+					throw new Error('tx failed');
+				}
+				this.ready = true;
+			}
+		}
+
+		@Service.register({ scope: ServiceScope.REQUEST })
+		class Repo {
+			constructor(@Service.inject(Tx) public tx: Tx) {}
+		}
+
+		@Service.register({ scope: ServiceScope.FACTORY })
+		class Flaky {
+			public async onInit() {
+				await tick();
+				throw new Error('flaky failed');
+			}
+		}
+
+		const unhandled: unknown[] = [];
+		const onUnhandled = (error: unknown) => unhandled.push(error);
+
+		beforeEach(() => {
+			inits = 0;
+			failuresLeft = 0;
+			unhandled.length = 0;
+			process.on('unhandledRejection', onUnhandled);
+			for (const cls of [Tx, Repo, Flaky]) Container.register(null, cls, undefined);
+		});
+		afterEach(() => {
+			process.off('unhandledRejection', onUnhandled);
+		});
+
+		it('resolves a request-scoped service whose onInit is async, then serves it synchronously', async () => {
+			await Service.runInRequestScope(async () => {
+				const tx = await Service.resolve(Tx);
+				expect(tx.ready).toBe(true);
+				expect(Service.get(Tx)).toBe(tx);
+			});
+		});
+
+		it('injects it into a request-scoped dependant through Service.resolve', async () => {
+			await Service.runInRequestScope(async () => {
+				const repo = await Service.resolve(Repo);
+				expect(repo.tx.ready).toBe(true);
+				expect(repo.tx).toBe(Service.get(Tx)!);
+			});
+		});
+
+		it('shares one onInit between concurrent resolutions in one request', async () => {
+			await Service.runInRequestScope(async () => {
+				const [a, b] = await Promise.all([Service.resolve(Tx), Service.resolve(Tx)]);
+				expect(a).toBe(b);
+				expect(inits).toBe(1);
+			});
+		});
+
+		it('rethrows a failing onInit to the caller, then retries on the next resolve', async () => {
+			failuresLeft = 1;
+			await Service.runInRequestScope(async () => {
+				await expect(Service.resolve(Tx)).rejects.toThrow('tx failed');
+				const tx = await Service.resolve(Tx);
+				expect(tx.ready).toBe(true);
+				expect(inits).toBe(2);
+			});
+			await tick();
+			expect(unhandled).toEqual([]);
+		});
+
+		it('rethrows a failing factory onInit without an unhandled rejection', async () => {
+			await expect(Service.resolve(Flaky)).rejects.toThrow('flaky failed');
+			await tick();
+			expect(unhandled).toEqual([]);
+		});
+	});
+
 	describe('inject', () => {
 		it('injects by class when no token is given', () => {
 			class Dep {}
@@ -174,6 +263,34 @@ describe('Request scope', () => {
 			expect(first.same).toBe(true);
 			expect(second.same).toBe(true);
 			expect(first.id).not.toBe(second.id);
+			await instance.kernel.shutdown();
+		});
+
+		it('injects an async request-scoped service into a request-scoped controller and a route parameter', async () => {
+			@Service.register({ scope: ServiceScope.REQUEST })
+			class Session {
+				public ready = false;
+
+				public async onInit() {
+					await tick();
+					this.ready = true;
+				}
+			}
+
+			@Http.controller({ path: '/session', scope: HttpControllerScope.REQUEST })
+			class SessionController {
+				constructor(@Service.inject(Session) public session: Session) {}
+
+				@Http.get()
+				public show(@Service.inject(Session) session: Session) {
+					return { ctor: this.session.ready, param: session.ready, same: session === this.session };
+				}
+			}
+
+			const { instance, app } = await build(SessionController, [Session]);
+			const response = await app.handle(new Request('http://localhost/session'));
+			expect(response.status).toBe(200);
+			expect(await response.json()).toEqual({ ctor: true, param: true, same: true });
 			await instance.kernel.shutdown();
 		});
 

@@ -164,14 +164,31 @@ const instantiate = (entry: ContainerEntry): Instantiation => {
 		const existing = store.get(entry);
 		if (existing) return existing;
 		const instance = construct(entry);
-		const instantiation = { instance, ready: runOnInit(entry, instance) };
+		const instantiation: Instantiation = { instance, ready: undefined };
+		const ready = runOnInit(entry, instance);
+		if (ready) {
+			// Once settled, the instance is served synchronously; a failure is forgotten, so that
+			// the next resolution in the request builds it again.
+			instantiation.ready = ready.then(
+				() => {
+					instantiation.ready = undefined;
+				},
+				(error) => {
+					if (store.get(entry) === instantiation) store.delete(entry);
+					throw error;
+				}
+			);
+			instantiation.ready.catch(() => {});
+		}
 		store.set(entry, instantiation);
 		return instantiation;
 	}
 
 	if (entry.scope === ServiceScope.FACTORY) {
 		const instance = construct(entry);
-		return { instance, ready: runOnInit(entry, instance) };
+		const ready = runOnInit(entry, instance);
+		ready?.catch(() => {});
+		return { instance, ready };
 	}
 
 	if (entry.initFailure) throw entry.initFailure.error;
@@ -249,8 +266,19 @@ const prepare = async (entry: ContainerEntry, path: readonly ContainerEntry[]): 
 	);
 	for (const dependency of found) {
 		if (!dependency) continue;
-		if (dependency.entry.scope !== ServiceScope.SINGLETON) await prepare(dependency.entry, trail);
-		else await entryValueAsync(dependency.entry, trail);
+		if (dependency.entry.scope === ServiceScope.SINGLETON) {
+			await entryValueAsync(dependency.entry, trail);
+		} else if (
+			dependency.entry.scope === ServiceScope.REQUEST &&
+			entry.scope !== ServiceScope.SINGLETON &&
+			requestStorage.getStore()
+		) {
+			// Built ahead in the request store, so that the dependant finds it ready. A singleton
+			// dependant is left to fail with a ScopeMismatchError when it is built.
+			await entryValueAsync(dependency.entry, trail);
+		} else {
+			await prepare(dependency.entry, trail);
+		}
 	}
 };
 
@@ -430,6 +458,38 @@ export namespace Container {
 		const found = lookup(service, ModuleContext.current());
 		if (!found) throw notFound(service, requester);
 		return entryValueAsync(found.entry);
+	}
+
+	/**
+	 * Awaits everything `cls` injects, so that {@link make} can then build it synchronously:
+	 * module initialisation, singletons and, inside a request scope, request-scoped services
+	 * with an asynchronous `onInit`.
+	 * @param cls The class about to be built from the current module context.
+	 */
+	export function prepareClass(cls: Class<unknown>): Promise<void> {
+		return prepare(
+			{
+				token: cls,
+				name: cls.name,
+				scope: ServiceScope.FACTORY,
+				global: false,
+				owner: ModuleContext.current() ?? null,
+				create: () => undefined,
+				initialised: false,
+				cls
+			},
+			[]
+		);
+	}
+
+	/**
+	 * Awaits a service, like {@link resolve}, so that a later {@link get} returns it synchronously.
+	 * Does nothing when the service is not visible, leaving {@link get} to return `null`.
+	 * @param service The service token.
+	 */
+	export async function prepareService(service: ServiceToken): Promise<void> {
+		const found = lookup(service, ModuleContext.current());
+		if (found) await entryValueAsync(found.entry);
 	}
 
 	/**
