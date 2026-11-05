@@ -51,10 +51,11 @@ export class UserController {
 	@Http.get({ path: '/:id', response: UserModel.selectSchema })
 	private async getUser(
 		@Http.param('id', t.String({ format: 'uuid' })) id: string,
-		@Http.context() c: any
-	) {
+		@Http.context() c: Context
+	): Promise<User> {
 		const user = await this.userService.getUser(id);
-		return !!user ? user : c.error(404, { message: 'User not found' });
+		if (!user) throw c.status(404, { message: 'User not found' });
+		return user;
 	}
 
 	@Http.post({ response: UserModel.selectSchema })
@@ -73,8 +74,8 @@ export class UserController {
 		@Http.body(UserModel.updateSchema) b: UserInsert,
 		@Http.query() q: any,
 		@co() c: UserController
-	) {
-		// return this.db.insert(usersTable).values(b).returning();
+	): UserInsert {
+		return b;
 	}
 
 	@Http.sse({ path: '/:id/notifications' })

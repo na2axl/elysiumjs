@@ -18,9 +18,9 @@ import type { AppContext } from '../src/app';
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-import Value from 'typebox/value';
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 import { Elysia, t } from 'elysia';
+import Value from 'typebox/value';
 
 import { Application } from '../src/app';
 import { Command } from '../src/command';
@@ -945,6 +945,20 @@ describe('Application class', () => {
 			return GreetModule;
 		};
 
+		it('reads the module graph of an app class without booting it', () => {
+			const initialised: string[] = [];
+			const GreetModule = makeModule(initialised);
+
+			@Application.register({ modules: [GreetModule], openapi: false })
+			class TestApp extends Application {}
+
+			const graph = TestApp.moduleGraph();
+
+			expect(graph.nodes.map((node) => node.moduleClass)).toContain(GreetModule);
+			expect(graph.node(GreetModule)?.props.controllers).toHaveLength(1);
+			expect(initialised).toEqual([]);
+		});
+
 		it('builds the app without listening or initialising the modules', async () => {
 			const initialised: string[] = [];
 
@@ -1360,7 +1374,11 @@ describe('Application class', () => {
 			await serve(instance);
 
 			// Elysia 2 runs the start hooks after listen() returns: wait for the start event.
-			for (let i = 0; i < 100 && emitSpy.mock.calls.every(([e]) => e !== 'elysium:server:start'); i++) {
+			for (
+				let i = 0;
+				i < 100 && emitSpy.mock.calls.every(([e]) => e !== 'elysium:server:start');
+				i++
+			) {
 				await Bun.sleep(10);
 			}
 

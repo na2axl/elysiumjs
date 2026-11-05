@@ -2,7 +2,9 @@
 	"extends": "../tsconfig.base.json",
 	"compilerOptions": {
 		"types": ["bun-types"],
-		"noEmit": true
+		"noEmit": true,
+		"noUnusedLocals": false,
+		"noUnusedParameters": false
 	},
 	"exclude": ["src/node_modules", "dist"]
 }

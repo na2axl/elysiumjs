@@ -47,6 +47,21 @@ styx module:rename --module billing --name payments
 
 In a multi module project, pass `--module <name>`. Run `styx help <command>` for every option.
 
+## Typed clients
+
+`styx routes:generate` writes the route types of the app to `src/routes.gen.ts` (set `routes` in `.elysiumrc` or pass `--out` to change it). The file exports `AppRoutes`, for Eden:
+
+```ts
+import type { AppRoutes } from './routes.gen';
+
+import { treaty } from '@elysia/eden';
+
+const api = treaty<AppRoutes>('http://localhost:3000');
+const { data } = await api.users({ id }).get();
+```
+
+The types come from the controller methods: the parameters decorated with `@Http.param`, `@Http.query` and `@Http.body` give the request types, and the return type gives the response type, so annotate the return type of methods that return different shapes. The file holds types only and is written again by `typecheck` in new projects, so keep it out of git.
+
 ## Running the app
 
 Every other command loads the project's app (`src/app.ts` or `index.ts`) and runs there:

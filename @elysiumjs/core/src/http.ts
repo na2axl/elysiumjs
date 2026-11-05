@@ -90,6 +90,11 @@ type HttpRequestHandler = <TResult = unknown, TArgs extends any[] = unknown[]>(
  */
 type HttpRequestHandlerMetadata = {
 	/**
+	 * The name of the controller method handling the route.
+	 */
+	name: string;
+
+	/**
 	 * The path of the HTTP route.
 	 */
 	path: Route;
@@ -382,6 +387,7 @@ const registerHttpRequestHandler = (props: HttpRequestHandlerRegistrationProps) 
 		Metadata.get(Symbols.http, target.constructor) ?? [];
 
 	metadata.push({
+		name: String(props.propertyKey),
 		path,
 		method,
 		body,
@@ -485,7 +491,68 @@ export type RequestHandlerDecoratorProps = {
 	transactional?: boolean;
 };
 
+/**
+ * A route of an HTTP controller, as `Http.describe()` reports it.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type HttpRouteDescription = {
+	/** The name of the controller method handling the route. */
+	name: string;
+	/** The HTTP method, in upper case. Server-sent events routes use `GET`. */
+	method: string;
+	/** The path of the route, relative to the controller path. */
+	path: Route;
+	/** Whether the route streams server-sent events. */
+	sse: boolean;
+	/** The index of the method parameter receiving the request body. */
+	body?: number;
+	/** The index of the method parameter receiving the query. */
+	query?: number;
+	/** The method parameters receiving URL parameters. */
+	params: Array<{ slug: string; index: number }>;
+};
+
+/**
+ * An HTTP controller, as `Http.describe()` reports it.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type HttpControllerDescription = {
+	/** The path of the controller. */
+	path: Route;
+	/** The routes of the controller. */
+	routes: HttpRouteDescription[];
+};
+
 export namespace Http {
+	/**
+	 * Describes the routes of an HTTP controller, for tools such as the route type generator.
+	 * Route decorators register their routes on the next tick, so call it after importing the
+	 * controller and awaiting a tick.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param controller The controller class.
+	 * @returns The description, or `undefined` when the class is not an HTTP controller.
+	 */
+	export const describe = (controller: Class<any>): HttpControllerDescription | undefined => {
+		const props: HttpControllerProps | undefined = Metadata.get('http:controller', controller);
+		if (!props) return undefined;
+		const metadata: HttpRequestHandlerMetadata[] = Metadata.get(Symbols.http, controller) ?? [];
+		return {
+			path: props.path ?? '/',
+			routes: metadata.map((route) => {
+				const sse = route.method === 'elysium:SSE';
+				return {
+					name: route.name,
+					method: sse ? 'GET' : route.method.toUpperCase(),
+					path: route.path,
+					sse,
+					body: route.body?.index,
+					query: route.query?.index,
+					params: route.params.map(({ slug, index }) => ({ slug, index }))
+				};
+			})
+		};
+	};
+
 	/**
 	 * Marks a class as an HTTP controller.
 	 * @author Axel Nana <axel.nana@workbud.com>
@@ -709,6 +776,7 @@ export namespace Http {
 				return app;
 			}
 
+			Metadata.define('http:controller', props, target);
 			Metadata.define(Symbols.elysiaPlugin, handleHttp, target);
 		};
 	};

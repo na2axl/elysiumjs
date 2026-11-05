@@ -18,7 +18,7 @@ import type { TSchema } from 'typebox';
 import type { CommandClass } from './command';
 import type { ElysiaApp, Route } from './http';
 import type { ConfiguredModule, ModuleClass } from './module';
-import type { ModuleNode } from './module-graph';
+import type { ModuleGraph, ModuleNode } from './module-graph';
 import type { Runtime as RuntimePort } from './runtime';
 import type { TestingApp, TestingOptions } from './testing';
 import type { ElysiaPlugin } from './utils';
@@ -320,6 +320,17 @@ export abstract class Application extends InteractsWithConsole {
 
 	private props(): AppProps {
 		return Metadata.get(Symbols.app, this.constructor) ?? {};
+	}
+
+	/**
+	 * Builds the module graph of an application class without creating or booting anything.
+	 * Used by tools that read the app's structure, such as the route type generator.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param environment The environment to build the graph for. Defaults to the current one.
+	 */
+	public static moduleGraph(environment?: string): ModuleGraph {
+		const { modules }: AppProps = Metadata.get(Symbols.app, this) ?? {};
+		return buildModuleGraph(modules ?? [], environment);
 	}
 
 	private async dispatch([action, ...rest]: string[]): Promise<void> {
