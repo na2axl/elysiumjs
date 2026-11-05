@@ -66,7 +66,7 @@ export const RUNTIMES: Record<'bun' | 'node' | 'workers', RuntimeChoice> = {
 		package: '@elysiumjs/runtime-workers',
 		alias: 'workersRuntime',
 		unavailable:
-			'Workers apps need the synchronous module build and the Workers adapter, which are still to come.'
+			'Workers apps compile ahead of time, but the templates use Postgres and Redis clients that need Bun, and the Workers adapter is still to come.'
 	}
 };
 
@@ -96,7 +96,6 @@ import { HermesLogger, HermesModule } from '@elysiumjs/hermes';
 import { RedisModule } from '@elysiumjs/redis';
 import { runtime as ${runtime.alias} } from '${runtime.package}';
 import { DrizzleModule } from '@elysiumjs/mnemosyne-drizzle';
-import { StyxModule } from '@elysiumjs/styx';
 ${enabledModules.map((module) => `import { ${module.import} } from '${module.name}';`).join('\n')}
 
 ${Object.keys(modules)
@@ -121,8 +120,7 @@ export const env = t.Object({});
 				main: { connection: process.env.DATABASE_URL! }
 			}
 		})),
-		StyxModule,${enabledModules.map((module) => `\n\t\t${module.expression},`).join('')}
-		${Object.keys(modules)
+		${enabledModules.map((module) => `${module.expression},\n\t\t`).join('')}${Object.keys(modules)
 			.map((module) => `${pascal(module)}Module`)
 			.join(',\n\t\t')}
 	],

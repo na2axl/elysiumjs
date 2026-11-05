@@ -2,7 +2,7 @@
   "name": "create-elysium",
   "version": "0.2.2",
   "license": "Apache-2.0",
-  "description": "Bootstrap you next Elysium.js app!",
+  "description": "Bootstrap your next Elysium.js app (runs styx create).",
   "author": {
     "name": "Axel Nana",
     "email": "axel.nana@workbud.com"
@@ -31,19 +31,10 @@
     "create-elysium": "./index.js"
   },
   "files": [
-    "index.js",
-    "template-*/**",
-    "feature-*/**",
-    "shared-*/**",
-    "plugin-*/**"
+    "index.js"
   ],
   "type": "module",
-  "devDependencies": {
-    "@types/prompts": "^2.4.9"
-  },
   "dependencies": {
-    "@elysiumjs/core": "workspace:*",
-    "prompts": "^2.4.2",
-    "radash": "catalog:"
+    "@elysiumjs/styx": "workspace:^"
   }
 }

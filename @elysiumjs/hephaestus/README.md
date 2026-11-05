@@ -4,27 +4,26 @@ Build tooling for Elysium.js applications: standalone binaries, Docker images an
 
 ## Installation
 
-```bash
-bun add @elysiumjs/hephaestus
-```
+Install it as a dev dependency of your project, beside `@elysiumjs/styx`:
 
-Install it as a regular dependency, not a dev dependency: `HephaestusModule` is imported by your application at runtime.
+```bash
+bun add -D @elysiumjs/hephaestus
+```
 
 ## Usage
 
-Add `HephaestusModule` to the modules of your application. It provides the Hephaestus commands to `styx`.
+Styx loads the Hephaestus commands itself when the project installs the package, so the app imports nothing:
 
-```ts
-import { Application } from '@elysiumjs/core';
-import { HephaestusModule } from '@elysiumjs/hephaestus';
-
-@Application.register({
-	modules: [HephaestusModule /* , your other modules */]
-})
-export class App extends Application {}
+```bash
+styx hephaestus:build
+styx list
 ```
 
-Then run `bun styx list` to see the available commands.
+The build settings live in `hephaestus.config.ts` (`styx create --features hephaestus` writes one).
+
+Apps that still list `HephaestusModule` in their modules keep working, but the package then has to be a regular dependency.
+
+The classes behind the commands (`BinaryBuilder`, `AssetEmbedder`, `DockerGenerator`) are exported for build scripts. Styx builds its own standalone executables with them.
 
 ## License
 

@@ -63,7 +63,8 @@ export class AssetEmbedder {
 
 			for await (const file of glob.scan({
 				cwd: process.cwd(),
-				absolute: true
+				absolute: true,
+				dot: true
 			})) {
 				if (this.isExcluded(file)) continue;
 

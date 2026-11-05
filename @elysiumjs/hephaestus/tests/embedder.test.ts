@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'bun:test';
 
 import { AssetEmbedder } from '../src/assets/embedder';
@@ -44,6 +48,23 @@ describe('AssetEmbedder', () => {
 			expect(output).toContain('export function getAsset');
 			expect(output).toContain('export function getAssetString');
 			expect(output).toContain('export function listAssets');
+		});
+
+		it('should embed dotfiles matched by the patterns', async () => {
+			const dir = await mkdtemp(join(tmpdir(), 'hephaestus-embed-'));
+			const previous = process.cwd();
+			try {
+				await writeFile(join(dir, '.specs'), '{}');
+				await writeFile(join(dir, 'index.ts'), 'export {};');
+				process.chdir(dir);
+				const output = await new AssetEmbedder(makeConfig({ embed: ['**'] })).embed();
+
+				expect(output).toContain('".specs"');
+				expect(output).toContain('"index.ts"');
+			} finally {
+				process.chdir(previous);
+				await rm(dir, { recursive: true, force: true });
+			}
 		});
 	});
 

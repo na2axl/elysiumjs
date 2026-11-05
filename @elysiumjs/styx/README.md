@@ -1,79 +1,77 @@
 # @elysiumjs/styx
 
-CLI tool for Elysium.js framework.
+The command line tool of the Elysium.js framework. It creates projects, generates code and runs your app's commands.
 
 ## Installation
 
-```bash
-bun install @elysiumjs/styx
-```
-
-## Usage
-
-The `styx` command needs to be run inside an Elysium.js project. It loads `src/app.ts` (or `index.ts`) and starts the exported `Application` subclass.
-
-Add `StyxModule` to the modules of your application to get the commands below. It is only active in development (`NODE_ENV=development`, the default), so the `make:*` and `module:*` commands are absent in production. The `migration:*` commands come from your database module (`DrizzleModule`) and stay available in production.
-
-```ts
-import { Application } from '@elysiumjs/core';
-import { StyxModule } from '@elysiumjs/styx';
-
-@Application.register({
-	modules: [StyxModule /* , your other modules */]
-})
-export class App extends Application {}
-```
-
-To create new items:
+Install it globally to create projects and use it anywhere:
 
 ```bash
-bun styx make:command [options]
-bun styx make:controller [options]
-bun styx make:job [options]
-bun styx make:middleware [options]
-bun styx make:model [options]
-bun styx make:repository [options]
-bun styx make:service [options]
-bun styx make:validator [options]
+bun add -g @elysiumjs/styx
 ```
 
-To manage migrations:
+Projects also install it as a dev dependency (`styx create` does this). Inside a project, the global `styx` hands every command to the project's own copy, like `nest` does, so each project runs the Styx version it was written for.
+
+Standalone executables, which need neither Bun nor the package files, are built with `bun run build:bin` (current platform) or `bun run build:bin --all` (Linux, macOS and Windows). They embed the code stubs and project templates with Hephaestus.
+
+## Creating a project
 
 ```bash
-bun styx migration:generate [options]
-bun styx migration:run [options]
+styx create my-app
 ```
 
-To manage modules:
+Without options, it asks for the template (single or multi module), the runtime, the modules, plugins and features. Options skip the prompts:
 
 ```bash
-bun styx module:new [options]
-bun styx module:rename [options]
+styx create my-app --template multi --modules users,billing --features prettier,hephaestus --git false
 ```
 
-To start the Elysium.js project:
+`--install false` writes the files without installing dependencies, `--force` replaces a folder that is not empty, and `--yes` takes the defaults for every option not given. `bun create elysium my-app` runs the same command.
+
+## Generating code
+
+The generators write files from stubs and never start your app, so they work before the app can boot:
 
 ```bash
-bun styx serve
+styx make:command --name SendReport
+styx make:controller --name UserController
+styx make:job --name ImportUsers
+styx make:middleware --name AuthMiddleware
+styx make:model --name User
+styx make:repository --name UserRepository
+styx make:service --name UserService
+styx make:validator --name CreateUser
+styx module:new --name billing
+styx module:rename --module billing --name payments
 ```
 
-To execute a custom command:
+In a multi module project, pass `--module <name>`. Run `styx help <command>` for every option.
+
+## Running the app
+
+Every other command loads the project's app (`src/app.ts` or `index.ts`) and runs there:
 
 ```bash
-bun styx <command>
+styx serve
+styx migration:generate
+styx migration:run
+styx <your command>
 ```
 
-To show all available commands:
+These need `@elysiumjs/styx` in the project's dev dependencies.
+
+## Build tools
+
+When the project installs `@elysiumjs/hephaestus` (as a dev dependency), its `hephaestus:*` commands are available through `styx` without adding anything to the app.
+
+## Listing commands
 
 ```bash
-bun styx list
+styx list
+styx help <command>
 ```
 
-To get help for a specific command:
-
-```bash
-bun styx help <command>
-```
+`StyxModule` is still exported for apps that list it, but the generators no longer need it.
 
 ## Contributing
 
