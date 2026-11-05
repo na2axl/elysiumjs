@@ -23,6 +23,54 @@ export class ${module}Module extends Module {}
 `;
 
 /**
+ * A runtime the generated app can run on.
+ */
+export type RuntimeChoice = {
+	/** The prompt label. */
+	title: string;
+
+	/** The prompt hint. */
+	description: string;
+
+	/** The package exporting the runtime as `runtime`. */
+	package: string;
+
+	/** The local name the app imports `runtime` as. */
+	alias: string;
+
+	/** Why the runtime cannot be picked yet, when it cannot. */
+	unavailable?: string;
+};
+
+/**
+ * The runtimes offered by the runtime step, by prompt value.
+ */
+export const RUNTIMES: Record<'bun' | 'node' | 'workers', RuntimeChoice> = {
+	bun: {
+		title: 'Bun',
+		description: 'Run with Bun (https://bun.sh)',
+		package: '@elysiumjs/runtime-bun',
+		alias: 'bunRuntime'
+	},
+	node: {
+		title: 'Node.js',
+		description: 'Run with Node.js (https://nodejs.org)',
+		package: '@elysiumjs/runtime-node',
+		alias: 'nodeRuntime',
+		unavailable:
+			'The Postgres, Redis and CLI packages the templates use still need Bun, and Node.js cannot run decorators without a build step.'
+	},
+	workers: {
+		title: 'Cloudflare Workers',
+		description: 'Deploy to Cloudflare Workers (https://workers.cloudflare.com)',
+		package: '@elysiumjs/runtime-workers',
+		alias: 'workersRuntime',
+		unavailable:
+			'Workers apps need the synchronous module build and the Workers adapter, which are still to come.'
+	}
+};
+
+/**
  * A module added to the generated app by a plugin or a feature.
  */
 export type EnabledModule = {
@@ -39,13 +87,14 @@ export type EnabledModule = {
 export const getAppCode = (
 	projectName: string,
 	modules: Record<string, string>,
-	enabledModules: EnabledModule[] = []
+	enabledModules: EnabledModule[] = [],
+	runtime: RuntimeChoice = RUNTIMES.bun
 ) => /* js */ `import type { ErrorContext } from 'elysia';
 
 import { Application, Service, t } from '@elysiumjs/core';
 import { HermesLogger, HermesModule } from '@elysiumjs/hermes';
 import { RedisModule } from '@elysiumjs/redis';
-import { runtime as bunRuntime } from '@elysiumjs/runtime-bun';
+import { runtime as ${runtime.alias} } from '${runtime.package}';
 import { DrizzleModule } from '@elysiumjs/mnemosyne-drizzle';
 import { StyxModule } from '@elysiumjs/styx';
 ${enabledModules.map((module) => `import { ${module.import} } from '${module.name}';`).join('\n')}
@@ -57,7 +106,7 @@ ${Object.keys(modules)
 export const env = t.Object({});
 
 @Application.register({
-	runtime: bunRuntime,
+	runtime: ${runtime.alias},
 	modules: [
 		HermesModule.with({ level: 'debug', format: 'pretty' }),
 		RedisModule.with({
