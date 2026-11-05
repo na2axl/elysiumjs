@@ -14,7 +14,7 @@
 
 import type { Application, ElysiumPlugin } from '@elysiumjs/core';
 
-import { opentelemetry } from '@elysiajs/opentelemetry';
+import { opentelemetry } from '@elysia/opentelemetry';
 import { Env } from '@elysiumjs/core';
 import * as Sentry from '@sentry/bun';
 import { Elysia } from 'elysia';
@@ -58,20 +58,20 @@ export const plugin = (options?: Sentry.BunOptions): ElysiumPlugin => {
 					})
 				)
 				// Capture exceptions
-				.onError({ as: 'global' }, ({ error, Sentry }) => {
+				.onError('global', ({ error, Sentry }) => {
 					Sentry.captureException(error);
 				})
 				// Need this to inject attributes into the span
 				// https://github.com/elysiajs/opentelemetry/issues/40
 				.onAfterResponse(
-					{ as: 'global' },
+					'global',
 					// @ts-expect-error Unused parameters
 					function injectAttributes({
 						body,
 						cookie,
 						params,
 						request,
-						response,
+						responseValue,
 						route,
 						server,
 						store,

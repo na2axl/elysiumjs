@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { TSchema } from 'elysia';
+import type { TSchema } from '@elysiumjs/core';
 import type { ColumnMetadata, ModelAdapter } from './interfaces';
 
 import { Application } from '@elysiumjs/core';
@@ -76,14 +76,14 @@ const parseColumnType = (column: ColumnMetadata) => {
 			return t.Object({});
 		case 'date':
 			return t
-				.Transform(t.String({ format: 'date' }))
-				.Decode((date) => new Date(date))
-				.Encode((date) => date.toISOString());
+				.Codec(t.String({ format: 'date' }))
+				.Decode((date: string) => new Date(date))
+				.Encode((date: Date) => date.toISOString());
 		case 'datetime':
 			return t
-				.Transform(t.String({ format: 'date-time' }))
-				.Decode((date) => new Date(date))
-				.Encode((date) => date.toISOString());
+				.Codec(t.String({ format: 'date-time' }))
+				.Decode((date: string) => new Date(date))
+				.Encode((date: Date) => date.toISOString());
 		case 'bigint':
 			return t.BigInt();
 		case 'buffer':

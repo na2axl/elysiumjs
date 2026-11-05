@@ -1,4 +1,4 @@
-import type { ErrorContext } from 'elysia';
+import type { ServerError } from '@elysiumjs/core';
 
 import { Application, Middleware, Service, WampModule } from '@elysiumjs/core';
 import { HeraclesModule, RedisTransport } from '@elysiumjs/heracles';
@@ -59,7 +59,7 @@ import { XServerMiddleware } from '#hero/middlewares/x-server.middleware';
 	}
 })
 export class App extends Application {
-	protected onError(e: ErrorContext): Promise<boolean> {
+	protected onError(e: ServerError): Promise<boolean> {
 		Service.get(HermesLogger)?.error(e.error.message, e.error);
 		return super.onError(e);
 	}

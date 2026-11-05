@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ElysiaOpenAPIConfig } from '@elysiajs/openapi';
-import type { AnyElysia, ElysiaConfig, ErrorContext, TSchema } from 'elysia';
+import type { ElysiaOpenAPIConfig } from '@elysia/openapi';
+import type { AnyElysia, ErrorContext } from 'elysia';
+import type { TSchema } from 'typebox';
 import type { CommandClass } from './command';
 import type { ElysiaApp, Route } from './http';
 import type { ConfiguredModule, ModuleClass } from './module';
@@ -24,10 +25,10 @@ import type { ElysiaPlugin } from './utils';
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-import { openapi as openapiPlugin } from '@elysiajs/openapi';
-import { Value } from '@sinclair/typebox/value';
-import { Elysia } from 'elysia';
+import { openapi as openapiPlugin } from '@elysia/openapi';
+import { Elysia, ElysiaStatus } from 'elysia';
 import { first } from 'radash';
+import Value from 'typebox/value';
 
 import { getCommandName } from './command';
 import { ConsoleFormat, InteractsWithConsole } from './console';
@@ -37,7 +38,7 @@ import { Event } from './event';
 import { Kernel } from './kernel';
 import { getLogger } from './logger';
 import { Metadata } from './metadata';
-import { applyMiddlewares } from './middleware';
+import { applyMiddlewares, middlewareStops } from './middleware';
 import { ModuleContext } from './module-context';
 import { buildModuleGraph } from './module-graph';
 import { Runtime } from './runtime';
@@ -64,7 +65,7 @@ export type AppProps = {
 	/**
 	 * The Elysia server configuration.
 	 */
-	server?: ElysiaConfig<Route> & {
+	server?: ElysiaConfig & {
 		/**
 		 * The port to listen on.
 		 */
@@ -87,7 +88,7 @@ export type AppProps = {
 	 *
 	 * Set it to `false` to disable OpenAPI documentation.
 	 */
-	openapi?: ElysiaOpenAPIConfig | false;
+	openapi?: ElysiaOpenAPIConfig<boolean, string> | false;
 
 	/**
 	 * The validation schema for the application environment.
@@ -100,8 +101,15 @@ export type AppProps = {
 	plugins?: ElysiumPlugin[];
 };
 
-/** An error raised while handling a request, as given to the Elysia error hook. */
-type ServerError = ErrorContext & { code: string | number; error: any };
+/** The options of the root Elysia app. */
+type ElysiaConfig = NonNullable<ConstructorParameters<typeof Elysia>[0]>;
+
+/**
+ * An error raised while handling a request, as given to the Elysia error hook. `code` is set for
+ * the errors Elysia raises ('validation', 'not-found', ...).
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type ServerError = ErrorContext & { code?: string; error: any };
 
 /**
  * Type for the application context.
@@ -212,7 +220,7 @@ export abstract class Application extends InteractsWithConsole {
 			const rawEnv = Value.Convert(env, Value.Clone(runtimeEnv));
 
 			if (this.#debug && !Value.Check(env, rawEnv)) {
-				const error = Value.Errors(env, rawEnv).First();
+				const error = Value.Errors(env, rawEnv)[0];
 				this.trace(error! as unknown as Error, 'Invalid environment configuration');
 			}
 
@@ -277,7 +285,7 @@ export abstract class Application extends InteractsWithConsole {
 	 * @param _error The error context.
 	 * @returns Whether to continue the error propagation.
 	 */
-	protected async onError(_error: ErrorContext): Promise<boolean> {
+	protected async onError(_error: ServerError): Promise<boolean> {
 		return true;
 	}
 
@@ -460,7 +468,7 @@ export abstract class Application extends InteractsWithConsole {
 
 		await this.bootKernel(true);
 
-		this.#elysia = new Elysia(server).onRequest((c) => {
+		this.#elysia = (new Elysia(server) as unknown as Elysia<Route>).onRequest((c) => {
 			if (this.isDebug) {
 				getLogger().debug('Incoming request', { method: c.request.method, url: c.request.url });
 			}
@@ -469,7 +477,7 @@ export abstract class Application extends InteractsWithConsole {
 		Event.emit('elysium:server:before-init', this, this);
 
 		// Keeps a tenant already resolved by a middleware, which runs before this hook.
-		this.#elysia.resolve({ as: 'global' }, (ctx) => ({
+		this.#elysia.derive('global', (ctx) => ({
 			tenant:
 				(ctx as { tenant?: string }).tenant ?? ctx.request.headers.get('x-tenant-id') ?? 'public'
 		}));
@@ -531,7 +539,7 @@ export abstract class Application extends InteractsWithConsole {
 	/** Registers the error handler and the start and stop hooks of the root app. */
 	private setupServerHooks(): void {
 		this.#elysia
-			.onError({ as: 'global' }, (e) => this.handleServerError(e as ServerError))
+			.onError('global', (e) => this.handleServerError(e as ServerError))
 			.onStart(async (elysia) => {
 				await this.onStart(elysia as unknown as Elysia<Route>);
 				Event.emit('elysium:server:start', elysia, this);
@@ -547,6 +555,7 @@ export abstract class Application extends InteractsWithConsole {
 
 	/** Turns an error raised while handling a request into the response sent to the client. */
 	private async handleServerError(e: ServerError) {
+		if (middlewareStops.has(e.error)) return;
 		if (!(await this.onError(e))) return;
 
 		Event.emit('elysium:error', e);
@@ -557,10 +566,15 @@ export abstract class Application extends InteractsWithConsole {
 			...e.error
 		});
 
-		if (typeof e.code === 'number') return e.error.response;
+		// A thrown status is already a response.
+		if (e.error instanceof ElysiaStatus) return e.error;
+
+		// Elysia names its errors in kebab case ('not-found'); the response keeps the upper snake case
+		// names ('NOT_FOUND'), with UNKNOWN for errors Elysia did not raise.
+		const code = e.code ? e.code.toUpperCase().replaceAll('-', '_') : 'UNKNOWN';
 
 		let data = {};
-		switch (e.code) {
+		switch (code) {
 			case 'VALIDATION':
 				data = { scope: e.error.type, code: e.error.message };
 				break;
@@ -569,7 +583,7 @@ export abstract class Application extends InteractsWithConsole {
 				break;
 		}
 
-		return { type: e.code, data };
+		return { type: code, data };
 	}
 
 	/**

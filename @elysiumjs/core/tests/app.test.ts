@@ -13,12 +13,12 @@
 // limitations under the License.
 
 import type { Mock } from 'bun:test';
-import type { ValueError } from '@sinclair/typebox/value';
+import type { TLocalizedValidationError } from 'typebox/error';
 import type { AppContext } from '../src/app';
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-import { Value } from '@sinclair/typebox/value';
+import Value from 'typebox/value';
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 import { Elysia, t } from 'elysia';
 
@@ -279,24 +279,21 @@ describe('Application class', () => {
 
 		it('should validate and handle invalid environment configuration when debug is enabled', () => {
 			const traceSpy = spyOn(Application.prototype, 'trace');
-			const errorFirstMock: ValueError = {
-				type: 43,
-				path: '/TEST_VAR',
-				message: 'Expected string',
-				errors: [],
-				value: {},
-				schema: t.Object({ TEST_VAR: t.String() })
-			};
+			const schema = t.Object({ TEST_VAR: t.String() });
+			const errorFirstMock = {
+				keyword: 'type',
+				schemaPath: '#/properties/TEST_VAR',
+				instancePath: '/TEST_VAR',
+				params: { type: 'string' },
+				message: 'must be string'
+			} as TLocalizedValidationError;
 			const valueCheckSpy = spyOn(Value, 'Check').mockReturnValueOnce(false);
-			// @ts-expect-error The type is incorrect
-			const valueErrorsSpy = spyOn(Value, 'Errors').mockReturnValueOnce({
-				First: () => errorFirstMock
-			});
+			const valueErrorsSpy = spyOn(Value, 'Errors').mockReturnValueOnce([errorFirstMock]);
 			spyOn(Value, 'Convert').mockReturnValueOnce({});
 			const valueCleanSpy = spyOn(Value, 'Clean').mockReturnValueOnce({});
 			const initEnvSpy = spyOn(Env, 'initEnv');
 
-			@Application.register({ debug: true, env: errorFirstMock.schema })
+			@Application.register({ debug: true, env: schema })
 			class TestApp extends Application {}
 
 			new TestApp();
@@ -1274,7 +1271,11 @@ describe('Application class', () => {
 
 			const instance = new TestApp();
 			await serve(instance);
-			await nextTick();
+
+			// Elysia 2 runs the start hooks after listen() returns: wait for the start event.
+			for (let i = 0; i < 100 && emitSpy.mock.calls.every(([e]) => e !== 'elysium:server:start'); i++) {
+				await Bun.sleep(10);
+			}
 
 			expect(onStartSpy).toHaveBeenCalledWith(instance.elysia);
 			expect(emitSpy).toHaveBeenLastCalledWith('elysium:server:start', instance.elysia, instance);

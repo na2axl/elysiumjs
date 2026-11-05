@@ -18,7 +18,7 @@ import type { Context } from './http';
 import type { LoggerInterface } from './logger';
 import type { ModuleNode } from './module-graph';
 
-import { ElysiaCustomStatusResponse } from 'elysia';
+import { ElysiaStatus } from 'elysia';
 
 import { Application } from './app';
 import { getLogger } from './logger';
@@ -60,6 +60,12 @@ export const executeMiddlewareChain = (
 };
 
 /**
+ * The status responses thrown by middlewares to stop a request. They are responses, not errors.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export const middlewareStops = new WeakSet<object>();
+
+/**
  * Builds middleware instances in the context of a module.
  * @author Axel Nana <axel.nana@workbud.com>
  * @param middlewares The middleware classes.
@@ -98,10 +104,14 @@ export const applyMiddlewares = (
 			const result = await executeMiddlewareChain(mi, c, 'onRequest', node);
 			if (result === undefined) return executeMiddlewareChain(mi, c, 'onTransform', node);
 
-			// A transform hook stops the request only on a status response; any other value would be
-			// merged into the context and the request would go on.
-			if (result instanceof ElysiaCustomStatusResponse) return result;
-			return c.status(result instanceof Response ? result.status : (c.set.status ?? 200), result);
+			// A transform hook cannot stop the request by returning a value, so the response is thrown
+			// as a status. It is marked so the error handler sends it as is instead of reporting it.
+			const stop =
+				result instanceof ElysiaStatus
+					? result
+					: c.status(result instanceof Response ? result.status : (c.set.status ?? 200), result);
+			middlewareStops.add(stop);
+			throw stop;
 		});
 	} else {
 		plugin.onRequest((c) => {

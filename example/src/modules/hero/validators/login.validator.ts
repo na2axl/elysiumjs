@@ -1,3 +1,5 @@
+import type { Static } from '@elysiumjs/core';
+
 import { t } from 'elysia';
 
 export class LoginValidator {
@@ -36,4 +38,4 @@ export class LoginValidator {
     public static readonly schema = t.Object({});
 }
 
-export type LoginRequest = typeof LoginValidator.schema.static;
+export type LoginRequest = Static<typeof LoginValidator.schema>;

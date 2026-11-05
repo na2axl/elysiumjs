@@ -338,10 +338,12 @@ describe('Middleware', () => {
 
 			M.applyMiddlewares([RejectMiddleware], plugin as never, testNode());
 			const status = mock((code: number, body: unknown) => ({ code, body }));
-			expect(await callbacks.onTransform({ ...mockContext, set: {}, status } as never)).toEqual({
-				code: 200,
-				body: 'rejected'
-			});
+			const stop = await callbacks.onTransform({ ...mockContext, set: {}, status } as never).then(
+				() => undefined,
+				(e: unknown) => e
+			);
+			expect(stop).toEqual({ code: 200, body: 'rejected' });
+			expect(M.middlewareStops.has(stop as object)).toBe(true);
 			expect(calls).toEqual(['onRequest', 'onTransform']);
 		});
 
