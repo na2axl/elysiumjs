@@ -116,19 +116,19 @@ A CLI command boots lazily: running `app:cmd` initialises the command's own modu
 
 Core never calls a host API directly. Environment variables, timers, the HTTP server, process exit and shutdown signals come from a runtime, which ships as its own package:
 
-| Package                      | Export                                            | Notes                                                                                                     |
-| ---------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `@elysiumjs/runtime-bun`     | `bunRuntime`                                      | `Bun.env`, `Bun.sleep`, `listen`, process exit and signals                                                |
-| `@elysiumjs/runtime-node`    | `nodeRuntime`                                     | Same on Node.js; set `server: { adapter: node() }` from `@elysiajs/node`                                  |
-| `@elysiumjs/runtime-workers` | `workersRuntime`, `createWorkersRuntime({ env })` | Env from `process.env` (`nodejs_compat`) or `env`; no `serve` (export the app's `fetch`), exit or signals |
+| Package                      | Exports                             | Notes                                                                                                     |
+| ---------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `@elysiumjs/runtime-bun`     | `runtime`                           | `Bun.env`, `Bun.sleep`, `listen`, process exit and signals                                                |
+| `@elysiumjs/runtime-node`    | `runtime`                           | Same on Node.js; set `server: { adapter: node() }` from `@elysiajs/node`                                  |
+| `@elysiumjs/runtime-workers` | `runtime`, `createRuntime({ env })` | Env from `process.env` (`nodejs_compat`) or `env`; no `serve` (export the app's `fetch`), exit or signals |
 
-Pass it to the application, or call `Runtime.use()` before anything needs it:
+Each package exports `runtime` (rename it at import if you like). Pass it to the application, or call `Runtime.use()` before anything needs it:
 
 ```ts
 import { Application } from '@elysiumjs/core';
-import { bunRuntime } from '@elysiumjs/runtime-bun';
+import { runtime } from '@elysiumjs/runtime-bun';
 
-@Application.register({ runtime: bunRuntime, modules: [] })
+@Application.register({ runtime, modules: [] })
 class App extends Application {}
 ```
 
@@ -138,7 +138,7 @@ Without a runtime, `Runtime.get()` throws `RuntimeNotConfiguredError`; only the 
 
 - The `database`, `redis`, `wamp` and `elysium:hermes` keys of `@Application.register()` are gone. Add `DrizzleModule.with()`, `RedisModule.with()`, `WampModule.with()` and `HermesModule.with()` to `modules` instead.
 - `Redis` and `RedisModule` moved to `@elysiumjs/redis`.
-- An application needs a runtime: add `runtime: bunRuntime` from `@elysiumjs/runtime-bun` to `@Application.register()`.
+- An application needs a runtime: add `runtime` from `@elysiumjs/runtime-bun` to `@Application.register()`.
 - `plugins` no longer takes package plugins. Add the package's module (for example `SentryModule`) to `modules`.
 - Importing a file no longer registers its commands or services. List commands in a module's `commands`, services in `services`, and jobs in `jobs`.
 - `new App()` is replaced by `await App.start()`. `Application.testing()` boots a module graph for tests.

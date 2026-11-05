@@ -45,7 +45,7 @@ export const getAppCode = (
 import { Application, Service, t } from '@elysiumjs/core';
 import { HermesLogger, HermesModule } from '@elysiumjs/hermes';
 import { RedisModule } from '@elysiumjs/redis';
-import { bunRuntime } from '@elysiumjs/runtime-bun';
+import { runtime as bunRuntime } from '@elysiumjs/runtime-bun';
 import { DrizzleModule } from '@elysiumjs/mnemosyne-drizzle';
 import { StyxModule } from '@elysiumjs/styx';
 ${enabledModules.map((module) => `import { ${module.import} } from '${module.name}';`).join('\n')}

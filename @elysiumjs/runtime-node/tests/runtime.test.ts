@@ -16,27 +16,27 @@ import type { AnyElysia } from 'elysia';
 
 import { describe, expect, it, mock } from 'bun:test';
 
-import { nodeRuntime } from '../src';
+import { runtime } from '../src';
 
-describe('nodeRuntime', () => {
+describe('runtime', () => {
 	it('is named node', () => {
-		expect(nodeRuntime.name).toBe('node');
+		expect(runtime.name).toBe('node');
 	});
 
 	it('reads the process environment', () => {
 		process.env.ELYSIUM_RUNTIME_TEST = 'yes';
-		expect(nodeRuntime.env().ELYSIUM_RUNTIME_TEST).toBe('yes');
+		expect(runtime.env().ELYSIUM_RUNTIME_TEST).toBe('yes');
 	});
 
 	it('sleeps for the given duration', async () => {
 		const start = performance.now();
-		await nodeRuntime.sleep(5);
+		await runtime.sleep(5);
 		expect(performance.now() - start).toBeGreaterThanOrEqual(4);
 	});
 
 	it('serves through the app listen method', () => {
 		const app = { listen: mock() } as unknown as AnyElysia;
-		nodeRuntime.serve(app, 1234);
+		runtime.serve(app, 1234);
 		expect(app.listen).toHaveBeenCalledWith(1234);
 	});
 
@@ -44,7 +44,7 @@ describe('nodeRuntime', () => {
 		const original = process.exit;
 		process.exit = mock() as unknown as typeof process.exit;
 		try {
-			nodeRuntime.exit(3);
+			runtime.exit(3);
 			expect(process.exit).toHaveBeenCalledWith(3);
 		} finally {
 			process.exit = original;
@@ -53,7 +53,7 @@ describe('nodeRuntime', () => {
 
 	it('adds and removes shutdown handlers on SIGINT and SIGTERM', () => {
 		const handler = () => {};
-		const remove = nodeRuntime.onShutdown(handler);
+		const remove = runtime.onShutdown(handler);
 		expect(process.listeners('SIGINT')).toContain(handler);
 		expect(process.listeners('SIGTERM')).toContain(handler);
 		remove();

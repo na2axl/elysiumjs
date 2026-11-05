@@ -17,38 +17,38 @@ import type { AnyElysia } from 'elysia';
 import { RuntimeNotSupportedError } from '@elysiumjs/core';
 import { describe, expect, it } from 'bun:test';
 
-import { createWorkersRuntime, workersRuntime } from '../src';
+import { createRuntime, runtime } from '../src';
 
-describe('createWorkersRuntime', () => {
+describe('createRuntime', () => {
 	it('is named workers', () => {
-		expect(workersRuntime.name).toBe('workers');
+		expect(runtime.name).toBe('workers');
 	});
 
 	it('reads process.env by default, or the env it is given', () => {
-		expect(createWorkersRuntime().env()).toBe(process.env);
+		expect(createRuntime().env()).toBe(process.env);
 		const env = { A: '1' };
-		expect(createWorkersRuntime({ env }).env()).toBe(env);
+		expect(createRuntime({ env }).env()).toBe(env);
 	});
 
 	it('refuses to serve, since the host owns the server', () => {
-		expect(() => workersRuntime.serve({} as AnyElysia, 3000)).toThrow(RuntimeNotSupportedError);
-		expect(() => workersRuntime.serve({} as AnyElysia, 3000)).toThrow(
+		expect(() => runtime.serve({} as AnyElysia, 3000)).toThrow(RuntimeNotSupportedError);
+		expect(() => runtime.serve({} as AnyElysia, 3000)).toThrow(
 			"Application.serve is not supported on the workers runtime. Export the app's fetch handler from the Worker instead."
 		);
 	});
 
 	it('has no process to exit and no signals', () => {
 		const exit = process.exit;
-		expect(() => workersRuntime.exit(1)).not.toThrow();
+		expect(() => runtime.exit(1)).not.toThrow();
 		expect(process.exit).toBe(exit);
 		const before = process.listeners('SIGINT').length;
-		const remove = workersRuntime.onShutdown(() => {});
+		const remove = runtime.onShutdown(() => {});
 		expect(process.listeners('SIGINT')).toHaveLength(before);
 		expect(remove).toBeFunction();
 		remove();
 	});
 
 	it('sleeps with a timer', async () => {
-		await expect(workersRuntime.sleep(1)).resolves.toBeUndefined();
+		await expect(runtime.sleep(1)).resolves.toBeUndefined();
 	});
 });

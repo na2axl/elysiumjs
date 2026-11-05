@@ -21,7 +21,7 @@ const SIGNALS = ['SIGINT', 'SIGTERM'] as const;
  * `server: { adapter: node() }` (from `@elysiajs/node`) on the application.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export const nodeRuntime: Runtime = {
+export const runtime: Runtime = {
 	name: 'node',
 	env: () => process.env,
 	sleep: (ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)),

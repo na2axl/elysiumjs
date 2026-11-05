@@ -5,7 +5,7 @@ import { HeraclesModule, RedisTransport } from '@elysiumjs/heracles';
 import { HermesLogger, HermesModule } from '@elysiumjs/hermes';
 import { DrizzleModule } from '@elysiumjs/mnemosyne-drizzle';
 import { RedisModule } from '@elysiumjs/redis';
-import { bunRuntime } from '@elysiumjs/runtime-bun';
+import { runtime as bunRuntime } from '@elysiumjs/runtime-bun';
 import { StyxModule } from '@elysiumjs/styx';
 
 import { MainModule } from '#hero/hero.module';

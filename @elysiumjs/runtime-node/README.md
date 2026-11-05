@@ -12,11 +12,13 @@ bun add @elysiumjs/runtime-node
 
 ```ts
 import { Application } from '@elysiumjs/core';
-import { nodeRuntime } from '@elysiumjs/runtime-node';
+import { runtime } from '@elysiumjs/runtime-node';
 
-@Application.register({ runtime: nodeRuntime, modules: [] })
+@Application.register({ runtime, modules: [] })
 class App extends Application {}
 ```
+
+The package exports `runtime`; rename it at import if you like: `import { runtime as nodeRuntime } from '@elysiumjs/runtime-node'`.
 
 Uses `process.env`, timers, Elysia's `listen`, `process.exit` and `SIGINT`/`SIGTERM` handlers. Elysia needs its Node adapter: set `server: { adapter: node() }` from `@elysiajs/node`.
 

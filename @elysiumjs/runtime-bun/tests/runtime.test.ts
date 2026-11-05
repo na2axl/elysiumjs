@@ -16,27 +16,27 @@ import type { AnyElysia } from 'elysia';
 
 import { describe, expect, it, mock } from 'bun:test';
 
-import { bunRuntime } from '../src';
+import { runtime } from '../src';
 
-describe('bunRuntime', () => {
+describe('runtime', () => {
 	it('is named bun', () => {
-		expect(bunRuntime.name).toBe('bun');
+		expect(runtime.name).toBe('bun');
 	});
 
 	it('reads the process environment', () => {
 		process.env.ELYSIUM_RUNTIME_TEST = 'yes';
-		expect(bunRuntime.env().ELYSIUM_RUNTIME_TEST).toBe('yes');
+		expect(runtime.env().ELYSIUM_RUNTIME_TEST).toBe('yes');
 	});
 
 	it('sleeps for the given duration', async () => {
 		const start = performance.now();
-		await bunRuntime.sleep(5);
+		await runtime.sleep(5);
 		expect(performance.now() - start).toBeGreaterThanOrEqual(4);
 	});
 
 	it('serves through the app listen method', () => {
 		const app = { listen: mock() } as unknown as AnyElysia;
-		bunRuntime.serve(app, 1234);
+		runtime.serve(app, 1234);
 		expect(app.listen).toHaveBeenCalledWith(1234);
 	});
 
@@ -44,7 +44,7 @@ describe('bunRuntime', () => {
 		const original = process.exit;
 		process.exit = mock() as unknown as typeof process.exit;
 		try {
-			bunRuntime.exit(3);
+			runtime.exit(3);
 			expect(process.exit).toHaveBeenCalledWith(3);
 		} finally {
 			process.exit = original;
@@ -53,7 +53,7 @@ describe('bunRuntime', () => {
 
 	it('adds and removes shutdown handlers on SIGINT and SIGTERM', () => {
 		const handler = () => {};
-		const remove = bunRuntime.onShutdown(handler);
+		const remove = runtime.onShutdown(handler);
 		expect(process.listeners('SIGINT')).toContain(handler);
 		expect(process.listeners('SIGTERM')).toContain(handler);
 		remove();

@@ -17,7 +17,7 @@ import type { Runtime } from '@elysiumjs/core';
 import { RuntimeNotSupportedError } from '@elysiumjs/core';
 
 /**
- * Options of {@link createWorkersRuntime}.
+ * Options of {@link createRuntime}.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export type WorkersRuntimeOptions = {
@@ -35,7 +35,7 @@ export type WorkersRuntimeOptions = {
  * @param options The runtime options.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export const createWorkersRuntime = (options: WorkersRuntimeOptions = {}): Runtime => ({
+export const createRuntime = (options: WorkersRuntimeOptions = {}): Runtime => ({
 	name: 'workers',
 	env: () => options.env ?? (typeof process === 'undefined' ? {} : process.env),
 	sleep: (ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
@@ -56,4 +56,4 @@ export const createWorkersRuntime = (options: WorkersRuntimeOptions = {}): Runti
  * The Workers runtime reading `process.env`.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export const workersRuntime: Runtime = createWorkersRuntime();
+export const runtime: Runtime = createRuntime();

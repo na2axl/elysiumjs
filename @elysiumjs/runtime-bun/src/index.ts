@@ -20,12 +20,12 @@ const SIGNALS = ['SIGINT', 'SIGTERM'] as const;
  * The Elysium runtime for Bun.
  *
  * ```ts
- * @Application.register({ runtime: bunRuntime, modules: [...] })
+ * @Application.register({ runtime, modules: [...] })
  * class App extends Application {}
  * ```
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export const bunRuntime: Runtime = {
+export const runtime: Runtime = {
 	name: 'bun',
 	env: () => Bun.env,
 	sleep: (ms) => Bun.sleep(ms),

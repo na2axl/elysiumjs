@@ -13,7 +13,7 @@ bun add @elysiumjs/redis
 ```ts
 import { Application } from '@elysiumjs/core';
 import { Redis, RedisModule } from '@elysiumjs/redis';
-import { bunRuntime } from '@elysiumjs/runtime-bun';
+import { runtime as bunRuntime } from '@elysiumjs/runtime-bun';
 
 @Application.register({
 	runtime: bunRuntime,

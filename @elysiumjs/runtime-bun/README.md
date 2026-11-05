@@ -12,11 +12,13 @@ bun add @elysiumjs/runtime-bun
 
 ```ts
 import { Application } from '@elysiumjs/core';
-import { bunRuntime } from '@elysiumjs/runtime-bun';
+import { runtime } from '@elysiumjs/runtime-bun';
 
-@Application.register({ runtime: bunRuntime, modules: [] })
+@Application.register({ runtime, modules: [] })
 class App extends Application {}
 ```
+
+The package exports `runtime`; rename it at import if you like: `import { runtime as bunRuntime } from '@elysiumjs/runtime-bun'`.
 
 Uses `Bun.env`, `Bun.sleep`, Elysia's `listen`, `process.exit` and `SIGINT`/`SIGTERM` handlers.
 
