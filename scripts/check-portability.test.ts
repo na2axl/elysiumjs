@@ -59,4 +59,23 @@ describe('checkPortability', () => {
 		const root = await fixture({ 'conn.ts': 'Bun.sleep(1);' });
 		expect(checkPortability([root], { [root]: ['src/conn.ts'] })).toEqual([]);
 	});
+
+	test('catches dynamic, side-effect, require and bare Node imports', async () => {
+		const root = await fixture({
+			'b.ts': [
+				"const a = import('node:fs');",
+				"import 'node:fs';",
+				"const c = require('node:fs');",
+				"import { d } from 'fs';",
+				"import { e } from 'fs/promises';",
+				"import { f } from 'events';",
+				"const g = import('node:events');",
+				"import { h } from 'bun';",
+				"import { i } from '@scope/fs';",
+				'process.exit();'
+			].join('\n')
+		});
+		const lines = checkPortability([root], {}).map((f) => f.line);
+		expect(lines).toEqual([1, 2, 3, 4, 5, 8, 10]);
+	});
 });

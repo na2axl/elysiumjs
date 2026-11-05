@@ -18,6 +18,7 @@
  */
 
 import { readFileSync } from 'node:fs';
+import { builtinModules } from 'node:module';
 import { join, relative } from 'node:path';
 
 import { Glob } from 'bun';
@@ -25,12 +26,26 @@ import { Glob } from 'bun';
 /** A host-specific reference found in a source file. */
 export type PortabilityFinding = { file: string; line: number; match: string };
 
+/** Node.js modules available on Workers under nodejs_compat. */
+const ALLOWED_NODE_MODULES = ['async_hooks', 'buffer', 'events'];
+
+const BARE_BUILTINS = builtinModules
+	.filter(
+		(name) =>
+			!name.startsWith('_') && !name.startsWith('bun') && !ALLOWED_NODE_MODULES.includes(name)
+	)
+	.map((name) => name.replace(/[/]/g, '\\/'))
+	.join('|');
+
+// Covers `from '…'`, `import('…')`, side-effect `import '…'` and `require('…')`.
+const SPECIFIER = String.raw`(?:from\s*|import\s*\(\s*|import\s*|require\s*\(\s*)['"]`;
+
 const PATTERNS: RegExp[] = [
 	/\bBun\./,
-	/from ['"]bun['"]/,
+	new RegExp(`${SPECIFIER}bun['"]`),
 	/\bprocess\./,
-	// `async_hooks`, `buffer` and `events` are available on Workers under nodejs_compat.
-	/from ['"]node:(?!async_hooks|buffer|events)/
+	new RegExp(`${SPECIFIER}node:(?!${ALLOWED_NODE_MODULES.join('|')})`),
+	new RegExp(`${SPECIFIER}(?:${BARE_BUILTINS})['"]`)
 ];
 
 /** Packages scanned by the gate, relative to the repository root. */
@@ -48,7 +63,10 @@ export const ROOTS = [
 /** Files exempt from the gate, per root. Globs are relative to the root. */
 export const ALLOW: Record<string, string[]> = {
 	// The Bun adapter of the Redis connection port.
-	'@elysiumjs/redis': ['src/connection.ts']
+	'@elysiumjs/redis': ['src/connection.ts'],
+	// A lazy `import('node:readline')`, only reached after `Runtime.terminal()` returned a terminal
+	// (never on Workers). Readline should move into the runtime packages later.
+	'@elysiumjs/core': ['src/console.ts']
 };
 
 function isComment(line: string): boolean {

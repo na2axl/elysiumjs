@@ -42,7 +42,9 @@ jobs:
         run: bun run lint
 
       - name: Portability
-        run: bun run check:portability
+        run: |
+          bun run test:scripts
+          bun run check:portability
 
   # Late stage: build + test, needs services
   test:
