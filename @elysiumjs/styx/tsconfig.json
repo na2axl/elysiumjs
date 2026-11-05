@@ -8,6 +8,5 @@
 		"declarationDir": "dist",
 		"rootDir": "src"
 	},
-	"include": ["src"],
-	"exclude": ["src/styx.ts"]
+	"include": ["src"]
 }

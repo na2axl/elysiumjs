@@ -2,7 +2,7 @@
   "name": "@elysiumjs/styx",
   "version": "0.8.2",
   "license": "Apache-2.0",
-  "description": "The CLI tool for the Elysium.js framework.",
+  "description": "The command line tool of the Elysium.js framework: creates projects, generates code and runs app commands.",
   "private": false,
   "author": "Workbud Technologies Inc.",
   "repository": {
@@ -17,13 +17,14 @@
   "scripts": {
     "format": "prettier --write \"./src/**/*.ts\"",
     "clean": "rimraf dist",
-    "build:js": "bun build ./src/styx.ts ./src/index.ts --outdir ./dist --target bun -e @elysiumjs/* --root ./src --minify-syntax --minify-whitespace",
+    "build:js": "bun build ./src/cli.ts ./src/index.ts --outdir ./dist --target bun -e @elysiumjs/* --root ./src --minify-syntax --minify-whitespace",
     "build:ts": "tsc",
     "build": "bun run clean && bun run build:js && bun run build:ts",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "bun run build",
     "test": "bun test",
-    "test:coverage": "bun test --coverage"
+    "test:coverage": "bun test --coverage",
+    "build:bin": "bun scripts/build-bin.ts"
   },
   "keywords": [
     "elysium",
@@ -36,26 +37,28 @@
   "type": "module",
   "sideEffects": false,
   "bin": {
-    "styx": "dist/styx.js"
+    "styx": "dist/cli.js"
   },
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
     "dist",
     "stubs",
+    "templates",
     "CHANGELOG.md"
   ],
   "devDependencies": {
     "@elysiumjs/core": "workspace:*",
-    "@elysiumjs/heracles": "workspace:*",
+    "@elysiumjs/hephaestus": "workspace:*",
+    "@elysiumjs/runtime-bun": "workspace:*",
     "@types/prompts": "^2.4.9",
     "@types/string-template": "^1.0.7",
     "prompts": "^2.4.2",
     "radash": "catalog:",
     "string-template": "^1.0.0"
   },
-  "peerDependencies": {
+  "dependencies": {
     "@elysiumjs/core": "workspace:^",
-    "@elysiumjs/heracles": "workspace:^"
+    "@elysiumjs/runtime-bun": "workspace:^"
   }
 }

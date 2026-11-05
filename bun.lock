@@ -210,20 +210,21 @@
       "name": "@elysiumjs/styx",
       "version": "0.8.2",
       "bin": {
-        "styx": "dist/styx.js",
+        "styx": "dist/cli.js",
+      },
+      "dependencies": {
+        "@elysiumjs/core": "workspace:^",
+        "@elysiumjs/runtime-bun": "workspace:^",
       },
       "devDependencies": {
         "@elysiumjs/core": "workspace:*",
-        "@elysiumjs/heracles": "workspace:*",
+        "@elysiumjs/hephaestus": "workspace:*",
+        "@elysiumjs/runtime-bun": "workspace:*",
         "@types/prompts": "^2.4.9",
         "@types/string-template": "^1.0.7",
         "prompts": "^2.4.2",
         "radash": "catalog:",
         "string-template": "^1.0.0",
-      },
-      "peerDependencies": {
-        "@elysiumjs/core": "workspace:^",
-        "@elysiumjs/heracles": "workspace:^",
       },
     },
     "create-elysium": {
@@ -233,12 +234,7 @@
         "create-elysium": "./index.js",
       },
       "dependencies": {
-        "@elysiumjs/core": "workspace:*",
-        "prompts": "^2.4.2",
-        "radash": "catalog:",
-      },
-      "devDependencies": {
-        "@types/prompts": "^2.4.9",
+        "@elysiumjs/styx": "workspace:^",
       },
     },
     "example": {

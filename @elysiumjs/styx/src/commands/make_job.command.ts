@@ -14,15 +14,13 @@
 
 import type { PromptObject } from 'prompts';
 
-import { join } from 'node:path';
-
 import { Command, CommandArgumentType } from '@elysiumjs/core';
 import prompts from 'prompts';
 import { snake } from 'radash';
 import formatter from 'string-template';
 
+import { readAsset } from '../assets';
 import { addToModuleHint, getModulePath, parseProjectConfig } from '../config';
-import { getRootPath } from '../utils';
 import { BaseCommand } from './base.command';
 
 /**
@@ -168,10 +166,10 @@ export class MakeJobCommand extends BaseCommand {
 		}
 
 		// Get stub file
-		const stubFile = Bun.file(join(getRootPath(), 'stubs/job.stub'));
+		const stubText = await readAsset('stubs/job.stub');
 
 		// Format the stub content
-		const stub = formatter(await stubFile.text(), answers);
+		const stub = formatter(stubText, answers);
 
 		const path = answers.module ? await getModulePath(answers.module) : './src';
 
