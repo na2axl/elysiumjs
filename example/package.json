@@ -4,8 +4,8 @@
 	"type": "module",
 	"private": true,
 	"scripts": {
-		"routes": "styx routes:generate",
-		"typecheck": "styx routes:generate && tsc --noEmit"
+		"routes": "bun ../@elysiumjs/styx/dist/cli.js routes:generate",
+		"typecheck": "bun run routes && tsc --noEmit"
 	},
 	"imports": {
 		"#hero/*": "./src/modules/hero/*.ts"
