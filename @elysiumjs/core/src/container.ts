@@ -15,12 +15,17 @@
 import type { Class } from 'type-fest';
 import type { ModuleNode } from './module-graph';
 import type { ServiceDefinition, ServiceFactoryDefinition } from './service';
+import type { ServiceToken } from './token';
+
+import { AsyncLocalStorage } from 'node:async_hooks';
 
 import {
 	CircularDependencyError,
 	DuplicateGlobalServiceError,
 	ElysiumError,
 	EnvironmentSkippedModuleError,
+	OutsideRequestScopeError,
+	ScopeMismatchError,
 	ServiceNotFoundError,
 	ServiceNotReadyError,
 	ServiceNotVisibleError
@@ -28,6 +33,7 @@ import {
 import { Metadata } from './metadata';
 import { ModuleContext } from './module-context';
 import { ServiceScope } from './service';
+import { tokenLabel, tokenOf } from './token';
 import { Symbols } from './utils';
 
 /**
@@ -35,7 +41,10 @@ import { Symbols } from './utils';
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export type ContainerEntry = {
-	/** The name the service is registered under. */
+	/** The token the service is registered under: its name, or its class. */
+	token: ServiceToken;
+
+	/** A readable name for messages. Never used to look the service up. */
 	name: string;
 
 	/** The service's scope. */
@@ -74,25 +83,31 @@ export type VisibilityResolver = {
 	/** The modules whose exports `node` can see. */
 	visibleOwners(node: ModuleNode): readonly ModuleNode[];
 
-	/** The service names `owner` exports, or `true` when it exports all its services. */
-	exportsOf(owner: ModuleNode): readonly string[] | true;
+	/** The service tokens `owner` exports, or `true` when it exports all its services. */
+	exportsOf(owner: ModuleNode): readonly ServiceToken[] | true;
 };
 
-type InjectedService = { name: string; index: number };
+type InjectedService = { token: ServiceToken; index: number };
+
+/** The request-scoped instances of the request being handled. */
+type RequestStore = Map<ContainerEntry, Instantiation>;
 
 type Instantiation = { instance: unknown; ready: Promise<void> | undefined };
 
 const GLOBAL_OWNER = '<global>';
 
-const globalScope = new Map<string, ContainerEntry>();
-const moduleScopes = new Map<ModuleNode, Map<string, ContainerEntry>>();
+const globalScope = new Map<ServiceToken, ContainerEntry>();
+const moduleScopes = new Map<ModuleNode, Map<ServiceToken, ContainerEntry>>();
+const requestStorage = new AsyncLocalStorage<RequestStore>();
+const keyedRequestStores = new WeakMap<object, RequestStore>();
 const building: ContainerEntry[] = [];
 const constructedEntries: { entry: ContainerEntry; instance: unknown }[] = [];
 
-let overridden: ReadonlySet<string> = new Set();
+let overridden: ReadonlySet<ServiceToken> = new Set();
 let visibility: VisibilityResolver | null = null;
 let moduleInitHook: ((owner: ModuleNode) => Promise<void> | void) | null = null;
-let skippedLookup: ((name: string) => { module: string; environment: string } | null) | null = null;
+let skippedLookup:
+	((token: ServiceToken) => { module: string; environment: string } | null) | null = null;
 
 const isPromise = (value: unknown): value is Promise<unknown> =>
 	typeof value === 'object' &&
@@ -125,6 +140,12 @@ const construct = (entry: ContainerEntry): unknown => {
 	if (at !== -1) {
 		throw new CircularDependencyError([...building.slice(at), entry].map((e) => e.name));
 	}
+	if (entry.scope === ServiceScope.REQUEST) {
+		const captive = building.findLast((e) => e.scope !== ServiceScope.FACTORY);
+		if (captive?.scope === ServiceScope.SINGLETON) {
+			throw new ScopeMismatchError(captive.name, entry.name);
+		}
+	}
 	building.push(entry);
 	try {
 		return inOwnerContext(entry.owner, entry.create);
@@ -137,6 +158,17 @@ const construct = (entry: ContainerEntry): unknown => {
  * Builds (or reuses) the instance of an entry. Singletons are recorded once.
  */
 const instantiate = (entry: ContainerEntry): Instantiation => {
+	if (entry.scope === ServiceScope.REQUEST) {
+		const store = requestStorage.getStore();
+		if (!store) throw new OutsideRequestScopeError(entry.name);
+		const existing = store.get(entry);
+		if (existing) return existing;
+		const instance = construct(entry);
+		const instantiation = { instance, ready: runOnInit(entry, instance) };
+		store.set(entry, instantiation);
+		return instantiation;
+	}
+
 	if (entry.scope === ServiceScope.FACTORY) {
 		const instance = construct(entry);
 		return { instance, ready: runOnInit(entry, instance) };
@@ -179,19 +211,19 @@ const instantiate = (entry: ContainerEntry): Instantiation => {
 
 /** Whether building this entry requires its owning module to be initialised first. */
 const needsOwnerInit = (entry: ContainerEntry): boolean =>
-	entry.owner !== null && (entry.scope === ServiceScope.FACTORY || !('instance' in entry));
+	entry.owner !== null && (entry.scope !== ServiceScope.SINGLETON || !('instance' in entry));
 
 const entryValue = (entry: ContainerEntry): unknown => {
 	if (needsOwnerInit(entry) && moduleInitHook) {
 		const pending = moduleInitHook(entry.owner!);
 		if (isPromise(pending)) {
 			pending.catch(() => {});
-			throw new ServiceNotReadyError(entry.name, entry.owner?.id ?? null);
+			throw new ServiceNotReadyError(entry.name, entry.owner?.id ?? null, entry.token);
 		}
 	}
 
 	const { instance, ready } = instantiate(entry);
-	if (ready) throw new ServiceNotReadyError(entry.name, entry.owner?.id ?? null);
+	if (ready) throw new ServiceNotReadyError(entry.name, entry.owner?.id ?? null, entry.token);
 	return instance;
 };
 
@@ -208,16 +240,16 @@ const prepare = async (entry: ContainerEntry, path: readonly ContainerEntry[]): 
 	if (needsOwnerInit(entry) && moduleInitHook) {
 		await moduleInitHook(entry.owner!);
 	}
-	if (!entry.cls || ('instance' in entry && entry.scope !== ServiceScope.FACTORY)) return;
+	if (!entry.cls || ('instance' in entry && entry.scope === ServiceScope.SINGLETON)) return;
 
 	const dependencies: InjectedService[] = Metadata.get(Symbols.services, entry.cls) ?? [];
 	// Look dependencies up synchronously, in the owner's context.
 	const found = inOwnerContext(entry.owner, () =>
-		dependencies.map((dependency) => Container.lookup(dependency.name, ModuleContext.current()))
+		dependencies.map((dependency) => Container.lookup(dependency.token, ModuleContext.current()))
 	);
 	for (const dependency of found) {
 		if (!dependency) continue;
-		if (dependency.entry.scope === ServiceScope.FACTORY) await prepare(dependency.entry, trail);
+		if (dependency.entry.scope !== ServiceScope.SINGLETON) await prepare(dependency.entry, trail);
 		else await entryValueAsync(dependency.entry, trail);
 	}
 };
@@ -244,34 +276,35 @@ export namespace Container {
 	 * @param owner The declaring module, or `null` for a service registered outside any module.
 	 * @param def A service class or factory definition.
 	 * @param config The owning module's resolved config, handed to factory definitions.
-	 * @returns The name the service was registered under.
+	 * @returns The token the service was registered under: its name, or its class.
 	 * @throws {DuplicateGlobalServiceError} If a global service with that name already exists.
 	 */
 	export function register(
 		owner: ModuleNode | null,
 		def: ServiceDefinition,
 		config: unknown
-	): string {
+	): ServiceToken {
 		const isClass = typeof def === 'function';
 		const options: Partial<ServiceFactoryDefinition> = isClass
 			? (Metadata.get(Symbols.serviceOptions, def) ?? {})
 			: def;
-		const name = options.name ?? (isClass ? def.name : '');
-		if (overridden.has(name)) return name;
+		const token: ServiceToken = options.name ?? (isClass ? def : '');
+		if (overridden.has(token)) return token;
 
 		add({
-			name,
+			token,
+			name: tokenLabel(token),
 			scope: options.scope ?? ServiceScope.SINGLETON,
 			global: options.global ?? owner === null,
 			owner,
 			cls: isClass ? def : undefined,
 			create: isClass
 				? () => make(def)
-				: () => def.factory(config, (service) => require(service, def.name)),
+				: () => def.factory(config, (service) => require(service, tokenLabel(def.name))),
 			initialised: false
 		});
 
-		return name;
+		return token;
 	}
 
 	/**
@@ -280,14 +313,14 @@ export namespace Container {
 	 */
 	export function add(entry: ContainerEntry): void {
 		if (entry.global || !entry.owner) {
-			const existing = globalScope.get(entry.name);
+			const existing = globalScope.get(entry.token);
 			if (existing) {
 				throw new DuplicateGlobalServiceError(entry.name, [
 					ownerId(existing.owner),
 					ownerId(entry.owner)
 				]);
 			}
-			globalScope.set(entry.name, entry);
+			globalScope.set(entry.token, entry);
 			return;
 		}
 
@@ -296,12 +329,12 @@ export namespace Container {
 			scope = new Map();
 			moduleScopes.set(entry.owner, scope);
 		}
-		if (scope.has(entry.name)) {
+		if (scope.has(entry.token)) {
 			throw new ElysiumError(
 				`Service "${entry.name}" is declared twice in module ${entry.owner.id}.`
 			);
 		}
-		scope.set(entry.name, entry);
+		scope.set(entry.token, entry);
 	}
 
 	/**
@@ -309,8 +342,8 @@ export namespace Container {
 	 * any definition with one of these names, so lookups reach the global entry.
 	 * Pass `null` to clear.
 	 */
-	export function setOverrides(names: Iterable<string> | null): void {
-		overridden = new Set(names ?? []);
+	export function setOverrides(tokens: Iterable<ServiceToken> | null): void {
+		overridden = new Set([...(tokens ?? [])].map(tokenOf));
 	}
 
 	/**
@@ -336,7 +369,7 @@ export namespace Container {
 	 * that belong to modules skipped for the current environment.
 	 */
 	export function setSkippedLookup(
-		lookup: ((name: string) => { module: string; environment: string } | null) | null
+		lookup: ((token: ServiceToken) => { module: string; environment: string } | null) | null
 	): void {
 		skippedLookup = lookup;
 	}
@@ -346,9 +379,10 @@ export namespace Container {
 	 * it can see, then the global scope. Without `from`, only the global scope is searched.
 	 */
 	export function lookup(
-		name: string,
+		service: ServiceToken,
 		from: ModuleNode | undefined
 	): { entry: ContainerEntry; owner: ModuleNode | null } | null {
+		const name = tokenOf(service);
 		const found = (entry: ContainerEntry | undefined) =>
 			entry ? { entry, owner: entry.owner } : null;
 
@@ -358,7 +392,7 @@ export namespace Container {
 
 			for (const imported of visibility?.visibleOwners(from) ?? []) {
 				const exported = visibility!.exportsOf(imported);
-				if (exported === true || exported.includes(name)) {
+				if (exported === true || exported.some((token) => tokenOf(token) === name)) {
 					const entry = moduleScopes.get(imported)?.get(name);
 					if (entry) return found(entry);
 				}
@@ -373,8 +407,8 @@ export namespace Container {
 	 * @returns The service, or `null` if none is visible.
 	 * @throws {ServiceNotReadyError} If the service or its module is still initialising.
 	 */
-	export function get(name: string): unknown {
-		const found = lookup(name, ModuleContext.current());
+	export function get(service: ServiceToken): unknown {
+		const found = lookup(service, ModuleContext.current());
 		return found ? entryValue(found.entry) : null;
 	}
 
@@ -383,8 +417,8 @@ export namespace Container {
 	 * @returns The service, or `null` if there is no global service with that name.
 	 * @throws {ServiceNotReadyError} If the service or its module is still initialising.
 	 */
-	export function getGlobal(name: string): unknown {
-		const entry = globalScope.get(name);
+	export function getGlobal(service: ServiceToken): unknown {
+		const entry = globalScope.get(tokenOf(service));
 		return entry ? entryValue(entry) : null;
 	}
 
@@ -392,9 +426,9 @@ export namespace Container {
 	 * Like {@link get}, but awaits the `onInit` of the service and of its owning module.
 	 * @throws {ServiceNotFoundError | ServiceNotVisibleError | EnvironmentSkippedModuleError}
 	 */
-	export async function resolve(name: string, requester: string): Promise<unknown> {
-		const found = lookup(name, ModuleContext.current());
-		if (!found) throw notFound(name, requester);
+	export async function resolve(service: ServiceToken, requester: string): Promise<unknown> {
+		const found = lookup(service, ModuleContext.current());
+		if (!found) throw notFound(service, requester);
 		return entryValueAsync(found.entry);
 	}
 
@@ -406,22 +440,39 @@ export namespace Container {
 		const dependencies: InjectedService[] = Metadata.get(Symbols.services, cls) ?? [];
 		const params: unknown[] = [];
 		for (const dependency of dependencies) {
-			params[dependency.index] = require(dependency.name, cls.name);
+			params[dependency.index] = require(dependency.token, cls.name);
 		}
 		return new cls(...params);
 	}
 
+	/**
+	 * Instantiates a class that is kept for the app lifetime, like {@link make}. A request-scoped
+	 * dependency throws {@link ScopeMismatchError}, since the instance would keep the first
+	 * request's copy.
+	 * @param cls The class to instantiate.
+	 */
+	export function makeSingleton<T>(cls: Class<T>): T {
+		const marker = { token: cls, name: cls.name, scope: ServiceScope.SINGLETON } as ContainerEntry;
+		building.push(marker);
+		try {
+			return make(cls);
+		} finally {
+			building.pop();
+		}
+	}
+
 	/** Gets a visible service, throwing rather than returning `null`. */
-	function require(service: string | Class<any>, requester: string): any {
-		const name = typeof service === 'string' ? service : service.name;
-		const found = lookup(name, ModuleContext.current());
-		if (!found) throw notFound(name, requester);
+	function require(service: ServiceToken, requester: string): any {
+		const found = lookup(service, ModuleContext.current());
+		if (!found) throw notFound(service, requester);
 		return entryValue(found.entry);
 	}
 
 	/** Explains why `name` can't be resolved from the current context. */
-	function notFound(name: string, requester: string): ElysiumError {
-		const skipped = skippedLookup?.(name);
+	function notFound(service: ServiceToken, requester: string): ElysiumError {
+		const token = tokenOf(service);
+		const name = tokenLabel(token);
+		const skipped = skippedLookup?.(token);
 		if (skipped) {
 			return new EnvironmentSkippedModuleError(
 				name,
@@ -432,7 +483,7 @@ export namespace Container {
 		}
 
 		const hidden = [...moduleScopes.values()]
-			.map((scope) => scope.get(name))
+			.map((scope) => scope.get(token))
 			.find((entry) => entry !== undefined);
 		return hidden
 			? new ServiceNotVisibleError(
@@ -444,16 +495,39 @@ export namespace Container {
 			: new ServiceNotFoundError(name);
 	}
 
-	/** Whether the global scope has a service with that name. */
-	export const hasGlobal = (name: string): boolean => globalScope.has(name);
+	/** Whether the global scope has a service with that token. */
+	export const hasGlobal = (service: ServiceToken): boolean => globalScope.has(tokenOf(service));
 
-	/** The names registered in the global scope. */
-	export const globalNames = (): string[] => [...globalScope.keys()];
+	/** The names registered in the global scope (services registered by class are left out). */
+	export const globalNames = (): string[] =>
+		[...globalScope.keys()].filter((token): token is string => typeof token === 'string');
 
 	/** Removes a service from the global scope. */
-	export const removeGlobal = (name: string): void => {
-		globalScope.delete(name);
+	export const removeGlobal = (service: ServiceToken): void => {
+		globalScope.delete(tokenOf(service));
 	};
+
+	/**
+	 * Runs `fn` in a request scope: request-scoped services resolved inside it, including in the
+	 * asynchronous work it starts, get one instance for the whole run.
+	 *
+	 * Without `key`, a run inside another request scope joins it. With `key` (such as the request
+	 * object), every run with the same key shares one scope, so separate hooks of one request see
+	 * the same instances.
+	 * @param fn The work to run.
+	 * @param key The object the scope belongs to.
+	 */
+	export const runInRequestScope = <T>(fn: () => T, key?: object): T => {
+		let store = key ? keyedRequestStores.get(key) : requestStorage.getStore();
+		if (!store) {
+			store = new Map();
+			if (key) keyedRequestStores.set(key, store);
+		}
+		return requestStorage.run(store, fn);
+	};
+
+	/** Whether the current code runs in a request scope. */
+	export const inRequestScope = (): boolean => requestStorage.getStore() !== undefined;
 
 	/** Clears the global scope. */
 	export const clearGlobal = (): void => {
@@ -462,13 +536,19 @@ export namespace Container {
 
 	/** The live singletons, in construction order (those whose `onInit` failed are left out). Returns a snapshot. */
 	export const constructed = (): readonly {
+		token: ServiceToken;
 		name: string;
 		instance: unknown;
 		owner: ModuleNode | null;
 	}[] =>
 		constructedEntries
 			.filter(({ entry }) => !entry.initFailure)
-			.map(({ entry, instance }) => ({ name: entry.name, instance, owner: entry.owner }));
+			.map(({ entry, instance }) => ({
+				token: entry.token,
+				name: entry.name,
+				instance,
+				owner: entry.owner
+			}));
 
 	/** Clears every scope and the construction record. */
 	export function reset(): void {

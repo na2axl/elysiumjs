@@ -10,7 +10,7 @@ bun add @elysiumjs/hermes
 
 ## Usage
 
-Add `HermesModule` to your application. It provides the logger as the global services `HermesLogger` and `logger`.
+Add `HermesModule` to your application. It provides the logger as global services, by the `HermesLogger` class and by the name `logger`.
 
 ```ts
 import { Application } from '@elysiumjs/core';

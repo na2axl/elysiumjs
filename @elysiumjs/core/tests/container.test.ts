@@ -60,6 +60,7 @@ describe('Container', () => {
 	});
 
 	it('resolves an exported service of an imported module', () => {
+		@Service.register({ name: 'BService' })
 		class BService {}
 		Container.register(B, BService, undefined);
 		expect(run(A, () => Service.get(BService))).toBeInstanceOf(BService);
@@ -334,9 +335,11 @@ describe('Container', () => {
 			]);
 
 		const registerCycle = () => {
+			@Service.register({ name: 'CycA' })
 			class CycA {
 				constructor(@Service.inject('CycB') public b: unknown) {}
 			}
+			@Service.register({ name: 'CycB' })
 			class CycB {
 				constructor(@Service.inject('CycA') public a: unknown) {}
 			}
@@ -360,6 +363,7 @@ describe('Container', () => {
 		});
 
 		it('throws for a self-cycle in both paths', async () => {
+			@Service.register({ name: 'Self' })
 			class Self {
 				constructor(@Service.inject('Self') public me: unknown) {}
 			}

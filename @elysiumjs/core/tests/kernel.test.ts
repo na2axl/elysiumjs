@@ -159,7 +159,7 @@ describe('Kernel', () => {
 		class DevModule extends Module {}
 
 		class NeedsDev {
-			constructor(@Service.inject('DevOnlyService') public readonly dev: unknown) {}
+			constructor(@Service.inject(DevOnlyService) public readonly dev: unknown) {}
 		}
 		@Module.register({ imports: [DevModule], services: [NeedsDev] })
 		class App extends Module {}
@@ -386,7 +386,7 @@ describe('Kernel', () => {
 			}
 		}
 		class Cmd {
-			constructor(@Service.inject('GlobalSvc') public readonly svc: GlobalSvc) {}
+			constructor(@Service.inject(GlobalSvc) public readonly svc: GlobalSvc) {}
 		}
 		@Module.register({ commands: [Cmd as any] })
 		class Home extends Module {
@@ -523,7 +523,7 @@ describe('Kernel', () => {
 		class DevModule extends Module {}
 
 		class MyCommand {
-			constructor(@Service.inject('DevOnlyService') public readonly dev: unknown) {}
+			constructor(@Service.inject(DevOnlyService) public readonly dev: unknown) {}
 		}
 		@Module.register({ imports: [DevModule], commands: [MyCommand as any] })
 		class Home extends Module {}

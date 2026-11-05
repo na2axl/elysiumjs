@@ -20,6 +20,7 @@ import * as Elysia from 'elysia';
 
 import * as pkg from '../src';
 import { Application } from '../src/app';
+import { Container } from '../src/container';
 import { Event } from '../src/event';
 import { Http, HttpControllerScope } from '../src/http';
 import { Metadata } from '../src/metadata';
@@ -68,7 +69,7 @@ describe('Http namespace', () => {
 		});
 
 		it('should register the controller in the service container with SERVER scope', async () => {
-			const makeSpy = spyOn(Service, 'make');
+			const makeSpy = spyOn(Container, 'makeSingleton');
 
 			// Create a test class
 			@Http.controller({

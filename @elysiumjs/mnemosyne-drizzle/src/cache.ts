@@ -137,7 +137,7 @@ export class DrizzleDatabaseCache extends DrizzleCache {
 			this.#cache = createDatabaseCacheStorage({ storage: this.#storageEngine });
 		} catch (error) {
 			if (!(error instanceof ServiceNotReadyError)) throw error;
-			await Service.resolve(error.service);
+			await Service.resolve(error.token);
 			this.#cache = createDatabaseCacheStorage({ storage: this.#storageEngine });
 		}
 		return this.#cache;

@@ -13,11 +13,14 @@
 // limitations under the License.
 
 import type { Class } from 'type-fest';
+import type { ServiceToken } from './token';
 
 import { isString } from 'radash';
 
 import { Container } from './container';
+import { ElysiumError } from './errors';
 import { Metadata } from './metadata';
+import { tokenLabel, tokenOf } from './token';
 import { Symbols } from './utils';
 
 /**
@@ -33,7 +36,14 @@ export enum ServiceScope {
 	/**
 	 * A new instance of the service is created every time it is injected or retrieved.
 	 */
-	FACTORY
+	FACTORY,
+
+	/**
+	 * One instance of the service is created per request, and shared by everything resolved
+	 * while handling that request. Resolving it outside a request throws, and so does injecting
+	 * it into a singleton.
+	 */
+	REQUEST
 }
 
 /**
@@ -70,7 +80,9 @@ const isClass = <T, V>(value: Class<T> | V): value is Class<T> => {
  */
 export type ServiceProps = Partial<{
 	/**
-	 * The name of the service. If not set, it will default to the service class name.
+	 * The name (token) of the service. Without one, the service is identified by its class:
+	 * inject it with `@Service.inject(TheClass)` or by its parameter type, and get it with
+	 * `Service.get(TheClass)`.
 	 */
 	name: string;
 
@@ -98,8 +110,8 @@ export type ServiceProps = Partial<{
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export type ServiceFactoryDefinition = {
-	/** The name of the service. */
-	name: string;
+	/** The token of the service: a name, or a class to register the service by class. */
+	name: ServiceToken;
 
 	/** Builds the service from the owning module's config and a resolver for visible services. */
 	factory: (config: any, get: <T>(name: string | Class<T>) => T) => unknown;
@@ -117,8 +129,7 @@ export type ServiceFactoryDefinition = {
  */
 export type ServiceDefinition = Class<any> | ServiceFactoryDefinition;
 
-const nameOf = (service: string | ServiceClass): string =>
-	isString(service) ? service : service.name;
+const nameOf = (service: ServiceToken): ServiceToken => tokenOf(service);
 
 export namespace Service {
 	/**
@@ -136,16 +147,25 @@ export namespace Service {
 	/**
 	 * Resolves a registered service and set it as a parameter value.
 	 * @author Axel Nana <axel.nana@workbud.com>
-	 * @param service An optional name for the service. If not set, the name of the parameter's type is used instead.
+	 * @param service The name or class of the service. Without it, the parameter's type is used,
+	 * which needs the compiler to emit decorator metadata (`emitDecoratorMetadata`).
+	 * @throws {ElysiumError} When no service is given and the parameter type is unknown.
 	 */
-	export const inject = (service?: string | ServiceClass): ParameterDecorator => {
+	export const inject = (service?: ServiceToken): ParameterDecorator => {
 		return function (target, propertyKey, parameterIndex) {
 			const services = Metadata.get(Symbols.services, target, propertyKey!) ?? [];
 			const types: Function[] = Metadata.get('design:paramtypes', target, propertyKey!) ?? [];
-			const name = isString(service) ? service : (service?.name ?? types[parameterIndex].name);
+			const type = types[parameterIndex];
+			const token = service ?? (type && type !== Object ? (type as ServiceClass) : undefined);
+			if (token === undefined) {
+				const owner = typeof target === 'function' ? target : target.constructor;
+				throw new ElysiumError(
+					`Cannot tell which service to inject in parameter ${parameterIndex} of ${tokenLabel(owner as ServiceClass)}${propertyKey ? `.${String(propertyKey)}` : ''}: pass its name or class to @Service.inject().`
+				);
+			}
 
 			services.push({
-				name,
+				token,
 				index: parameterIndex
 			});
 
@@ -161,7 +181,7 @@ export namespace Service {
 	 * @returns The service, or `null` if none with that name/type is visible.
 	 * @throws {ServiceNotReadyError} If the service, or its module, is still initialising.
 	 */
-	export const get = <T>(service: string | TypedServiceClass<T>): T | null => {
+	export const get = <T>(service: ServiceToken | TypedServiceClass<T>): T | null => {
 		return Container.get(nameOf(service)) as T | null;
 	};
 
@@ -171,7 +191,7 @@ export namespace Service {
 	 * @param service The name of the service, or its class.
 	 * @throws {ServiceNotFoundError | ServiceNotVisibleError | EnvironmentSkippedModuleError}
 	 */
-	export const resolve = <T>(service: string | TypedServiceClass<T>): Promise<T> => {
+	export const resolve = <T>(service: ServiceToken | TypedServiceClass<T>): Promise<T> => {
 		return Container.resolve(nameOf(service), 'Service.resolve') as Promise<T>;
 	};
 
@@ -205,11 +225,11 @@ export namespace Service {
 	 * Binds a service to the global scope and sets it as a singleton.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param service The service class to bind.
-	 * @param name An optional name for the service. If not set, the name of the service class is used instead.
+	 * @param name An optional name for the service. Without it, the service is bound to its class.
 	 */
 	export const bind = <T>(service: TypedServiceClass<T>, name?: string): T => {
-		const s = make(service);
-		return instance(name ?? service.name, s);
+		const s = Container.makeSingleton(service);
+		return instance(name ?? service, s);
 	};
 
 	/**
@@ -224,7 +244,7 @@ export namespace Service {
 	 * Binds a service to the global scope and sets it as a factory.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param service The service class to bind.
-	 * @param name An optional name for the service. If not set, the name of the service class is used instead.
+	 * @param name An optional name for the service. Without it, the service is bound to its class.
 	 */
 	export function factory<T>(service: TypedServiceClass<T>, name?: string): T;
 
@@ -238,9 +258,9 @@ export namespace Service {
 		serviceOrName: TypedServiceClass<T> | string,
 		nameOrFactory?: FactoryFn<T> | string
 	): T {
-		const serviceName = isString(serviceOrName)
+		const serviceName: ServiceToken = isString(serviceOrName)
 			? serviceOrName
-			: ((nameOrFactory as string | undefined) ?? serviceOrName.name);
+			: ((nameOrFactory as string | undefined) ?? tokenOf(serviceOrName));
 
 		const create = () => {
 			return isClass(serviceOrName) ? make(serviceOrName) : (nameOrFactory as FactoryFn<T>)();
@@ -258,7 +278,7 @@ export namespace Service {
 	 * @param instance The instance to bind.
 	 * @throws {DuplicateGlobalServiceError} If a global service with that name exists.
 	 */
-	export const instance = <T>(service: string | TypedServiceClass<T>, instance: T): T => {
+	export const instance = <T>(service: ServiceToken | TypedServiceClass<T>, instance: T): T => {
 		addGlobal(nameOf(service), ServiceScope.SINGLETON, () => instance, { instance });
 		return instance;
 	};
@@ -268,7 +288,7 @@ export namespace Service {
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param service The service class or name to remove.
 	 */
-	export const remove = (service: string | TypedServiceClass<any>): void => {
+	export const remove = (service: ServiceToken): void => {
 		Container.removeGlobal(nameOf(service));
 	};
 
@@ -278,7 +298,7 @@ export namespace Service {
 	 * @param service The service class or name to check.
 	 * @returns `true` if the service exists, `false` otherwise.
 	 */
-	export const exists = (service: string | TypedServiceClass<any>): boolean => {
+	export const exists = (service: ServiceToken): boolean => {
 		return Container.hasGlobal(nameOf(service));
 	};
 
@@ -287,12 +307,21 @@ export namespace Service {
 	 * Matches by name in any scope (global or module), not only the global one.
 	 * Lets modules release only the resources they actually created.
 	 * @author Axel Nana <axel.nana@workbud.com>
-	 * @param name The name of the service to check.
+	 * @param service The name or class of the service to check.
 	 * @returns `true` if the service has a live instance, `false` otherwise.
 	 */
-	export const isConstructed = (name: string): boolean => {
-		return Container.constructed().some((entry) => entry.name === name);
+	export const isConstructed = (service: ServiceToken): boolean => {
+		const token = tokenOf(service);
+		return Container.constructed().some((entry) => entry.token === token);
 	};
+
+	/**
+	 * Runs `fn` in a request scope: request-scoped services resolved inside it, including in the
+	 * asynchronous work it starts, share one instance. HTTP route handlers already run in one.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param fn The work to run, such as a job or a test.
+	 */
+	export const runInRequestScope = <T>(fn: () => T): T => Container.runInRequestScope(fn);
 
 	/**
 	 * Clears the global scope.
@@ -323,13 +352,15 @@ export namespace Service {
 	};
 
 	const addGlobal = (
-		name: string,
+		service: ServiceToken,
 		scope: ServiceScope,
 		create: () => unknown,
 		prebuilt?: { instance: unknown }
 	): void => {
+		const token = tokenOf(service);
 		Container.add({
-			name,
+			token,
+			name: tokenLabel(token),
 			scope,
 			global: true,
 			owner: null,

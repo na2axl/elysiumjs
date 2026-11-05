@@ -14,6 +14,7 @@
 
 import type { Class } from 'type-fest';
 import type { ConfiguredModule, ModuleClass, ModuleProps } from './module';
+import type { ServiceToken } from './token';
 
 import { isEqual } from 'radash';
 
@@ -26,6 +27,7 @@ import {
 } from './errors';
 import { Metadata } from './metadata';
 import { getModuleProps, isConfiguredModule } from './module';
+import { tokenOf } from './token';
 import { currentEnvironment, Symbols } from './utils';
 
 /** The import site used for modules listed directly in the application. */
@@ -75,8 +77,8 @@ export type ModuleGraph = {
 	/** The direct imports of `node`, plus the modules they re-export. */
 	visibleOwners(node: ModuleNode): readonly ModuleNode[];
 
-	/** The service names `node` exports, or `true` when it exports everything. */
-	exportsOf(node: ModuleNode): readonly string[] | true;
+	/** The service tokens `node` exports, or `true` when it exports everything. */
+	exportsOf(node: ModuleNode): readonly ServiceToken[] | true;
 
 	/** Gathers controllers, commands or jobs across modules, with their owner. */
 	collect<K extends Collectable>(key: K): readonly { item: Class<any>; module: ModuleNode }[];
@@ -187,9 +189,6 @@ function assertUniqueCommands(nodes: readonly ModuleNode[], environment: string)
 const isModuleClass = (value: unknown): value is ModuleClass =>
 	typeof value === 'function' && Metadata.get(Symbols.module, value) !== undefined;
 
-const serviceName = (cls: Class<any>): string =>
-	Metadata.get(Symbols.serviceOptions, cls)?.name ?? cls.name;
-
 /**
  * Builds the module graph from decorator metadata. Pure: constructs nothing.
  *
@@ -258,12 +257,10 @@ export function buildModuleGraph(
 		return result;
 	};
 
-	const exportsOf = (node: ModuleNode): readonly string[] | true => {
+	const exportsOf = (node: ModuleNode): readonly ServiceToken[] | true => {
 		const exported = node.props.exports;
 		if (exported === true) return true;
-		return (exported ?? [])
-			.filter((e) => !isModuleClass(e))
-			.map((e) => (typeof e === 'string' ? e : serviceName(e as Class<any>)));
+		return (exported ?? []).filter((e) => !isModuleClass(e)).map((e) => tokenOf(e as ServiceToken));
 	};
 
 	const collect = <K extends Collectable>(key: K) =>

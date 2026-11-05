@@ -11,24 +11,25 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+import type { HermesConfig } from './types';
 
 import { LOGGER_SERVICE, Module } from '@elysiumjs/core';
 
 import { HermesLogger } from './services/logger.service';
-import { DEFAULT_CONFIG, type HermesConfig } from './types';
+import { DEFAULT_CONFIG } from './types';
 
 /**
- * Provides the {@link HermesLogger} as the global services `HermesLogger` and `logger`
+ * Provides the {@link HermesLogger} as global services, by its class and as `logger`
  * (the same instance), built from the module config.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 @Module.register<HermesConfig>({
 	services: (config) => [
-		{ name: HermesLogger.name, global: true, factory: () => new HermesLogger(config) },
+		{ name: HermesLogger, global: true, factory: () => new HermesLogger(config) },
 		{
 			name: LOGGER_SERVICE,
 			global: true,
-			factory: (_config: unknown, get: <T>(name: string) => T) => get<HermesLogger>(HermesLogger.name)
+			factory: (_config, get) => get<HermesLogger>(HermesLogger)
 		}
 	]
 })

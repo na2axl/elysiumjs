@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { ServiceToken } from './token';
+
 /**
  * Base class of every error thrown by the Elysium framework.
  *
@@ -154,9 +156,15 @@ export class ServiceNotFoundError extends ElysiumError {
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export class ServiceNotReadyError extends ElysiumError {
+	/**
+	 * @param service The service label, used in the message.
+	 * @param owner The id of the module owning the service.
+	 * @param token The token to pass to `Service.resolve()` to wait for the service.
+	 */
 	constructor(
 		public readonly service: string,
-		public readonly owner: string | null = null
+		public readonly owner: string | null = null,
+		public readonly token: ServiceToken = service
 	) {
 		const where = owner ? ` Its module ${owner} initialises asynchronously.` : '';
 		super(
@@ -236,6 +244,35 @@ export class EventListenerNotSupportedError extends ElysiumError {
 	) {
 		super(
 			`${className}.${method} (module ${moduleName}) is an instance event listener, but ${className} is not listed in the services of ${moduleName}. Make the method static or register the class as a service.`
+		);
+	}
+}
+
+/**
+ * Thrown when a request-scoped service is resolved outside a request.
+ *
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class OutsideRequestScopeError extends ElysiumError {
+	constructor(public readonly service: string) {
+		super(
+			`Service "${service}" is request-scoped and was resolved outside a request. Resolve it from a route handler, or run the code in Service.runInRequestScope().`
+		);
+	}
+}
+
+/**
+ * Thrown when a singleton service depends on a request-scoped one.
+ *
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class ScopeMismatchError extends ElysiumError {
+	constructor(
+		public readonly service: string,
+		public readonly dependency: string
+	) {
+		super(
+			`Singleton service "${service}" depends on the request-scoped service "${dependency}". Make "${service}" request-scoped or a factory, or resolve "${dependency}" when it is needed.`
 		);
 	}
 }

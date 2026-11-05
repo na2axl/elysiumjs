@@ -17,6 +17,7 @@ import type { WiredListener } from './event-wiring';
 import type { Module } from './module';
 import type { ModuleGraph, ModuleNode } from './module-graph';
 import type { ServiceDefinition } from './service';
+import type { ServiceToken } from './token';
 
 import { isEqual } from 'radash';
 
@@ -30,12 +31,13 @@ import { getModuleProps } from './module';
 import { ModuleContext } from './module-context';
 import { selectConfig } from './module-graph';
 import { Service, ServiceScope } from './service';
+import { tokenOf } from './token';
 import { Symbols } from './utils';
 
 /** The global service name under which the kernel registers itself. */
 export const KERNEL_SERVICE = 'elysium.kernel';
 
-type Registered = { name: string; scope: ServiceScope };
+type Registered = { token: ServiceToken; scope: ServiceScope };
 
 const isConfigurable = (cls: unknown): cls is { config: string; resolveConfig(input?: any): any } =>
 	typeof (cls as { resolveConfig?: unknown }).resolveConfig === 'function';
@@ -47,10 +49,8 @@ const scopeOf = (def: ServiceDefinition): ServiceScope =>
 	(typeof def === 'function' ? Metadata.get(Symbols.serviceOptions, def)?.scope : def.scope) ??
 	ServiceScope.SINGLETON;
 
-const nameOf = (def: ServiceDefinition): string =>
-	typeof def === 'function'
-		? (Metadata.get(Symbols.serviceOptions, def)?.name ?? def.name)
-		: def.name;
+const tokenOfDefinition = (def: ServiceDefinition): ServiceToken =>
+	typeof def === 'function' ? tokenOf(def) : def.name;
 
 /**
  * Turns a module graph into a running container: registers configs and services,
@@ -114,7 +114,7 @@ export class Kernel {
 				services: new Set(serviceClasses)
 			});
 			for (const def of defs) {
-				registered.push({ name: Container.register(node, def, config), scope: scopeOf(def) });
+				registered.push({ token: Container.register(node, def, config), scope: scopeOf(def) });
 			}
 			this.registered.set(node, registered);
 		}
@@ -137,13 +137,13 @@ export class Kernel {
 		return pending;
 	}
 
-	/** Initialises every module in graph order, then constructs every non-factory service. */
+	/** Initialises every module in graph order, then constructs every singleton service. */
 	public async bootEager(): Promise<void> {
 		for (const node of this.graph.nodes) await this.initModule(node);
 		for (const node of this.graph.nodes) {
-			for (const { name, scope } of this.registered.get(node) ?? []) {
-				if (scope === ServiceScope.FACTORY) continue;
-				await ModuleContext.run(node, () => Service.resolve(name));
+			for (const { token, scope } of this.registered.get(node) ?? []) {
+				if (scope !== ServiceScope.SINGLETON) continue;
+				await ModuleContext.run(node, () => Service.resolve(token));
 			}
 		}
 	}
@@ -154,9 +154,12 @@ export class Kernel {
 	 */
 	public async prepare<T>(cls: Class<T>, owner: ModuleNode): Promise<T> {
 		await this.initModule(owner);
-		const dependencies: { name: string }[] = Metadata.get(Symbols.services, cls) ?? [];
-		for (const { name } of dependencies) {
-			await ModuleContext.run(owner, () => Container.resolve(name, cls.name));
+		const dependencies: { token: ServiceToken }[] = Metadata.get(Symbols.services, cls) ?? [];
+		for (const { token } of dependencies) {
+			const found = ModuleContext.run(owner, () => Container.lookup(token, owner));
+			// Request-scoped dependencies are built with the class, inside a request scope.
+			if (found?.entry.scope === ServiceScope.REQUEST) continue;
+			await ModuleContext.run(owner, () => Container.resolve(token, cls.name));
 		}
 		return ModuleContext.run(owner, () => Service.make(cls));
 	}
@@ -292,15 +295,15 @@ export class Kernel {
 
 	/** Maps class and factory service names of skipped modules to the module that declares them. */
 	private buildSkippedLookup() {
-		const owners = new Map<string, string>();
+		const owners = new Map<ServiceToken, string>();
 		for (const cls of this.graph.skipped) {
 			const { services } = getModuleProps(cls);
 			if (!Array.isArray(services)) continue;
-			for (const def of services) owners.set(nameOf(def), cls.name);
+			for (const def of services) owners.set(tokenOfDefinition(def), cls.name);
 		}
 		const { environment } = this.graph;
-		return (name: string) => {
-			const module = owners.get(name);
+		return (token: ServiceToken) => {
+			const module = owners.get(token);
 			return module === undefined ? null : { module, environment };
 		};
 	}

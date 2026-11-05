@@ -19,9 +19,7 @@ import type { ModuleNode } from './module-graph';
 import { Container } from './container';
 import { EventListenerNotSupportedError } from './errors';
 import { EventBus, getEventListeners } from './event';
-import { Metadata } from './metadata';
 import { ModuleContext } from './module-context';
-import { Symbols } from './utils';
 
 /**
  * A listener the kernel added to the event bus.
@@ -31,9 +29,6 @@ export type WiredListener = {
 	readonly event: string;
 	readonly wrapper: (data: EventData<any>) => Promise<void>;
 };
-
-const serviceName = (cls: Class<any>): string =>
-	Metadata.get(Symbols.serviceOptions, cls)?.name ?? cls.name;
 
 const handlerFor = (
 	node: ModuleNode,
@@ -45,7 +40,7 @@ const handlerFor = (
 		try {
 			await ModuleContext.run(node, async () => {
 				if (meta.static) return (cls as any)[method](data);
-				const instance: any = await Container.resolve(serviceName(cls), cls.name);
+				const instance: any = await Container.resolve(cls, cls.name);
 				return instance[method](data);
 			});
 		} catch (e: unknown) {

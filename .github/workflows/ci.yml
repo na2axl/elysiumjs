@@ -93,6 +93,9 @@ jobs:
       - name: Build
         run: bun run build
 
+      - name: Services resolve in a minified build
+        run: bun run --cwd @elysiumjs/core check:minified
+
       - name: Compiles ahead of time for Workers
         run: bun run --cwd @elysiumjs/runtime-workers check:aot
 
