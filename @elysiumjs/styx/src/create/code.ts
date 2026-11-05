@@ -14,6 +14,28 @@
 
 import { pascal } from 'radash';
 
+import { version } from '../../package.json';
+
+/** The ranges of the third-party tools features add, as in the root package.json of the monorepo. */
+const TOOL_VERSIONS: Record<string, string> = {
+	prettier: '^3.9.10',
+	'@ianvs/prettier-plugin-sort-imports': '^4.7.1'
+};
+
+/**
+ * The version range written to the `package.json` of a new project for a package: the `^` range
+ * of the Styx version for `@elysiumjs/*`, a known range for the tools features add.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param name The package name.
+ * @throws When no version is known for the package.
+ */
+export const versionFor = (name: string): string => {
+	if (name.startsWith('@elysiumjs/')) return `^${version}`;
+	const range = TOOL_VERSIONS[name];
+	if (!range) throw new Error(`No version is known for ${name}.`);
+	return range;
+};
+
 export const getModuleCode = (module: string) => /* js */ `import { Module } from '@elysiumjs/core';
 
 @Module.register({

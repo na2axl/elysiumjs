@@ -24,7 +24,7 @@ import prompts from 'prompts';
 import { assign, objectify, pascal, snake } from 'radash';
 
 import { listAssets, readAsset } from '../assets';
-import { getAppCode, getModuleCode, RUNTIMES } from './code';
+import { getAppCode, getModuleCode, RUNTIMES, versionFor } from './code';
 import { resolveProjectPath, validateModuleName, validateProjectName } from './names';
 
 /** The answers that describe the project to create. */
@@ -61,7 +61,9 @@ const copyAssets = async (folder: string, to: string, projectName: string, skip:
 		const file = path.split('/').at(-1)!;
 		if (file === '.gitkeep' || skip.includes(file)) continue;
 		const text = await readAsset(`${folder}/${path}`);
-		await Bun.write(target, text.replaceAll('{PROJECT_NAME}', projectName));
+		// npm drops `.gitignore` from published packages, so it ships as `gitignore`.
+		const renamed = file === 'gitignore' ? join(dirname(target), '.gitignore') : target;
+		await Bun.write(renamed, text.replaceAll('{PROJECT_NAME}', projectName));
 	}
 };
 
@@ -144,7 +146,7 @@ export const createProject = async (
 	});
 
 	const devPackages: string[] = [];
-	const packages: string[] = [`${runtime.package}@latest`];
+	const packages: string[] = [runtime.package];
 	const enabledModules: EnabledModule[] = [];
 
 	for (const [kind, names] of [
@@ -163,6 +165,11 @@ export const createProject = async (
 		}
 	}
 
+	const declare = (names: string[]) => objectify(names, (n) => n, versionFor);
+	packageJson = assign(packageJson, {
+		dependencies: { ...packageJson.dependencies, ...declare(packages) },
+		devDependencies: { ...packageJson.devDependencies, ...declare(devPackages) }
+	});
 	await Bun.write(packageFile, JSON.stringify(packageJson, null, 2) + '\n');
 
 	await Bun.write(
@@ -183,8 +190,6 @@ export const createProject = async (
 	if (options.install) {
 		progress('Installing dependencies...');
 		await exec(projectPath, ['bun', 'install']);
-		await exec(projectPath, ['bun', 'add', ...packages]);
-		if (devPackages.length > 0) await exec(projectPath, ['bun', 'add', '-D', ...devPackages]);
 		if (options.features.includes('prettier')) {
 			progress('Formatting code using Prettier...');
 			await exec(projectPath, ['bun', 'run', 'format']);

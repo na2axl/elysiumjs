@@ -79,6 +79,26 @@ describe('createProject', () => {
 		expect(commands).toEqual([]);
 	});
 
+	it('writes .gitignore from the packaged gitignore', async () => {
+		const path = await createProject(defaults({ path: dir }), exec);
+
+		expect(existsSync(join(path, '.gitignore'))).toBe(true);
+		expect(existsSync(join(path, 'gitignore'))).toBe(false);
+	});
+
+	it('declares every dependency when install is false', async () => {
+		const path = await createProject(
+			defaults({ path: dir, plugins: ['sentry'], features: ['prettier'] }),
+			exec
+		);
+		const pkg = await Bun.file(join(path, 'package.json')).json();
+
+		expect(pkg.dependencies['@elysiumjs/runtime-bun']).toMatch(/^\^\d/);
+		expect(pkg.dependencies['@elysiumjs/plugin-sentry']).toMatch(/^\^\d/);
+		expect(pkg.devDependencies).toHaveProperty('prettier');
+		expect(commands).toEqual([]);
+	});
+
 	it('writes a multi module project with features', async () => {
 		const path = await createProject(
 			defaults({
@@ -109,15 +129,6 @@ describe('createProject', () => {
 
 		expect(commands).toEqual([
 			['bun', 'install'],
-			['bun', 'add', '@elysiumjs/runtime-bun@latest'],
-			[
-				'bun',
-				'add',
-				'-D',
-				'@ianvs/prettier-plugin-sort-imports',
-				'prettier',
-				'@elysiumjs/hephaestus@latest'
-			],
 			['bun', 'run', 'format'],
 			['git', 'init']
 		]);
