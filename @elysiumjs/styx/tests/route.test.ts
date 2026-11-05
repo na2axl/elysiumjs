@@ -74,6 +74,17 @@ describe('route', () => {
 		});
 	});
 
+	it('asks to install Styx for app tools when the project has none', () => {
+		for (const command of ['routes:generate', 'hephaestus:build']) {
+			const result = route([command], { project: '/app', self });
+			expect(result).toMatchObject({ kind: 'error' });
+		}
+		expect(route(['routes:generate'], { self })).toMatchObject({ kind: 'error' });
+		expect(route(['routes:generate'], { project: '/app', projectCli: local, self: local })).toEqual(
+			{ kind: 'cli', argv: ['routes:generate'] }
+		);
+	});
+
 	it('asks to install Styx for app commands when the project has none', () => {
 		const result = route(['serve'], { project: '/app', self });
 		expect(result).toMatchObject({ kind: 'error' });
@@ -100,6 +111,7 @@ describe('command kinds', () => {
 		expect(isGenerator(undefined)).toBe(false);
 		expect(isCliCommand('hephaestus:build')).toBe(true);
 		expect(isCliCommand('make:job')).toBe(true);
+		expect(isCliCommand('routes:generate')).toBe(true);
 		expect(isCliCommand('work')).toBe(false);
 	});
 });

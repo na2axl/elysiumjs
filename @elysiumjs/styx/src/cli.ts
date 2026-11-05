@@ -31,6 +31,15 @@ const findProject = (from: string): string | undefined => {
 	}
 };
 
+/** Resolves a package path the way the project would import it (works in workspaces). */
+const resolveFrom = (project: string, specifier: string): string | undefined => {
+	try {
+		return Bun.resolveSync(specifier, project);
+	} catch {
+		return undefined;
+	}
+};
+
 const real = (path: string): string => {
 	try {
 		return realpathSync(path);
@@ -41,8 +50,8 @@ const real = (path: string): string => {
 
 /** The entry of the Styx a project installs, when it does. */
 const findProjectCli = (project: string): string | undefined => {
-	const cli = join(project, 'node_modules', '@elysiumjs', 'styx', 'dist', 'cli.js');
-	return existsSync(cli) ? real(cli) : undefined;
+	const cli = resolveFrom(project, '@elysiumjs/styx/dist/cli.js');
+	return cli ? real(cli) : undefined;
 };
 
 /**
@@ -54,9 +63,9 @@ const loadTools = async (
 	isProjectCli: boolean
 ): Promise<ModuleClass[]> => {
 	if (!project || !isProjectCli) return [];
-	const entry = join(project, 'node_modules', '@elysiumjs', 'hephaestus');
-	if (!existsSync(entry)) return [];
-	const hephaestus = await import(Bun.resolveSync('@elysiumjs/hephaestus', project));
+	const entry = resolveFrom(project, '@elysiumjs/hephaestus');
+	if (!entry) return [];
+	const hephaestus = await import(entry);
 	return hephaestus.HephaestusModule ? [hephaestus.HephaestusModule] : [];
 };
 

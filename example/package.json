@@ -3,6 +3,10 @@
 	"module": "index.ts",
 	"type": "module",
 	"private": true,
+	"scripts": {
+		"routes": "bun ../@elysiumjs/styx/dist/cli.js routes:generate",
+		"typecheck": "bun run routes && tsc --noEmit"
+	},
 	"imports": {
 		"#hero/*": "./src/modules/hero/*.ts"
 	},
@@ -15,5 +19,8 @@
 		"@elysiumjs/runtime-bun": "workspace:^",
 		"@elysiumjs/styx": "workspace:^",
 		"radash": "catalog:"
+	},
+	"devDependencies": {
+		"@elysia/eden": "2.0.0-rc.1"
 	}
 }

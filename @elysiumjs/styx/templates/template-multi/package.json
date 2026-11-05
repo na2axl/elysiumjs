@@ -3,7 +3,9 @@
 	"type": "module",
 	"private": true,
 	"scripts": {
-		"dev": "bun --watch styx serve"
+		"dev": "bun --watch styx serve",
+		"routes": "styx routes:generate",
+		"typecheck": "styx routes:generate && tsc --noEmit"
 	},
 	"imports": {
 		"#root/*": "./src/*.ts"

@@ -27,6 +27,8 @@ export { type EventData, type EventHandler, Event } from './event';
 export { type LoggerInterface, ConsoleLogger, getLogger, LOGGER_SERVICE } from './logger';
 export {
 	type Context,
+	type HttpControllerDescription,
+	type HttpRouteDescription,
 	type Route,
 	DATABASE_TRANSACTION_SERVICE,
 	HttpControllerScope,

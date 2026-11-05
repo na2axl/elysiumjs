@@ -45,9 +45,13 @@ const GLOBAL_COMMANDS = new Set(['create', 'new']);
 export const isGenerator = (command: string | undefined): boolean =>
 	command !== undefined && /^(make|module):/.test(command);
 
-/** Commands Styx runs itself inside a project: the code generators and the build tools. */
+/** Commands that read the app's code without booting it, with the project's own packages. */
+export const isAppTool = (command: string | undefined): boolean =>
+	command !== undefined && /^(routes|hephaestus):/.test(command);
+
+/** Commands Styx runs itself inside a project: the code generators and the app tools. */
 export const isCliCommand = (command: string | undefined): boolean =>
-	isGenerator(command) || (command !== undefined && /^hephaestus:/.test(command));
+	isGenerator(command) || isAppTool(command);
 
 /** Turns `create my-app` into `create --name my-app`. */
 const withPositionalName = (argv: string[]): string[] => {
@@ -72,8 +76,13 @@ export const route = (argv: string[], context: RouteContext): Route => {
 	}
 
 	if (!context.project) {
-		if (command === undefined || command === 'list' || command === 'help' || isGenerator(command)) {
-			return isGenerator(command)
+		if (
+			command === undefined ||
+			command === 'list' ||
+			command === 'help' ||
+			isCliCommand(command)
+		) {
+			return isCliCommand(command)
 				? {
 						kind: 'error',
 						message: `Run ${command} inside an Elysium project (a folder with an .elysiumrc file).`
@@ -90,7 +99,7 @@ export const route = (argv: string[], context: RouteContext): Route => {
 		return { kind: 'handoff', cli: context.projectCli, argv };
 	}
 
-	if (isCliCommand(command)) return { kind: 'cli', argv };
+	if (isGenerator(command)) return { kind: 'cli', argv };
 
 	if (!context.projectCli) {
 		return {
@@ -99,6 +108,8 @@ export const route = (argv: string[], context: RouteContext): Route => {
 				'This project does not install @elysiumjs/styx. Add it with: bun add -D @elysiumjs/styx'
 		};
 	}
+
+	if (isAppTool(command)) return { kind: 'cli', argv };
 
 	return { kind: 'app', project: context.project, argv };
 };

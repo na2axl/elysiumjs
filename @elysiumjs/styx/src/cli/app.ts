@@ -27,12 +27,13 @@ import {
 	MakeServiceCommand,
 	MakeValidatorCommand,
 	ModuleNewCommand,
-	ModuleRenameCommand
+	ModuleRenameCommand,
+	RoutesGenerateCommand
 } from '../commands';
 import { CreateCommand } from '../create/create.command';
 
 /**
- * The commands of the global `styx` CLI: `create` and the code generators.
+ * The commands Styx runs itself: `create`, the code generators and `routes:generate`.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 @Module.register({
@@ -47,7 +48,8 @@ import { CreateCommand } from '../create/create.command';
 		MakeServiceCommand,
 		MakeValidatorCommand,
 		ModuleNewCommand,
-		ModuleRenameCommand
+		ModuleRenameCommand,
+		RoutesGenerateCommand
 	]
 })
 export class StyxCliModule extends Module {}

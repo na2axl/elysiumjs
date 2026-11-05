@@ -894,6 +894,82 @@ describe('Http namespace', () => {
 		});
 	});
 
+	describe('Http.describe', () => {
+		it('describes the routes and their decorated parameters', async () => {
+			@Http.controller({ path: '/posts' })
+			class PostController {
+				@Http.get({ path: '/:id' })
+				show(@Http.param('id') id: string, @Http.query() query: unknown) {
+					return { id, query };
+				}
+
+				@Http.post()
+				create(@Http.context() c: unknown, @Http.body() body: unknown) {
+					return { c, body };
+				}
+
+				@Http.sse({ path: '/feed' })
+				feed() {
+					return {};
+				}
+
+				@Http.custom({ method: 'trace', path: '/trace' })
+				trace() {
+					return {};
+				}
+			}
+
+			await nextTick();
+
+			expect(Http.describe(PostController)).toEqual({
+				path: '/posts',
+				routes: [
+					{
+						name: 'show',
+						method: 'GET',
+						path: '/:id',
+						sse: false,
+						body: undefined,
+						query: 1,
+						params: [{ slug: 'id', index: 0 }]
+					},
+					{
+						name: 'create',
+						method: 'POST',
+						path: '/',
+						sse: false,
+						body: 1,
+						query: undefined,
+						params: []
+					},
+					{
+						name: 'feed',
+						method: 'GET',
+						path: '/feed',
+						sse: true,
+						body: undefined,
+						query: undefined,
+						params: []
+					},
+					{
+						name: 'trace',
+						method: 'TRACE',
+						path: '/trace',
+						sse: false,
+						body: undefined,
+						query: undefined,
+						params: []
+					}
+				]
+			});
+		});
+
+		it('returns undefined for a class that is not an HTTP controller', () => {
+			class NotAController {}
+			expect(Http.describe(NotAController)).toBeUndefined();
+		});
+	});
+
 	describe('Integration with Elysia', () => {
 		afterEach(() => {
 			mock.restore();

@@ -39,6 +39,12 @@ export interface ProjectConfig {
 	 * Only used if the Elysium project is not a mono module.
 	 */
 	modules?: Record<string, string>;
+
+	/**
+	 * The file `styx routes:generate` writes the route types to, relative to the project.
+	 * @default 'src/routes.gen.ts'
+	 */
+	routes?: string;
 }
 
 /**
