@@ -502,13 +502,13 @@ export namespace Container {
 	}
 
 	/**
-	 * Awaits a service, like {@link resolve}, so that a later {@link get} returns it synchronously.
-	 * Does nothing when the service is not visible, leaving {@link get} to return `null`.
+	 * Awaits a service like {@link resolve}, but returns `null` when it is not visible from the
+	 * current module context, like {@link get}. A factory service is built once, with its `onInit` done.
 	 * @param service The service token.
 	 */
-	export async function prepareService(service: ServiceToken): Promise<void> {
+	export async function resolveVisible(service: ServiceToken): Promise<unknown> {
 		const found = lookup(service, ModuleContext.current());
-		if (found) await entryValueAsync(found.entry);
+		return found ? entryValueAsync(found.entry) : null;
 	}
 
 	/**

@@ -656,10 +656,9 @@ export namespace Http {
 
 						if (!isEmpty(route.services)) {
 							for (const service of route.services) {
-								parameters[service.index] = await ModuleContext.run(node, async () => {
-									await Container.prepareService(service.token);
-									return Service.get(service.token);
-								});
+								parameters[service.index] = await ModuleContext.run(node, () =>
+									Container.resolveVisible(service.token)
+								);
 							}
 						}
 

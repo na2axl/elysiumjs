@@ -378,6 +378,35 @@ describe('Request scope', () => {
 			await instance.kernel.shutdown();
 		});
 
+		it('builds a factory service once for a route parameter, with its onInit done', async () => {
+			let built = 0;
+
+			@Service.register({ scope: ServiceScope.FACTORY })
+			class Made {
+				public readonly id = ++built;
+				public ready = false;
+
+				public async onInit() {
+					await tick();
+					this.ready = true;
+				}
+			}
+
+			@Http.controller({ path: '/made' })
+			class MadeController {
+				@Http.get()
+				public show(@Service.inject(Made) made: Made) {
+					return { id: made.id, ready: made.ready };
+				}
+			}
+
+			const { instance, app } = await build(MadeController, [Made]);
+			const response = await app.handle(new Request('http://localhost/made'));
+			expect(await response.json()).toEqual({ id: 1, ready: true });
+			expect(built).toBe(1);
+			await instance.kernel.shutdown();
+		});
+
 		it('still injects null for a route parameter whose service is not registered', async () => {
 			@Http.controller({ path: '/missing' })
 			class MissingController {
