@@ -100,6 +100,31 @@ describe('Request scope', () => {
 			);
 		});
 
+		it('refuses a singleton above a factory before building the request-scoped service', async () => {
+			let built = 0;
+
+			@Service.register({ scope: ServiceScope.REQUEST })
+			class Opened {
+				public async onInit() {
+					built++;
+				}
+			}
+			@Service.register({ scope: ServiceScope.FACTORY })
+			class Middle {
+				constructor(@Service.inject(Opened) public opened: Opened) {}
+			}
+			@Service.register()
+			class Holder {
+				constructor(@Service.inject(Middle) public middle: Middle) {}
+			}
+			for (const cls of [Opened, Middle, Holder]) Container.register(null, cls, undefined);
+
+			await Service.runInRequestScope(async () => {
+				await expect(Service.resolve(Holder)).rejects.toBeInstanceOf(ScopeMismatchError);
+			});
+			expect(built).toBe(0);
+		});
+
 		it('lets request-scoped and factory services depend on request-scoped ones', () => {
 			@Service.register({ scope: ServiceScope.REQUEST })
 			class PerRequest {
@@ -291,6 +316,56 @@ describe('Request scope', () => {
 			const response = await app.handle(new Request('http://localhost/session'));
 			expect(response.status).toBe(200);
 			expect(await response.json()).toEqual({ ctor: true, param: true, same: true });
+			await instance.kernel.shutdown();
+		});
+
+		it('still injects null for a route parameter whose service is not registered', async () => {
+			@Http.controller({ path: '/missing' })
+			class MissingController {
+				@Http.get()
+				public show(@Service.inject('missing.service') missing: unknown) {
+					return { missing };
+				}
+			}
+
+			const { instance, app } = await build(MissingController);
+			const response = await app.handle(new Request('http://localhost/missing'));
+			expect(await response.json()).toEqual({ missing: null });
+			await instance.kernel.shutdown();
+		});
+
+		it('runs the onRequest hook of a request-scoped controller once its services are ready', async () => {
+			@Service.register({ scope: ServiceScope.REQUEST })
+			class Session {
+				public ready = false;
+
+				public async onInit() {
+					await tick();
+					this.ready = true;
+				}
+			}
+
+			const seen: boolean[] = [];
+
+			@Http.controller({ path: '/hooked', scope: HttpControllerScope.REQUEST })
+			class HookedController {
+				constructor(@Service.inject(Session) public session: Session) {}
+
+				@Http.onRequest()
+				public check() {
+					seen.push(this.session.ready);
+				}
+
+				@Http.get()
+				public show() {
+					return 'ok';
+				}
+			}
+
+			const { instance, app } = await build(HookedController, [Session]);
+			const response = await app.handle(new Request('http://localhost/hooked'));
+			expect(response.status).toBe(200);
+			expect(seen).toEqual([true]);
 			await instance.kernel.shutdown();
 		});
 

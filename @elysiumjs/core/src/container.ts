@@ -270,11 +270,11 @@ const prepare = async (entry: ContainerEntry, path: readonly ContainerEntry[]): 
 			await entryValueAsync(dependency.entry, trail);
 		} else if (
 			dependency.entry.scope === ServiceScope.REQUEST &&
-			entry.scope !== ServiceScope.SINGLETON &&
+			!trail.some((e) => e.scope === ServiceScope.SINGLETON) &&
 			requestStorage.getStore()
 		) {
-			// Built ahead in the request store, so that the dependant finds it ready. A singleton
-			// dependant is left to fail with a ScopeMismatchError when it is built.
+			// Built ahead in the request store, so that the dependant finds it ready. Under a
+			// singleton, it is left to fail with a ScopeMismatchError when it is built.
 			await entryValueAsync(dependency.entry, trail);
 		} else {
 			await prepare(dependency.entry, trail);
