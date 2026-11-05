@@ -913,6 +913,93 @@ describe('Application class', () => {
 		});
 	});
 
+	describe('build', () => {
+		/** A module whose onInit is recorded, with a service its controller injects. */
+		const makeModule = (initialised: string[], fail = false) => {
+			@Service.register({ name: 'build.greeter' })
+			class Greeter {
+				public greet(name: string) {
+					return `hello ${name}`;
+				}
+			}
+
+			@Http.controller({ path: '/greet' })
+			class GreetController {
+				public constructor(@Service.inject('build.greeter') private readonly greeter: Greeter) {}
+
+				@Http.get({ path: '/:name' })
+				public greet(@Http.param('name', t.String()) name: string) {
+					return this.greeter.greet(name);
+				}
+			}
+
+			@Module.register({ services: [Greeter], controllers: [GreetController] })
+			class GreetModule extends Module {
+				public async onInit() {
+					await nextTick();
+					initialised.push('greet');
+					if (fail) throw new Error('boot failed');
+				}
+			}
+
+			return GreetModule;
+		};
+
+		it('builds the app without listening or initialising the modules', async () => {
+			const initialised: string[] = [];
+
+			@Application.register({ modules: [makeModule(initialised)], openapi: false })
+			class TestApp extends Application {}
+
+			const instance = new TestApp();
+			const listen = spyOn(Elysia.prototype, 'listen');
+			const app = await instance.build();
+
+			expect(app).toBe(instance.elysia);
+			expect(listen).not.toHaveBeenCalled();
+			expect(initialised).toEqual([]);
+			await instance.kernel.shutdown();
+		});
+
+		it('boots the modules once, on the first request', async () => {
+			const initialised: string[] = [];
+
+			@Application.register({ modules: [makeModule(initialised)], openapi: false })
+			class TestApp extends Application {}
+
+			const instance = new TestApp();
+			const app = await instance.build();
+
+			const [first, second] = await Promise.all([
+				app.handle(new Request('http://localhost/greet/ada')),
+				app.handle(new Request('http://localhost/greet/alan'))
+			]);
+			expect(await first.text()).toBe('hello ada');
+			expect(await second.text()).toBe('hello alan');
+			expect(initialised).toEqual(['greet']);
+
+			await app.handle(new Request('http://localhost/greet/grace'));
+			expect(initialised).toEqual(['greet']);
+			await instance.kernel.shutdown();
+		});
+
+		it('fails the requests when the modules do not boot', async () => {
+			const initialised: string[] = [];
+
+			@Application.register({ modules: [makeModule(initialised, true)], openapi: false })
+			class TestApp extends Application {}
+
+			const instance = new TestApp();
+			const app = await instance.build();
+
+			const response = await app.handle(new Request('http://localhost/greet/ada'));
+			expect(response.status).toBe(500);
+			expect(await response.json()).toMatchObject({ type: 'UNKNOWN' });
+			expect(initialised).toEqual(['greet']);
+			await instance.kernel.shutdown();
+		});
+	});
+
 	describe('serve', () => {
 		it('should handle the serve command', async () => {
 			@Application.register({ server: { port: 0 }, modules: [], openapi: false })

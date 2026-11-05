@@ -27,7 +27,8 @@
     "prepublishOnly": "bun run build",
     "test": "bun test",
     "test:coverage": "bun test --coverage",
-    "check:runtime": "bun scripts/check-runtime.ts"
+    "check:runtime": "bun scripts/check-runtime.ts",
+    "check:aot": "bun scripts/check-aot.ts"
   },
   "keywords": [
     "elysium",

@@ -94,15 +94,17 @@ export const applyMiddlewares = (
 	plugin: AnyElysia,
 	node: ModuleNode | null
 ) => {
-	const mi = makeMiddlewares(middlewares, node);
+	// Built on the first request, so that building the app needs no module to be initialised.
+	let built: Middleware[] | undefined;
+	const mi = () => (built ??= makeMiddlewares(middlewares, node));
 
 	if (node) {
 		// Elysia runs every onRequest hook on every request of the app, whatever plugin registered it.
 		// The onRequest middlewares of a module or a controller run first in its transform hook instead,
 		// which is scoped to its routes.
 		plugin.onTransform(async (c) => {
-			const result = await executeMiddlewareChain(mi, c, 'onRequest', node);
-			if (result === undefined) return executeMiddlewareChain(mi, c, 'onTransform', node);
+			const result = await executeMiddlewareChain(mi(), c, 'onRequest', node);
+			if (result === undefined) return executeMiddlewareChain(mi(), c, 'onTransform', node);
 
 			// A transform hook cannot stop the request by returning a value, so the response is thrown
 			// as a status. It is marked so the error handler sends it as is instead of reporting it.
@@ -115,24 +117,24 @@ export const applyMiddlewares = (
 		});
 	} else {
 		plugin.onRequest((c) => {
-			return executeMiddlewareChain(mi, c, 'onRequest', node);
+			return executeMiddlewareChain(mi(), c, 'onRequest', node);
 		});
 
 		plugin.onTransform((c) => {
-			return executeMiddlewareChain(mi, c, 'onTransform', node);
+			return executeMiddlewareChain(mi(), c, 'onTransform', node);
 		});
 	}
 
 	plugin.onBeforeHandle((c) => {
-		return executeMiddlewareChain(mi, c, 'onBeforeHandle', node);
+		return executeMiddlewareChain(mi(), c, 'onBeforeHandle', node);
 	});
 
 	plugin.onAfterHandle((c) => {
-		return executeMiddlewareChain(mi, c, 'onAfterHandle', node);
+		return executeMiddlewareChain(mi(), c, 'onAfterHandle', node);
 	});
 
 	plugin.onAfterResponse((c) => {
-		return executeMiddlewareChain(mi, c, 'onAfterResponse', node);
+		return executeMiddlewareChain(mi(), c, 'onAfterResponse', node);
 	});
 };
 

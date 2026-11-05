@@ -505,8 +505,10 @@ export namespace Http {
 
 				const getController = (() => {
 					if (props.scope === HttpControllerScope.SERVER) {
-						const controller = ModuleContext.run(node, () => Service.make(target));
-						return () => () => controller;
+						// Built once, on the first request, so that building the app needs no module to be
+						// initialised.
+						let controller: unknown;
+						return () => () => (controller ??= ModuleContext.run(node, () => Service.make(target)));
 					} else if (props.scope === HttpControllerScope.REQUEST) {
 						return () => () => ModuleContext.run(node, () => Service.make(target));
 					} else {

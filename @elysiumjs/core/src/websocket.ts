@@ -82,13 +82,16 @@ export namespace Websocket {
 			async function handleWebsocket(node: ModuleNode): Promise<Elysia> {
 				await nextTick();
 
-				const controller = ModuleContext.run(node, () => Service.make(target));
+				// Built on the first connection, so that building the app needs no module to be initialised.
+				let controller: unknown;
+				const getController = () =>
+					(controller ??= ModuleContext.run(node, () => Service.make(target)));
 
 				const metadata = Metadata.get(Symbols.websocket, target) ?? {};
 				const inModule =
 					(handler?: (...args: any[]) => any) =>
 					(...args: any[]) =>
-						ModuleContext.run(node, () => handler?.apply(controller, args));
+						ModuleContext.run(node, () => handler?.apply(getController(), args));
 				const open = metadata.open && inModule(metadata.open);
 				const close = metadata.close && inModule(metadata.close);
 				const message = metadata.message && inModule(metadata.message);

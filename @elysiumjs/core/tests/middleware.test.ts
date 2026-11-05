@@ -286,7 +286,7 @@ describe('Middleware', () => {
 	describe('applyMiddlewares', () => {
 		const hooks = ['onRequest', 'onTransform', 'onBeforeHandle', 'onAfterHandle', 'onAfterResponse'];
 
-		it('should build the middlewares in the module context and register the scoped hooks', () => {
+		it('should build the middlewares in the module context and register the scoped hooks', async () => {
 			const plugin = Object.fromEntries(hooks.map((h) => [h, mock()])) as unknown as Elysia;
 			const node = testNode();
 			const seen: unknown[] = [];
@@ -297,12 +297,19 @@ describe('Middleware', () => {
 
 			M.applyMiddlewares([TestMiddleware1, TestMiddleware2], plugin as never, node);
 
-			expect(makeSpy).toHaveBeenCalledWith(TestMiddleware1);
-			expect(makeSpy).toHaveBeenCalledWith(TestMiddleware2);
-			expect(seen).toEqual([node, node]);
 			for (const hook of hooks.filter((h) => h !== 'onRequest')) {
 				expect((plugin as any)[hook]).toHaveBeenCalled();
 			}
+
+			// The middlewares are built on the first request, once.
+			expect(makeSpy).not.toHaveBeenCalled();
+			const beforeHandle = (plugin as any).onBeforeHandle.mock.calls[0][0];
+			await beforeHandle(mockContext);
+			await beforeHandle(mockContext);
+			expect(makeSpy).toHaveBeenCalledTimes(2);
+			expect(makeSpy).toHaveBeenCalledWith(TestMiddleware1);
+			expect(makeSpy).toHaveBeenCalledWith(TestMiddleware2);
+			expect(seen).toEqual([node, node]);
 			// Elysia would run an onRequest hook on every request of the app.
 			expect((plugin as any).onRequest).not.toHaveBeenCalled();
 		});

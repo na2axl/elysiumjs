@@ -460,15 +460,64 @@ export abstract class Application extends InteractsWithConsole {
 	}
 
 	/**
-	 * Starts the server: boots the kernel, builds the root Elysia app, lets modules hook into it,
-	 * mounts their controllers and listens.
+	 * Builds the root Elysia app without listening, for hosts that own the server (Cloudflare
+	 * Workers) and for ahead-of-time compilation with `elysia/plugin/aot`, which evaluates the
+	 * entry at build time.
+	 *
+	 * Modules are registered but not initialised: they boot on the first request, so building the
+	 * app runs no `onInit` work and builds no service.
+	 *
+	 * @example
+	 * ```ts
+	 * export const app = await new App().build();
+	 * export default { fetch: (request: Request) => app.fetch(request) };
+	 * ```
+	 * @returns The root Elysia app.
+	 * @throws When the module graph is invalid or a module config is missing.
 	 */
+	public async build(): Promise<Elysia<Route>> {
+		const { modules } = this.props();
+		this.#kernel = new Kernel(buildModuleGraph(modules ?? []));
+		await this.bootKernel(false);
+		await this.buildServer(true);
+		return this.#elysia;
+	}
+
+	/** Starts the server: boots the kernel, builds the root Elysia app and listens. */
 	private async commandServe(): Promise<void> {
-		const { server, openapi, plugins } = this.props();
+		const { server } = this.props();
 
 		await this.bootKernel(true);
+		await this.buildServer(false);
 
-		this.#elysia = (new Elysia(server) as unknown as Elysia<Route>).onRequest((c) => {
+		const runtime = Runtime.get();
+		runtime.serve(this.#elysia, server?.port ?? (parseInt(runtime.env().PORT ?? '', 10) || 3000));
+	}
+
+	/**
+	 * Builds the root Elysia app: lets modules hook into it and mounts their controllers.
+	 * @param bootOnFirstRequest Whether the first request boots the modules, when they were only
+	 * registered.
+	 */
+	private async buildServer(bootOnFirstRequest: boolean): Promise<void> {
+		const { server, openapi, plugins } = this.props();
+
+		this.#elysia = new Elysia(server) as unknown as Elysia<Route>;
+
+		// First of the hooks, so that every later one finds the modules initialised.
+		if (bootOnFirstRequest) {
+			let booted = false;
+			let booting: Promise<void> | undefined;
+			this.#elysia.onRequest(() => {
+				if (booted) return;
+				booting ??= this.kernel.bootEager().then(() => {
+					booted = true;
+				});
+				return booting;
+			});
+		}
+
+		this.#elysia.onRequest((c) => {
 			if (this.isDebug) {
 				getLogger().debug('Incoming request', { method: c.request.method, url: c.request.url });
 			}
@@ -498,9 +547,6 @@ export abstract class Application extends InteractsWithConsole {
 		await this.serveModules();
 
 		Event.emit('elysium:server:after-init', this, this);
-
-		const runtime = Runtime.get();
-		runtime.serve(this.#elysia, server?.port ?? (parseInt(runtime.env().PORT ?? '', 10) || 3000));
 	}
 
 	/** Lets every module hook into the root app, then mounts the controllers of each module. */
