@@ -83,6 +83,21 @@ const config = {
 	}
 };
 
+/** Builds the Elysia plugin of a controller and runs its start hooks, as the server does on listen. */
+const startPlugin = async (controller: object) => {
+	const onStart = spyOn(Elysia.prototype, 'onStart');
+	try {
+		const plugin = Metadata.get(Symbols.elysiaPlugin, controller);
+		const elysia: Elysia = await plugin(testNode());
+		for (const [handler] of onStart.mock.calls) {
+			for (const fn of [handler].flat()) await (fn as (app: Elysia) => unknown)(elysia);
+		}
+	} finally {
+		onStart.mockRestore();
+	}
+	await nextTick();
+};
+
 describe('WampModule', () => {
 	let app: TestingApp | undefined;
 
@@ -456,10 +471,7 @@ describe('Wamp controllers', () => {
 			public topic() {}
 		}
 
-		const plugin = Metadata.get(Symbols.elysiaPlugin, TestWampController);
-		const elysia: Elysia = await plugin(testNode());
-		await elysia.event.start?.[0].fn(elysia as any);
-		await nextTick();
+		await startPlugin(TestWampController);
 
 		const client = Wamp.getConnection('other') as any;
 		expect(client.register).toHaveBeenCalledWith('test.rpc', expect.any(Function), {
@@ -479,10 +491,7 @@ describe('Wamp controllers', () => {
 			public topic() {}
 		}
 
-		const plugin = Metadata.get(Symbols.elysiaPlugin, TestWampController);
-		const elysia: Elysia = await plugin(testNode());
-		await elysia.event.start?.[0].fn(elysia as any);
-		await nextTick();
+		await startPlugin(TestWampController);
 	};
 
 	it('logs the registrations and subscriptions', async () => {

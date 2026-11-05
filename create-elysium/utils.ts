@@ -89,7 +89,7 @@ export const getAppCode = (
 	modules: Record<string, string>,
 	enabledModules: EnabledModule[] = [],
 	runtime: RuntimeChoice = RUNTIMES.bun
-) => /* js */ `import type { ErrorContext } from 'elysia';
+) => /* js */ `import type { ServerError } from '@elysiumjs/core';
 
 import { Application, Service, t } from '@elysiumjs/core';
 import { HermesLogger, HermesModule } from '@elysiumjs/hermes';
@@ -144,7 +144,7 @@ export const env = t.Object({});
 	env
 })
 export class App extends Application {
-	protected onError(e: ErrorContext): Promise<boolean> {
+	protected onError(e: ServerError): Promise<boolean> {
 		Service.get(HermesLogger)?.error(e.error.message, e.error);
 		return super.onError(e);
 	}

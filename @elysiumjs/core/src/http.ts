@@ -12,15 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type {
-	Context as ElysiaContext,
-	Handler,
-	HTTPMethod,
-	PreContext,
-	SSEPayload,
-	TSchema
-} from 'elysia';
+import type { Context as ElysiaContext, SSEPayload } from 'elysia';
 import type { Class, MergeDeep } from 'type-fest';
+import type { Static, TSchema } from 'typebox';
 import type { AppHttpContext } from '.';
 import type { Middleware } from './middleware';
 import type { Module } from './module';
@@ -45,6 +39,18 @@ import { nextTick, Symbols } from './utils';
 export type Route = `/${string}`;
 
 /**
+ * An HTTP method name.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type HTTPMethod = string;
+
+/**
+ * A function computing a value from the request context, used by custom parameter decorators.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+type Handler = (c: Context) => unknown;
+
+/**
  * A class for validating data against a schema.
  * @author Axel Nana <axel.nana@workbud.com>
  */
@@ -59,7 +65,7 @@ export type ValidatorClass<T extends TSchema = TSchema> = {
 	 * Whether the request should be authorized before validation. If the request is not authorized,
 	 * the validation will be skipped.
 	 */
-	authorize(ctx: Context<T['static']>): Promise<boolean>;
+	authorize(ctx: Context<Static<T>>): Promise<boolean>;
 
 	/**
 	 * Processes custom validation logic. This method is called after the validation schema is checked
@@ -67,7 +73,7 @@ export type ValidatorClass<T extends TSchema = TSchema> = {
 	 * @param data The input data to validate.
 	 * @returns Whether the input data is valid.
 	 */
-	validate(ctx: Context<T['static']>): Promise<boolean>;
+	validate(ctx: Context<Static<T>>): Promise<boolean>;
 };
 
 /**
@@ -190,7 +196,7 @@ export type Singleton<TController = unknown, TModule extends Module = Module> = 
 			module: TModule;
 		};
 
-		resolve: {
+		derive: {
 			/**
 			 * The tenant ID.
 			 */
@@ -214,7 +220,7 @@ export type Context<
 	Singleton<TController, TModule>
 >;
 
-export type ElysiaApp = Elysia<Route, Singleton>;
+export type ElysiaApp = Elysia<Route, 'local', Singleton>;
 
 /**
  * Iterates an async generator with every step running in the context of a module.
@@ -508,11 +514,11 @@ export namespace Http {
 					}
 				})();
 
-				app.resolve({ as: 'local' }, () => ({ controller: getController() }));
+				app.derive('local', () => ({ controller: getController() }));
 
 				const onRequest = Metadata.get('http:onRequest', target) ?? {};
 				if (onRequest.handler) {
-					app.onRequest((c: PreContext<Singleton>) => {
+					app.onRequest((c) => {
 						const controller = getController()();
 						return ModuleContext.run(node, () => onRequest.handler.call(controller, c));
 					});
@@ -653,39 +659,49 @@ export namespace Http {
 
 					const mi = makeMiddlewares(route.middlewares, node);
 
-					app.route(route.method, route.path, getHandler(), {
-						// @ts-ignore
-						config: {},
-						async transform(c) {
-							if (
-								isValidator &&
-								!(await ModuleContext.run(node, () =>
-									route.body!.validator!.authorize(c as Context)
-								))
-							) {
-								throw c.status(401, 'Unauthorized');
-							}
+					// The route is built from metadata at runtime, so Elysia cannot infer its types here.
+					const addRoute = app.route as unknown as (
+						method: string,
+						path: string,
+						hook: Record<string, unknown>,
+						handler: unknown
+					) => unknown;
 
-							return executeMiddlewareChain(mi, c, 'onTransform', node);
+					addRoute.call(
+						app,
+						route.method,
+						route.path,
+						{
+							async transform(c: Context) {
+								if (
+									isValidator &&
+									!(await ModuleContext.run(node, () => route.body!.validator!.authorize(c)))
+								) {
+									throw c.status(401, 'Unauthorized');
+								}
+
+								return executeMiddlewareChain(mi, c, 'onTransform', node);
+							},
+							beforeHandle(c: Context) {
+								return executeMiddlewareChain(mi, c, 'onBeforeHandle', node);
+							},
+							afterHandle(c: Context) {
+								return executeMiddlewareChain(mi, c, 'onAfterHandle', node);
+							},
+							afterResponse(c: Context) {
+								return executeMiddlewareChain(mi, c, 'onAfterResponse', node);
+							},
+							detail: {
+								tags: props.tags,
+								description: route.description,
+								operationId: route.operationId
+							},
+							body: isValidator ? route.body?.validator?.schema : route.body?.schema,
+							response: route.response,
+							params: isEmpty(params) ? undefined : t.Object(params)
 						},
-						beforeHandle(c) {
-							return executeMiddlewareChain(mi, c, 'onBeforeHandle', node);
-						},
-						afterHandle(c) {
-							return executeMiddlewareChain(mi, c, 'onAfterHandle', node);
-						},
-						afterResponse(c) {
-							return executeMiddlewareChain(mi, c, 'onAfterResponse', node);
-						},
-						detail: {
-							tags: props.tags,
-							description: route.description,
-							operationId: route.operationId
-						},
-						body: isValidator ? route.body?.validator?.schema : route.body?.schema,
-						response: route.response,
-						params: isEmpty(params) ? undefined : t.Object(params)
-					});
+						getHandler()
+					);
 				}
 
 				return app;

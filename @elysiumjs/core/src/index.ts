@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { SingletonBase } from 'elysia';
-
-export { type Elysia, type TSchema, type Static, t } from 'elysia';
-export { type AppContext, type ElysiumPlugin, Application } from './app';
+export { type Elysia, t } from 'elysia';
+export { type Static, type TSchema } from 'typebox';
+export { type AppContext, type ElysiumPlugin, type ServerError, Application } from './app';
 export {
 	type CommandArgumentProps,
 	type CommandClass,
@@ -90,7 +89,11 @@ export { type WS, type WSError, Websocket } from './websocket';
  * The type for the context of the application.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export interface AppHttpContext extends SingletonBase {}
+export interface AppHttpContext {
+	decorator: Record<string, unknown>;
+	store: Record<string, unknown>;
+	derive: Record<string, unknown>;
+}
 
 /**
  * The type for all registered environment variables.

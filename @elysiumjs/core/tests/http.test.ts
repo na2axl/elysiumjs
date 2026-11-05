@@ -64,7 +64,7 @@ describe('Http namespace', () => {
 
 			const app = await plugin(testNode());
 
-			expect(app.config.prefix).toBe('/test');
+			expect(app['~config'].prefix).toBe('/test');
 		});
 
 		it('should register the controller in the service container with SERVER scope', async () => {
@@ -77,7 +77,7 @@ describe('Http namespace', () => {
 			})
 			class TestController {}
 
-			const resolveSpy = spyOn(Elysia.Elysia.prototype, 'resolve');
+			const deriveSpy = spyOn(Elysia.Elysia.prototype, 'derive');
 
 			// Get the plugin function
 			const plugin = Metadata.get(Symbols.elysiaPlugin, TestController);
@@ -87,7 +87,7 @@ describe('Http namespace', () => {
 
 			// Check if the controller was built once, when the plugin was created
 			expect(makeSpy).toHaveBeenCalledWith(TestController);
-			expect(resolveSpy).toHaveBeenCalledWith({ as: 'local' }, expect.any(Function));
+			expect(deriveSpy).toHaveBeenCalledWith('local', expect.any(Function));
 		});
 
 		it('should register the controller in the service container with REQUEST scope', async () => {
@@ -105,7 +105,7 @@ describe('Http namespace', () => {
 				}
 			}
 
-			const resolveSpy = spyOn(Elysia.Elysia.prototype, 'resolve');
+			const deriveSpy = spyOn(Elysia.Elysia.prototype, 'derive');
 			const executeMiddlewareChainSpy = spyOn(M, 'executeMiddlewareChain').mockImplementation(
 				async () => undefined
 			);
@@ -118,7 +118,7 @@ describe('Http namespace', () => {
 
 			// Check if the controller was registered in the service container
 			expect(makeSpy).not.toHaveBeenCalledWith(TestController);
-			expect(resolveSpy).toHaveBeenCalledWith({ as: 'local' }, expect.any(Function));
+			expect(deriveSpy).toHaveBeenCalledWith('local', expect.any(Function));
 
 			// A REQUEST-scoped controller is built for each request.
 			const response = await app.handle(new Request('http://localhost/test'));
@@ -923,14 +923,14 @@ describe('Http namespace', () => {
 			expect(routeSpy).toHaveBeenCalledWith(
 				'GET',
 				'/users',
-				expect.any(Function),
-				expect.anything()
+				expect.anything(),
+				expect.any(Function)
 			);
 			expect(routeSpy).toHaveBeenCalledWith(
 				'POST',
 				'/users',
-				expect.any(Function),
-				expect.anything()
+				expect.anything(),
+				expect.any(Function)
 			);
 		});
 

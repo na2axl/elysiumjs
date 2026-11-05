@@ -15,7 +15,6 @@
 import { Application } from '@elysiumjs/core';
 import { afterAll, afterEach, beforeAll, describe, expect, it, jest, mock, spyOn } from 'bun:test';
 import * as d from 'drizzle-orm/pg-core';
-import { t } from 'elysia';
 
 import { createSchemaFromDrizzle, drizzleAdapter, DrizzleModel } from '../src/model';
 import { pgTable } from '../src/table';
@@ -156,78 +155,25 @@ describe('DrizzleModel', () => {
 	});
 
 	describe('createSchemaFromDrizzle', () => {
+		const columnsOf = (mode: 'select' | 'create' | 'update') => {
+			const getTableConfigSpy = spyOn(d, 'getTableConfig');
+			const schema = createSchemaFromDrizzle(mockTable, { mode }) as {
+				properties: Record<string, unknown>;
+			};
+			expect(getTableConfigSpy).toHaveBeenCalledWith(mockTable);
+			return Object.keys(schema.properties).sort();
+		};
+
 		it('should create a schema for select mode', () => {
-			const getTableConfigSpy = spyOn(d, 'getTableConfig');
-			const objectSpy = spyOn(t, 'Object');
-
-			createSchemaFromDrizzle(mockTable, { mode: 'select' });
-
-			expect(getTableConfigSpy).toHaveBeenCalledWith(mockTable);
-			expect(objectSpy).toHaveBeenCalledWith(
-				expect.objectContaining({
-					id: expect.any(Object),
-					name: expect.any(Object),
-					email: expect.any(Object),
-					age: expect.any(Object),
-					is_confirmed: expect.any(Object)
-				})
-			);
-
-			objectSpy.mockRestore();
+			expect(columnsOf('select')).toEqual(['age', 'email', 'id', 'is_confirmed', 'name']);
 		});
 
-		it('should create a schema for create mode', () => {
-			const getTableConfigSpy = spyOn(d, 'getTableConfig');
-			const objectSpy = spyOn(t, 'Object');
-
-			createSchemaFromDrizzle(mockTable, { mode: 'create' });
-
-			expect(getTableConfigSpy).toHaveBeenCalledWith(mockTable);
-
-			// Primary key should be excluded in create mode
-			expect(objectSpy).toHaveBeenCalledWith(
-				expect.objectContaining({
-					name: expect.any(Object),
-					email: expect.any(Object),
-					age: expect.any(Object),
-					is_confirmed: expect.any(Object)
-				})
-			);
-
-			expect(objectSpy).not.toHaveBeenCalledWith(
-				expect.objectContaining({
-					id: expect.any(Object)
-				})
-			);
-
-			objectSpy.mockRestore();
+		it('should create a schema for create mode, without the primary key', () => {
+			expect(columnsOf('create')).toEqual(['age', 'email', 'is_confirmed', 'name']);
 		});
 
-		it('should create a schema for update mode', () => {
-			const getTableConfigSpy = spyOn(d, 'getTableConfig');
-			const objectSpy = spyOn(t, 'Object');
-
-			createSchemaFromDrizzle(mockTable, { mode: 'update' });
-
-			expect(getTableConfigSpy).toHaveBeenCalledWith(mockTable);
-
-			// Primary key should be excluded in update mode
-			expect(objectSpy).toHaveBeenCalledWith(
-				expect.objectContaining({
-					name: expect.any(Object),
-					email: expect.any(Object),
-					age: expect.any(Object),
-					is_confirmed: expect.any(Object)
-				})
-			);
-
-			expect(objectSpy).not.toHaveBeenCalledWith(
-				expect.objectContaining({
-					id: expect.any(Object)
-				})
-			);
-
-			objectSpy.mockRestore();
+		it('should create a schema for update mode, without the primary key', () => {
+			expect(columnsOf('update')).toEqual(['age', 'email', 'is_confirmed', 'name']);
 		});
 	});
 

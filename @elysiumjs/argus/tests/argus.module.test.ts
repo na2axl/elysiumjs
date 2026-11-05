@@ -16,6 +16,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { Application, MissingModuleConfigError, Module } from '@elysiumjs/core';
+import { SpanStatusCode, trace } from '@opentelemetry/api';
 import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test';
 import { Elysia } from 'elysia';
 
@@ -75,7 +76,7 @@ describe('ArgusModule', () => {
 			expect(use).toHaveBeenCalledTimes(1);
 			const installed = (use.mock.calls[0] as unknown[])[0] as any;
 			expect(installed).toBeInstanceOf(Elysia);
-			expect(installed.config.name).toBe((argusPlugin() as any).config.name);
+			expect(installed['~config'].name).toBe((argusPlugin() as any)['~config'].name);
 		} finally {
 			await app.shutdown();
 		}
@@ -116,5 +117,43 @@ describe('ArgusModule', () => {
 		}).catch(() => undefined);
 		await app?.shutdown();
 		expect(shutdown).not.toHaveBeenCalled();
+	});
+});
+
+describe('argusPlugin', () => {
+	afterEach(() => mock.restore());
+
+	it('traces the routes of the app it is installed on, ending the span with the outcome', async () => {
+		const spans: { name: string; status?: unknown; ended: boolean }[] = [];
+		spyOn(trace, 'getTracer').mockReturnValue({
+			startSpan: (name: string) => {
+				const span = { name, status: undefined as unknown, ended: false };
+				spans.push(span);
+				return {
+					setStatus: (status: unknown) => void (span.status = status),
+					setAttribute: () => {},
+					recordException: () => {},
+					end: () => void (span.ended = true)
+				};
+			}
+		} as any);
+
+		const app = new Elysia()
+			.use(argusPlugin())
+			.get('/ok', () => 'ok')
+			.get('/fail', () => {
+				throw new Error('boom');
+			});
+
+		await app.handle(new Request('http://localhost/ok'));
+		await app.handle(new Request('http://localhost/fail'));
+		await Bun.sleep(5);
+
+		expect(spans.map((s) => s.name)).toEqual(['GET /ok', 'GET /fail']);
+		expect(spans[0]).toMatchObject({ ended: true, status: { code: SpanStatusCode.OK } });
+		expect(spans[1]).toMatchObject({
+			ended: true,
+			status: { code: SpanStatusCode.ERROR, message: 'boom' }
+		});
 	});
 });

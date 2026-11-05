@@ -27,7 +27,7 @@ mock.module('@sentry/bun', () => ({
 	onUncaughtExceptionIntegration: () => ({ name: 'uncaught' }),
 	captureException: () => {}
 }));
-mock.module('@elysiajs/opentelemetry', () => ({
+mock.module('@elysia/opentelemetry', () => ({
 	opentelemetry: () => (app: unknown) => app
 }));
 
@@ -77,8 +77,14 @@ describe('SentryModule', () => {
 			expect(use).toHaveBeenCalledTimes(1);
 			const installed = (use.mock.calls[0] as unknown[])[0] as any;
 			expect(installed).toBeInstanceOf(Elysia);
-			expect(installed.decorator.Sentry).toBeDefined();
-			expect(installed.config.name).toBe('@elysiumjs/plugin-sentry');
+			expect(installed['~config'].name).toBe('@elysiumjs/plugin-sentry');
+
+			// The plugin decorates every request context with Sentry.
+			const response = await new Elysia()
+				.use(installed)
+				.get('/', (c: any) => String(c.Sentry !== undefined))
+				.handle(new Request('http://localhost/'));
+			expect(await response.text()).toBe('true');
 		} finally {
 			await app.shutdown();
 		}

@@ -13,12 +13,14 @@
 // limitations under the License.
 
 import type { ServerWebSocket } from 'bun';
-import type { Context, ErrorContext, TSchema } from 'elysia';
+import type { Context, ErrorContext } from 'elysia';
 import type { Class, ConditionalPick, JsonObject, Primitive } from 'type-fest';
+import type { TSchema } from 'typebox';
 import type { Route } from './http';
 import type { ModuleNode } from './module-graph';
 
 import { Elysia } from 'elysia';
+import { websocket } from 'elysia/websocket';
 
 import { Event } from './event';
 import { Metadata } from './metadata';
@@ -95,7 +97,7 @@ export namespace Websocket {
 					? inModule(metadata.error)
 					: (e: WSError) => Event.emit('elysium:error', e.error);
 
-				const app = new Elysia({ name: `${node.id}:${target.name}` });
+				const app = new Elysia({ name: `${node.id}:${target.name}` }).use(websocket());
 
 				// The middleware hooks run on the upgrade request, so they can reject the connection.
 				const middlewares = Metadata.get(Symbols.middlewares, target) ?? [];
