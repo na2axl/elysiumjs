@@ -18,6 +18,7 @@
 	"dependencies": {
 		"@elysiumjs/core": "latest",
 		"@elysiumjs/hermes": "latest",
+		"@elysiumjs/redis": "latest",
 		"@elysiumjs/mnemosyne-drizzle": "latest",
 		"@elysiumjs/styx": "latest"
 	}

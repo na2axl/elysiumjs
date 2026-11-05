@@ -14,7 +14,8 @@
 
 import type { TestingApp } from '@elysiumjs/core';
 
-import { Application, RedisModule, Service, ServiceNotFoundError } from '@elysiumjs/core';
+import { Application, Service, ServiceNotFoundError } from '@elysiumjs/core';
+import { RedisModule } from '@elysiumjs/redis';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, mock } from 'bun:test';
 
 import * as pkg from '../src';

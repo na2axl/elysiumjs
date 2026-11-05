@@ -13,6 +13,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+import type { EnabledModule } from './utils';
+
 import { cp, exists, mkdir, rm } from 'node:fs/promises';
 import { dirname, join, relative, resolve } from 'node:path';
 import { cwd } from 'node:process';
@@ -21,9 +23,7 @@ import { Command, ConsoleFormat } from '@elysiumjs/core';
 import prompts from 'prompts';
 import { assign, objectify, pascal, snake } from 'radash';
 
-import type { EnabledModule } from './utils';
-
-import { getAppCode, getModuleCode } from './utils';
+import { getAppCode, getModuleCode, RUNTIMES } from './utils';
 
 const __dirname = dirname(Bun.fileURLToPath(import.meta.url));
 
@@ -102,6 +102,20 @@ class CreateElysiumCommand extends Command {
 							disabled: true
 						}
 					]
+				},
+				{
+					type: 'select',
+					name: 'runtime',
+					message: 'Which runtime will the app run on?',
+					choices: Object.entries(RUNTIMES).map(([value, runtime]) => ({
+						title: runtime.title,
+						value,
+						description: runtime.unavailable
+							? `${runtime.description}. Not available yet: ${runtime.unavailable}`
+							: runtime.description,
+						disabled: runtime.unavailable !== undefined
+					})),
+					initial: 0
 				},
 				{
 					type(_, values) {
@@ -258,6 +272,12 @@ class CreateElysiumCommand extends Command {
 
 		await Bun.$`cd ${projectPath} && bun install`.quiet();
 
+		const runtime = RUNTIMES[answers.runtime as keyof typeof RUNTIMES];
+
+		s.update(`Installing the ${runtime.title} runtime...`);
+
+		await Bun.$`cd ${projectPath} && bun add ${runtime.package}@latest`.quiet();
+
 		const enabledModules: EnabledModule[] = [];
 
 		const setupPluginOrFeature = async (name: string, kind: 'plugin' | 'feature') => {
@@ -338,7 +358,8 @@ class CreateElysiumCommand extends Command {
 				(m: string) =>
 					answers.template === 'multi' ? `#${m}/${snake(m)}.module` : `#root/${snake(m)}.module`
 			),
-			enabledModules
+			enabledModules,
+			runtime
 		);
 		await Bun.file(join(projectPath, 'src', 'app.ts')).write(appCode);
 

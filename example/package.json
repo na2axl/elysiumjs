@@ -11,6 +11,8 @@
 		"@elysiumjs/heracles": "workspace:^",
 		"@elysiumjs/hermes": "workspace:^",
 		"@elysiumjs/mnemosyne-drizzle": "workspace:^",
+		"@elysiumjs/redis": "workspace:^",
+		"@elysiumjs/runtime-bun": "workspace:^",
 		"@elysiumjs/styx": "workspace:^",
 		"radash": "catalog:"
 	}

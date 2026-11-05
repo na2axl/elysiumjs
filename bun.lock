@@ -85,9 +85,11 @@
       },
       "devDependencies": {
         "@elysiumjs/core": "workspace:*",
+        "@elysiumjs/redis": "workspace:*",
       },
       "peerDependencies": {
         "@elysiumjs/core": "workspace:^",
+        "@elysiumjs/redis": "workspace:^",
       },
     },
     "@elysiumjs/hermes": {
@@ -115,9 +117,11 @@
       },
       "devDependencies": {
         "@elysiumjs/core": "workspace:*",
+        "@elysiumjs/redis": "workspace:*",
       },
       "peerDependencies": {
         "@elysiumjs/core": "workspace:^",
+        "@elysiumjs/redis": "workspace:^",
       },
     },
     "@elysiumjs/mnemosyne-drizzle": {
@@ -131,6 +135,7 @@
       "devDependencies": {
         "@elysiumjs/core": "workspace:*",
         "@elysiumjs/mnemosyne": "workspace:*",
+        "@elysiumjs/runtime-bun": "workspace:*",
         "@types/prompts": "^2.4.9",
       },
       "peerDependencies": {
@@ -147,6 +152,52 @@
       },
       "devDependencies": {
         "@elysiumjs/core": "workspace:*",
+      },
+      "peerDependencies": {
+        "@elysiumjs/core": "workspace:^",
+      },
+    },
+    "@elysiumjs/redis": {
+      "name": "@elysiumjs/redis",
+      "version": "0.0.0",
+      "dependencies": {
+        "radash": "catalog:",
+      },
+      "devDependencies": {
+        "@elysiumjs/core": "workspace:*",
+      },
+      "peerDependencies": {
+        "@elysiumjs/core": "workspace:^",
+      },
+    },
+    "@elysiumjs/runtime-bun": {
+      "name": "@elysiumjs/runtime-bun",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@elysiumjs/core": "workspace:*",
+        "elysia": "^1.4.30",
+      },
+      "peerDependencies": {
+        "@elysiumjs/core": "workspace:^",
+      },
+    },
+    "@elysiumjs/runtime-node": {
+      "name": "@elysiumjs/runtime-node",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@elysiumjs/core": "workspace:*",
+        "elysia": "^1.4.30",
+      },
+      "peerDependencies": {
+        "@elysiumjs/core": "workspace:^",
+      },
+    },
+    "@elysiumjs/runtime-workers": {
+      "name": "@elysiumjs/runtime-workers",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@elysiumjs/core": "workspace:*",
+        "elysia": "^1.4.30",
       },
       "peerDependencies": {
         "@elysiumjs/core": "workspace:^",
@@ -194,6 +245,8 @@
         "@elysiumjs/heracles": "workspace:^",
         "@elysiumjs/hermes": "workspace:^",
         "@elysiumjs/mnemosyne-drizzle": "workspace:^",
+        "@elysiumjs/redis": "workspace:^",
+        "@elysiumjs/runtime-bun": "workspace:^",
         "@elysiumjs/styx": "workspace:^",
         "radash": "catalog:",
       },
@@ -303,6 +356,14 @@
     "@elysiumjs/mnemosyne-drizzle": ["@elysiumjs/mnemosyne-drizzle@workspace:@elysiumjs/mnemosyne-drizzle"],
 
     "@elysiumjs/plugin-sentry": ["@elysiumjs/plugin-sentry@workspace:@elysiumjs/plugin-sentry"],
+
+    "@elysiumjs/redis": ["@elysiumjs/redis@workspace:@elysiumjs/redis"],
+
+    "@elysiumjs/runtime-bun": ["@elysiumjs/runtime-bun@workspace:@elysiumjs/runtime-bun"],
+
+    "@elysiumjs/runtime-node": ["@elysiumjs/runtime-node@workspace:@elysiumjs/runtime-node"],
+
+    "@elysiumjs/runtime-workers": ["@elysiumjs/runtime-workers@workspace:@elysiumjs/runtime-workers"],
 
     "@elysiumjs/styx": ["@elysiumjs/styx@workspace:@elysiumjs/styx"],
 

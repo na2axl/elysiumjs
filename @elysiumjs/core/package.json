@@ -17,13 +17,14 @@
   "scripts": {
     "format": "prettier --write \"./src/**/*.ts\"",
     "clean": "rimraf dist",
-    "build:js": "bun build ./src/index.ts --outdir ./dist --target bun --packages external --root ./src --minify-syntax --minify-whitespace",
+    "build:js": "bun build ./src/index.ts --outdir ./dist --target node --packages external --root ./src --minify-syntax --minify-whitespace",
     "build:ts": "tsc",
     "build": "bun run clean && bun run build:js && bun run build:ts",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "bun run build",
     "test": "bun test",
-    "test:coverage": "bun test --coverage"
+    "test:coverage": "bun test --coverage",
+    "check:runtime": "bun scripts/check-runtime.ts"
   },
   "keywords": [
     "elysium",

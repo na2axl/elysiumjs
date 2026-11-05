@@ -1,9 +1,11 @@
 import type { ErrorContext } from 'elysia';
 
-import { Application, Middleware, RedisModule, Service, WampModule } from '@elysiumjs/core';
+import { Application, Middleware, Service, WampModule } from '@elysiumjs/core';
 import { HeraclesModule, RedisTransport } from '@elysiumjs/heracles';
 import { HermesLogger, HermesModule } from '@elysiumjs/hermes';
 import { DrizzleModule } from '@elysiumjs/mnemosyne-drizzle';
+import { RedisModule } from '@elysiumjs/redis';
+import { runtime as bunRuntime } from '@elysiumjs/runtime-bun';
 import { StyxModule } from '@elysiumjs/styx';
 
 import { MainModule } from '#hero/hero.module';
@@ -11,6 +13,7 @@ import { XServerMiddleware } from '#hero/middlewares/x-server.middleware';
 
 @Middleware.register(XServerMiddleware)
 @Application.register({
+	runtime: bunRuntime,
 	modules: [
 		HermesModule.with({ level: 'debug', format: 'pretty' }),
 		RedisModule.with({

@@ -14,6 +14,10 @@
 
 import { mock } from 'bun:test';
 
+// Core ships no runtime: the tests use one shaped like @elysiumjs/runtime-bun.
+import { Runtime } from '../src/runtime';
+import { testRuntime } from './test-runtime';
+
 // Mock dependencies
 
 const { AsyncLocalStorage: RealAsyncLocalStorage } = process.getBuiltinModule('node:async_hooks');
@@ -26,3 +30,5 @@ mock.module('node:async_hooks', () => ({
 		public disable = mock();
 	}
 }));
+
+Runtime.use(testRuntime);

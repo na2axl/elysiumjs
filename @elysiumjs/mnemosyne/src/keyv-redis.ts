@@ -17,7 +17,8 @@ import type { KeyvEntry, StoredData } from 'keyv';
 
 import { EventEmitter } from 'node:events';
 
-import { Event, Redis, Service } from '@elysiumjs/core';
+import { Event, Service } from '@elysiumjs/core';
+import { Redis } from '@elysiumjs/redis';
 
 /**
  * Keyv adapter for redis. This adapter is based on the Bun's Redis client.
