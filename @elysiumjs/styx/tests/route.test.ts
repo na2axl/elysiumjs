@@ -101,6 +101,14 @@ describe('route', () => {
 			route(['hephaestus:build'], { project: '/app', projectCli: local, self: local })
 		).toEqual({ kind: 'cli', argv: ['hephaestus:build'] });
 	});
+
+	it('runs build as hephaestus:build in the project Styx', () => {
+		expect(
+			route(['build', '--target', 'workers'], { project: '/app', projectCli: local, self: local })
+		).toEqual({ kind: 'cli', argv: ['hephaestus:build', '--target', 'workers'] });
+		expect(route(['build'], { project: '/app', self })).toMatchObject({ kind: 'error' });
+		expect(isCliCommand('build')).toBe(true);
+	});
 });
 
 describe('command kinds', () => {

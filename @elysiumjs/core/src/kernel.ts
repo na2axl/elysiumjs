@@ -81,6 +81,15 @@ export class Kernel {
 	}
 
 	/**
+	 * The service classes a module registers, from its `services` (factory definitions left out).
+	 * Empty until {@link register} has run.
+	 * @param node The module.
+	 */
+	public serviceClasses(node: ModuleNode): readonly Class<any>[] {
+		return [...(this.ownClasses.get(node)?.services ?? [])];
+	}
+
+	/**
 	 * Phase 2: resolves each module's config, instantiates the module and registers its services.
 	 * @throws {ConflictingModuleConfigError | MissingModuleConfigError}
 	 */

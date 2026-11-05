@@ -52,6 +52,12 @@ export const HephaestusConfigSchema = z.object({
 			split: z.boolean().default(false)
 		})
 		.prefault({}),
+	workers: z
+		.object({
+			entry: z.string().default('./src/worker.ts'),
+			outfile: z.string().default('worker.js')
+		})
+		.prefault({}),
 	assets: z
 		.object({
 			embed: z.array(z.string()).default([]),

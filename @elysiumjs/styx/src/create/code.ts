@@ -66,7 +66,7 @@ export const RUNTIMES: Record<'bun' | 'node' | 'workers', RuntimeChoice> = {
 		package: '@elysiumjs/runtime-workers',
 		alias: 'workersRuntime',
 		unavailable:
-			'Workers apps compile ahead of time, but the templates use Postgres and Redis clients that need Bun, and the Workers adapter is still to come.'
+			'The templates use Postgres and Redis clients that need Bun. A Worker can be set up by hand with createWorker() from @elysiumjs/runtime-workers and built with styx build --target workers.'
 	}
 };
 

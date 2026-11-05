@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
+
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { loadConfig } from '../src/config/loader';
 
@@ -32,6 +33,12 @@ describe('loadConfig', () => {
 
 	it('should throw when no config file exists', async () => {
 		await expect(loadConfig(tempDir)).rejects.toThrow('No Hephaestus config found');
+	});
+
+	it('should return the defaults, named after the folder, when the config is optional', async () => {
+		const config = await loadConfig(tempDir, { optional: true });
+		expect(config.output.name).toBe(basename(tempDir));
+		expect(config.workers).toEqual({ entry: './src/worker.ts', outfile: 'worker.js' });
 	});
 
 	it('should load a JSON config file', async () => {

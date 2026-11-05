@@ -13,11 +13,17 @@
 // limitations under the License.
 
 import type { ServiceFactoryDefinition } from '@elysiumjs/core';
+import type { KeyvStoreAdapter } from 'keyv';
 
 import { Module } from '@elysiumjs/core';
 import { KeyvCacheableMemory } from 'cacheable';
 
-import { makeCacheInterface, MEMORY_CACHE_SERVICE, REDIS_CACHE_SERVICE } from './cache';
+import {
+	cacheStoreService,
+	makeCacheInterface,
+	MEMORY_CACHE_SERVICE,
+	REDIS_CACHE_SERVICE
+} from './cache';
 import { KeyvRedis } from './keyv-redis';
 
 /**
@@ -44,19 +50,25 @@ export type MnemosyneModuleConfig = {
 					lruSize: number;
 			  }
 			| false;
+
+		/**
+		 * Other caches, each over the Keyv stores its function creates, read with
+		 * `Cache.store(name)`. The function is called once per cache namespace.
+		 */
+		stores?: Record<string, () => KeyvStoreAdapter>;
 	};
 };
 
 /**
- * Provides the caches as the global services `mnemosyne.cache.redis` and
- * `mnemosyne.cache.memory`. Tenancy config and strategy, and database connections, are
+ * Provides the caches as the global services `mnemosyne.cache.redis`,
+ * `mnemosyne.cache.memory` and `mnemosyne.cache.store.<name>`. Tenancy config and strategy, and database connections, are
  * registered by the database driver modules.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 @Module.register<MnemosyneModuleConfig>({
 	services: (config) => {
 		const services: ServiceFactoryDefinition[] = [];
-		const { redis, memory } = config.cache;
+		const { redis, memory, stores } = config.cache;
 
 		if (redis) {
 			services.push({
@@ -74,6 +86,14 @@ export type MnemosyneModuleConfig = {
 					makeCacheInterface(
 						() => new KeyvCacheableMemory({ ttl: memory.ttl, lruSize: memory.lruSize })
 					)
+			});
+		}
+
+		for (const [name, createStore] of Object.entries(stores ?? {})) {
+			services.push({
+				name: cacheStoreService(name),
+				global: true,
+				factory: () => makeCacheInterface(createStore)
 			});
 		}
 

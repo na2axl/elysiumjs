@@ -2,7 +2,7 @@
   "name": "@elysiumjs/runtime-workers",
   "version": "0.0.0",
   "license": "Apache-2.0",
-  "description": "Cloudflare Workers runtime for the Elysium.js framework.",
+  "description": "Cloudflare Workers runtime and adapter for the Elysium.js framework.",
   "private": false,
   "author": {
     "name": "Axel Nana",
@@ -28,7 +28,8 @@
     "test": "bun test",
     "test:coverage": "bun test --coverage",
     "check:runtime": "bun scripts/check-runtime.ts",
-    "check:aot": "bun scripts/check-aot.ts"
+    "check:aot": "bun scripts/check-aot.ts",
+    "check:wrangler": "bun scripts/check-wrangler.ts"
   },
   "keywords": [
     "elysium",
@@ -48,7 +49,9 @@
   "sideEffects": false,
   "devDependencies": {
     "@elysiumjs/core": "workspace:*",
-    "elysia": "^2.0.0-rc.1"
+    "elysia": "^2.0.0-rc.1",
+    "wrangler": "4.158.0",
+    "@elysiumjs/mnemosyne": "workspace:*"
   },
   "peerDependencies": {
     "@elysiumjs/core": "workspace:^"

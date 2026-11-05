@@ -140,12 +140,6 @@ const construct = (entry: ContainerEntry): unknown => {
 	if (at !== -1) {
 		throw new CircularDependencyError([...building.slice(at), entry].map((e) => e.name));
 	}
-	if (entry.scope === ServiceScope.REQUEST) {
-		const captive = building.findLast((e) => e.scope !== ServiceScope.FACTORY);
-		if (captive?.scope === ServiceScope.SINGLETON) {
-			throw new ScopeMismatchError(captive.name, entry.name);
-		}
-	}
 	building.push(entry);
 	try {
 		return inOwnerContext(entry.owner, entry.create);
@@ -159,6 +153,12 @@ const construct = (entry: ContainerEntry): unknown => {
  */
 const instantiate = (entry: ContainerEntry): Instantiation => {
 	if (entry.scope === ServiceScope.REQUEST) {
+		// Checked first: a singleton built outside a request would otherwise report the
+		// missing request instead of the dependency it must not keep.
+		const captive = building.findLast((e) => e.scope !== ServiceScope.FACTORY);
+		if (captive?.scope === ServiceScope.SINGLETON) {
+			throw new ScopeMismatchError(captive.name, entry.name);
+		}
 		const store = requestStorage.getStore();
 		if (!store) throw new OutsideRequestScopeError(entry.name);
 		const existing = store.get(entry);

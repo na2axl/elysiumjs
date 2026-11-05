@@ -29,6 +29,18 @@ import { MnemosyneModule } from '@elysiumjs/mnemosyne';
 export class App extends Application {}
 ```
 
+Any Keyv store can back a cache of its own with `stores`, read with `Cache.store(name)`. On Cloudflare Workers, `KeyvWorkersKV` from `@elysiumjs/runtime-workers` stores entries in a KV namespace:
+
+```ts
+import { KeyvWorkersKV } from '@elysiumjs/runtime-workers';
+
+MnemosyneModule.with({
+	cache: { redis: false, stores: { kv: () => new KeyvWorkersKV({ binding: 'CACHE' }) } }
+});
+
+await Cache.store('kv').set('greeting', 'hello', 120_000);
+```
+
 Models and repositories are built with a driver package. See [`@elysiumjs/mnemosyne-drizzle`](../mnemosyne-drizzle/README.md).
 
 ## License

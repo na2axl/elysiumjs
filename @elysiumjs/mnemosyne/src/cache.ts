@@ -26,6 +26,12 @@ export const REDIS_CACHE_SERVICE = 'mnemosyne.cache.redis';
 export const MEMORY_CACHE_SERVICE = 'mnemosyne.cache.memory';
 
 /**
+ * Name of the global service backing `Cache.store(name)`.
+ * @param name The store name, as given in the `MnemosyneModule` config.
+ */
+export const cacheStoreService = (name: string): string => `mnemosyne.cache.store.${name}`;
+
+/**
  * Interface for a cache storage.
  * @author Axel Nana <axel.nana@workbud.com>
  */
@@ -208,5 +214,16 @@ export abstract class Cache {
 	 */
 	public static get memory(): CacheInterface {
 		return getCache(MEMORY_CACHE_SERVICE);
+	}
+
+	/**
+	 * A cache over a store given in `MnemosyneModule.with({ cache: { stores } })`, such as
+	 * Workers KV.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param name The store name.
+	 * @throws {ServiceNotFoundError} If the `MnemosyneModule` has no store with that name.
+	 */
+	public static store(name: string): CacheInterface {
+		return getCache(cacheStoreService(name));
 	}
 }

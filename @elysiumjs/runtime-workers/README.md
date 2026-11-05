@@ -1,6 +1,6 @@
 # @elysiumjs/runtime-workers
 
-Cloudflare Workers runtime for [Elysium.js](https://github.com/na2axl/elysiumjs).
+Cloudflare Workers runtime and adapter for [Elysium.js](https://github.com/na2axl/elysiumjs).
 
 ## Installation
 
@@ -22,17 +22,87 @@ The package exports `runtime`; rename it at import if you like: `import { runtim
 
 Environment variables come from `process.env`, which workerd fills from the Worker's vars and secrets with the `nodejs_compat` flag; use `createRuntime({ env })` to pass others. The host owns the server and the isolate: `serve` throws (export the app's `fetch` from the Worker), and exit and signals do nothing. `bun run check:runtime` checks that the bundle never touches the `Bun` global.
 
-## Serving and compiling ahead of time
+## The Worker entry
 
-Build the app with `Application.build()` and export its `fetch`. It returns the root Elysia app without listening. Modules boot on the first request, so building runs no `onInit` work:
+`createWorker()` builds the app and returns the handlers a Worker module exports: `fetch` serves the routes, `queue` hands each batch to its consumers, and `scheduled` runs the cron handlers. It also returns the root Elysia `app`; export it as `app` so that the AOT plugin below compiles the routes:
 
 ```ts
-export const app = await new App().build();
+import { createWorker } from '@elysiumjs/runtime-workers';
 
-export default { fetch: (request: Request) => app.fetch(request) };
+import { App } from './app';
+
+const worker = await createWorker(new App());
+
+export const app = worker.app;
+
+export default worker;
 ```
 
-Workers forbid generating code at runtime (`new Function`), which Elysia does for validators unless the app is compiled ahead of time. Bundle the entry with Elysia's AOT plugin, which evaluates it at build time:
+Modules boot on the first invocation, whatever its kind, so building runs no `onInit` work.
+
+### Bindings
+
+Each invocation runs with its own env and execution context. Read them with `Workers.env()`, `Workers.context()` and `Workers.binding(name)`, or inject them: `WorkersModule` provides the env (`workers.env`), the context (`workers.context`) and each binding it lists as global request-scoped services.
+
+```ts
+import { Service, ServiceScope } from '@elysiumjs/core';
+import { Workers, WorkersModule } from '@elysiumjs/runtime-workers';
+
+@Service.register({ scope: ServiceScope.REQUEST })
+export class JobQueue {
+	public constructor(@Workers.inject('JOBS') private readonly queue: Queue<Job>) {}
+
+	public send(job: Job) {
+		return this.queue.send(job);
+	}
+}
+
+@Application.register({
+	runtime,
+	modules: [WorkersModule.with({ bindings: ['JOBS'] }), JobsModule]
+})
+export class App extends Application {}
+```
+
+A binding belongs to the invocation, so only request-scoped services, factories and request-scoped controllers take it: a singleton that depends on one throws `ScopeMismatchError`. Outside an invocation, reading a binding throws `OutsideInvocationError`.
+
+### Queues and cron triggers
+
+Mark methods of module services with `@Workers.queue(name)` or `@Workers.cron(expression)`. Each handler runs in its module, in a request scope of its own. A queue handler receives the batch, and the whole batch is retried when it throws. A cron handler receives the scheduled controller; the expression must match the one in the wrangler config. `*` matches every queue or cron. A batch or event no handler matches throws `NoWorkersHandlerError`.
+
+```ts
+@Service.register()
+export class JobConsumer {
+	@Workers.queue('jobs')
+	public async handle(batch: MessageBatch<Job>) {
+		for (const message of batch.messages) {
+			await this.run(message.body);
+			message.ack();
+		}
+	}
+
+	@Workers.cron('*/5 * * * *')
+	public async sweep(controller: ScheduledController) {}
+}
+```
+
+The handler types (`WorkersMessageBatch`, `WorkersScheduledController`, `WorkersKVNamespace`, ...) are structural, so the types from `@cloudflare/workers-types` or `wrangler types` fit them.
+
+### KV cache
+
+`KeyvWorkersKV` is a Keyv store over a KV namespace, for the caches of `@elysiumjs/mnemosyne`. It reads the binding from the current invocation on every call. KV is eventually consistent and expires entries after at least 60 seconds, so shorter TTLs are rounded up.
+
+```ts
+MnemosyneModule.with({
+	cache: { redis: false, stores: { kv: () => new KeyvWorkersKV({ binding: 'CACHE' }) } }
+});
+
+await Cache.store('kv').set('greeting', 'hello', 120_000);
+```
+
+## Compiling ahead of time
+
+Workers forbid generating code at runtime (`new Function`), which Elysia does for validators unless the app is compiled ahead of time. With `@elysiumjs/hephaestus` installed, `styx build --target workers` bundles `src/worker.ts` this way into `dist/worker.js`. Without it, bundle the entry with Elysia's AOT plugin, which evaluates it at build time:
 
 ```ts
 import { aot } from 'elysia/plugin/aot/bun';
@@ -48,7 +118,7 @@ await Bun.build({
 });
 ```
 
-`bun run check:aot` compiles a sample app this way, checks that the bundle has no runtime code generation, and serves a validated route under Node.js with code generation from strings disallowed.
+`bun run check:aot` compiles a sample app this way, checks that the bundle has no runtime code generation, and serves a validated route under Node.js with code generation from strings disallowed. `bun run check:wrangler` compiles the sample Worker in `scripts/worker` and runs it in `wrangler dev`: a route sends to a queue, the consumer and a cron handler write to the KV cache, and routes read it back.
 
 ## License
 

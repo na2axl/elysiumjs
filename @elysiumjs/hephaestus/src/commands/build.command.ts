@@ -17,17 +17,37 @@ import type { PlatformTarget } from '../types';
 import { Command, CommandArgumentType } from '@elysiumjs/core';
 
 import { BinaryBuilder } from '../builder/binary.builder';
+import { WorkersBuilder } from '../builder/workers.builder';
 import { loadConfig } from '../config/loader';
 
 /**
- * Command used to build the project into a standalone binary.
+ * Command used to build the project into a standalone binary (`--target binary`, the default) or
+ * a Cloudflare Worker bundle compiled ahead of time (`--target workers`).
  * @author Axel Nana <axel.nana@workbud.com>
  */
 @Command.register()
 export class HephaestusBuildCommand extends Command {
 	public static readonly command: string = 'hephaestus:build';
-	public static readonly description: string = 'Build the project into a standalone binary.';
+	public static readonly description: string =
+		'Build the project into a standalone binary, or a Cloudflare Worker bundle.';
 	public static override readonly dev: boolean = true;
+
+	@Command.arg({
+		name: 'target',
+		required: false,
+		description: 'What to build: a standalone binary, or a Cloudflare Worker bundle',
+		type: CommandArgumentType.ENUM,
+		enum: ['binary', 'workers'],
+		default: 'binary'
+	})
+	private target: 'binary' | 'workers' = 'binary';
+
+	@Command.arg({
+		name: 'entry',
+		required: false,
+		description: 'The entry to build, instead of the one in the config'
+	})
+	private entry?: string;
 
 	@Command.arg({
 		name: 'platform',
@@ -55,8 +75,11 @@ export class HephaestusBuildCommand extends Command {
 	private allPlatforms: boolean = false;
 
 	public async run(): Promise<void> {
+		if (this.target === 'workers') return this.buildWorker();
+
 		try {
 			const config = await loadConfig();
+			if (this.entry) config.entry = this.entry;
 			const builder = new BinaryBuilder(config);
 
 			if (this.allPlatforms) {
@@ -84,6 +107,30 @@ export class HephaestusBuildCommand extends Command {
 					`Built ${result.platform}: ${result.outputPath} (${this.formatSize(result.size)}, ${result.duration}ms)`
 				);
 			}
+		} catch (error: any) {
+			this.trace(error, 'Build failed');
+			process.exit(1);
+		}
+	}
+
+	/** Builds the Worker bundle, compiled ahead of time for workerd. */
+	private async buildWorker(): Promise<void> {
+		try {
+			const config = await loadConfig(process.cwd(), { optional: true });
+			const spinner = this.spinner('Building the Worker');
+			const result = await new WorkersBuilder().build({
+				entry: this.entry ?? config.workers.entry,
+				outdir: config.output.dir,
+				outfile: config.workers.outfile,
+				minify: config.build.minify,
+				sourcemap: config.build.sourcemap
+			});
+			spinner.complete('Build completed');
+
+			this.newLine();
+			this.success(
+				`Built ${result.outputPath} (${this.formatSize(result.size)}, ${this.formatSize(result.gzipSize)} gzipped, ${result.duration}ms)`
+			);
 		} catch (error: any) {
 			this.trace(error, 'Build failed');
 			process.exit(1);
