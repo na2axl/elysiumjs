@@ -1012,6 +1012,87 @@ describe('Application class', () => {
 			expect(initialised).toEqual(['greet']);
 			await instance.kernel.shutdown();
 		});
+
+		describe('boot retry', () => {
+			/** A module and a singleton whose onInit fail the given number of times. */
+			const makeFlaky = (failures: { module: number; service: number }, calls: string[]) => {
+				@Service.register({ name: 'retry.store', global: true })
+				class Store {
+					public ready = false;
+
+					public async onInit() {
+						await nextTick();
+						calls.push('service');
+						if (failures.service-- > 0) throw new Error('service failed');
+						this.ready = true;
+					}
+				}
+
+				@Module.register({ services: [Store] })
+				class FlakyModule extends Module {
+					public async onInit() {
+						await nextTick();
+						calls.push('module');
+						if (failures.module-- > 0) throw new Error('module failed');
+					}
+				}
+
+				@Application.register({ modules: [FlakyModule], openapi: false })
+				class FlakyApp extends Application {}
+
+				return new FlakyApp();
+			};
+
+			it('retries the boot after a module onInit fails once', async () => {
+				const calls: string[] = [];
+				const instance = makeFlaky({ module: 1, service: 0 }, calls);
+				await instance.build();
+
+				await expect(instance.boot()).rejects.toThrow('module failed');
+				await instance.boot();
+
+				expect(calls).toEqual(['module', 'module', 'service']);
+				expect((await Service.resolve<{ ready: boolean }>('retry.store')).ready).toBe(true);
+				await instance.kernel.shutdown();
+			});
+
+			it('retries a singleton whose onInit failed', async () => {
+				const calls: string[] = [];
+				const instance = makeFlaky({ module: 0, service: 1 }, calls);
+				await instance.build();
+
+				await expect(instance.boot()).rejects.toThrow('service failed');
+				await instance.boot();
+
+				expect(calls).toEqual(['module', 'service', 'service']);
+				expect((await Service.resolve<{ ready: boolean }>('retry.store')).ready).toBe(true);
+				await instance.kernel.shutdown();
+			});
+
+			it('shares one retry between concurrent boots', async () => {
+				const calls: string[] = [];
+				const instance = makeFlaky({ module: 1, service: 0 }, calls);
+				await instance.build();
+
+				await expect(instance.boot()).rejects.toThrow('module failed');
+				await Promise.all([instance.boot(), instance.boot()]);
+
+				expect(calls).toEqual(['module', 'module', 'service']);
+				await instance.kernel.shutdown();
+			});
+
+			it('keeps a successful boot', async () => {
+				const calls: string[] = [];
+				const instance = makeFlaky({ module: 0, service: 0 }, calls);
+				await instance.build();
+
+				await instance.boot();
+				await instance.boot();
+
+				expect(calls).toEqual(['module', 'service']);
+				await instance.kernel.shutdown();
+			});
+		});
 	});
 
 	describe('serve', () => {

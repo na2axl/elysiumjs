@@ -66,6 +66,7 @@ export class Kernel {
 	private readonly initOrder: ModuleNode[] = [];
 	private readonly inFlight = new Map<ModuleNode, Promise<void>>();
 	private readonly failures = new Map<ModuleNode, { error: unknown }>();
+	private readonly rejected = new Set<ModuleNode>();
 	private readonly ownClasses = new Map<
 		ModuleNode,
 		{ owned: Class<any>[]; services: Set<Class<any>> }
@@ -140,10 +141,20 @@ export class Kernel {
 		let pending = this.inFlight.get(node);
 		if (!pending) {
 			pending = this.runInit(node);
-			pending.catch(() => {});
+			pending.catch(() => this.rejected.add(node));
 			this.inFlight.set(node, pending);
 		}
 		return pending;
+	}
+
+	/**
+	 * Forgets the modules whose initialisation failed, so that the next {@link initModule}
+	 * runs their `onInit` again. Initialisations still in flight are kept.
+	 */
+	public resetFailures(): void {
+		this.failures.clear();
+		for (const node of this.rejected) this.inFlight.delete(node);
+		this.rejected.clear();
 	}
 
 	/** Initialises every module in graph order, then constructs every singleton service. */
@@ -251,7 +262,7 @@ export class Kernel {
 			throw error;
 		}
 		if (!pending) return true;
-		pending.catch(() => {});
+		pending.catch(() => this.rejected.add(node));
 		this.inFlight.set(node, pending);
 		return false;
 	}

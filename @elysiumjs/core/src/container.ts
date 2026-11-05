@@ -610,6 +610,25 @@ export namespace Container {
 				owner: entry.owner
 			}));
 
+	/**
+	 * Forgets the singletons whose `onInit` failed, so that the next resolution builds them
+	 * again.
+	 */
+	export function forgetFailures(): void {
+		const failed = new Set<ContainerEntry>();
+		for (const entries of [globalScope, ...moduleScopes.values()]) {
+			for (const entry of entries.values()) if (entry.initFailure) failed.add(entry);
+		}
+		for (const entry of failed) {
+			delete entry.instance;
+			delete entry.initPromise;
+			delete entry.initFailure;
+			entry.initialised = false;
+		}
+		const kept = constructedEntries.filter(({ entry }) => !failed.has(entry));
+		constructedEntries.splice(0, constructedEntries.length, ...kept);
+	}
+
 	/** Clears every scope and the construction record. */
 	export function reset(): void {
 		globalScope.clear();

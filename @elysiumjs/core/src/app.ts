@@ -32,6 +32,7 @@ import Value from 'typebox/value';
 
 import { getCommandName } from './command';
 import { ConsoleFormat, InteractsWithConsole } from './console';
+import { Container } from './container';
 import { initEnv } from './env';
 import { ElysiumError, InvalidControllerError } from './errors';
 import { Event } from './event';
@@ -499,10 +500,21 @@ export abstract class Application extends InteractsWithConsole {
 	 * Initialises every module and builds every singleton service, once. An app from
 	 * {@link build} calls it on its first request; hosts call it before other work, such as a
 	 * queue batch or a scheduled event.
-	 * @throws When a module fails to initialise; later calls return the same failure.
+	 * @throws When a module or a singleton fails to initialise. Later calls retry the failed ones,
+	 * so that a transient failure does not break every later request.
 	 */
 	public boot(): Promise<void> {
-		return (this.#booting ??= this.kernel.bootEager());
+		if (this.#booting) return this.#booting;
+		const attempt = this.kernel.bootEager().catch((error) => {
+			if (this.#booting === attempt) {
+				this.#booting = undefined;
+				this.kernel.resetFailures();
+				Container.forgetFailures();
+			}
+			throw error;
+		});
+		this.#booting = attempt;
+		return attempt;
 	}
 
 	/** Starts the server: boots the kernel, builds the root Elysia app and listens. */
