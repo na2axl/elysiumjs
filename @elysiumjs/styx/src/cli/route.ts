@@ -45,9 +45,12 @@ const GLOBAL_COMMANDS = new Set(['create', 'new']);
 export const isGenerator = (command: string | undefined): boolean =>
 	command !== undefined && /^(make|module):/.test(command);
 
-/** Commands that read the app's code without booting it, with the project's own packages. */
+/**
+ * Commands that read the app's code without booting it, with the project's own packages.
+ * `build` runs `hephaestus:build`.
+ */
 export const isAppTool = (command: string | undefined): boolean =>
-	command !== undefined && /^(routes|hephaestus):/.test(command);
+	command !== undefined && (command === 'build' || /^(routes|hephaestus):/.test(command));
 
 /** Commands Styx runs itself inside a project: the code generators and the app tools. */
 export const isCliCommand = (command: string | undefined): boolean =>
@@ -109,6 +112,7 @@ export const route = (argv: string[], context: RouteContext): Route => {
 		};
 	}
 
+	if (command === 'build') return { kind: 'cli', argv: ['hephaestus:build', ...argv.slice(1)] };
 	if (isAppTool(command)) return { kind: 'cli', argv };
 
 	return { kind: 'app', project: context.project, argv };

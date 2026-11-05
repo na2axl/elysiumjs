@@ -14,7 +14,7 @@
 
 import type { HephaestusConfig } from '../types';
 
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 
 import { HephaestusConfigSchema } from '../types';
 
@@ -24,9 +24,14 @@ const CONFIG_FILENAMES = ['hephaestus.config.ts', 'hephaestus.config.js', 'hepha
  * Loads and validates the Hephaestus build configuration from the project root.
  * @author Axel Nana <axel.nana@workbud.com>
  * @param cwd The working directory to search for config files.
+ * @param options With `optional`, a project without a config gets the defaults, named after its
+ * folder.
  * @returns The validated configuration.
  */
-export async function loadConfig(cwd: string = process.cwd()): Promise<HephaestusConfig> {
+export async function loadConfig(
+	cwd: string = process.cwd(),
+	options: { optional?: boolean } = {}
+): Promise<HephaestusConfig> {
 	for (const filename of CONFIG_FILENAMES) {
 		const configPath = join(cwd, filename);
 		const file = Bun.file(configPath);
@@ -41,6 +46,8 @@ export async function loadConfig(cwd: string = process.cwd()): Promise<Hephaestu
 			return HephaestusConfigSchema.parse(mod.default ?? mod);
 		}
 	}
+
+	if (options.optional) return HephaestusConfigSchema.parse({ output: { name: basename(cwd) } });
 
 	throw new Error(`No Hephaestus config found. Create one of: ${CONFIG_FILENAMES.join(', ')}`);
 }

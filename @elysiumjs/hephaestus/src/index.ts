@@ -16,8 +16,8 @@ export { HephaestusModule } from './hephaestus.module';
 export type { HephaestusConfig, PlatformTarget } from './types';
 export { HephaestusConfigSchema, PlatformTargetSchema } from './types';
 
-export type { BuildResult } from './builder';
-export { BinaryBuilder } from './builder';
+export type { BuildResult, WorkersBuildOptions, WorkersBuildResult } from './builder';
+export { BinaryBuilder, WorkersBuilder } from './builder';
 
 export type { AssetManifest } from './assets';
 export { AssetEmbedder } from './assets';

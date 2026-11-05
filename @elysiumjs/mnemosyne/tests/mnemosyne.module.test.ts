@@ -17,9 +17,10 @@ import type { TestingApp } from '@elysiumjs/core';
 import { Application, Service, ServiceNotFoundError } from '@elysiumjs/core';
 import { RedisModule } from '@elysiumjs/redis';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, mock } from 'bun:test';
+import { KeyvCacheableMemory } from 'cacheable';
 
 import * as pkg from '../src';
-import { Cache, MnemosyneModule } from '../src';
+import { Cache, cacheStoreService, MnemosyneModule } from '../src';
 import { AbstractDatabase } from '../src/database';
 import { KeyvRedis } from '../src/keyv-redis';
 import { getTenancyConfig, getTenancyStrategy } from '../src/tenancy';
@@ -124,6 +125,24 @@ describe('MnemosyneModule', () => {
 
 		await Bun.sleep(80);
 		expect(await Cache.memory.get('k')).toBeUndefined();
+	});
+
+	it('provides a cache over each configured store', async () => {
+		app = await Application.testing({
+			modules: [
+				MnemosyneModule.with({
+					cache: {
+						redis: false,
+						stores: { local: () => new KeyvCacheableMemory({ ttl: 1000, lruSize: 10 }) }
+					}
+				})
+			]
+		});
+		await app.get(cacheStoreService('local'));
+		await Cache.store('local').set('k', 'v');
+		expect(await Cache.store('local').get('k')).toBe('v');
+		expect(await Cache.store('local').tags('a').get('k')).toBeUndefined();
+		expect(() => Cache.store('missing')).toThrow(ServiceNotFoundError);
 	});
 
 	it('merges the defaults into a partial config', async () => {

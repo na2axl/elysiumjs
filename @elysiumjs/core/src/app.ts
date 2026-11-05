@@ -137,6 +137,7 @@ export abstract class Application extends InteractsWithConsole {
 	#elysia: Elysia<Route>;
 	#debug: boolean;
 	#kernel: Kernel | undefined;
+	#booting: Promise<void> | undefined;
 	#removeShutdownHandler: (() => void) | undefined;
 
 	private readonly _appContextStorage: AppContext = new AsyncLocalStorage();
@@ -421,7 +422,7 @@ export abstract class Application extends InteractsWithConsole {
 	/** Registers the kernel (and boots it eagerly if asked), then announces the launch. */
 	private async bootKernel(eager: boolean): Promise<void> {
 		await this.kernel.register();
-		if (eager) await this.kernel.bootEager();
+		if (eager) await this.boot();
 		Event.emit('elysium:app:launched', this, this);
 	}
 
@@ -494,6 +495,16 @@ export abstract class Application extends InteractsWithConsole {
 		return this.#elysia;
 	}
 
+	/**
+	 * Initialises every module and builds every singleton service, once. An app from
+	 * {@link build} calls it on its first request; hosts call it before other work, such as a
+	 * queue batch or a scheduled event.
+	 * @throws When a module fails to initialise; later calls return the same failure.
+	 */
+	public boot(): Promise<void> {
+		return (this.#booting ??= this.kernel.bootEager());
+	}
+
 	/** Starts the server: boots the kernel, builds the root Elysia app and listens. */
 	private async commandServe(): Promise<void> {
 		const { server } = this.props();
@@ -518,13 +529,11 @@ export abstract class Application extends InteractsWithConsole {
 		// First of the hooks, so that every later one finds the modules initialised.
 		if (bootOnFirstRequest) {
 			let booted = false;
-			let booting: Promise<void> | undefined;
 			this.#elysia.onRequest(() => {
 				if (booted) return;
-				booting ??= this.kernel.bootEager().then(() => {
+				return this.boot().then(() => {
 					booted = true;
 				});
-				return booting;
 			});
 		}
 

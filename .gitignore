@@ -57,3 +57,6 @@
 # Local agent tooling state
 .omc/
 .superpowers/
+
+# wrangler
+**/.wrangler

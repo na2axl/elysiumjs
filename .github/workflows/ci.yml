@@ -99,6 +99,9 @@ jobs:
       - name: Compiles ahead of time for Workers
         run: bun run --cwd @elysiumjs/runtime-workers check:aot
 
+      - name: Runs in wrangler dev
+        run: bun run --cwd @elysiumjs/runtime-workers check:wrangler
+
       - name: Test
         run: bun run test:coverage
         env:

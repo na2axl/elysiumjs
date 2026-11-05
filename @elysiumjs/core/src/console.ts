@@ -73,10 +73,21 @@ export class InteractsWithConsole {
 	 * Write a message to the console.
 	 * @param message The message to write.
 	 * @param newLine Whether to add a newline at the end (default: `true`).
-	 * @param out The output stream to write to (default: `process.stdout`).
+	 * @param out The output stream to write to (default: `process.stdout`). Hosts without
+	 * streams, such as Cloudflare Workers, write to the console instead.
 	 */
-	public write(message: string, newLine: boolean = true, out: WriteStream = process.stdout): void {
-		out.write(message + (newLine ? '\n' : ''));
+	public write(
+		message: string,
+		newLine: boolean = true,
+		out: WriteStream | undefined = process.stdout
+	): void {
+		if (typeof out?.write === 'function') {
+			out.write(message + (newLine ? '\n' : ''));
+		} else if (out !== undefined && out === process.stderr) {
+			console.error(message);
+		} else {
+			console.log(message);
+		}
 	}
 
 	/**
