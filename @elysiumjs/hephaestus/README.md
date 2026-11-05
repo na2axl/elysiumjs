@@ -21,7 +21,7 @@ styx list
 
 The build settings live in `hephaestus.config.ts` (`styx create --features hephaestus` writes one).
 
-Apps that still list `HephaestusModule` in their modules keep working, but the package then has to be a regular dependency.
+To provide the commands from the app itself instead, list `HephaestusModule` in its modules and install the package as a regular dependency.
 
 The classes behind the commands (`BinaryBuilder`, `AssetEmbedder`, `DockerGenerator`) are exported for build scripts. Styx builds its own standalone executables with them.
 

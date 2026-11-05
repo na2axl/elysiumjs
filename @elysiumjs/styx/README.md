@@ -10,7 +10,7 @@ Install it globally to create projects and use it anywhere:
 bun add -g @elysiumjs/styx
 ```
 
-Projects also install it as a dev dependency (`styx create` does this). Inside a project, the global `styx` hands every command to the project's own copy, like `nest` does, so each project runs the Styx version it was written for.
+Projects also install it as a dev dependency (`styx create` does this). Inside a project, the global `styx` hands every command to the project's own copy, so each project runs the Styx version it was written for.
 
 Standalone executables, which need neither Bun nor the package files, are built with `bun run build:bin` (current platform) or `bun run build:bin --all` (Linux, macOS and Windows). They embed the code stubs and project templates with Hephaestus.
 
@@ -70,8 +70,6 @@ When the project installs `@elysiumjs/hephaestus` (as a dev dependency), its `he
 styx list
 styx help <command>
 ```
-
-`StyxModule` is still exported for apps that list it, but the generators no longer need it.
 
 ## Contributing
 

@@ -16,7 +16,7 @@
  * What the `styx` command does with its arguments.
  * - `version`: print the version.
  * - `cli`: run Styx's own commands (`create`, the code generators) without loading a project.
- * - `handoff`: run the project's own Styx, like nest-cli does, so the project's versions are used.
+ * - `handoff`: run the project's own Styx, so the project's versions are used.
  * - `app`: load the project's app and run the command there (`serve`, the app's commands).
  * - `error`: say why the command cannot run here.
  * @author Axel Nana <axel.nana@workbud.com>
