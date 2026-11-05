@@ -88,9 +88,14 @@ export const createWorker = async <Env = Record<string, unknown>>(
 	return {
 		app: elysia,
 		fetch: (request, env, ctx) =>
-			runInvocation({ env: env as Record<string, unknown>, ctx }, async () =>
-				elysia.fetch(request)
-			),
+			runInvocation({ env: env as Record<string, unknown>, ctx }, async () => {
+				try {
+					return await elysia.fetch(request);
+				} finally {
+					// Disposal outlives the response: the runtime keeps the Worker alive until it ends.
+					Workers.context().waitUntil(Service.disposeRequestScope(request));
+				}
+			}),
 
 		queue: (batch, env, ctx) =>
 			runInvocation({ env: env as Record<string, unknown>, ctx }, async () => {

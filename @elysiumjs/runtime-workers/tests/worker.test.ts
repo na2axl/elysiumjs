@@ -210,6 +210,41 @@ describe('createWorker', () => {
 		await app.kernel.shutdown();
 	});
 
+	it('destroys request-scoped services through waitUntil once fetch resolves', async () => {
+		const destroyed: string[] = [];
+
+		@Service.register({ scope: ServiceScope.REQUEST })
+		class Scratch {
+			public onDestroy() {
+				destroyed.push('Scratch');
+			}
+		}
+
+		@Http.controller({ path: '/scratch' })
+		class ScratchController {
+			@Http.get()
+			public show(@Service.inject(Scratch) scratch: Scratch) {
+				return { ok: !!scratch };
+			}
+		}
+
+		@Module.register({ services: [Scratch], controllers: [ScratchController] })
+		class ScratchModule extends Module {}
+
+		@Application.register({ runtime, modules: [ScratchModule], openapi: false })
+		class ScratchApp extends Application {}
+
+		const app = new ScratchApp();
+		const worker = await createWorker(app);
+		const context = ctx();
+		const response = await worker.fetch(new Request('http://localhost/scratch'), {}, context);
+		expect(response.status).toBe(200);
+		expect(context.waited.length).toBeGreaterThan(0);
+		await Promise.all(context.waited);
+		expect(destroyed).toEqual(['Scratch']);
+		await app.kernel.shutdown();
+	});
+
 	it('fails a batch no service consumes', async () => {
 		@Module.register({})
 		class EmptyModule extends Module {}

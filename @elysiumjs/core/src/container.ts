@@ -30,6 +30,7 @@ import {
 	ServiceNotReadyError,
 	ServiceNotVisibleError
 } from './errors';
+import { getLogger } from './logger';
 import { Metadata } from './metadata';
 import { ModuleContext } from './module-context';
 import { ServiceScope } from './service';
@@ -145,6 +146,24 @@ const construct = (entry: ContainerEntry): unknown => {
 		return inOwnerContext(entry.owner, entry.create);
 	} finally {
 		building.pop();
+	}
+};
+
+/**
+ * Calls `onDestroy` on the instances of a request store, dependants first, each in its owner's
+ * context. A failing hook is logged and does not stop the others.
+ */
+const destroyStore = async (store: RequestStore): Promise<void> => {
+	const entries = [...store.entries()].reverse();
+	store.clear();
+	for (const [entry, { instance }] of entries) {
+		const onDestroy = (instance as { onDestroy?: () => unknown } | null)?.onDestroy;
+		if (typeof onDestroy !== 'function') continue;
+		try {
+			await inOwnerContext(entry.owner, () => onDestroy.call(instance));
+		} catch (error) {
+			getLogger().error('Error while destroying', { target: `service ${entry.name}`, error });
+		}
 	}
 };
 
@@ -579,11 +598,39 @@ export namespace Container {
 	 */
 	export const runInRequestScope = <T>(fn: () => T, key?: object): T => {
 		let store = key ? keyedRequestStores.get(key) : requestStorage.getStore();
+		const owned = !key && !store;
 		if (!store) {
 			store = new Map();
 			if (key) keyedRequestStores.set(key, store);
 		}
-		return requestStorage.run(store, fn);
+		if (!owned) return requestStorage.run(store, fn);
+
+		const created = store;
+		let result: T;
+		try {
+			result = requestStorage.run(created, fn);
+		} catch (error) {
+			void destroyStore(created);
+			throw error;
+		}
+		if (!isPromise(result)) {
+			void destroyStore(created);
+			return result;
+		}
+		return result.finally(() => destroyStore(created)) as T;
+	};
+
+	/**
+	 * Ends the request scope of `key`: removes its store and calls `onDestroy` on its instances,
+	 * the last created first, each in its owner's module context. Errors are logged, never thrown.
+	 * Disposing a scope twice, or one that never existed, does nothing.
+	 * @param key The object the scope was started with.
+	 */
+	export const disposeRequestScope = async (key: object): Promise<void> => {
+		const store = keyedRequestStores.get(key);
+		if (!store) return;
+		keyedRequestStores.delete(key);
+		await destroyStore(store);
 	};
 
 	/** Whether the current code runs in a request scope. */

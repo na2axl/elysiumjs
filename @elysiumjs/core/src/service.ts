@@ -324,6 +324,16 @@ export namespace Service {
 	export const runInRequestScope = <T>(fn: () => T): T => Container.runInRequestScope(fn);
 
 	/**
+	 * Ends the request scope started for `key`, calling `onDestroy` on its request-scoped
+	 * instances, the last created first. Errors are logged, never thrown, and a second call does
+	 * nothing. Runtimes that keep a scope per request call this once the response is sent.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param key The request object the scope belongs to.
+	 */
+	export const disposeRequestScope = (key: object): Promise<void> =>
+		Container.disposeRequestScope(key);
+
+	/**
 	 * Clears the global scope.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 */

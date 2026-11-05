@@ -144,6 +144,65 @@ describe('Request scope', () => {
 				expect(Service.get(PerCall)!.state).toBe(state);
 			});
 		});
+
+		describe('disposal', () => {
+			const log: string[] = [];
+
+			@Service.register({ scope: ServiceScope.REQUEST })
+			class B {
+				public onDestroy() {
+					log.push('B');
+				}
+			}
+
+			@Service.register({ scope: ServiceScope.REQUEST })
+			class A {
+				constructor(@Service.inject(B) public b: B) {}
+
+				public onDestroy() {
+					log.push('A');
+				}
+			}
+
+			beforeEach(() => {
+				log.length = 0;
+				Container.register(null, B, undefined);
+				Container.register(null, A, undefined);
+			});
+
+			it('destroys request instances in reverse order when an unkeyed scope ends', async () => {
+				await Service.runInRequestScope(async () => Service.resolve(A));
+				expect(log).toEqual(['A', 'B']);
+			});
+
+			it('destroys them even when the work throws', async () => {
+				await expect(
+					Service.runInRequestScope(async () => {
+						await Service.resolve(A);
+						throw new Error('boom');
+					})
+				).rejects.toThrow('boom');
+				expect(log).toEqual(['A', 'B']);
+			});
+
+			it('does not dispose a joined outer scope from a nested run', async () => {
+				await Service.runInRequestScope(async () => {
+					await Service.resolve(A);
+					await Service.runInRequestScope(async () => Service.resolve(A));
+					expect(log).toEqual([]);
+				});
+				expect(log).toEqual(['A', 'B']);
+			});
+
+			it('disposes a keyed scope once, through disposeRequestScope', async () => {
+				const key = {};
+				await Container.runInRequestScope(async () => Service.resolve(A), key);
+				expect(log).toEqual([]);
+				await Container.disposeRequestScope(key);
+				await Container.disposeRequestScope(key);
+				expect(log).toEqual(['A', 'B']);
+			});
+		});
 	});
 
 	describe('async onInit', () => {
@@ -366,6 +425,48 @@ describe('Request scope', () => {
 			const response = await app.handle(new Request('http://localhost/hooked'));
 			expect(response.status).toBe(200);
 			expect(seen).toEqual([true]);
+			await instance.kernel.shutdown();
+		});
+
+		it('destroys request instances after the response, also when the handler throws', async () => {
+			const destroyed: string[] = [];
+
+			@Service.register({ scope: ServiceScope.REQUEST })
+			class Inner {
+				public onDestroy() {
+					destroyed.push('Inner');
+				}
+			}
+			@Service.register({ scope: ServiceScope.REQUEST })
+			class Outer {
+				constructor(@Service.inject(Inner) public inner: Inner) {}
+
+				public onDestroy() {
+					destroyed.push('Outer');
+				}
+			}
+
+			@Http.controller({ path: '/dispose' })
+			class DisposeController {
+				@Http.get({ path: '/ok' })
+				public ok(@Service.inject(Outer) outer: Outer) {
+					return { ok: !!outer };
+				}
+
+				@Http.get({ path: '/fail' })
+				public fail(@Service.inject(Outer) _outer: Outer) {
+					throw new Error('handler failed');
+				}
+			}
+
+			const { instance, app } = await build(DisposeController, [Inner, Outer]);
+			const ok = await app.handle(new Request('http://localhost/dispose/ok'));
+			const failed = await app.handle(new Request('http://localhost/dispose/fail'));
+			await tick();
+
+			expect(ok.status).toBe(200);
+			expect(failed.status).toBe(500);
+			expect(destroyed).toEqual(['Outer', 'Inner', 'Outer', 'Inner']);
 			await instance.kernel.shutdown();
 		});
 

@@ -618,6 +618,7 @@ export abstract class Application extends InteractsWithConsole {
 	private setupServerHooks(): void {
 		this.#elysia
 			.onError('global', (e) => this.handleServerError(e as ServerError))
+			.onAfterResponse('global', (c) => Container.disposeRequestScope(c.request ?? c))
 			.onStart(async (elysia) => {
 				await this.onStart(elysia as unknown as Elysia<Route>);
 				Event.emit('elysium:server:start', elysia, this);
