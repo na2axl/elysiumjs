@@ -1271,7 +1271,11 @@ describe('Application class', () => {
 
 			const instance = new TestApp();
 			await serve(instance);
-			await nextTick();
+
+			// Elysia 2 runs the start hooks after listen() returns: wait for the start event.
+			for (let i = 0; i < 100 && emitSpy.mock.calls.every(([e]) => e !== 'elysium:server:start'); i++) {
+				await Bun.sleep(10);
+			}
 
 			expect(onStartSpy).toHaveBeenCalledWith(instance.elysia);
 			expect(emitSpy).toHaveBeenLastCalledWith('elysium:server:start', instance.elysia, instance);
