@@ -93,9 +93,9 @@ describe('createProject', () => {
 		);
 		const pkg = await Bun.file(join(path, 'package.json')).json();
 
-		expect(pkg.dependencies['@elysiumjs/runtime-bun']).toMatch(/^\^\d/);
-		expect(pkg.dependencies['@elysiumjs/plugin-sentry']).toMatch(/^\^\d/);
-		expect(pkg.devDependencies).toHaveProperty('prettier');
+		expect(pkg.dependencies['@elysiumjs/runtime-bun']).toBe('latest');
+		expect(pkg.dependencies['@elysiumjs/plugin-sentry']).toBe('latest');
+		expect(pkg.devDependencies.prettier).toBe('^3.9.10');
 		expect(commands).toEqual([]);
 	});
 
