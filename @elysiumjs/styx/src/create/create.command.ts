@@ -17,7 +17,7 @@ import type { EnabledModule, RuntimeChoice } from './code';
 
 import { existsSync } from 'node:fs';
 import { mkdir, readdir, rm } from 'node:fs/promises';
-import { dirname, join, relative, resolve } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 
 import { Command, CommandArgumentType, ConsoleFormat } from '@elysiumjs/core';
 import prompts from 'prompts';
@@ -25,6 +25,7 @@ import { assign, objectify, pascal, snake } from 'radash';
 
 import { listAssets, readAsset } from '../assets';
 import { getAppCode, getModuleCode, RUNTIMES } from './code';
+import { resolveProjectPath, validateModuleName, validateProjectName } from './names';
 
 /** The answers that describe the project to create. */
 export type CreateOptions = {
@@ -39,8 +40,6 @@ export type CreateOptions = {
 	install: boolean;
 	force: boolean;
 };
-
-const PROJECT_NAME = /^[a-z0-9@\-_/]+$/i;
 
 /** Splits a comma separated list. */
 const list = (value: unknown): string[] | undefined =>
@@ -79,6 +78,12 @@ export const createProject = async (
 	exec: (cwd: string, command: string[]) => Promise<void>,
 	progress: (step: string) => void = () => {}
 ): Promise<string> => {
+	// Checked first: the project path may be removed below, with --force.
+	const directory = validateProjectName(options.name);
+	const projectPath = resolveProjectPath(options.path, directory);
+	const modules =
+		options.template === 'single' ? ['main'] : options.modules.map(validateModuleName);
+
 	const runtime: RuntimeChoice = RUNTIMES[options.runtime];
 	if (!runtime) throw new Error(`Unknown runtime ${options.runtime}.`);
 	if (runtime.unavailable)
@@ -86,9 +91,6 @@ export const createProject = async (
 	if ((await listAssets(`templates/template-${options.template}`)).length === 0) {
 		throw new Error(`Unknown template ${options.template}.`);
 	}
-
-	const projectPath = resolve(options.path, options.name);
-	const modules = options.template === 'single' ? ['main'] : options.modules;
 
 	progress('Creating project directory...');
 	if (existsSync(projectPath) && (await readdir(projectPath)).length > 0) {
@@ -320,7 +322,14 @@ export class CreateCommand extends Command {
 				name: 'name',
 				message: 'What is the name of the project?',
 				initial: 'elysium-app',
-				validate: (value: string) => PROJECT_NAME.test(value) || 'Invalid project name.'
+				validate: (value: string) => {
+					try {
+						validateProjectName(value);
+						return true;
+					} catch (error) {
+						return (error as Error).message;
+					}
+				}
 			},
 			{
 				type: given.template ? null : 'select',
@@ -395,11 +404,8 @@ export class CreateCommand extends Command {
 			: {};
 
 		const name = given.name ?? answers.name;
-		if (!name || !PROJECT_NAME.test(name)) {
-			throw new Error(
-				name ? `Invalid project name: ${name}` : 'Give the project a name: styx create my-app'
-			);
-		}
+		if (!name) throw new Error('Give the project a name: styx create my-app');
+		validateProjectName(name);
 
 		return {
 			name,
