@@ -53,6 +53,15 @@
         "@elysiumjs/core": "workspace:^",
       },
     },
+    "@elysiumjs/conformance": {
+      "name": "@elysiumjs/conformance",
+      "version": "0.0.0",
+      "dependencies": {
+        "@elysiumjs/core": "workspace:^",
+        "@elysiumjs/runtime-bun": "workspace:^",
+        "elysia": "^2.0.0-rc.1",
+      },
+    },
     "@elysiumjs/core": {
       "name": "@elysiumjs/core",
       "version": "0.10.0",
@@ -364,6 +373,8 @@
     "@elysiumjs/argus": ["@elysiumjs/argus@workspace:@elysiumjs/argus"],
 
     "@elysiumjs/cerberus": ["@elysiumjs/cerberus@workspace:@elysiumjs/cerberus"],
+
+    "@elysiumjs/conformance": ["@elysiumjs/conformance@workspace:@elysiumjs/conformance"],
 
     "@elysiumjs/core": ["@elysiumjs/core@workspace:@elysiumjs/core"],
 

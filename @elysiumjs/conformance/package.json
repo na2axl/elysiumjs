@@ -1,0 +1,23 @@
+{
+  "name": "@elysiumjs/conformance",
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "description": "Runtime conformance scenarios for the Elysium.js framework.",
+  "private": true,
+  "author": {
+    "name": "Axel Nana",
+    "email": "axel.nana@workbud.com"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test tests/bun"
+  },
+  "type": "module",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": {
+    "@elysiumjs/core": "workspace:^",
+    "@elysiumjs/runtime-bun": "workspace:^",
+    "elysia": "^2.0.0-rc.1"
+  }
+}

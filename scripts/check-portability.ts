@@ -51,6 +51,7 @@ const PATTERNS: RegExp[] = [
 /** Packages scanned by the gate, relative to the repository root. */
 export const ROOTS = [
 	'@elysiumjs/core',
+	'@elysiumjs/conformance',
 	'@elysiumjs/cerberus',
 	'@elysiumjs/argus',
 	'@elysiumjs/hermes',
