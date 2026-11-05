@@ -140,7 +140,7 @@ describe('buildModuleGraph', () => {
 		expect(graph.exportsOf(graph.node(B)!)).toEqual([]);
 	});
 
-	it('returns true for exports: true and service names otherwise', () => {
+	it('returns true for exports: true and service tokens otherwise', () => {
 		class Foo {}
 		@Module.register({ exports: true })
 		class All extends Module {}
@@ -149,7 +149,7 @@ describe('buildModuleGraph', () => {
 
 		const graph = buildModuleGraph([All, Some], 'development');
 		expect(graph.exportsOf(graph.node(All)!)).toBe(true);
-		expect(graph.exportsOf(graph.node(Some)!)).toEqual(['Foo', 'token']);
+		expect(graph.exportsOf(graph.node(Some)!)).toEqual([Foo, 'token']);
 	});
 
 	it('is assignable to the container visibility resolver', () => {

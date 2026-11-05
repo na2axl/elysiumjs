@@ -103,6 +103,40 @@ Or, if using `styx`, run:
 bun styx serve
 ```
 
+## Services
+
+A service is identified by its class. Give it a name with `@Service.register({ name })` to look it up by that string instead. Class names are never used as identifiers, so services resolve the same way after a bundler renames classes (`bun run check:minified` builds a minified app and checks it).
+
+```typescript
+import { Service, ServiceScope } from '@elysiumjs/core';
+
+@Service.register()
+export class UserRepository {}
+
+@Service.register({ name: 'mailer' })
+export class MailerService {}
+
+@Service.register()
+export class UserService {
+	constructor(
+		@Service.inject(UserRepository) private readonly users: UserRepository,
+		@Service.inject('mailer') private readonly mailer: MailerService
+	) {}
+}
+```
+
+`@Service.inject()` without an argument injects the class of the parameter type, read from `emitDecoratorMetadata`. Pass the class or the name when the type is an interface or is missing; Elysium throws at declaration time when it cannot tell which service to inject.
+
+A service has one of three scopes:
+
+| Scope                    | Instances                                                   |
+| ------------------------ | ----------------------------------------------------------- |
+| `ServiceScope.SINGLETON` | One for the app (the default)                               |
+| `ServiceScope.FACTORY`   | A new one each time the service is resolved                 |
+| `ServiceScope.REQUEST`   | One per HTTP request, shared by its middlewares and handler |
+
+A request-scoped service resolves only inside a request: resolving it elsewhere throws `OutsideRequestScopeError`. Code outside a route, such as a job or a test, opens a scope with `Service.runInRequestScope(fn)`; every request-scoped service resolved inside `fn`, including after an `await`, is shared for that run. A singleton, or a controller with the default server scope, cannot depend on a request-scoped service, since it would keep the first request's instance: Elysium throws `ScopeMismatchError`. Use a request-scoped controller (`scope: HttpControllerScope.REQUEST`), or inject the service in the route handler's parameters.
+
 ## Lazy boot
 
 A CLI command boots lazily: running `app:cmd` initialises the command's own module and the modules it imports, not the whole graph. `help <cmd>` is always lazy, even for commands with `static boot = true`.

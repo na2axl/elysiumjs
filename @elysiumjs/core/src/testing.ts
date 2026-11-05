@@ -15,6 +15,7 @@
 import type { Class } from 'type-fest';
 import type { Application } from './app';
 import type { ConfiguredModule, ModuleClass } from './module';
+import type { ServiceToken } from './token';
 
 import { Container } from './container';
 import { ElysiumError } from './errors';
@@ -31,8 +32,11 @@ export type TestingOptions = {
 	/** The modules to boot. */
 	modules: (ModuleClass | ConfiguredModule<any>)[];
 
-	/** Services registered as globals; they win over module services of the same name. */
-	overrides?: Record<string, unknown>;
+	/**
+	 * Services registered as globals; they win over module services with the same token.
+	 * Give named services by name, or any service by class with a `Map`.
+	 */
+	overrides?: Record<string, unknown> | Map<ServiceToken, unknown>;
 
 	/** The environment to build the graph for. Defaults to `test`. */
 	environment?: string;
@@ -81,8 +85,9 @@ export async function createTestingApp(options: TestingOptions): Promise<Testing
 		const graph = buildModuleGraph(modules, environment);
 		const kernel = new Kernel(graph);
 
-		Container.setOverrides(Object.keys(overrides));
-		for (const [name, value] of Object.entries(overrides)) Service.instance(name, value);
+		const entries = overrides instanceof Map ? [...overrides] : Object.entries(overrides);
+		Container.setOverrides(entries.map(([token]) => token));
+		for (const [token, value] of entries) Service.instance(token, value);
 
 		await kernel.register();
 		if (boot === 'eager') await kernel.bootEager();

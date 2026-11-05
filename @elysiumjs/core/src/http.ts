@@ -19,11 +19,13 @@ import type { AppHttpContext } from '.';
 import type { Middleware } from './middleware';
 import type { Module } from './module';
 import type { ModuleNode } from './module-graph';
+import type { ServiceToken } from './token';
 
 import { Elysia, sse as esse, t } from 'elysia';
 import { assign, isEmpty, objectify } from 'radash';
 
 import { Application } from './app';
+import { Container } from './container';
 import { Event } from './event';
 import { Metadata } from './metadata';
 import { applyMiddlewares, executeMiddlewareChain, makeMiddlewares } from './middleware';
@@ -157,7 +159,7 @@ type HttpRequestHandlerMetadata = {
 	/**
 	 * The list of services injected in the handler.
 	 */
-	services: Array<{ name: string; index: number }>;
+	services: Array<{ token: ServiceToken; index: number }>;
 
 	/**
 	 * Whether the request handler is transactional.
@@ -575,7 +577,8 @@ export namespace Http {
 						// Built once, on the first request, so that building the app needs no module to be
 						// initialised.
 						let controller: unknown;
-						return () => () => (controller ??= ModuleContext.run(node, () => Service.make(target)));
+						return () => () =>
+							(controller ??= ModuleContext.run(node, () => Container.makeSingleton(target)));
 					} else if (props.scope === HttpControllerScope.REQUEST) {
 						return () => () => ModuleContext.run(node, () => Service.make(target));
 					} else {
@@ -587,10 +590,12 @@ export namespace Http {
 
 				const onRequest = Metadata.get('http:onRequest', target) ?? {};
 				if (onRequest.handler) {
-					app.onRequest((c) => {
-						const controller = getController()();
-						return ModuleContext.run(node, () => onRequest.handler.call(controller, c));
-					});
+					app.onRequest((c) =>
+						Container.runInRequestScope(() => {
+							const controller = getController()();
+							return ModuleContext.run(node, () => onRequest.handler.call(controller, c));
+						}, c.request)
+					);
 				}
 
 				const middlewares = Metadata.get(Symbols.middlewares, target) ?? [];
@@ -599,7 +604,13 @@ export namespace Http {
 				const metadata: HttpRequestHandlerMetadata[] = Metadata.get(Symbols.http, target) ?? [];
 
 				for (const route of metadata) {
-					const getParameters = async (c: Context) => {
+					/** The object the request scope of a request belongs to, shared by its hooks. */
+					const scopeKey = (c: Context): object => c.request ?? c;
+
+					const getParameters = (c: Context) =>
+						Container.runInRequestScope(() => readParameters(c), scopeKey(c));
+
+					const readParameters = async (c: Context) => {
 						const parameters: any[] = [];
 
 						if (route.rawContext) {
@@ -631,7 +642,7 @@ export namespace Http {
 						if (!isEmpty(route.services)) {
 							for (const service of route.services) {
 								parameters[service.index] = ModuleContext.run(node, () =>
-									Service.get(service.name)
+									Service.get(service.token)
 								);
 							}
 						}
@@ -656,12 +667,16 @@ export namespace Http {
 							c: Context,
 							body: () => Promise<TResult>
 						): Promise<TResult> =>
-							Application.context.run(
-								new Map([
-									['tenant', c.tenant as unknown],
-									['http:context', c]
-								]),
-								() => (isTransactional ? getTransactionRunner()(body) : body())
+							Container.runInRequestScope(
+								() =>
+									Application.context.run(
+										new Map([
+											['tenant', c.tenant as unknown],
+											['http:context', c]
+										]),
+										() => (isTransactional ? getTransactionRunner()(body) : body())
+									),
+								scopeKey(c)
 							);
 
 						const callHandler = <TResult>(c: Context, args: unknown[]): TResult =>
@@ -749,16 +764,28 @@ export namespace Http {
 									throw c.status(401, 'Unauthorized');
 								}
 
-								return executeMiddlewareChain(mi, c, 'onTransform', node);
+								return Container.runInRequestScope(
+									() => executeMiddlewareChain(mi, c, 'onTransform', node),
+									scopeKey(c)
+								);
 							},
 							beforeHandle(c: Context) {
-								return executeMiddlewareChain(mi, c, 'onBeforeHandle', node);
+								return Container.runInRequestScope(
+									() => executeMiddlewareChain(mi, c, 'onBeforeHandle', node),
+									scopeKey(c)
+								);
 							},
 							afterHandle(c: Context) {
-								return executeMiddlewareChain(mi, c, 'onAfterHandle', node);
+								return Container.runInRequestScope(
+									() => executeMiddlewareChain(mi, c, 'onAfterHandle', node),
+									scopeKey(c)
+								);
 							},
 							afterResponse(c: Context) {
-								return executeMiddlewareChain(mi, c, 'onAfterResponse', node);
+								return Container.runInRequestScope(
+									() => executeMiddlewareChain(mi, c, 'onAfterResponse', node),
+									scopeKey(c)
+								);
 							},
 							detail: {
 								tags: props.tags,

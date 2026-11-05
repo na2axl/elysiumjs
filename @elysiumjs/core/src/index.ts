@@ -50,6 +50,8 @@ export {
 	InvalidModuleConfigError,
 	MissingModuleConfigError,
 	ModuleCycleError,
+	OutsideRequestScopeError,
+	ScopeMismatchError,
 	ServiceNotFoundError,
 	ServiceNotReadyError,
 	ServiceNotVisibleError

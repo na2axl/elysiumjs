@@ -1,0 +1,46 @@
+// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+import type { Class } from 'type-fest';
+
+import { Metadata } from './metadata';
+import { Symbols } from './utils';
+
+/**
+ * What identifies a service in the container: the name it is registered under, or its class.
+ *
+ * A class registered without a name is identified by the class itself, never by the class name,
+ * so services resolve the same way in minified builds, where bundlers rename classes.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type ServiceToken = string | Class<any>;
+
+/**
+ * The token a service is registered under: a string as given, and for a class the name declared
+ * with `@Service.register({ name })`, or else the class itself.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param service The service name or class.
+ */
+export const tokenOf = (service: ServiceToken): ServiceToken =>
+	typeof service === 'string'
+		? service
+		: ((Metadata.get(Symbols.serviceOptions, service)?.name as string | undefined) ?? service);
+
+/**
+ * A readable label for a token, for messages only: it must never be used to look a service up.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param token The service token.
+ */
+export const tokenLabel = (token: ServiceToken): string =>
+	typeof token === 'string' ? token : token.name || '<anonymous class>';

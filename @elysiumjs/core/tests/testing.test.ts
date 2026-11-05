@@ -56,11 +56,11 @@ describe('Application.testing', () => {
 	it('lets an override replace a module service', async () => {
 		app = await createTestingApp({
 			modules: [MailModule],
-			overrides: { Mailer: { send: () => 'fake' } }
+			overrides: new Map([[Mailer, { send: () => 'fake' }]])
 		});
 		const mailer = await app.get<Mailer>(Mailer, MailModule);
 		expect(mailer.send()).toBe('fake');
-		expect((await app.get<Mailer>('Mailer')).send()).toBe('fake');
+		expect((await app.get<Mailer>(Mailer)).send()).toBe('fake');
 	});
 
 	it('lets an override win over a global module service', async () => {
@@ -75,7 +75,7 @@ describe('Application.testing', () => {
 
 		app = await createTestingApp({
 			modules: [ClockModule],
-			overrides: { Clock: { now: () => 'fake' } }
+			overrides: new Map([[Clock, { now: () => 'fake' }]])
 		});
 		expect((await app.get<Clock>(Clock)).now()).toBe('fake');
 	});

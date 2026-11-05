@@ -128,10 +128,17 @@ describe('Service', () => {
 			expect(() => Service.instance(TestService, new TestService())).toThrow(
 				DuplicateGlobalServiceError
 			);
-			expect(() => Service.factory('TestService', () => ({}))).toThrow(DuplicateGlobalServiceError);
-			expect(() => Service.registerLazy('TestService', () => ({}))).toThrow(
-				DuplicateGlobalServiceError
-			);
+			expect(() => Service.factory(TestService)).toThrow(DuplicateGlobalServiceError);
+			Service.instance('named', {});
+			expect(() => Service.registerLazy('named', () => ({}))).toThrow(DuplicateGlobalServiceError);
+		});
+
+		it('keeps a class and a string with the class name as distinct services', () => {
+			class TestService {}
+			const instance = Service.bind(TestService);
+			const named = Service.instance('TestService', {});
+			expect(Service.get(TestService)).toBe(instance);
+			expect(Service.get('TestService')).toBe(named);
 		});
 
 		it('registerLazy resolves on first access only, once', () => {

@@ -148,7 +148,7 @@ describe('HermesLogger', () => {
 
 		it('should use Service instance when registered', () => {
 			const baseLogger = new HermesLogger({ level: 'debug' });
-			Service.instance(HermesLogger.name, baseLogger as any);
+			Service.instance(HermesLogger, baseLogger as any);
 
 			try {
 				const childSpy = spyOn(baseLogger, 'child');
@@ -158,7 +158,7 @@ describe('HermesLogger', () => {
 				expect(logger).toBeInstanceOf(HermesLogger);
 			} finally {
 				// Global services outlive the test file; later files expect none.
-				Service.remove(HermesLogger.name);
+				Service.remove(HermesLogger);
 			}
 		});
 	});

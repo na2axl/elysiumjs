@@ -27,7 +27,7 @@ describe('HermesModule', () => {
 
 	it('registers nothing on import', () => {
 		expect(Service.exists('logger')).toBe(false);
-		expect(Service.exists(HermesLogger.name)).toBe(false);
+		expect(Service.exists(HermesLogger)).toBe(false);
 	});
 
 	it('provides one logger under both names, built from config', async () => {
