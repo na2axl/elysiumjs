@@ -82,12 +82,19 @@ describe('Http namespace', () => {
 			// Get the plugin function
 			const plugin = Metadata.get(Symbols.elysiaPlugin, TestController);
 
-			// Call the plugin function
-			await plugin(testNode());
-
-			// Check if the controller was built once, when the plugin was created
-			expect(makeSpy).toHaveBeenCalledWith(TestController);
+			const app = await plugin(testNode());
 			expect(deriveSpy).toHaveBeenCalledWith('local', expect.any(Function));
+
+			// The controller is built on the first request, then kept for the next ones.
+			expect(makeSpy).not.toHaveBeenCalledWith(TestController);
+			const derive = deriveSpy.mock.calls.find(([scope]) => scope === 'local')![1] as () => {
+				controller: () => unknown;
+			};
+			const first = derive().controller();
+			expect(first).toBeInstanceOf(TestController);
+			expect(derive().controller()).toBe(first);
+			expect(makeSpy.mock.calls.filter(([cls]) => cls === TestController)).toHaveLength(1);
+			expect(app).toBeDefined();
 		});
 
 		it('should register the controller in the service container with REQUEST scope', async () => {

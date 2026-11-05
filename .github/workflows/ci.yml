@@ -93,6 +93,9 @@ jobs:
       - name: Build
         run: bun run build
 
+      - name: Compiles ahead of time for Workers
+        run: bun run --cwd @elysiumjs/runtime-workers check:aot
+
       - name: Test
         run: bun run test:coverage
         env:
