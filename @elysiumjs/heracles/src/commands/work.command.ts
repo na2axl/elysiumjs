@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Command, CommandArgumentType, Redis } from '@elysiumjs/core';
+import { Command, CommandArgumentType } from '@elysiumjs/core';
+import { Redis } from '@elysiumjs/redis';
 
 import { RedisWorker } from '../workers/redis.worker';
 

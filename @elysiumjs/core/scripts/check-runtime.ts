@@ -15,8 +15,7 @@
 /**
  * Gate for running core outside Bun (Cloudflare Workers first):
  *
- * 1. The core bundle reaches no host API through the `Bun` global. The only allowed access is
- *    the Bun runtime's own, through `globalThis`, which is never evaluated on other runtimes.
+ * 1. The core bundle never touches the `Bun` global: host APIs come from a runtime package.
  * 2. The bundle loads and boots an application under Node.js, where `Bun` does not exist.
  */
 
@@ -53,13 +52,13 @@ try {
 	}
 
 	const bundle = await Bun.file(join(outdir, 'index.js')).text();
-	const freeBunReferences = bundle
+	const bunReferences = bundle
 		.split('\n')
 		.map((line, index) => ({ line: line.trim(), number: index + 1 }))
-		.filter(({ line }) => /(?<![\w$.])Bun\s*\./.test(line));
-	if (freeBunReferences.length > 0) {
-		for (const { line, number } of freeBunReferences) console.error(`index.js:${number}: ${line}`);
-		throw new Error('The core bundle uses the Bun global outside the Bun runtime.');
+		.filter(({ line }) => /\bBun\b/.test(line));
+	if (bunReferences.length > 0) {
+		for (const { line, number } of bunReferences) console.error(`index.js:${number}: ${line}`);
+		throw new Error('The core bundle uses the Bun global.');
 	}
 
 	// Elysia and the other dependencies resolve from core's node_modules.
@@ -69,11 +68,13 @@ try {
 		entry,
 		`
 const core = await import('./.runtime-check-${process.pid}.bundle.mjs');
-if (core.Runtime.get().name !== 'node') throw new Error('Expected the node runtime, got ' + core.Runtime.get().name);
+if (core.Runtime.find() !== undefined) throw new Error('Core must not pick a runtime by itself.');
+const runtime = { name: 'check', env: () => process.env, sleep: async () => {}, serve() {}, exit() {}, onShutdown: () => () => {} };
 class App extends core.Application {}
-core.Application.register({ modules: [] })(App);
+core.Application.register({ runtime, modules: [] })(App);
 process.env.ELYSIUM_RUNTIME_CHECK = 'ok';
 new App();
+if (core.Runtime.get() !== runtime) throw new Error('The runtime option was not applied.');
 if (core.Env.get('ELYSIUM_RUNTIME_CHECK') !== 'ok') throw new Error('The environment was not read through the runtime.');
 console.log(core.InteractsWithConsole.name, 'loaded and booted under Node.js', process.version);
 `
@@ -90,7 +91,7 @@ console.log(core.InteractsWithConsole.name, 'loaded and booted under Node.js', p
 		await rm(join(root, `.runtime-check-${process.pid}.bundle.mjs`), { force: true });
 	}
 
-	console.log('Runtime check passed: no Bun global access outside the Bun runtime.');
+	console.log('Runtime check passed: core does not use the Bun global.');
 } finally {
 	await rm(outdir, { recursive: true, force: true });
 }

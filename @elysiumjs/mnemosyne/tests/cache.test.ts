@@ -14,7 +14,8 @@
 
 import type { Mock } from 'bun:test';
 
-import { Application, RedisModule } from '@elysiumjs/core';
+import { Application } from '@elysiumjs/core';
+import { RedisModule } from '@elysiumjs/redis';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 import { createCache } from 'cache-manager';
 import * as KV from 'keyv';

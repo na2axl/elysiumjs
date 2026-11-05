@@ -12,14 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { Module, needsDefaultAlias, runAll, Service, ServiceNotFoundError } from '@elysiumjs/core';
 import { omit } from 'radash';
-
-import { needsDefaultAlias, runAll } from './connections';
-import { Container } from './container';
-import { ServiceNotFoundError } from './errors';
-import { Module } from './module';
-import { Runtime } from './runtime';
-import { Service } from './service';
 
 /**
  * Properties used to create a new redis connection.
@@ -28,12 +22,30 @@ import { Service } from './service';
 export type RedisConnectionProps = Bun.RedisOptions & { url: string };
 
 /**
+ * Creates the client of a redis connection.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type RedisClientFactory = (
+	url: string,
+	options: Omit<RedisConnectionProps, 'url'>
+) => unknown;
+
+/** Creates a client with Bun's built-in Redis client. */
+const bunClient: RedisClientFactory = (url, options) => new Bun.RedisClient(url, options);
+
+/**
  * Configuration of the {@link RedisModule}.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export type RedisModuleConfig = {
 	/** The name of the connection that `default` resolves to. */
 	default: string;
+
+	/**
+	 * Creates the client of a connection. Defaults to `Bun.RedisClient`; pass another factory
+	 * on runtimes without it.
+	 */
+	client?: RedisClientFactory;
 
 	/** The connections to declare, by name. */
 	connections: Record<string, RedisConnectionProps>;
@@ -95,8 +107,7 @@ export namespace Redis {
 			...Object.entries(config.connections).map(([name, props]) => ({
 				name: Redis.getConnectionName(name),
 				global: true,
-				factory: () =>
-					Runtime.get().createRedisClient(props.url, omit(props, ['url'])) as Bun.RedisClient
+				factory: () => (config.client ?? bunClient)(props.url, omit(props, ['url']))
 			})),
 			...(alias
 				? [
@@ -118,13 +129,10 @@ export class RedisModule extends Module.configurable<RedisModuleConfig>({
 	/** Closes the clients that were created. */
 	public override async onDestroy(): Promise<void> {
 		const names = Object.keys(this.config.connections).map(Redis.getConnectionName);
-		const clients = Container.constructed().filter(({ name }) => names.includes(name));
 		await runAll(
-			clients.map(
-				({ instance }) =>
-					() =>
-						(instance as Bun.RedisClient).close()
-			)
+			names
+				.filter((name) => Service.isConstructed(name))
+				.map((name) => () => Service.get<{ close(): unknown }>(name)?.close())
 		);
 	}
 }

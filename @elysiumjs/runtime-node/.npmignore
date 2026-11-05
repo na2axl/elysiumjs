@@ -1,0 +1,16 @@
+.git
+coverage
+tests
+node_modules
+.yalc
+.turbo
+
+.gitignore
+.prettierignore
+.prettierrc
+.DS_Store
+
+bun.lock
+bunfig.toml
+bun.lockb
+yalc.lock

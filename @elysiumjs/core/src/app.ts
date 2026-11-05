@@ -18,6 +18,7 @@ import type { CommandClass } from './command';
 import type { ElysiaApp, Route } from './http';
 import type { ConfiguredModule, ModuleClass } from './module';
 import type { ModuleNode } from './module-graph';
+import type { Runtime as RuntimePort } from './runtime';
 import type { TestingApp, TestingOptions } from './testing';
 import type { ElysiaPlugin } from './utils';
 
@@ -69,6 +70,12 @@ export type AppProps = {
 		 */
 		port?: number;
 	};
+
+	/**
+	 * The runtime the application runs on, from `@elysiumjs/runtime-bun`, `@elysiumjs/runtime-node`
+	 * or `@elysiumjs/runtime-workers`. Can be omitted when `Runtime.use()` was called before.
+	 */
+	runtime?: RuntimePort;
 
 	/**
 	 * The modules the application is made of. They act as the imports of the root module.
@@ -165,7 +172,13 @@ export abstract class Application extends InteractsWithConsole {
 				...(ownMetadata?.modules ?? []),
 				...(props.modules ?? [])
 			];
-			const withoutModules = ({ modules: _modules, ...rest }: AppProps): AppProps => rest;
+			// The runtime is kept as given, never deep-copied.
+			const runtime = props.runtime ?? ownMetadata?.runtime ?? parentMetadata?.runtime;
+			const withoutModules = ({
+				modules: _modules,
+				runtime: _runtime,
+				...rest
+			}: AppProps): AppProps => rest;
 
 			// Precedence, highest first: own props, own metadata, parent metadata, defaults.
 			props = {
@@ -175,7 +188,8 @@ export abstract class Application extends InteractsWithConsole {
 					withoutModules(parentMetadata ?? {}),
 					{ openapi: false }
 				),
-				modules
+				modules,
+				...(runtime ? { runtime } : {})
 			};
 
 			// Store the merged metadata
@@ -189,8 +203,9 @@ export abstract class Application extends InteractsWithConsole {
 	public constructor() {
 		super();
 
-		const { env, debug }: AppProps = Metadata.get(Symbols.app, this.constructor) ?? {};
+		const { env, debug, runtime }: AppProps = Metadata.get(Symbols.app, this.constructor) ?? {};
 		this.#debug = debug ?? false;
+		if (runtime) Runtime.use(runtime);
 
 		const runtimeEnv = Runtime.get().env();
 		if (env) {

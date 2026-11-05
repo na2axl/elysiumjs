@@ -60,15 +60,11 @@ export { ModuleContext } from './module-context';
 export { type ModuleGraph, type ModuleNode } from './module-graph';
 export { type TestingApp, type TestingOptions } from './testing';
 export {
-	type RedisClientLike,
 	type ShutdownSignal,
-	bunRuntime,
-	createWorkersRuntime,
-	nodeRuntime,
 	Runtime,
+	RuntimeNotConfiguredError,
 	RuntimeNotSupportedError
 } from './runtime';
-export { type RedisConnectionProps, type RedisModuleConfig, Redis, RedisModule } from './redis';
 export {
 	type ServiceDefinition,
 	type ServiceFactoryDefinition,

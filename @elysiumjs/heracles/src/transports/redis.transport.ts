@@ -14,7 +14,8 @@
 
 import type { JobStatusInfo, Transport, TransportEvent } from '../transport';
 
-import { InteractsWithConsole, Redis, Service } from '@elysiumjs/core';
+import { InteractsWithConsole, Service } from '@elysiumjs/core';
+import { Redis } from '@elysiumjs/redis';
 import { RedisClient } from 'bun';
 import { uid } from 'radash';
 

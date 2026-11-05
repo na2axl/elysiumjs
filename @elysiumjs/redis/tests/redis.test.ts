@@ -12,16 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { TestingApp } from '../src/testing';
+import type { TestingApp } from '@elysiumjs/core';
 
+import {
+	Application,
+	ConsoleLogger,
+	InvalidModuleConfigError,
+	LOGGER_SERVICE,
+	Service,
+	ServiceNotFoundError
+} from '@elysiumjs/core';
 import { afterAll, afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
-import { Container } from '../src/container';
-import { InvalidModuleConfigError, ServiceNotFoundError } from '../src/errors';
-import { ConsoleLogger, LOGGER_SERVICE } from '../src/logger';
 import { Redis, RedisModule } from '../src/redis';
-import { Service } from '../src/service';
-import { createTestingApp } from '../src/testing';
+
+const createTestingApp = Application.testing;
 
 const createClient = () => ({ close: mock() });
 const clients: ReturnType<typeof createClient>[] = [];
@@ -101,7 +106,27 @@ describe('RedisModule', () => {
 		app = undefined;
 		expect(clients).toHaveLength(1);
 		expect(clients[0].close).toHaveBeenCalledTimes(1);
-		expect(Container.constructed()).toHaveLength(0);
+		expect(Service.isConstructed('redis.connection.cache')).toBe(false);
+	});
+
+	it('creates clients with the configured factory instead of Bun.RedisClient', async () => {
+		const client = { close: mock() };
+		const factory = mock((_url: string, _options: object) => client);
+		app = await createTestingApp({
+			modules: [
+				RedisModule.with({
+					default: 'cache',
+					client: factory,
+					connections: { cache: { url: 'redis://cache:6379', db: 2 } }
+				})
+			]
+		});
+		expect(await app.get('redis.connection.default')).toBe(client);
+		expect(factory).toHaveBeenCalledWith('redis://cache:6379', { db: 2 });
+		expect(ClientMock).not.toHaveBeenCalled();
+		await app.shutdown();
+		app = undefined;
+		expect(client.close).toHaveBeenCalledTimes(1);
 	});
 
 	it('closes a client shared with the default alias once', async () => {

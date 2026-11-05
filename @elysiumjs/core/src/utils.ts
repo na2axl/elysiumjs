@@ -55,12 +55,12 @@ export namespace Symbols {
 
 /**
  * Gets the current environment name.
- * @returns `NODE_ENV`, or `development` when unset.
+ * @returns `NODE_ENV` from the runtime, or `development` when unset or when no runtime is set.
  *
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export function currentEnvironment(): string {
-	return Runtime.get().env().NODE_ENV ?? 'development';
+	return Runtime.find()?.env().NODE_ENV ?? 'development';
 }
 
 export const nextTick = () => new Promise((resolve) => process.nextTick(resolve));

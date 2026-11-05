@@ -17,14 +17,6 @@ import type { AnyElysia } from 'elysia';
 import { ElysiumError } from './errors';
 
 /**
- * The minimal surface of a Redis client the framework relies on.
- * @author Axel Nana <axel.nana@workbud.com>
- */
-export interface RedisClientLike {
-	close(): void | Promise<void>;
-}
-
-/**
  * The process signals the application shuts down on.
  * @author Axel Nana <axel.nana@workbud.com>
  */
@@ -34,7 +26,9 @@ export type ShutdownSignal = 'SIGINT' | 'SIGTERM';
  * The host-specific operations the framework needs. Core never calls a host API directly
  * (`Bun.*`, `process.exit`, a server's `listen`): it asks the current runtime.
  *
- * The runtime is detected when first needed, and can be replaced with {@link Runtime.use}.
+ * Implementations ship as packages: `@elysiumjs/runtime-bun`, `@elysiumjs/runtime-node` and
+ * `@elysiumjs/runtime-workers`. Set one with the `runtime` option of `@Application.register()`
+ * or with {@link Runtime.use}.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export interface Runtime {
@@ -70,14 +64,6 @@ export interface Runtime {
 	 * @returns A function that removes the handler.
 	 */
 	onShutdown(handler: () => void): () => void;
-
-	/**
-	 * Creates a Redis client.
-	 * @param url The connection URL.
-	 * @param options The client options.
-	 * @throws {RuntimeNotSupportedError} On runtimes without a built-in Redis client.
-	 */
-	createRedisClient(url: string, options: Record<string, unknown>): RedisClientLike;
 }
 
 /**
@@ -90,110 +76,39 @@ export class RuntimeNotSupportedError extends ElysiumError {
 	}
 }
 
-/** The parts of the Bun global the Bun runtime uses. Read lazily, never at import. */
-type BunGlobal = {
-	RedisClient: new (url: string, options?: Record<string, unknown>) => RedisClientLike;
-};
-
-const SIGNALS: ShutdownSignal[] = ['SIGINT', 'SIGTERM'];
-
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-const processEnv = (): Record<string, string | undefined> =>
-	typeof process !== 'undefined' && process.env ? process.env : {};
-
 /**
- * The runtime for Bun.
+ * Thrown when the framework needs the runtime before one was set.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export const bunRuntime: Runtime = {
-	name: 'bun',
-	env: processEnv,
-	sleep,
-	serve(app, port) {
-		app.listen(port);
-	},
-	exit(code) {
-		process.exit(code);
-	},
-	onShutdown(handler) {
-		for (const signal of SIGNALS) process.on(signal, handler);
-		return () => {
-			for (const signal of SIGNALS) process.off(signal, handler);
-		};
-	},
-	createRedisClient(url, options) {
-		const bun = (globalThis as unknown as { Bun: BunGlobal }).Bun;
-		return new bun.RedisClient(url, options);
-	}
-};
-
-/**
- * The runtime for Node.js: the same as Bun's, without a built-in Redis client.
- * @author Axel Nana <axel.nana@workbud.com>
- */
-export const nodeRuntime: Runtime = {
-	...bunRuntime,
-	name: 'node',
-	createRedisClient() {
-		throw new RuntimeNotSupportedError('RedisModule', 'node');
-	}
-};
-
-/**
- * The runtime for Cloudflare Workers. The host owns the server and the isolate's lifetime:
- * export the app's `fetch` instead of calling `serve`, and nothing exits or receives signals.
- *
- * Environment variables come from `process.env` (populated from the Worker's vars with the
- * `nodejs_compat` flag); pass `env` to use other values.
- * @param options The environment to expose, when not `process.env`.
- * @author Axel Nana <axel.nana@workbud.com>
- */
-export const createWorkersRuntime = (
-	options: { env?: Record<string, string | undefined> } = {}
-): Runtime => ({
-	name: 'workers',
-	env: () => options.env ?? processEnv(),
-	sleep,
-	serve() {
-		throw new RuntimeNotSupportedError(
-			'Application.serve',
-			'workers',
-			"Export the app's fetch handler from the Worker instead."
+export class RuntimeNotConfiguredError extends ElysiumError {
+	public constructor() {
+		super(
+			'No runtime is set. Install @elysiumjs/runtime-bun, @elysiumjs/runtime-node or @elysiumjs/runtime-workers, then pass it as the `runtime` option of @Application.register() or call Runtime.use().'
 		);
-	},
-	exit() {},
-	onShutdown() {
-		return () => {};
-	},
-	createRedisClient() {
-		throw new RuntimeNotSupportedError('RedisModule', 'workers');
 	}
-});
+}
 
 let current: Runtime | undefined;
 
 export namespace Runtime {
 	/**
-	 * Picks the runtime for the host the code runs on.
+	 * Gets the runtime in use.
 	 * @author Axel Nana <axel.nana@workbud.com>
-	 * @param scope The global object to inspect.
+	 * @throws {RuntimeNotConfiguredError} When no runtime was set.
 	 */
-	export const detect = (scope: object = globalThis): Runtime => {
-		if ('Bun' in scope) return bunRuntime;
-		const { navigator } = scope as { navigator?: { userAgent?: string } };
-		if (navigator?.userAgent === 'Cloudflare-Workers') return createWorkersRuntime();
-		return nodeRuntime;
+	export const get = (): Runtime => {
+		if (!current) throw new RuntimeNotConfiguredError();
+		return current;
 	};
 
 	/**
-	 * Gets the runtime in use, detecting it on first call.
+	 * Gets the runtime in use, or `undefined` when none was set.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 */
-	export const get = (): Runtime => (current ??= detect());
+	export const find = (): Runtime | undefined => current;
 
 	/**
-	 * Replaces the runtime in use.
+	 * Sets the runtime to use.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param runtime The runtime to use.
 	 */
@@ -202,7 +117,7 @@ export namespace Runtime {
 	};
 
 	/**
-	 * Forgets the runtime in use, so the next {@link Runtime.get} detects it again.
+	 * Forgets the runtime in use.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 */
 	export const reset = (): void => {

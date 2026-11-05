@@ -18,13 +18,14 @@ import type { JobDispatchOptions } from '../queue';
 import type { TransportEvent } from '../transport';
 import type { QueuedJob, QueueState, Worker, WorkerQueueOptions } from '../worker';
 
-import { ModuleContext, Redis } from '@elysiumjs/core';
+import { ModuleContext } from '@elysiumjs/core';
+import { Redis } from '@elysiumjs/redis';
 import { RedisClient } from 'bun';
 
 import { Job, JobOverlapBehavior, JobStatus, WithId } from '../job';
+import { JobRegistry } from '../registry';
 import { TransportMode } from '../transport';
 import { RedisTransport } from '../transports/redis.transport';
-import { JobRegistry } from '../registry';
 import { getJobMetadata } from '../utils';
 import { BaseWorker } from './base.worker';
 
@@ -420,9 +421,7 @@ export class RedisWorker extends BaseWorker<RedisTransport> {
 
 		try {
 			const owner = jobOwners.get(queuedJob.job);
-			await (owner
-				? ModuleContext.run(owner, () => queuedJob.job.run())
-				: queuedJob.job.run());
+			await (owner ? ModuleContext.run(owner, () => queuedJob.job.run()) : queuedJob.job.run());
 
 			// Handle job result
 			if (queuedJob.job.status === JobStatus.COMPLETED) {

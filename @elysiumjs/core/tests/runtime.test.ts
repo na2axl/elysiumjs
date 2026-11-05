@@ -13,25 +13,19 @@
 // limitations under the License.
 
 import type { AnyElysia } from 'elysia';
+import type { Runtime as RuntimePort } from '../src/runtime';
 
 import { afterEach, describe, expect, it, mock } from 'bun:test';
 
 import { Application } from '../src/app';
 import { Env } from '../src/env';
-import { Event } from '../src/event';
-import {
-	bunRuntime,
-	createWorkersRuntime,
-	nodeRuntime,
-	Runtime,
-	RuntimeNotSupportedError
-} from '../src/runtime';
+import { Runtime, RuntimeNotConfiguredError, RuntimeNotSupportedError } from '../src/runtime';
 import { Service } from '../src/service';
 import { currentEnvironment } from '../src/utils';
+import { testRuntime } from './test-runtime';
 
 /** A runtime whose every operation is recorded. */
 const fakeRuntime = (env: Record<string, string | undefined> = {}) => {
-	const shutdownHandlers: (() => void)[] = [];
 	const removeShutdownHandler = mock(() => {});
 	return {
 		name: 'fake',
@@ -39,154 +33,96 @@ const fakeRuntime = (env: Record<string, string | undefined> = {}) => {
 		sleep: mock(async (_ms: number) => {}),
 		serve: mock((_app: AnyElysia, _port: number) => {}),
 		exit: mock((_code: number) => {}),
-		onShutdown: mock((handler: () => void) => {
-			shutdownHandlers.push(handler);
-			return removeShutdownHandler;
-		}),
-		createRedisClient: mock(() => ({ close: mock() })),
-		shutdownHandlers,
+		onShutdown: mock((_handler: () => void) => removeShutdownHandler),
 		removeShutdownHandler
-	} satisfies Runtime & Record<string, unknown>;
+	} satisfies RuntimePort & Record<string, unknown>;
 };
 
 afterEach(() => {
-	Runtime.reset();
+	Runtime.use(testRuntime);
 	Env.clear();
 	Service.clear();
-	Event.off('elysium:server:after-init');
 });
 
 describe('Runtime', () => {
-	it('detects Bun when the Bun global exists', () => {
-		expect(Runtime.get()).toBe(bunRuntime);
+	it('throws a helpful error when no runtime is set', () => {
+		Runtime.reset();
+		expect(Runtime.find()).toBeUndefined();
+		expect(() => Runtime.get()).toThrow(RuntimeNotConfiguredError);
+		expect(() => Runtime.get()).toThrow('@elysiumjs/runtime-bun');
 	});
 
-	it('detects Cloudflare Workers from the user agent', () => {
-		expect(Runtime.detect({ navigator: { userAgent: 'Cloudflare-Workers' } }).name).toBe('workers');
-	});
-
-	it('falls back to Node.js', () => {
-		expect(Runtime.detect({})).toBe(nodeRuntime);
-	});
-
-	it('keeps the detected runtime until reset', () => {
+	it('returns the runtime set with use', () => {
 		const runtime = fakeRuntime();
 		Runtime.use(runtime);
 		expect(Runtime.get()).toBe(runtime);
+		expect(Runtime.find()).toBe(runtime);
+	});
+
+	it('names the feature and runtime when a feature is not supported', () => {
+		expect(new RuntimeNotSupportedError('X', 'workers', 'Do Y.').message).toBe(
+			'X is not supported on the workers runtime. Do Y.'
+		);
+		expect(new RuntimeNotSupportedError('X', 'node').message).toBe(
+			'X is not supported on the node runtime.'
+		);
+	});
+});
+
+describe('currentEnvironment', () => {
+	it('reads NODE_ENV from the runtime', () => {
+		Runtime.use(fakeRuntime({ NODE_ENV: 'staging' }));
+		expect(currentEnvironment()).toBe('staging');
+	});
+
+	it('defaults to development when unset or when no runtime is set', () => {
+		Runtime.use(fakeRuntime({}));
+		expect(currentEnvironment()).toBe('development');
 		Runtime.reset();
-		expect(Runtime.get()).toBe(bunRuntime);
+		expect(currentEnvironment()).toBe('development');
 	});
 });
 
-describe('bunRuntime', () => {
-	it('reads process.env', () => {
-		expect(bunRuntime.env()).toBe(process.env);
-	});
+describe('Application runtime option', () => {
+	it('sets the runtime when the application is created, keeping the same object', () => {
+		Runtime.reset();
+		const runtime = fakeRuntime({ FOO: 'bar' });
 
-	it('sleeps with a timer', async () => {
-		const start = performance.now();
-		await bunRuntime.sleep(5);
-		expect(performance.now() - start).toBeGreaterThanOrEqual(4);
-	});
-
-	it('serves through the app listen method', () => {
-		const app = { listen: mock() } as unknown as AnyElysia;
-		bunRuntime.serve(app, 1234);
-		expect(app.listen).toHaveBeenCalledWith(1234);
-	});
-
-	it('adds and removes shutdown handlers on SIGINT and SIGTERM', () => {
-		const handler = () => {};
-		const remove = bunRuntime.onShutdown(handler);
-		expect(process.listeners('SIGINT')).toContain(handler);
-		expect(process.listeners('SIGTERM')).toContain(handler);
-		remove();
-		expect(process.listeners('SIGINT')).not.toContain(handler);
-		expect(process.listeners('SIGTERM')).not.toContain(handler);
-	});
-
-	it('creates Redis clients with Bun.RedisClient', () => {
-		const original = Bun.RedisClient;
-		const client = { close: mock() };
-		const RedisClient = mock(function () {
-			return client;
-		});
-		Bun.RedisClient = RedisClient as unknown as typeof Bun.RedisClient;
-		try {
-			expect(bunRuntime.createRedisClient('redis://localhost', { a: 1 })).toBe(client);
-			expect(RedisClient).toHaveBeenCalledWith('redis://localhost', { a: 1 });
-		} finally {
-			Bun.RedisClient = original;
-		}
-	});
-
-	it('exits through process.exit', () => {
-		const original = process.exit;
-		process.exit = mock() as unknown as typeof process.exit;
-		try {
-			bunRuntime.exit(3);
-			expect(process.exit).toHaveBeenCalledWith(3);
-		} finally {
-			process.exit = original;
-		}
-	});
-});
-
-describe('nodeRuntime', () => {
-	it('has no Redis client', () => {
-		expect(() => nodeRuntime.createRedisClient('redis://localhost', {})).toThrow(
-			RuntimeNotSupportedError
-		);
-	});
-});
-
-describe('createWorkersRuntime', () => {
-	it('reads process.env by default, or the env it is given', () => {
-		expect(createWorkersRuntime().env()).toBe(process.env);
-		const env = { A: '1' };
-		expect(createWorkersRuntime({ env }).env()).toBe(env);
-	});
-
-	it('refuses to serve, since the host owns the server', () => {
-		expect(() => createWorkersRuntime().serve({} as AnyElysia, 3000)).toThrow(
-			"Application.serve is not supported on the workers runtime. Export the app's fetch handler from the Worker instead."
-		);
-	});
-
-	it('has no process to exit and no signals', () => {
-		const runtime = createWorkersRuntime();
-		expect(() => runtime.exit(1)).not.toThrow();
-		expect(runtime.onShutdown(() => {})).toBeFunction();
-	});
-
-	it('has no Redis client', () => {
-		expect(() => createWorkersRuntime().createRedisClient('redis://localhost', {})).toThrow(
-			'RedisModule is not supported on the workers runtime.'
-		);
-	});
-
-	it('sleeps with a timer', async () => {
-		await expect(createWorkersRuntime().sleep(1)).resolves.toBeUndefined();
-	});
-});
-
-describe('Application on a custom runtime', () => {
-	it('reads its environment from the runtime', () => {
-		Runtime.use(fakeRuntime({ NODE_ENV: 'staging', FOO: 'bar' }));
-
-		@Application.register({ modules: [] })
+		@Application.register({ runtime, modules: [] })
 		class TestApp extends Application {}
 		new TestApp();
 
+		expect(Runtime.get()).toBe(runtime);
 		expect(Env.get('FOO')).toBe('bar');
-		expect(currentEnvironment()).toBe('staging');
+	});
+
+	it('inherits the runtime of a parent application', () => {
+		Runtime.reset();
+		const runtime = fakeRuntime();
+
+		@Application.register({ runtime })
+		class BaseApp extends Application {}
+
+		@Application.register({ modules: [] })
+		class TestApp extends BaseApp {}
+		new TestApp();
+
+		expect(Runtime.get()).toBe(runtime);
+	});
+
+	it('fails without a runtime option or Runtime.use', () => {
+		Runtime.reset();
+
+		@Application.register({ modules: [] })
+		class TestApp extends Application {}
+
+		expect(() => new TestApp()).toThrow(RuntimeNotConfiguredError);
 	});
 
 	it('serves, exits and handles signals through the runtime', async () => {
 		const runtime = fakeRuntime({ PORT: '4321' });
-		Runtime.use(runtime);
 
-		@Application.register({ modules: [], openapi: false })
+		@Application.register({ runtime, modules: [], openapi: false })
 		class TestApp extends Application {}
 		const app = new TestApp();
 
