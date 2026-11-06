@@ -15,7 +15,7 @@
 import type { Application } from '@elysiumjs/core';
 import type { AssertAdapter, Scenario, ScenarioDriver } from './types';
 
-import { resetContainer, Runtime } from '@elysiumjs/core';
+import { createHttpClient, resetContainer, Runtime } from '@elysiumjs/core';
 
 const EVENT_COUNT = 2;
 
@@ -62,10 +62,28 @@ const checkResponse = async (
 	}
 };
 
-/** The default driver: builds the app and hands each request to `elysia.handle`. */
+/**
+ * Sends a scenario's requests through `handle` and asserts each response.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param s The scenario.
+ * @param handle How a request reaches the app.
+ * @param assert The assertion adapter of the test framework.
+ */
+export const checkRequests = async (
+	s: Scenario,
+	handle: (request: Request) => Promise<Response>,
+	assert: AssertAdapter
+): Promise<void> => {
+	for (const [index, { request, expect }] of s.requests.entries()) {
+		await checkResponse(await handle(request()), expect, `${s.name} #${index + 1}`, assert);
+	}
+};
+
+/** The default driver: builds the app and sends each request through the HTTP test client. */
 const handleDriver: ScenarioDriver = async (app) => {
 	const elysia = await app.build();
-	return (request) => elysia.handle(request);
+	const client = createHttpClient((request) => elysia.handle(request));
+	return (request) => client.send(request);
 };
 
 /**
@@ -89,10 +107,7 @@ export const runScenario = async (
 	let failure: { error: unknown } | undefined;
 	try {
 		app = await s.app();
-		const handle = await driver(app);
-		for (const [index, { request, expect }] of s.requests.entries()) {
-			await checkResponse(await handle(request()), expect, `${s.name} #${index + 1}`, assert);
-		}
+		await checkRequests(s, await driver(app), assert);
 		await s.after?.(app, assert);
 	} catch (error) {
 		failure = { error };

@@ -18,7 +18,7 @@ import { describe, expect, it, mock } from 'bun:test';
 
 // The bridge opens a real port: tests/node/serve.test.ts in @elysiumjs/conformance covers it.
 const serveNode = mock();
-mock.module('../src/serve', () => ({ serveNode }));
+mock.module('../src/serve', () => ({ serveNode, peerAddress: mock() }));
 
 const { runtime } = await import('../src');
 
@@ -53,6 +53,21 @@ describe('runtime', () => {
 		const request = new Request('http://localhost/');
 		expect(await fetch(request)).toBe(response);
 		expect(app.fetch).toHaveBeenCalledWith(request);
+	});
+
+	it('returns a handle that closes the server and its idle connections', async () => {
+		const server = {
+			close: mock((done: (error?: Error) => void) => done()),
+			closeIdleConnections: mock()
+		};
+		serveNode.mockReturnValueOnce(server);
+		const app = { fetch: mock() } as unknown as AnyElysia;
+
+		const handle = runtime.serve(app, 0);
+		await handle?.close();
+
+		expect(server.close).toHaveBeenCalledTimes(1);
+		expect(server.closeIdleConnections).toHaveBeenCalledTimes(1);
 	});
 
 	it('exits through process.exit', () => {

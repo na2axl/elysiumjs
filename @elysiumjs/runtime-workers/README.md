@@ -90,6 +90,10 @@ export class JobConsumer {
 }
 ```
 
+With `@Workers.queue(name, { each: true })`, the handler receives one message at a time: a message it throws on is retried and the others are acked. Without `each`, the handler keeps batch semantics: it acks or retries messages itself, and the whole batch is retried when it throws.
+
+Several handlers can match one queue. A message retried for one of them is delivered again to every matching handler, including those that already handled it, so queue handlers must be idempotent.
+
 The handler types (`WorkersMessageBatch`, `WorkersScheduledController`, `WorkersKVNamespace`, ...) are structural, so the types from `@cloudflare/workers-types` or `wrangler types` fit them.
 
 ### KV cache
@@ -103,6 +107,8 @@ MnemosyneModule.with({
 
 await Cache.store('kv').set('greeting', 'hello', 120_000);
 ```
+
+`clear()` lists the keys of the namespace and deletes them, and each listed page and each deleted key is a subrequest. It stops at `maxOperations` (900 by default, under the 1000 subrequests of the paid plan; set 45 on the free plan), logs how many keys are left, and the next `clear()` goes on with them. `delete()` reads the key first, because the Keyv contract returns whether it existed; on eventually consistent KV that answer is best effort.
 
 ## Compiling ahead of time
 

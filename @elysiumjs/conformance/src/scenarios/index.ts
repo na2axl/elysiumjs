@@ -12,15 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { config } from './config';
 import { diDisposal, diScopes } from './di-scopes';
 import { errors } from './errors';
+import { filters } from './filters';
+import { interceptors } from './interceptors';
 import { lifecycle } from './lifecycle';
 import { middleware } from './middleware';
+import { problems } from './problems';
 import { routing } from './routing';
-import { sse } from './sse';
+import { security } from './security';
+import { sse, sseDisposal } from './sse';
 import { validation } from './validation';
 
-export { runScenario } from './run';
+export { checkRequests, runScenario } from './run';
 export type { AssertAdapter, Scenario, ScenarioDriver } from './types';
 
 /**
@@ -34,6 +39,12 @@ export const scenarios = [
 	diDisposal,
 	middleware,
 	errors,
+	problems,
+	filters,
+	interceptors,
+	config,
+	security,
 	lifecycle,
-	sse
+	sse,
+	sseDisposal
 ];

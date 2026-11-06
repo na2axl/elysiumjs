@@ -210,7 +210,7 @@ describe('createWorker', () => {
 		await app.kernel.shutdown();
 	});
 
-	it('destroys request-scoped services through waitUntil once fetch resolves', async () => {
+	it('destroys request-scoped services through waitUntil once the body is read', async () => {
 		const destroyed: string[] = [];
 
 		@Service.register({ scope: ServiceScope.REQUEST })
@@ -240,6 +240,7 @@ describe('createWorker', () => {
 		const response = await worker.fetch(new Request('http://localhost/scratch'), {}, context);
 		expect(response.status).toBe(200);
 		expect(context.waited.length).toBeGreaterThan(0);
+		expect(await response.json()).toEqual({ ok: true });
 		await Promise.all(context.waited);
 		expect(destroyed).toEqual(['Scratch']);
 		await app.kernel.shutdown();
@@ -443,6 +444,30 @@ describe('KeyvWorkersKV', () => {
 		expect(data.size).toBe(0);
 		expect(maxInFlight).toBeLessThanOrEqual(50);
 		expect(maxInFlight).toBeGreaterThan(1);
+	});
+
+	it('clear() stops at its operation budget and the next call goes on', async () => {
+		const { kv, data } = memoryKV();
+		const operations: string[] = [];
+		const counted: WorkersKVNamespace = {
+			...kv,
+			list: (options) => (operations.push('list'), kv.list(options)),
+			delete: (key) => (operations.push('delete'), kv.delete(key))
+		};
+		for (let i = 0; i < 10; i++) await kv.put(`k${i}`, 'v');
+		const store = new KeyvWorkersKV({ binding: 'CACHE', maxOperations: 6 });
+
+		await inInvocation(counted, () => store.clear());
+		expect(operations.length).toBeLessThanOrEqual(6);
+		expect(data.size).toBeGreaterThan(0);
+		expect(data.size).toBeLessThan(10);
+
+		for (let call = 0; call < 10 && data.size > 0; call++) {
+			operations.length = 0;
+			await inInvocation(counted, () => store.clear());
+			expect(operations.length).toBeLessThanOrEqual(6);
+		}
+		expect(data.size).toBe(0);
 	});
 
 	it('needs an invocation, so it holds no binding', () => {

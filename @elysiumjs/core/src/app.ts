@@ -16,11 +16,15 @@ import type { ElysiaOpenAPIConfig } from '@elysia/openapi';
 import type { AnyElysia, ErrorContext } from 'elysia';
 import type { TSchema } from 'typebox';
 import type { CommandClass } from './command';
+import type { FilterClass, FilterContext, FilterLevel } from './filter';
 import type { ElysiaApp, Route } from './http';
+import type { InterceptorClass } from './interceptor';
 import type { ConfiguredModule, ModuleClass } from './module';
 import type { ModuleGraph, ModuleNode } from './module-graph';
-import type { Runtime as RuntimePort } from './runtime';
-import type { TestingApp, TestingOptions } from './testing';
+import type { ProblemOptions } from './problem';
+import type { Runtime as RuntimePort, ServeHandle } from './runtime';
+import type { HttpOptions } from './security';
+import type { TestingApp, TestingAppOptions, TestingHttpApp, TestingOptions } from './testing';
 import type { ElysiaPlugin } from './utils';
 
 import { AsyncLocalStorage } from 'node:async_hooks';
@@ -28,24 +32,27 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { openapi as openapiPlugin } from '@elysia/openapi';
 import { Elysia, ElysiaStatus } from 'elysia';
 import { first } from 'radash';
-import Value from 'typebox/value';
 
 import { getCommandName } from './command';
+import { mergeEnvironmentSchemas, validateEnvironment } from './config';
 import { ConsoleFormat, InteractsWithConsole } from './console';
 import { Container } from './container';
-import { initEnv } from './env';
+import { Env, initEnv } from './env';
 import { ElysiumError, InvalidControllerError } from './errors';
 import { Event } from './event';
+import { FILTER_LEVELS, routeFilterLevels, runFilters } from './filter';
 import { Kernel } from './kernel';
 import { getLogger } from './logger';
 import { Metadata } from './metadata';
 import { applyMiddlewares, middlewareStops } from './middleware';
 import { ModuleContext } from './module-context';
 import { buildModuleGraph } from './module-graph';
+import { problemResponse, toProblem, unwrapParseError } from './problem';
 import { Runtime } from './runtime';
+import { applyHttpSecurity } from './security';
 import { Service } from './service';
-import { createTestingApp } from './testing';
-import { deepMerge, Symbols } from './utils';
+import { createTestingApp, createTestingHttpApp } from './testing';
+import { currentEnvironment, deepMerge, Symbols } from './utils';
 
 /**
  * An application plugin, consisting of a function that returns an Elysia instance.
@@ -101,6 +108,27 @@ export type AppProps = {
 	 * The list of plugins to load.
 	 */
 	plugins?: ElysiumPlugin[];
+
+	/**
+	 * How errors are rendered as RFC 9457 problem details: the base of relative problem types, and
+	 * the status of validation errors.
+	 */
+	problems?: ProblemOptions;
+
+	/**
+	 * Exception filters for every request, run after the filters of the route, the controller and
+	 * the module, and before the default problem details rendering.
+	 */
+	filters?: FilterClass[];
+
+	/** Interceptors around every request handler, outside those of the modules. */
+	interceptors?: InterceptorClass[];
+
+	/**
+	 * HTTP security: CORS, security headers, the request body limit (1 MiB by default) and the
+	 * trusted proxies that give `ctx.ip`.
+	 */
+	http?: HttpOptions;
 };
 
 /** The options of the root Elysia app. */
@@ -138,9 +166,15 @@ export abstract class Application extends InteractsWithConsole {
 	// @ts-expect-error The property is not initialized in the constructor.
 	#elysia: Elysia<Route>;
 	#debug: boolean;
+	/** The filter levels of each route of the built server, keyed by `METHOD path`. */
+	#routeFilters = new Map<string, FilterLevel[]>();
+	#appFilters: FilterLevel = { filters: [], node: null };
 	#kernel: Kernel | undefined;
 	#booting: Promise<void> | undefined;
 	#removeShutdownHandler: (() => void) | undefined;
+
+	/** The server started by `serve`, when the runtime returns a handle to close it. */
+	#serving: ServeHandle | undefined;
 
 	private readonly _appContextStorage: AppContext = new AsyncLocalStorage();
 
@@ -183,11 +217,22 @@ export abstract class Application extends InteractsWithConsole {
 				...(ownMetadata?.modules ?? []),
 				...(props.modules ?? [])
 			];
-			// The runtime is kept as given, never deep-copied.
-			const runtime = props.runtime ?? ownMetadata?.runtime ?? parentMetadata?.runtime;
+			// The runtime, the env schema (TypeBox keeps its kind under symbol keys) and the filter and
+			// interceptor classes are kept as given, never deep-copied.
+			const pick = <K extends 'runtime' | 'env' | 'filters' | 'interceptors'>(key: K) =>
+				props[key] ?? ownMetadata?.[key] ?? parentMetadata?.[key];
+			const runtime = pick('runtime');
+			const kept = {
+				env: pick('env'),
+				filters: pick('filters'),
+				interceptors: pick('interceptors')
+			};
 			const withoutModules = ({
 				modules: _modules,
 				runtime: _runtime,
+				env: _env,
+				filters: _filters,
+				interceptors: _interceptors,
 				...rest
 			}: AppProps): AppProps => rest;
 
@@ -200,7 +245,8 @@ export abstract class Application extends InteractsWithConsole {
 					{ openapi: false }
 				),
 				modules,
-				...(runtime ? { runtime } : {})
+				...(runtime ? { runtime } : {}),
+				...Object.fromEntries(Object.entries(kept).filter(([, value]) => value !== undefined))
 			};
 
 			// Store the merged metadata
@@ -214,23 +260,12 @@ export abstract class Application extends InteractsWithConsole {
 	public constructor() {
 		super();
 
-		const { env, debug, runtime }: AppProps = Metadata.get(Symbols.app, this.constructor) ?? {};
+		const { debug, runtime }: AppProps = Metadata.get(Symbols.app, this.constructor) ?? {};
 		this.#debug = debug ?? false;
 		if (runtime) Runtime.use(runtime);
 
-		const runtimeEnv = Runtime.get().env();
-		if (env) {
-			const rawEnv = Value.Convert(env, Value.Clone(runtimeEnv));
-
-			if (this.#debug && !Value.Check(env, rawEnv)) {
-				const error = Value.Errors(env, rawEnv)[0];
-				this.trace(error! as unknown as Error, 'Invalid environment configuration');
-			}
-
-			initEnv(Value.Clean(env, rawEnv) as Record<string, unknown>);
-		} else {
-			initEnv(runtimeEnv);
-		}
+		// Raw until the module graph is known: `run()` and `build()` validate the merged schemas.
+		initEnv(Runtime.get().env());
 
 		Service.remove('elysium.app');
 		Service.instance('elysium.app', this);
@@ -245,12 +280,18 @@ export abstract class Application extends InteractsWithConsole {
 	}
 
 	/**
-	 * Boots a module graph without a CLI or an HTTP server, for tests.
-	 * @param options The modules to boot, service overrides, environment and boot mode.
+	 * Sets up code under test. Given `app`, builds that application and returns an HTTP client that
+	 * drives it in memory (`http.get('/x').send()`). Given `modules`, boots a module graph without a
+	 * CLI or an HTTP server.
+	 * @param options The application or the modules, service overrides, environment and boot mode.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 */
-	public static testing(options: TestingOptions): Promise<TestingApp> {
-		return createTestingApp(options);
+	public static testing(options: TestingAppOptions): Promise<TestingHttpApp>;
+	public static testing(options: TestingOptions): Promise<TestingApp>;
+	public static testing(
+		options: TestingOptions | TestingAppOptions
+	): Promise<TestingApp | TestingHttpApp> {
+		return 'app' in options ? createTestingHttpApp(options) : createTestingApp(options);
 	}
 
 	/**
@@ -315,6 +356,7 @@ export abstract class Application extends InteractsWithConsole {
 		try {
 			const { modules } = this.props();
 			this.#kernel = new Kernel(buildModuleGraph(modules ?? []));
+			this.configureEnvironment();
 			return await this.dispatch(argv);
 		} catch (error) {
 			return this.fail(error);
@@ -381,6 +423,9 @@ export abstract class Application extends InteractsWithConsole {
 			this.removeSignalHandlers();
 			let code = 0;
 			try {
+				const serving = this.#serving;
+				this.#serving = undefined;
+				await serving?.close();
 				await this.#elysia?.stop();
 			} catch (error) {
 				code = 1;
@@ -492,9 +537,22 @@ export abstract class Application extends InteractsWithConsole {
 	public async build(): Promise<Elysia<Route>> {
 		const { modules } = this.props();
 		this.#kernel = new Kernel(buildModuleGraph(modules ?? []));
+		this.configureEnvironment();
 		await this.bootKernel(false);
 		await this.buildServer(true);
 		return this.#elysia;
+	}
+
+	/**
+	 * Validates the environment against the schemas of the app and its active modules, then makes
+	 * the validated values available through `Env.get()`.
+	 * @throws {InvalidEnvironmentError} Listing every missing or invalid variable.
+	 */
+	private configureEnvironment(): void {
+		const schema = mergeEnvironmentSchemas(this.props().env, this.kernel.graph);
+		if (!schema) return;
+		Env.clear();
+		initEnv(validateEnvironment(schema, Runtime.get().env()));
 	}
 
 	/**
@@ -502,7 +560,8 @@ export abstract class Application extends InteractsWithConsole {
 	 * {@link build} calls it on its first request; hosts call it before other work, such as a
 	 * queue batch or a scheduled event.
 	 * @throws When a module or a singleton fails to initialise. Later calls retry the failed ones,
-	 * so that a transient failure does not break every later request.
+	 * so that a transient failure does not break every later request. A permanent failure is
+	 * retried, and fails, on every request.
 	 */
 	public boot(): Promise<void> {
 		if (this.#booting) return this.#booting;
@@ -510,7 +569,7 @@ export abstract class Application extends InteractsWithConsole {
 			if (this.#booting === attempt) {
 				this.#booting = undefined;
 				this.kernel.resetFailures();
-				Container.forgetFailures();
+				Container.forgetFailures(this.kernel.graph.nodes);
 			}
 			throw error;
 		});
@@ -526,7 +585,11 @@ export abstract class Application extends InteractsWithConsole {
 		await this.buildServer(false);
 
 		const runtime = Runtime.get();
-		runtime.serve(this.#elysia, server?.port ?? (parseInt(runtime.env().PORT ?? '', 10) || 3000));
+		this.#serving =
+			runtime.serve(
+				this.#elysia,
+				server?.port ?? (parseInt(runtime.env().PORT ?? '', 10) || 3000)
+			) ?? undefined;
 	}
 
 	/**
@@ -564,6 +627,8 @@ export abstract class Application extends InteractsWithConsole {
 				(ctx as { tenant?: string }).tenant ?? ctx.request.headers.get('x-tenant-id') ?? 'public'
 		}));
 
+		applyHttpSecurity(this.#elysia, this.props().http);
+
 		if (openapi) {
 			this.#elysia.use(openapiPlugin(openapi));
 		}
@@ -578,8 +643,23 @@ export abstract class Application extends InteractsWithConsole {
 		applyMiddlewares(middlewares, this.#elysia, null);
 
 		await this.serveModules();
+		this.indexRouteFilters();
 
 		Event.emit('elysium:server:after-init', this, this);
+	}
+
+	/** Maps each route of the built server to the filter levels of its handler. */
+	private indexRouteFilters(): void {
+		this.#appFilters = { filters: this.props().filters ?? [], node: null };
+		this.#routeFilters.clear();
+		for (const route of this.#elysia.routes as {
+			method: string;
+			path: string;
+			handler: unknown;
+		}[]) {
+			const levels = routeFilterLevels.get(route.handler as Function);
+			if (levels?.length) this.#routeFilters.set(`${route.method} ${route.path}`, levels);
+		}
 	}
 
 	/** Lets every module hook into the root app, then mounts the controllers of each module. */
@@ -633,37 +713,60 @@ export abstract class Application extends InteractsWithConsole {
 			});
 	}
 
-	/** Turns an error raised while handling a request into the response sent to the client. */
+	/**
+	 * Turns an error raised while handling a request into the response sent to the client: a
+	 * thrown status as is, anything else as problem details. Only server errors are reported
+	 * (`onError`, the `elysium:error` event and the trace); client errors are part of normal
+	 * operation.
+	 */
 	private async handleServerError(e: ServerError) {
-		if (middlewareStops.has(e.error)) return;
-		if (!(await this.onError(e))) return;
+		const error: any = unwrapParseError(e.error);
+
+		// A middleware that stopped the request already chose its response.
+		if (middlewareStops.has(error)) return;
+
+		// A thrown status is already a response.
+		if (error instanceof ElysiaStatus) {
+			if (Number(error.status) >= 500 && !(await this.reportError(e))) return;
+			return error;
+		}
+
+		const route = (e as { route?: string }).route;
+		const routeLevels =
+			((e as unknown as Record<symbol, unknown>)[FILTER_LEVELS] as FilterLevel[] | undefined) ??
+			(route ? this.#routeFilters.get(`${e.request.method} ${route}`) : undefined) ??
+			[];
+		const levels = [...routeLevels, this.#appFilters];
+		const filtered = await runFilters(levels, error, e as unknown as FilterContext);
+		if (filtered) return filtered.response;
+
+		const { problems } = this.props();
+		const problem = toProblem(error, {
+			...problems,
+			path: e.request ? new URL(e.request.url).pathname : undefined,
+			development: currentEnvironment() === 'development'
+		});
+
+		if (problem.status >= 500 && !(await this.reportError(e))) return;
+
+		return problemResponse(problem);
+	}
+
+	/**
+	 * Reports a server error: calls `onError`, emits `elysium:error` and traces it.
+	 * @returns `false` when `onError` handled the error itself.
+	 */
+	private async reportError(e: ServerError): Promise<boolean> {
+		if (!(await this.onError(e))) return false;
 
 		Event.emit('elysium:error', e);
 		this.trace({
 			name: 'HttpError',
 			message: 'Unexpected error while handling HTTP request',
-			stack: e.error.stack,
+			stack: e.error?.stack,
 			...e.error
 		});
-
-		// A thrown status is already a response.
-		if (e.error instanceof ElysiaStatus) return e.error;
-
-		// Elysia names its errors in kebab case ('not-found'); the response keeps the upper snake case
-		// names ('NOT_FOUND'), with UNKNOWN for errors Elysia did not raise.
-		const code = e.code ? e.code.toUpperCase().replaceAll('-', '_') : 'UNKNOWN';
-
-		let data = {};
-		switch (code) {
-			case 'VALIDATION':
-				data = { scope: e.error.type, code: e.error.message };
-				break;
-			case 'INTERNAL_SERVER_ERROR':
-				data = { message: e.error.message };
-				break;
-		}
-
-		return { type: code, data };
+		return true;
 	}
 
 	/**

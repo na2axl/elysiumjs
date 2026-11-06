@@ -14,7 +14,9 @@
 
 import type { Scenario } from './types';
 
-import { Application, Http, Module } from '@elysiumjs/core';
+import { Application, Http, Module, Service, ServiceScope } from '@elysiumjs/core';
+
+import { waitFor } from './wait';
 
 const make = async (): Promise<Application> => {
 	let counter = 0;
@@ -53,4 +55,60 @@ export const sse: Scenario = {
 			}
 		}
 	]
+};
+
+let destroyed = 0;
+
+const makeDisposal = async (): Promise<Application> => {
+	destroyed = 0;
+	let counter = 0;
+
+	@Service.register({ scope: ServiceScope.REQUEST })
+	class StreamSession {
+		public onDestroy() {
+			destroyed++;
+		}
+	}
+
+	@Http.controller({ path: '/stream' })
+	class StreamController {
+		@Http.sse()
+		public events(@Service.inject(StreamSession) session: StreamSession) {
+			return `tick ${++counter} ${session ? 'open' : 'none'} destroyed ${destroyed}`;
+		}
+	}
+
+	@Module.register({ services: [StreamSession], controllers: [StreamController] })
+	class StreamModule extends Module {}
+
+	@Application.register({ modules: [StreamModule], openapi: false })
+	class StreamApp extends Application {}
+
+	return new StreamApp();
+};
+
+/**
+ * The request scope of a streamed response lives as long as its body: nothing is disposed while
+ * events are sent, and the scope is disposed once, after the client cancels the stream.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export const sseDisposal: Scenario = {
+	name: 'sse: the request scope is disposed when the stream ends',
+	app: makeDisposal,
+	requests: [
+		{
+			request: () => new Request('http://localhost/stream'),
+			expect: {
+				status: 200,
+				headers: { 'content-type': 'text/event-stream' },
+				text: 'data: tick 1 open destroyed 0\n\ndata: tick 2 open destroyed 0\n\n'
+			}
+		}
+	],
+	after: async (_app, assert) => {
+		await waitFor(() => destroyed >= 1);
+		// Leave time for a second, wrong, disposal to show up.
+		await new Promise<void>((resolve) => setTimeout(resolve, 50));
+		assert.equal(destroyed, 1, 'request scope disposed once after the stream');
+	}
 };

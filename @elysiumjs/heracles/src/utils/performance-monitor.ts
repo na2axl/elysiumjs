@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { RedisConnection } from '@elysiumjs/redis';
+import type { RedisClientFactory, RedisConnection } from '@elysiumjs/redis';
 
 import { InteractsWithConsole } from '@elysiumjs/core';
-import { bunRedis } from '@elysiumjs/redis';
+import { bunRedis, Redis } from '@elysiumjs/redis';
 
 /**
  * Histogram for tracking distributions
@@ -203,7 +203,15 @@ export class PerformanceMonitor extends InteractsWithConsole {
 
 	constructor(
 		options: {
+			/**
+			 * The `RedisModule` connection to report to. The monitor reports on a duplicate of it,
+			 * created with the connection's own client.
+			 */
+			connection?: string;
+			/** The Redis server to report to, when no `connection` is given. */
 			redisUrl?: string;
+			/** Creates the client of `redisUrl`. Defaults to `bunRedis`. */
+			client?: RedisClientFactory;
 			keyPrefix?: string;
 			enableReporting?: boolean;
 			reportingInterval?: number;
@@ -248,19 +256,24 @@ export class PerformanceMonitor extends InteractsWithConsole {
 		this.metrics.set('worker.concurrency', this.workerConcurrency);
 		this.metrics.set('worker.memory.usage', this.workerMemoryUsage);
 
-		// Initialize Redis client if URL provided
-		if (options.redisUrl && options.enableReporting) {
-			this.initializeReporting(options.redisUrl, options.reportingInterval || 10000);
+		// Report to Redis when a connection or a URL is given
+		if (options.enableReporting && (options.connection || options.redisUrl)) {
+			const connect = options.connection
+				? () => Redis.getConnection(options.connection!).duplicate()
+				: async () =>
+						(options.client ?? bunRedis)(options.redisUrl!, { enableAutoPipelining: true });
+			this.initializeReporting(connect, options.reportingInterval || 10000);
 		}
 	}
 
 	/**
 	 * Initialize Redis reporting
 	 */
-	private async initializeReporting(redisUrl: string, interval: number): Promise<void> {
-		this.client = bunRedis(redisUrl, {
-			enableAutoPipelining: true
-		});
+	private async initializeReporting(
+		connect: () => Promise<RedisConnection>,
+		interval: number
+	): Promise<void> {
+		this.client = await connect();
 
 		await this.client.connect();
 
@@ -344,7 +357,7 @@ export class PerformanceMonitor extends InteractsWithConsole {
 		this.workerConcurrency.set(concurrency);
 
 		// Update memory usage
-		const memUsage = globalThis.process?.memoryUsage?.() ?? { heapUsed: 0 };
+		const memUsage = globalThis.process?.memoryUsage?.() ?? { heapUsed: 0 }; // portability-allow: optional metric, zero where the host has no process
 		this.workerMemoryUsage.set(memUsage.heapUsed / 1024 / 1024); // MB
 	}
 

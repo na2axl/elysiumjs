@@ -14,7 +14,9 @@
     "pretest:node": "bun run --cwd ../core build && bun run --cwd ../runtime-node build",
     "test:node": "vitest run -c vitest.node.config.ts",
     "pretest:workerd": "bun run --cwd ../core build && bun run --cwd ../runtime-workers build",
-    "test:workerd": "vitest run -c vitest.workerd.config.ts"
+    "test:workerd": "vitest run -c vitest.workerd.config.ts",
+    "pretest:workerd-aot": "bun run --cwd ../core build && bun run --cwd ../runtime-workers build && bun scripts/build-aot.ts",
+    "test:workerd-aot": "vitest run -c vitest.workerd-aot.config.ts"
   },
   "type": "module",
   "module": "src/index.ts",

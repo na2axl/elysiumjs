@@ -32,6 +32,51 @@ const collectHandlers = (app: Application): Handler[] =>
 			.flatMap((cls) => Workers.handlersOf(cls).map((meta) => ({ ...meta, node, cls })))
 	);
 
+/**
+ * Disposes the request scope once the response body has been sent, or cancelled by the client,
+ * so that a streamed body (server-sent events, generators) keeps its request services while it
+ * runs. Disposal outlives the response: it is handed to `waitUntil`, and the runtime keeps the
+ * Worker alive until it ends.
+ */
+const disposeAfterBody = (request: Request, response: Response): Response => {
+	const ctx = Workers.context();
+	const source = response.body;
+	if (!source || response.status === 101) {
+		ctx.waitUntil(Service.disposeRequestScope(request));
+		return response;
+	}
+
+	let ended!: () => void;
+	ctx.waitUntil(
+		new Promise<void>((resolve) => (ended = resolve)).then(() =>
+			Service.disposeRequestScope(request)
+		)
+	);
+
+	const reader = source.getReader();
+	const body = new ReadableStream<Uint8Array>({
+		async pull(controller) {
+			try {
+				const { done, value } = await reader.read();
+				if (done) {
+					controller.close();
+					ended();
+				} else {
+					controller.enqueue(value);
+				}
+			} catch (error) {
+				controller.error(error);
+				ended();
+			}
+		},
+		async cancel(reason) {
+			ended();
+			await reader.cancel(reason);
+		}
+	});
+	return new Response(body, response);
+};
+
 /** Runs a handler in its module, in a request scope of its own. */
 const runHandler = (handler: Handler, argument: unknown): Promise<void> =>
 	ModuleContext.run(handler.node, () =>
@@ -134,11 +179,12 @@ export const createWorker = async <Env = Record<string, unknown>>(
 		app: elysia,
 		fetch: (request, env, ctx) =>
 			runInvocation({ env: env as Record<string, unknown>, ctx }, async () => {
+				let response: Response | undefined;
 				try {
-					return await elysia.fetch(request);
+					response = await elysia.fetch(request);
+					return disposeAfterBody(request, response);
 				} finally {
-					// Disposal outlives the response: the runtime keeps the Worker alive until it ends.
-					Workers.context().waitUntil(Service.disposeRequestScope(request));
+					if (!response) Workers.context().waitUntil(Service.disposeRequestScope(request));
 				}
 			}),
 

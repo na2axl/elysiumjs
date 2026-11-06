@@ -14,6 +14,8 @@
 
 import { relative, resolve, sep } from 'node:path';
 
+import { ElysiumError } from '@elysiumjs/core';
+
 /** An npm package name, optionally scoped. No part may start with a dot. */
 const PACKAGE_NAME = /^(?:@([a-z0-9-~][a-z0-9-._~]*)\/)?([a-z0-9-~][a-z0-9-._~]*)$/;
 
@@ -24,7 +26,7 @@ const MODULE_NAME = /^[a-z][a-z0-9-]*$/;
  * Thrown when a project or module name given to `styx create` is not usable.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class InvalidNameError extends Error {
+export class InvalidNameError extends ElysiumError {
 	/**
 	 * @param kind What the name is for, such as `project` or `module`.
 	 * @param value The refused name.

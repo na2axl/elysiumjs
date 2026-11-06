@@ -34,6 +34,7 @@ import { Metadata } from '../src/metadata';
 import { Middleware } from '../src/middleware';
 import { Module } from '../src/module';
 import { ModuleContext } from '../src/module-context';
+import { Runtime } from '../src/runtime';
 import { Service } from '../src/service';
 import { nextTick, Symbols } from '../src/utils';
 
@@ -275,58 +276,6 @@ describe('Application class', () => {
 			new TestApp();
 
 			expect(initEnvSpy).toHaveBeenCalledWith(Bun.env);
-		});
-
-		it('should validate and handle invalid environment configuration when debug is enabled', () => {
-			const traceSpy = spyOn(Application.prototype, 'trace');
-			const schema = t.Object({ TEST_VAR: t.String() });
-			const errorFirstMock = {
-				keyword: 'type',
-				schemaPath: '#/properties/TEST_VAR',
-				instancePath: '/TEST_VAR',
-				params: { type: 'string' },
-				message: 'must be string'
-			} as TLocalizedValidationError;
-			const valueCheckSpy = spyOn(Value, 'Check').mockReturnValueOnce(false);
-			const valueErrorsSpy = spyOn(Value, 'Errors').mockReturnValueOnce([errorFirstMock]);
-			spyOn(Value, 'Convert').mockReturnValueOnce({});
-			const valueCleanSpy = spyOn(Value, 'Clean').mockReturnValueOnce({});
-			const initEnvSpy = spyOn(Env, 'initEnv');
-
-			@Application.register({ debug: true, env: schema })
-			class TestApp extends Application {}
-
-			new TestApp();
-
-			expect(valueCheckSpy).toHaveBeenCalled();
-			expect(valueErrorsSpy).toHaveBeenCalled();
-			expect(traceSpy).toHaveBeenCalledWith(errorFirstMock, 'Invalid environment configuration');
-			expect(valueCleanSpy).toHaveBeenCalled();
-			expect(initEnvSpy).toHaveBeenCalledWith({});
-		});
-
-		it('should properly initialize environment with Value.Clean result when env is provided', () => {
-			const valueCloneSpy = spyOn(Value, 'Clone').mockReturnValueOnce({ TEST_VAR: 'test_value' });
-			const valueConvertSpy = spyOn(Value, 'Convert').mockReturnValueOnce({
-				TEST_VAR: 'test_value'
-			});
-			spyOn(Value, 'Check').mockReturnValueOnce(true);
-			const valueCleanSpy = spyOn(Value, 'Clean').mockReturnValueOnce({
-				TEST_VAR: 'cleaned_value'
-			});
-			const initEnvSpy = spyOn(Env, 'initEnv');
-
-			const envSchema = t.Object({ TEST_VAR: t.String() });
-
-			@Application.register({ env: envSchema })
-			class TestApp extends Application {}
-
-			new TestApp();
-
-			expect(valueCloneSpy).toHaveBeenCalledWith(Bun.env);
-			expect(valueConvertSpy).toHaveBeenCalledWith(envSchema, { TEST_VAR: 'test_value' });
-			expect(valueCleanSpy).toHaveBeenCalled();
-			expect(initEnvSpy).toHaveBeenCalledWith({ TEST_VAR: 'cleaned_value' });
 		});
 	});
 
@@ -768,6 +717,25 @@ describe('Application class', () => {
 			expect(process.listeners('SIGTERM')).toHaveLength(signalListeners.SIGTERM.length);
 		});
 
+		it('should close the server handle the runtime returns on a signal', async () => {
+			const close = mock(async () => {});
+			const runtime = Runtime.get();
+			const serveSpy = spyOn(runtime, 'serve').mockImplementation(() => ({ close }));
+
+			@Application.register({ server: { port: 0 } })
+			class TestApp extends Application {}
+
+			const instance = new TestApp();
+			await instance.run(['serve']);
+			process.emit('SIGTERM');
+			await nextTick();
+			await nextTick();
+
+			expect(close).toHaveBeenCalledTimes(1);
+			expect(process.exit).toHaveBeenCalledWith(0);
+			serveSpy.mockRestore();
+		});
+
 		it('should print an ElysiumError raised in the graph phase and exit 1', async () => {
 			@Module.register({})
 			class BrokenModule extends Module {}
@@ -1008,7 +976,8 @@ describe('Application class', () => {
 
 			const response = await app.handle(new Request('http://localhost/greet/ada'));
 			expect(response.status).toBe(500);
-			expect(await response.json()).toMatchObject({ type: 'UNKNOWN' });
+			expect(response.headers.get('content-type')).toBe('application/problem+json');
+			expect(await response.json()).toMatchObject({ type: 'about:blank', status: 500 });
 			expect(initialised).toEqual(['greet']);
 			await instance.kernel.shutdown();
 		});
@@ -1548,7 +1517,7 @@ describe('Application class', () => {
 			const response = await request(instance, 'http://localhost/');
 
 			expect(response.status).toBe(500);
-			expect(await response.json()).toMatchObject({ type: 'UNKNOWN' });
+			expect(await response.json()).toMatchObject({ type: 'about:blank', status: 500 });
 
 			expect(onErrorSpy).toHaveBeenCalledWith(expect.anything());
 			expect(emitSpy).toHaveBeenCalledWith('elysium:error', expect.anything());

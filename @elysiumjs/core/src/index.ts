@@ -52,6 +52,7 @@ export {
 	ModuleCycleError,
 	OutsideRequestScopeError,
 	ScopeMismatchError,
+	InterceptorNextCalledTwiceError,
 	ServiceNotFoundError,
 	ServiceNotReadyError,
 	ServiceNotVisibleError
@@ -61,8 +62,23 @@ export { Kernel, KERNEL_SERVICE } from './kernel';
 export { type ConfiguredModule, type ModuleClass, type ModuleProps, Module } from './module';
 export { ModuleContext } from './module-context';
 export { type ModuleGraph, type ModuleNode } from './module-graph';
-export { type TestingApp, type TestingOptions, resetContainer } from './testing';
 export {
+	type TestingApp,
+	type TestingAppOptions,
+	type TestingHttpApp,
+	type TestingOptions,
+	resetContainer
+} from './testing';
+export {
+	type HttpTestClient,
+	type RequestHandler,
+	type TestResponse,
+	createHttpClient,
+	TestRequest,
+	UnexpectedStatusError
+} from './http-client';
+export {
+	type ServeHandle,
 	type ShutdownSignal,
 	Runtime,
 	RuntimeNotConfiguredError,
@@ -106,3 +122,43 @@ export interface AppHttpContext {
 export interface AppEnv {
 	[key: string]: string;
 }
+export {
+	type DomainErrorProps,
+	type ProblemContext,
+	type ProblemDetails,
+	type ProblemOptions,
+	type ProblemValidationError,
+	DomainError,
+	isProblemDetails,
+	PROBLEM_CONTENT_TYPE,
+	ProblemDetailsSchema,
+	problemResponse,
+	statusTitle,
+	toProblem,
+	validationErrors
+} from './problem';
+export { type ExceptionFilter, type FilterClass, type FilterContext, Catch } from './filter';
+export {
+	type Interceptor,
+	type InterceptorClass,
+	type InterceptorContext,
+	TimingInterceptor,
+	TransformInterceptor
+} from './interceptor';
+export {
+	type EnvironmentIssue,
+	ConflictingEnvironmentSchemaError,
+	InvalidEnvironmentError,
+	mergeEnvironmentSchemas,
+	Secret,
+	validateEnvironment
+} from './config';
+export {
+	type CorsOptions,
+	type HttpOptions,
+	type SecurityHeadersOptions,
+	clientAddress,
+	DEFAULT_BODY_LIMIT,
+	InvalidCorsOptionsError,
+	PayloadTooLargeError
+} from './security';

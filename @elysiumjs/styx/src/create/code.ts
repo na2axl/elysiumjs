@@ -14,21 +14,28 @@
 
 import { pascal } from 'radash';
 
+import { elysiumVersions } from './versions' with { type: 'macro' };
+
 /** The ranges of the third-party tools features add, as in the root package.json of the monorepo. */
 const TOOL_VERSIONS: Record<string, string> = {
 	prettier: '^3.9.10',
 	'@ianvs/prettier-plugin-sort-imports': '^4.7.1'
 };
 
+/** The versions of the `@elysiumjs/*` packages Styx was released with. */
+const ELYSIUM_VERSIONS = elysiumVersions();
+
 /**
- * The version range written to the `package.json` of a new project for a package: `latest` for
- * `@elysiumjs/*` (each package has its own version), a known range for the tools features add.
+ * The version range written to the `package.json` of a new project for a package: a caret range
+ * on the version released with Styx for `@elysiumjs/*` (each package has its own version), a
+ * known range for the tools features add.
  * @author Axel Nana <axel.nana@workbud.com>
  * @param name The package name.
  * @throws When no version is known for the package.
  */
 export const versionFor = (name: string): string => {
-	if (name.startsWith('@elysiumjs/')) return 'latest';
+	const elysium = ELYSIUM_VERSIONS[name];
+	if (elysium) return `^${elysium}`;
 	const range = TOOL_VERSIONS[name];
 	if (!range) throw new Error(`No version is known for ${name}.`);
 	return range;

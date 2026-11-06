@@ -21,6 +21,7 @@ import type { ModuleNode } from './module-graph';
 import { ElysiaStatus } from 'elysia';
 
 import { Application } from './app';
+import { Container } from './container';
 import { getLogger } from './logger';
 import { Metadata } from './metadata';
 import { ModuleContext } from './module-context';
@@ -50,12 +51,18 @@ export const executeMiddlewareChain = (
 		}
 	};
 
-	return Application.context.run(
-		new Map([
-			['tenant', context.tenant],
-			['http:context', context]
-		]),
-		() => (node ? ModuleContext.run(node, chain) : chain())
+	// Every hook of a request joins the request scope keyed by its Request, so that app and module
+	// middlewares see the same request-scoped services as the handler.
+	return Container.runInRequestScope(
+		() =>
+			Application.context.run(
+				new Map([
+					['tenant', context.tenant],
+					['http:context', context]
+				]),
+				() => (node ? ModuleContext.run(node, chain) : chain())
+			),
+		context.request ?? context
 	);
 };
 

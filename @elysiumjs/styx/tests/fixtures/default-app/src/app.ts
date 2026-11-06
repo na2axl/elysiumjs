@@ -15,8 +15,9 @@
 import { Application, Module } from '@elysiumjs/core';
 
 import PostController from './post.controller';
+import UserProfileController from './user-profile.controller';
 
-@Module.register({ controllers: [PostController] })
+@Module.register({ controllers: [PostController, UserProfileController] })
 export class DefaultModule extends Module {}
 
 @Application.register({ modules: [DefaultModule], openapi: false })

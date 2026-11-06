@@ -19,6 +19,7 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { ElysiumError } from '@elysiumjs/core';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { listAssets, readAsset, useEmbeddedAssets } from '../src/assets';
@@ -93,8 +94,10 @@ describe('createProject', () => {
 		);
 		const pkg = await Bun.file(join(path, 'package.json')).json();
 
-		expect(pkg.dependencies['@elysiumjs/runtime-bun']).toBe('latest');
-		expect(pkg.dependencies['@elysiumjs/plugin-sentry']).toBe('latest');
+		const versionOf = async (dir: string) =>
+			`^${(await Bun.file(new URL(`../../${dir}/package.json`, import.meta.url)).json()).version}`;
+		expect(pkg.dependencies['@elysiumjs/runtime-bun']).toBe(await versionOf('runtime-bun'));
+		expect(pkg.dependencies['@elysiumjs/plugin-sentry']).toBe(await versionOf('plugin-sentry'));
 		expect(pkg.devDependencies.prettier).toBe('^3.9.10');
 		expect(commands).toEqual([]);
 	});
@@ -155,6 +158,10 @@ describe('createProject', () => {
 	});
 
 	describe('names and paths', () => {
+		it('reports invalid names as Elysium errors, which the CLI prints without a stack', () => {
+			expect(new InvalidNameError('project', 'x', 'reason')).toBeInstanceOf(ElysiumError);
+		});
+
 		it('refuses absolute, dot and parent names before touching the disk', async () => {
 			const project = join(dir, 'inner');
 			await mkdir(project, { recursive: true });

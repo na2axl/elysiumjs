@@ -13,12 +13,9 @@
 // limitations under the License.
 
 /**
- * KNOWN GAP: this lane runs Elysia's just-in-time compiled handlers, built from strings through
- * the Vitest integration's `unsafeEval`, while deployed Workers run handlers compiled ahead of
- * time by `elysia/plugin/aot`, with no code generation. The AOT path is only covered by the
- * `check:aot` and `check:wrangler` gates of `@elysiumjs/runtime-workers`, on one sample app. The
- * AOT plugin compiles the single app a build entry exports, at build time (its Vite plugin only
- * applies to `vite build`), while the scenarios build a fresh app per test in the test isolate.
+ * This lane runs Elysia's just-in-time compiled handlers, built from strings through the Vitest
+ * integration's `unsafeEval`. The workerd AOT lane (`vitest.workerd-aot.config.ts`) runs the same
+ * scenarios as Workers compiled ahead of time by `elysia/plugin/aot`, without code generation.
  *
  * Setup of the workerd lane, run in the test isolate before each test file.
  *
@@ -26,8 +23,8 @@
  *    integration routes `new Function` to workerd's `unsafeEval`, which takes one name per
  *    parameter: Elysia passes some as one comma-separated string (`'rt,fre,c'`), and calls
  *    `Function` without `new` in places. This splits the names and treats a call as `new`.
- *    Deployed Workers compile ahead of time with `elysia/plugin/aot` instead (see the
- *    `check:aot` and `check:wrangler` gates of `@elysiumjs/runtime-workers`).
+ *    Deployed Workers compile ahead of time with `elysia/plugin/aot` instead (see the workerd
+ *    AOT lane).
  * 2. workerd emits `unhandledRejection` as soon as a promise rejects without a handler, and
  *    `rejectionHandled` when one is attached a few microtasks later, such as when an async
  *    function returns a rejected promise to an awaiting caller. Node.js only reports the

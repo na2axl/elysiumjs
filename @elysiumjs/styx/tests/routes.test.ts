@@ -100,6 +100,18 @@ describe('default exported controllers', () => {
 		expect(output).not.toContain('import type { default }');
 		expect(output).toContain("PostController['list']");
 	});
+
+	it('names an anonymous default-exported controller after its file', async () => {
+		const fixtureDir = join(import.meta.dir, 'fixtures', 'default-app');
+		const out = join(fixtureDir, 'src', 'routes.gen.ts');
+		const { modules } = await collectRoutes(fixtureDir, DefaultApp, out);
+		const output = renderRoutes(modules);
+
+		expect(output).toContain(
+			"import type { default as UserProfileController } from './user-profile.controller';"
+		);
+		expect(output).toContain("UserProfileController['show']");
+	});
 });
 
 describe('renderRoutes', () => {

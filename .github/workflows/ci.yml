@@ -46,8 +46,9 @@ jobs:
           bun run test:scripts
           bun run check:portability
 
-  # The conformance scenarios, on each runtime: Bun, Node.js (Vitest) and workerd (Vitest in the
-  # Workers runtime).
+  # The conformance scenarios, on each runtime: Bun, Node.js (Vitest), workerd (Vitest in the
+  # Workers runtime), and workerd again with each scenario compiled ahead of time as a deployed
+  # Worker is, without code generation from strings.
   conformance:
     name: Conformance (${{ matrix.lane }})
     needs: quality
@@ -56,7 +57,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        lane: [bun, node, workerd]
+        lane: [bun, node, workerd, workerd-aot]
 
     steps:
       - uses: actions/checkout@v4
@@ -76,6 +77,11 @@ jobs:
       # Every lane imports the packages through their built `dist`.
       - name: Build
         run: bun run build
+
+      - name: Compile the scenarios ahead of time
+        if: matrix.lane == 'workerd-aot'
+        working-directory: "@elysiumjs/conformance"
+        run: bun scripts/build-aot.ts
 
       # Vitest is called directly in the Node.js and workerd lanes: their `test:*` scripts rebuild
       # through `pretest:*`, which the step above already did.

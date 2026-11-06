@@ -14,6 +14,8 @@
 
 import type { WorkersKVNamespace } from './types';
 
+import { getLogger } from '@elysiumjs/core';
+
 import { Workers } from './workers';
 
 /**
@@ -27,13 +29,23 @@ export type KeyvWorkersKVOptions = {
 	namespace?: string;
 	/** The separator between the namespace and the key. Defaults to `::`. */
 	keyPrefixSeparator?: string;
+	/**
+	 * The most KV operations (one per listed page, one per deleted key) one `clear()` makes, so
+	 * that it stays within the subrequest limit of an invocation. Defaults to 900, under the 1000
+	 * of the paid plan; set 45 on the free plan. Keys left over are logged, and the next
+	 * `clear()` goes on with them.
+	 */
+	maxOperations?: number;
 };
 
 /** Workers KV refuses expirations shorter than 60 seconds. */
 const MIN_TTL_SECONDS = 60;
 
-/** Keys deleted at once by `clear()`, to stay within the subrequest limits. */
+/** Keys deleted at once by `clear()`, to stay within the concurrency limits. */
 const KV_DELETE_CHUNK = 50;
+
+/** The default operation budget of `clear()`. */
+const DEFAULT_MAX_OPERATIONS = 900;
 
 /**
  * A Keyv store over Workers KV, for the caches of `@elysiumjs/mnemosyne`.
@@ -54,12 +66,14 @@ export class KeyvWorkersKV {
 	public namespace: string | undefined;
 	readonly #binding: string;
 	readonly #separator: string;
+	readonly #maxOperations: number;
 	readonly #listeners = new Map<string, Array<(...args: any[]) => void>>();
 
 	constructor(options: KeyvWorkersKVOptions) {
 		this.#binding = options.binding;
 		this.namespace = options.namespace;
 		this.#separator = options.keyPrefixSeparator ?? '::';
+		this.#maxOperations = Math.max(2, options.maxOperations ?? DEFAULT_MAX_OPERATIONS);
 	}
 
 	public get opts() {
@@ -115,20 +129,40 @@ export class KeyvWorkersKV {
 		return deleted.some(Boolean);
 	}
 
-	/** Deletes every key of the namespace, or every key of the KV namespace without one. */
+	/**
+	 * Deletes every key of the namespace, or every key of the KV namespace without one, within the
+	 * `maxOperations` budget. When the budget runs out, the keys left are logged as a warning and
+	 * stay for the next `clear()`.
+	 */
 	public async clear(): Promise<void> {
 		const kv = this.#kv();
 		const prefix = this.namespace ? `${this.namespace}${this.#separator}` : undefined;
-		// Every page is listed before deleting, so that deletions do not move the cursor.
+		let budget = this.#maxOperations;
+		// The pages are listed before deleting, so that deletions do not move the cursor. Listing
+		// stops once the keys found use up the rest of the budget.
 		const names: string[] = [];
 		let cursor: string | undefined;
 		do {
 			const page = await kv.list({ prefix, cursor });
+			budget--;
 			names.push(...page.keys.map(({ name }) => name));
 			cursor = page.list_complete ? undefined : page.cursor;
-		} while (cursor);
-		for (let i = 0; i < names.length; i += KV_DELETE_CHUNK) {
-			await Promise.all(names.slice(i, i + KV_DELETE_CHUNK).map((name) => kv.delete(name)));
+		} while (cursor && budget > names.length + 1);
+
+		const deleting = names.slice(0, Math.max(0, budget));
+		for (let i = 0; i < deleting.length; i += KV_DELETE_CHUNK) {
+			await Promise.all(deleting.slice(i, i + KV_DELETE_CHUNK).map((name) => kv.delete(name)));
+		}
+
+		const left = names.length - deleting.length;
+		if (left > 0 || cursor) {
+			getLogger().warn('KV clear() stopped at its operation budget; call it again for the rest', {
+				binding: this.#binding,
+				namespace: this.namespace,
+				deleted: deleting.length,
+				remaining: cursor ? `${left} listed, more not listed` : left,
+				maxOperations: this.#maxOperations
+			});
 		}
 	}
 

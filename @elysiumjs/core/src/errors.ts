@@ -276,3 +276,16 @@ export class ScopeMismatchError extends ElysiumError {
 		);
 	}
 }
+
+/**
+ * Thrown when an interceptor calls `next()` more than once, which would run the handler twice.
+ *
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class InterceptorNextCalledTwiceError extends ElysiumError {
+	constructor(public readonly interceptor: string) {
+		super(
+			`Interceptor "${interceptor}" called next() more than once. Call it once, and keep its result.`
+		);
+	}
+}

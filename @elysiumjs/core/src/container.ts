@@ -97,6 +97,8 @@ type Instantiation = { instance: unknown; ready: Promise<void> | undefined };
 
 const GLOBAL_OWNER = '<global>';
 
+const isDefined = <T>(value: T | undefined): value is T => value !== undefined;
+
 const globalScope = new Map<ServiceToken, ContainerEntry>();
 const moduleScopes = new Map<ModuleNode, Map<ServiceToken, ContainerEntry>>();
 const requestStorage = new AsyncLocalStorage<RequestStore>();
@@ -667,11 +669,22 @@ export namespace Container {
 	/**
 	 * Forgets the singletons whose `onInit` failed, so that the next resolution builds them
 	 * again.
+	 * @param nodes The modules of the application to retry: only their services, and the global
+	 * services they own, are forgotten, so that two applications in one process do not reset each
+	 * other's failures. Every failed singleton when omitted.
 	 */
-	export function forgetFailures(): void {
+	export function forgetFailures(nodes?: readonly ModuleNode[]): void {
+		const within = nodes ? new Set(nodes) : undefined;
+		const scopes = within
+			? [globalScope, ...[...within].map((node) => moduleScopes.get(node)).filter(isDefined)]
+			: [globalScope, ...moduleScopes.values()];
 		const failed = new Set<ContainerEntry>();
-		for (const entries of [globalScope, ...moduleScopes.values()]) {
-			for (const entry of entries.values()) if (entry.initFailure) failed.add(entry);
+		for (const entries of scopes) {
+			for (const entry of entries.values()) {
+				if (!entry.initFailure) continue;
+				if (within && !(entry.owner && within.has(entry.owner))) continue;
+				failed.add(entry);
+			}
 		}
 		for (const entry of failed) {
 			delete entry.instance;
