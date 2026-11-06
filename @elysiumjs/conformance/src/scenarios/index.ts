@@ -21,6 +21,7 @@ import { lifecycle } from './lifecycle';
 import { middleware } from './middleware';
 import { problems } from './problems';
 import { routing } from './routing';
+import { security } from './security';
 import { sse } from './sse';
 import { validation } from './validation';
 
@@ -42,6 +43,7 @@ export const scenarios = [
 	filters,
 	interceptors,
 	config,
+	security,
 	lifecycle,
 	sse
 ];

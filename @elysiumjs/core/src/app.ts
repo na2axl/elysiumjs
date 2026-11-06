@@ -23,6 +23,7 @@ import type { ConfiguredModule, ModuleClass } from './module';
 import type { ModuleGraph, ModuleNode } from './module-graph';
 import type { ProblemOptions } from './problem';
 import type { Runtime as RuntimePort } from './runtime';
+import type { HttpOptions } from './security';
 import type { TestingApp, TestingAppOptions, TestingHttpApp, TestingOptions } from './testing';
 import type { ElysiaPlugin } from './utils';
 
@@ -46,8 +47,9 @@ import { Metadata } from './metadata';
 import { applyMiddlewares, middlewareStops } from './middleware';
 import { ModuleContext } from './module-context';
 import { buildModuleGraph } from './module-graph';
-import { problemResponse, toProblem } from './problem';
+import { problemResponse, toProblem, unwrapParseError } from './problem';
 import { Runtime } from './runtime';
+import { applyHttpSecurity } from './security';
 import { Service } from './service';
 import { createTestingApp, createTestingHttpApp } from './testing';
 import { currentEnvironment, deepMerge, Symbols } from './utils';
@@ -121,6 +123,12 @@ export type AppProps = {
 
 	/** Interceptors around every request handler, outside those of the modules. */
 	interceptors?: InterceptorClass[];
+
+	/**
+	 * HTTP security: CORS, security headers, the request body limit (1 MiB by default) and the
+	 * trusted proxies that give `ctx.ip`.
+	 */
+	http?: HttpOptions;
 };
 
 /** The options of the root Elysia app. */
@@ -608,6 +616,8 @@ export abstract class Application extends InteractsWithConsole {
 				(ctx as { tenant?: string }).tenant ?? ctx.request.headers.get('x-tenant-id') ?? 'public'
 		}));
 
+		applyHttpSecurity(this.#elysia, this.props().http);
+
 		if (openapi) {
 			this.#elysia.use(openapiPlugin(openapi));
 		}
@@ -699,7 +709,7 @@ export abstract class Application extends InteractsWithConsole {
 	 * operation.
 	 */
 	private async handleServerError(e: ServerError) {
-		const error = e.error;
+		const error: any = unwrapParseError(e.error);
 
 		// A middleware that stopped the request already chose its response.
 		if (middlewareStops.has(error)) return;

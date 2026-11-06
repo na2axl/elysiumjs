@@ -55,6 +55,7 @@ export const createRuntime = (options: WorkersRuntimeOptions = {}): Runtime => (
 		else console.log(line);
 	},
 	terminal: () => undefined,
+	clientAddress: (request) => request.headers.get('cf-connecting-ip') ?? undefined,
 	onShutdown() {
 		return () => {};
 	}

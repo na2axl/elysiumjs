@@ -152,3 +152,12 @@ export {
 	Secret,
 	validateEnvironment
 } from './config';
+export {
+	type CorsOptions,
+	type HttpOptions,
+	type SecurityHeadersOptions,
+	clientAddress,
+	DEFAULT_BODY_LIMIT,
+	InvalidCorsOptionsError,
+	PayloadTooLargeError
+} from './security';

@@ -14,9 +14,9 @@
 
 import type { Runtime } from '@elysiumjs/core';
 
-import { serveNode } from './serve';
+import { peerAddress, serveNode } from './serve';
 
-export { type FetchHandler, serveNode } from './serve';
+export { type FetchHandler, peerAddress, serveNode } from './serve';
 
 const SIGNALS = ['SIGINT', 'SIGTERM'] as const;
 
@@ -33,6 +33,7 @@ export const runtime: Runtime = {
 	serve(app, port) {
 		serveNode(async (request) => app.fetch(request), port);
 	},
+	clientAddress: peerAddress,
 	exit(code) {
 		process.exit(code);
 	},

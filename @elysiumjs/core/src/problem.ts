@@ -169,6 +169,18 @@ export const isProblemDetails = (value: unknown): value is ProblemDetails =>
 	typeof (value as ProblemDetails).title === 'string' &&
 	typeof (value as ProblemDetails).type === 'string';
 
+/**
+ * Elysia wraps anything thrown while parsing the body (such as a body over the size limit) in a
+ * parse error. Returns the wrapped error when it is a {@link DomainError}, so that it keeps its
+ * own status, and the error itself otherwise.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param error The thrown value.
+ */
+export const unwrapParseError = (error: unknown): unknown => {
+	const wrapped = error as { code?: unknown; cause?: unknown } | null;
+	return wrapped?.code === 'parse' && wrapped.cause instanceof DomainError ? wrapped.cause : error;
+};
+
 const escapePointer = (segment: string) => segment.replaceAll('~', '~0').replaceAll('/', '~1');
 
 /** Joins a request part and a validator path (`root`, `email`, `items.0.name`) into a pointer. */

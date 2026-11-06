@@ -16,6 +16,9 @@ import type { Runtime } from '@elysiumjs/core';
 
 const SIGNALS = ['SIGINT', 'SIGTERM'] as const;
 
+/** The server started by `serve`, which knows the peer address of its requests. */
+let server: { requestIP(request: Request): { address: string } | null } | undefined;
+
 /**
  * The Elysium runtime for Bun.
  *
@@ -31,7 +34,9 @@ export const runtime: Runtime = {
 	sleep: (ms) => Bun.sleep(ms),
 	serve(app, port) {
 		app.listen(port);
+		server = app.server ?? undefined;
 	},
+	clientAddress: (request) => server?.requestIP(request)?.address,
 	exit(code) {
 		process.exit(code);
 	},

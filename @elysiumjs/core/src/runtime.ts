@@ -84,6 +84,13 @@ export interface Runtime {
 	 * The interactive terminal, or `undefined` on runtimes without one.
 	 */
 	terminal(): RuntimeTerminal | undefined;
+
+	/**
+	 * The address of the client that sent a request, as the host sees it (before any proxy
+	 * headers), or `undefined` when unknown.
+	 * @param request The request.
+	 */
+	clientAddress?(request: Request): string | undefined;
 }
 
 /**
