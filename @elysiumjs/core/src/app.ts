@@ -48,7 +48,7 @@ import { Metadata } from './metadata';
 import { applyMiddlewares, middlewareStops, runErrorMiddlewares } from './middleware';
 import { ModuleContext } from './module-context';
 import { buildModuleGraph } from './module-graph';
-import { problemResponse, toProblem, unwrapParseError } from './problem';
+import { DomainError, problemResponse, requestIdOf, toProblem, unwrapParseError } from './problem';
 import { Runtime } from './runtime';
 import { applyHttpSecurity } from './security';
 import { Service } from './service';
@@ -640,6 +640,7 @@ export abstract class Application extends InteractsWithConsole {
 		}));
 
 		applyHttpSecurity(this.#elysia, this.props().http);
+		DomainError.typeBase = this.props().problems?.typeBase;
 
 		if (openapi) {
 			this.#elysia.use(openapiPlugin(openapi));
@@ -755,9 +756,11 @@ export abstract class Application extends InteractsWithConsole {
 		if (filtered) return filtered.response;
 
 		const { problems } = this.props();
+		const { requestId, ...options } = problems ?? {};
 		const problem = toProblem(error, {
-			...problems,
+			...options,
 			path: e.request ? new URL(e.request.url).pathname : undefined,
+			requestId: e.request ? requestIdOf(e.request, requestId) : undefined,
 			development: currentEnvironment() === 'development'
 		});
 
@@ -765,7 +768,9 @@ export abstract class Application extends InteractsWithConsole {
 
 		// Headers set by the request, such as by an onError middleware, go on the problem response.
 		const headers = Object.fromEntries(
-			Object.entries(e.set?.headers ?? {}).map(([name, value]) => [name, String(value)])
+			Object.entries({ ...e.set?.headers, ...(error as DomainError).headers }).map(
+				([name, value]) => [name, String(value)]
+			)
 		);
 		return problemResponse(problem, headers);
 	}

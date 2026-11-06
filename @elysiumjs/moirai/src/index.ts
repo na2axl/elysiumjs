@@ -14,6 +14,8 @@
 
 export {
 	type CommandOptions,
+	type CommandOutcome,
+	type CommandRetry,
 	Commands,
 	effectHandler,
 	type Handler,
@@ -22,6 +24,7 @@ export {
 	Moirai,
 	Queries,
 	type QueryOptions,
+	type QueryOutcome,
 	registerEffect
 } from './command';
 export {

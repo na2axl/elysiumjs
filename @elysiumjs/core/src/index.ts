@@ -133,18 +133,31 @@ export interface AppEnv {
 	[key: string]: string;
 }
 export {
-	type DomainErrorProps,
+	type DomainErrorOptions,
+	type ElysiumProblemCode,
+	type ProblemCatalogue,
+	type ProblemCode,
 	type ProblemContext,
 	type ProblemDetails,
 	type ProblemOptions,
 	type ProblemValidationError,
+	BadRequestError,
+	ConflictError,
 	DomainError,
+	ELYSIUM_PROBLEM_CODES,
+	ForbiddenError,
+	isDomainError,
 	isProblemDetails,
+	NotFoundError,
 	PROBLEM_CONTENT_TYPE,
 	ProblemDetailsSchema,
 	problemResponse,
+	problemType,
+	requestIdOf,
 	statusTitle,
 	toProblem,
+	UnauthenticatedError,
+	ValidationFailedError,
 	validationErrors
 } from './problem';
 export { type ExceptionFilter, type FilterClass, type FilterContext, Catch } from './filter';

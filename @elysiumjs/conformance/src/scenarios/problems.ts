@@ -14,15 +14,26 @@
 
 import type { Scenario } from './types';
 
-import { Application, DomainError, Http, Module } from '@elysiumjs/core';
+import { Application, DomainError, Http, Module, NotFoundError } from '@elysiumjs/core';
 import { t } from 'elysia';
+
+class InsufficientFunds extends DomainError.for('INSUFFICIENT_FUNDS', 409) {
+	constructor(missing: number) {
+		super(`${missing} more are needed.`, { extensions: { missing } });
+	}
+}
 
 const make = async (): Promise<Application> => {
 	@Http.controller({ path: '/p' })
 	class ProblemController {
 		@Http.get({ path: '/missing' })
 		public missing() {
-			throw DomainError.notFound('No such post.', { postId: 7 });
+			throw new NotFoundError('No such post.', { extensions: { postId: 7 } });
+		}
+
+		@Http.post({ path: '/pay' })
+		public pay(): { paid: true } | InsufficientFunds {
+			return new InsufficientFunds(3);
 		}
 
 		@Http.get({ path: '/status' })
@@ -44,7 +55,11 @@ const make = async (): Promise<Application> => {
 	@Module.register({ controllers: [ProblemController] })
 	class ProblemModule extends Module {}
 
-	@Application.register({ modules: [ProblemModule], openapi: false })
+	@Application.register({
+		modules: [ProblemModule],
+		openapi: false,
+		problems: { typeBase: 'https://api.example.com/problems/' }
+	})
 	class ProblemApp extends Application {}
 
 	return new ProblemApp();
@@ -53,8 +68,9 @@ const make = async (): Promise<Application> => {
 const problemJson = { 'content-type': 'application/problem+json' };
 
 /**
- * Errors are rendered as RFC 9457 problem details: domain errors with their status, validation
- * errors with JSON pointers, unexpected errors as 500. A thrown status is sent as is.
+ * Errors are rendered as RFC 9457 problem details with a `code` and the request id: domain errors
+ * thrown or returned with their status, validation errors with JSON pointers, unexpected errors
+ * as 500. A thrown status is sent as is.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export const problems: Scenario = {
@@ -62,17 +78,33 @@ export const problems: Scenario = {
 	app: make,
 	requests: [
 		{
-			request: () => new Request('http://localhost/p/missing'),
+			request: () =>
+				new Request('http://localhost/p/missing', { headers: { 'x-request-id': 'req-1' } }),
 			expect: {
 				status: 404,
 				headers: problemJson,
 				json: {
-					postId: 7,
-					type: 'about:blank',
+					type: 'https://api.example.com/problems/not-found',
 					title: 'Not Found',
 					status: 404,
+					code: 'NOT_FOUND',
 					detail: 'No such post.',
+					postId: 7,
+					requestId: 'req-1',
 					instance: '/p/missing'
+				}
+			}
+		},
+		{
+			request: () => new Request('http://localhost/p/pay', { method: 'POST' }),
+			expect: {
+				status: 409,
+				headers: problemJson,
+				includes: {
+					type: 'https://api.example.com/problems/insufficient-funds',
+					code: 'INSUFFICIENT_FUNDS',
+					detail: '3 more are needed.',
+					missing: 3
 				}
 			}
 		},
@@ -86,10 +118,11 @@ export const problems: Scenario = {
 			expect: {
 				status: 422,
 				headers: problemJson,
-				json: {
-					type: 'about:blank',
+				includes: {
+					type: 'https://api.example.com/problems/validation-failed',
 					title: 'Unprocessable Entity',
 					status: 422,
+					code: 'VALIDATION_FAILED',
 					detail: 'The request body is invalid.',
 					instance: '/p/signup',
 					errors: [{ pointer: '/body/age', message: 'is required', code: 'requiredProperties' }]
@@ -102,11 +135,11 @@ export const problems: Scenario = {
 		},
 		{
 			request: () => new Request('http://localhost/p/boom'),
-			expect: { status: 500, headers: problemJson }
+			expect: { status: 500, headers: problemJson, includes: { code: 'INTERNAL_ERROR' } }
 		},
 		{
 			request: () => new Request('http://localhost/nowhere'),
-			expect: { status: 404, headers: problemJson }
+			expect: { status: 404, headers: problemJson, includes: { code: 'NOT_FOUND' } }
 		}
 	]
 };

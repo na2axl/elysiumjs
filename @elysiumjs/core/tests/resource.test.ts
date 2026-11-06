@@ -101,7 +101,7 @@ describe('Resource.serialize', () => {
 		} catch (error) {
 			expect(error).toBeInstanceOf(DomainError);
 			expect((error as DomainError).status).toBe(400);
-			expect((error as DomainError).extensions.errors).toEqual([
+			expect((error as DomainError).errors).toEqual([
 				{ pointer: '/query/fields', message: 'unknown field "passwordHash"', code: 'fields' },
 				{ pointer: '/query/fields', message: 'unknown field "nope"', code: 'fields' }
 			]);

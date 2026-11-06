@@ -68,10 +68,41 @@ export type HandlerClass<TInput = any, TResult = any> = new (
 ) => Handler<TInput, TResult>;
 
 type InputOf<C extends HandlerClass> = Parameters<InstanceType<C>['handle']>[0];
-type ResultOf<C extends HandlerClass> = Exclude<
-	Awaited<ReturnType<InstanceType<C>['handle']>>,
-	DomainError
->;
+type OutcomeOf<C extends HandlerClass> = Awaited<ReturnType<InstanceType<C>['handle']>>;
+type ResultOf<C extends HandlerClass> = Exclude<OutcomeOf<C>, DomainError>;
+
+/**
+ * What `Commands.execute()` gives: the result, or the DomainError that refused the call, from the
+ * handler or from moirai itself.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type CommandOutcome<C extends HandlerClass> =
+	| OutcomeOf<C>
+	| InvalidInputError
+	| CommandForbiddenError
+	| IdempotencyKeyRequiredError
+	| IdempotencyKeyReusedError;
+
+/**
+ * What `Queries.ask()` gives: the result, or the DomainError that refused the call.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type QueryOutcome<C extends HandlerClass> =
+	OutcomeOf<C> | InvalidInputError | CommandForbiddenError;
+
+/**
+ * How a command retries a transient failure.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type CommandRetry = {
+	/** The attempts, the first included. Defaults to `maxAttempts` of the module. */
+	attempts?: number;
+	/**
+	 * Whether a failure, thrown or a returned DomainError, is transient. Defaults to `isTransient`
+	 * of the module.
+	 */
+	isTransient?: (error: unknown) => boolean;
+};
 
 /**
  * The options of a command.
@@ -102,8 +133,13 @@ export type CommandOptions<S extends TSchema = TSchema> = {
 	 * and replays it instead of racing it. Needs a `lock` store.
 	 */
 	serializeBy?: (input: Static<S>) => string;
-	/** Whether a transient failure retries in a new unit of work. Defaults to `true`. */
-	retry?: boolean;
+	/**
+	 * Whether a transient failure retries in a new unit of work. Defaults to `true`, with the
+	 * `maxAttempts` and `isTransient` of the module. An object sets them for this command, such as
+	 * an `isTransient` that also retries a returned `ConcurrencyConflict` error. A transient
+	 * DomainError that outlasts the attempts is returned like any refusal.
+	 */
+	retry?: boolean | CommandRetry;
 	/** Decides whether the call may run, such as with the abilities of the current user. */
 	authorize?: (input: Static<S>) => boolean | Promise<boolean>;
 };
@@ -204,17 +240,27 @@ const validate = <S extends TSchema>(schema: S, raw: unknown, name: string): Sta
 			name,
 			errors.map((error) => ({
 				pointer: `/${(error as { instancePath?: string }).instancePath?.replace(/^\//, '') ?? ''}`,
-				detail: error.message
+				message: error.message
 			}))
 		);
 	}
 	return value;
 };
 
-/** The result, or the DomainError it is thrown as. */
+/** The result, or the DomainError it is thrown as, so that the unit of work rolls back. */
 const unwrap = <T>(result: T | DomainError): T => {
 	if (result instanceof DomainError) throw result;
 	return result;
+};
+
+/** Runs a call, and gives the DomainError that refused it as its value. */
+const settle = async <T>(call: () => Promise<T>): Promise<T | DomainError> => {
+	try {
+		return await call();
+	} catch (error) {
+		if (error instanceof DomainError) return error;
+		throw error;
+	}
 };
 
 export namespace Commands {
@@ -222,20 +268,27 @@ export namespace Commands {
 	 * Runs a command: validates the input, checks `authorize`, then runs the handler in a unit of
 	 * work (or joins the open one), retrying transient failures, and replaying the stored response
 	 * of an idempotent command called again with the same key.
+	 *
+	 * A refusal is a value: the DomainError the handler returns or throws, or one of moirai's own
+	 * (an invalid input, a refused `authorize`, a missing or reused idempotency key). The unit of
+	 * work rolls back, nothing is stored for idempotency, and the error is returned, so a handler
+	 * that returns it sends it as the problem of its route.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param command The command class.
 	 * @param input The raw input.
 	 * @param call The idempotency key of the call.
-	 * @throws {InvalidInputError} When the input does not match the schema (400).
-	 * @throws {CommandForbiddenError} When `authorize` refuses the call (403).
-	 * @throws {IdempotencyKeyRequiredError} When an idempotent command gets no key (428).
-	 * @throws {IdempotencyKeyReusedError} When the key was used for another request (422).
-	 * @throws {DomainError} When the handler refuses the call.
 	 */
-	export const execute = async <C extends HandlerClass>(
+	export const execute = <C extends HandlerClass>(
 		command: C,
 		input: InputOf<C>,
 		call: { idempotencyKey?: string; scope?: string } = {}
+	): Promise<CommandOutcome<C>> =>
+		settle(() => run(command, input, call)) as Promise<CommandOutcome<C>>;
+
+	const run = async <C extends HandlerClass>(
+		command: C,
+		input: InputOf<C>,
+		call: { idempotencyKey?: string; scope?: string }
 	): Promise<ResultOf<C>> => {
 		const props = Metadata.get(COMMAND, command) as (CommandOptions & { name: string }) | undefined;
 		if (!props) throw new TypeError(`${command.name} is not marked with @Moirai.command().`);
@@ -295,7 +348,10 @@ export namespace Commands {
 					? await UnitOfWork.run(() => body(attempt), { connection: props.connection })
 					: await body(attempt);
 			} catch (error) {
-				const again = retry && attempt < config.maxAttempts && config.isTransient(error);
+				const policy = typeof retry === 'object' ? retry : {};
+				const attempts = retry === false ? 1 : (policy.attempts ?? config.maxAttempts);
+				const transient = policy.isTransient ?? config.isTransient;
+				const again = attempt < attempts && transient(error);
 				if (!again) throw error;
 			}
 		}
@@ -304,25 +360,23 @@ export namespace Commands {
 
 export namespace Queries {
 	/**
-	 * Runs a query: validates the input, checks `authorize`, and runs the handler.
+	 * Runs a query: validates the input, checks `authorize`, and runs the handler. A refusal is a
+	 * value: the DomainError the handler returns or throws, an invalid input, or a refused
+	 * `authorize`.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param query The query class.
 	 * @param input The raw input.
-	 * @throws {InvalidInputError} When the input does not match the schema (400).
-	 * @throws {CommandForbiddenError} When `authorize` refuses the call (403).
-	 * @throws {DomainError} When the handler refuses the call.
 	 */
-	export const ask = async <C extends HandlerClass>(
+	export const ask = <C extends HandlerClass>(
 		query: C,
 		input: InputOf<C>
-	): Promise<ResultOf<C>> => {
-		const props = Metadata.get(QUERY, query) as (QueryOptions & { name: string }) | undefined;
-		if (!props) throw new TypeError(`${query.name} is not marked with @Moirai.query().`);
-		const value = validate(props.input, input, props.name);
-		if (props.authorize && !(await props.authorize(value)))
-			throw new CommandForbiddenError(props.name);
-		return unwrap(
-			await instanceOf(query).handle(value, { name: props.name, attempt: 1 })
-		) as ResultOf<C>;
-	};
+	): Promise<QueryOutcome<C>> =>
+		settle(async () => {
+			const props = Metadata.get(QUERY, query) as (QueryOptions & { name: string }) | undefined;
+			if (!props) throw new TypeError(`${query.name} is not marked with @Moirai.query().`);
+			const value = validate(props.input, input, props.name);
+			if (props.authorize && !(await props.authorize(value)))
+				throw new CommandForbiddenError(props.name);
+			return instanceOf(query).handle(value, { name: props.name, attempt: 1 });
+		}) as Promise<QueryOutcome<C>>;
 }

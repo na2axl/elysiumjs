@@ -36,16 +36,17 @@ class WalletBalanceQuery {
 	}
 }
 
-// In a controller:
-await Commands.execute(TopUpCommand, body, { idempotencyKey: headers['idempotency-key'] });
-await Queries.ask(WalletBalanceQuery, { walletId });
+// In a controller, which returns the outcome: a result, or the DomainError that refused the call.
+return Commands.execute(TopUpCommand, body, { idempotencyKey: headers['idempotency-key'] });
+return Queries.ask(WalletBalanceQuery, { walletId });
 ```
 
-- An input that does not match the schema answers a 400 problem, with one entry per mistake.
-- When `authorize(input)` returns `false`, the call answers a 403 problem.
-- A command runs in a unit of work, or joins the one already open. A transient failure retries in a new unit of work, up to 3 attempts. Transient failures are errors with `transient: true`, and Postgres serialization failures and deadlocks.
-- A handler refuses a call by returning or throwing a `DomainError`. The unit of work then rolls back, and the error reaches the caller.
-- An idempotent command needs a key, or it answers a 428 problem. A repeat with the same key and input replays the stored response, as JSON; with another input, it answers a 422 problem.
+- A refusal is a value. `Commands.execute()` and `Queries.ask()` return the DomainError that refused the call, and their return type lists it next to the result. A controller that returns it sends it as the problem of its route, and typed clients see it under its status. Check one with `isDomainError(outcome)`.
+- An input that does not match the schema is refused with a 400 `VALIDATION_FAILED` problem, with one entry per mistake.
+- When `authorize(input)` returns `false`, the call is refused with a 403 `FORBIDDEN` problem.
+- A command runs in a unit of work, or joins the one already open. A transient failure retries in a new unit of work, up to 3 attempts. Transient failures are errors with `transient: true`, and Postgres serialization failures and deadlocks. `retry: { attempts, isTransient }` sets them per command, such as to retry a returned optimistic-concurrency error; `retry: false` never retries. A transient DomainError that outlasts the attempts is returned.
+- A handler refuses a call by returning a `DomainError`, or throwing one. The unit of work then rolls back, nothing is stored for idempotency, and the error is returned to the caller. A command that joined an open unit of work hands it up: the unit rolls back when its opener returns it too.
+- An idempotent command needs a key, or it is refused with a 428 `IDEMPOTENCY_KEY_REQUIRED` problem. A repeat with the same key and input replays the stored response, as JSON; with another input, it is refused with a 422 `IDEMPOTENCY_KEY_REUSED` problem.
 - A key belongs to its owner: the current user by default (`currentUserId()` of core, else `anonymous`), or what `scope(input)` of the command or `Commands.execute(..., { scope })` returns, such as a tenant and a user. Another owner presenting the same key runs the command on its own.
 - `serializeBy` makes calls that share a key run one after the other, so a double tap waits for the first call and replays its response.
 

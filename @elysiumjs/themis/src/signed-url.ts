@@ -21,9 +21,9 @@ import { assertStrongSecret } from './errors';
  * Raised when a signed URL was tampered with or has expired. Rendered as a 403 problem.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class InvalidSignatureError extends DomainError {
+export class InvalidSignatureError extends DomainError.for('INVALID_SIGNATURE', 403) {
 	constructor(expired: boolean) {
-		super({ status: 403, detail: expired ? 'This link has expired.' : 'This link is not valid.' });
+		super(expired ? 'This link has expired.' : 'This link is not valid.');
 	}
 }
 

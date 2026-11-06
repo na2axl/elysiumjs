@@ -15,7 +15,7 @@
 import type { ProblemValidationError, TObject, TSchema } from '@elysiumjs/core';
 import type { ModelClass } from './interfaces';
 
-import { DomainError } from '@elysiumjs/core';
+import { BadRequestError } from '@elysiumjs/core';
 import { t } from 'elysia';
 
 /**
@@ -256,7 +256,7 @@ export namespace Query {
 	 * @param spec The query spec.
 	 * @param query The query, as Elysia parses it (`filter[status]` keys stay flat).
 	 * @returns The parsed query, for a repository's `list()`.
-	 * @throws {DomainError} A 400 problem whose `errors` name every invalid parameter.
+	 * @throws {BadRequestError} A 400 problem whose `errors` name every invalid parameter.
 	 */
 	export const parse = (spec: QuerySpec, query: Record<string, unknown> = {}): ParsedQuery => {
 		const errors: ProblemValidationError[] = [];
@@ -359,7 +359,7 @@ export namespace Query {
 		}
 
 		if (errors.length > 0) {
-			throw DomainError.badRequest('The query is invalid.', { errors });
+			throw new BadRequestError('The query is invalid.', { errors });
 		}
 		return { filters, sort, after, limit };
 	};

@@ -16,7 +16,7 @@ import type { TSchema } from 'typebox';
 
 import { ElysiaStatus } from 'elysia';
 
-import { DomainError } from './problem';
+import { BadRequestError } from './problem';
 
 const HIDDEN = Symbol.for('elysium:Hidden');
 
@@ -157,7 +157,7 @@ export namespace Resource {
 	 * @param schema The response schema.
 	 * @param value The handler result.
 	 * @param options The sparse fieldset.
-	 * @throws {DomainError} A 400 problem when `fields` names a field the schema does not have.
+	 * @throws {BadRequestError} A 400 problem when `fields` names a field the schema does not have.
 	 */
 	export const serialize = (
 		schema: TSchema,
@@ -175,7 +175,7 @@ export namespace Resource {
 		);
 		const unknown = fields.filter((field) => !allowed.includes(field));
 		if (unknown.length > 0) {
-			throw DomainError.badRequest('The requested fields are not part of this resource.', {
+			throw new BadRequestError('The requested fields are not part of this resource.', {
 				errors: unknown.map((field) => ({
 					pointer: '/query/fields',
 					message: `unknown field "${field}"`,

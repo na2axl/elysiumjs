@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { ProblemValidationError } from '@elysiumjs/core';
+
 import { DomainError, ElysiumError } from '@elysiumjs/core';
 
 /**
@@ -19,13 +21,9 @@ import { DomainError, ElysiumError } from '@elysiumjs/core';
  * problem.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class IdempotencyKeyRequiredError extends DomainError {
+export class IdempotencyKeyRequiredError extends DomainError.for('IDEMPOTENCY_KEY_REQUIRED', 428) {
 	constructor(public readonly command: string) {
-		super({
-			status: 428,
-			detail: `The ${command} command needs an Idempotency-Key.`,
-			extensions: { command }
-		});
+		super(`The ${command} command needs an Idempotency-Key.`, { extensions: { command } });
 	}
 }
 
@@ -34,11 +32,9 @@ export class IdempotencyKeyRequiredError extends DomainError {
  * 422 problem.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class IdempotencyKeyReusedError extends DomainError {
+export class IdempotencyKeyReusedError extends DomainError.for('IDEMPOTENCY_KEY_REUSED', 422) {
 	constructor(public readonly key: string) {
-		super({
-			status: 422,
-			detail: 'This Idempotency-Key was already used for another request.',
+		super('This Idempotency-Key was already used for another request.', {
 			extensions: { idempotencyKey: key }
 		});
 	}
@@ -63,16 +59,12 @@ export class IdempotencyConflictError extends ElysiumError {
  * problem, with one entry per mistake in `errors`.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class InvalidInputError extends DomainError {
+export class InvalidInputError extends DomainError.for('VALIDATION_FAILED', 400) {
 	constructor(
 		public readonly target: string,
-		errors: { pointer: string; detail: string }[]
+		errors: readonly ProblemValidationError[]
 	) {
-		super({
-			status: 400,
-			detail: `The input of ${target} is invalid.`,
-			extensions: { errors }
-		});
+		super(`The input of ${target} is invalid.`, { errors });
 	}
 }
 
@@ -80,9 +72,9 @@ export class InvalidInputError extends DomainError {
  * Raised when the `authorize` hook of a command refuses the call. Rendered as a 403 problem.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class CommandForbiddenError extends DomainError {
+export class CommandForbiddenError extends DomainError.for('FORBIDDEN', 403) {
 	constructor(public readonly command: string) {
-		super({ status: 403, detail: `You may not run the ${command} command.` });
+		super(`You may not run the ${command} command.`);
 	}
 }
 

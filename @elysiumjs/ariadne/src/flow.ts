@@ -215,8 +215,8 @@ export namespace Flow {
 	 * The `@Http.*()` parameter decorators work on it, and `@Flow.state()` and `@Flow.context()`
 	 * give the state and the flow.
 	 *
-	 * The step returns {@link advance}, {@link refuse}, or an answer that keeps the state. A thrown
-	 * error commits nothing, and the client may retry the same step id.
+	 * The step returns {@link advance}, {@link refuse}, or an answer that keeps the state. A
+	 * returned or thrown error commits nothing, and the client may retry the same step id.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 */
 	export const step = <S = any>(options: FlowStepOptions<S> = {}): MethodDecorator => {

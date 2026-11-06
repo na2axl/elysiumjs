@@ -977,7 +977,11 @@ describe('Application class', () => {
 			const response = await app.handle(new Request('http://localhost/greet/ada'));
 			expect(response.status).toBe(500);
 			expect(response.headers.get('content-type')).toBe('application/problem+json');
-			expect(await response.json()).toMatchObject({ type: 'about:blank', status: 500 });
+			expect(await response.json()).toMatchObject({
+				type: 'internal-error',
+				code: 'INTERNAL_ERROR',
+				status: 500
+			});
 			expect(initialised).toEqual(['greet']);
 			await instance.kernel.shutdown();
 		});
@@ -1517,7 +1521,11 @@ describe('Application class', () => {
 			const response = await request(instance, 'http://localhost/');
 
 			expect(response.status).toBe(500);
-			expect(await response.json()).toMatchObject({ type: 'about:blank', status: 500 });
+			expect(await response.json()).toMatchObject({
+				type: 'internal-error',
+				code: 'INTERNAL_ERROR',
+				status: 500
+			});
 
 			expect(onErrorSpy).toHaveBeenCalledWith(expect.anything());
 			expect(emitSpy).toHaveBeenCalledWith('elysium:error', expect.anything());

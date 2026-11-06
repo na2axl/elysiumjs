@@ -35,7 +35,7 @@ import { runInterceptors } from './interceptor';
 import { Metadata } from './metadata';
 import { applyMiddlewares, enlist, executeMiddlewareChain, makeMiddlewares } from './middleware';
 import { ModuleContext } from './module-context';
-import { DomainError } from './problem';
+import { BadRequestError, DomainError } from './problem';
 import { enforceRateLimit, rateLimitOf } from './rate-limit';
 import { isSerializable, readFields, Resource } from './resource';
 import { Runtime } from './runtime';
@@ -832,9 +832,19 @@ export namespace Http {
 						const callHandler = <TResult>(c: Context, args: unknown[]): TResult =>
 							ModuleContext.run(node, () => route.handler.call(c.controller(), ...args) as TResult);
 
+						/**
+						 * Calls the handler, and throws the DomainError it returns: a returned error rolls back
+						 * the transaction and reaches the interceptors and the error hooks like a thrown one.
+						 */
+						const callForValue = async <TResult>(c: Context, args: unknown[]): Promise<TResult> => {
+							const result = await callHandler<Promise<TResult>>(c, args);
+							if (result instanceof DomainError) throw result;
+							return result;
+						};
+
 						const initTransactedHandler = <TResult = unknown>(c: Context) => {
 							return (...args: unknown[]) =>
-								inRequestScope(c, async () => callHandler<Promise<TResult>>(c, args));
+								inRequestScope(c, () => callForValue<TResult>(c, args));
 						};
 
 						if (isGenerator) {
@@ -880,7 +890,7 @@ export namespace Http {
 									runInterceptors(
 										[...outerInterceptors(), routeInterceptors],
 										c as unknown as InterceptorContext,
-										async () => callHandler<Promise<unknown>>(c, args)
+										() => callForValue<unknown>(c, args)
 									)
 								);
 						};
@@ -911,7 +921,7 @@ export namespace Http {
 									return toBody(c, await handler(...(await getParameters(c))));
 								}
 
-								throw DomainError.badRequest('The request body is invalid.');
+								throw new BadRequestError('The request body is invalid.');
 							};
 						}
 
