@@ -40,8 +40,8 @@ const IGNORED = /(\.d|\.test|\.spec)\.tsx?$/;
 const locateControllers = async (
 	projectPath: string,
 	outFile: string
-): Promise<Map<Function, { file: string; exportName: string }>> => {
-	const found = new Map<Function, { file: string; exportName: string }>();
+): Promise<Map<Function, { file: string; exportName: string; className: string }>> => {
+	const found = new Map<Function, { file: string; exportName: string; className: string }>();
 	const glob = new Bun.Glob('**/*.{ts,tsx}');
 	const roots = ['src', 'index.ts'];
 
@@ -60,7 +60,7 @@ const locateControllers = async (
 			const exports: Record<string, unknown> = await import(file);
 			for (const [exportName, value] of Object.entries(exports)) {
 				if (typeof value === 'function' && !found.has(value)) {
-					found.set(value, { file, exportName });
+					found.set(value, { file, exportName, className: value.name });
 				}
 			}
 		}
@@ -111,6 +111,7 @@ export const collectRoutes = async (
 			}
 			controllers.push({
 				exportName: source.exportName,
+				...(source.exportName === 'default' ? { className: source.className } : {}),
 				specifier: specifierFor(outFile, source.file),
 				path: description.path,
 				routes: description.routes

@@ -60,10 +60,10 @@ export namespace Symbols {
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export function currentEnvironment(): string {
-	return Runtime.find()?.env().NODE_ENV ?? 'development';
+	return Runtime.find()?.env().NODE_ENV ?? globalThis.process?.env?.NODE_ENV ?? 'development';
 }
 
-export const nextTick = () => new Promise((resolve) => process.nextTick(resolve));
+export const nextTick = () => new Promise<void>((resolve) => queueMicrotask(resolve));
 
 /** The factory stored on a controller class; builds its Elysia plugin in a module's context. */
 export type ElysiaPlugin = (node: ModuleNode) => Promise<Elysia>;

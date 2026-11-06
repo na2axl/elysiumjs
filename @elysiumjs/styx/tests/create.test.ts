@@ -15,7 +15,7 @@
 import type { CreateOptions } from '../src/create/create.command';
 
 import { existsSync } from 'node:fs';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -23,6 +23,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { listAssets, readAsset, useEmbeddedAssets } from '../src/assets';
 import { createProject } from '../src/create/create.command';
+import { InvalidNameError } from '../src/create/names';
 
 const defaults = (overrides: Partial<CreateOptions> = {}): CreateOptions => ({
 	name: 'my-app',
@@ -78,6 +79,26 @@ describe('createProject', () => {
 		expect(commands).toEqual([]);
 	});
 
+	it('writes .gitignore from the packaged gitignore', async () => {
+		const path = await createProject(defaults({ path: dir }), exec);
+
+		expect(existsSync(join(path, '.gitignore'))).toBe(true);
+		expect(existsSync(join(path, 'gitignore'))).toBe(false);
+	});
+
+	it('declares every dependency when install is false', async () => {
+		const path = await createProject(
+			defaults({ path: dir, plugins: ['sentry'], features: ['prettier'] }),
+			exec
+		);
+		const pkg = await Bun.file(join(path, 'package.json')).json();
+
+		expect(pkg.dependencies['@elysiumjs/runtime-bun']).toBe('latest');
+		expect(pkg.dependencies['@elysiumjs/plugin-sentry']).toBe('latest');
+		expect(pkg.devDependencies.prettier).toBe('^3.9.10');
+		expect(commands).toEqual([]);
+	});
+
 	it('writes a multi module project with features', async () => {
 		const path = await createProject(
 			defaults({
@@ -108,15 +129,6 @@ describe('createProject', () => {
 
 		expect(commands).toEqual([
 			['bun', 'install'],
-			['bun', 'add', '@elysiumjs/runtime-bun@latest'],
-			[
-				'bun',
-				'add',
-				'-D',
-				'@ianvs/prettier-plugin-sort-imports',
-				'prettier',
-				'@elysiumjs/hephaestus@latest'
-			],
 			['bun', 'run', 'format'],
 			['git', 'init']
 		]);
@@ -140,6 +152,51 @@ describe('createProject', () => {
 		await expect(createProject(defaults({ path: dir, features: ['nope'] }), exec)).rejects.toThrow(
 			'Unknown feature'
 		);
+	});
+
+	describe('names and paths', () => {
+		it('refuses absolute, dot and parent names before touching the disk', async () => {
+			const project = join(dir, 'inner');
+			await mkdir(project, { recursive: true });
+			await Bun.write(join(project, 'keep.txt'), 'keep');
+			await Bun.write(join(dir, 'keep.txt'), 'keep');
+
+			for (const name of [join(dir, 'abs'), '.', '..', '../sibling', '@scope/../x']) {
+				await expect(
+					createProject(defaults({ name, path: project, force: true }), exec)
+				).rejects.toBeInstanceOf(InvalidNameError);
+			}
+
+			expect(existsSync(join(project, 'keep.txt'))).toBe(true);
+			expect(existsSync(join(dir, 'keep.txt'))).toBe(true);
+		});
+
+		it('refuses upper-case project names', async () => {
+			await expect(createProject(defaults({ name: 'MyApp', path: dir }), exec)).rejects.toThrow(
+				'Invalid project name "MyApp"'
+			);
+		});
+
+		it('refuses invalid module names without writing outside src/modules', async () => {
+			for (const module of ['1api', '../evil', 'Api']) {
+				await expect(
+					createProject(
+						defaults({ path: dir, template: 'multi', modules: [module], force: true }),
+						exec
+					)
+				).rejects.toThrow(`Invalid module name "${module}"`);
+			}
+			expect(existsSync(join(dir, 'my-app', 'src', 'evil'))).toBe(false);
+			expect(existsSync(join(dir, 'my-app', 'src', 'modules', '1api'))).toBe(false);
+		});
+
+		it('accepts a scoped name and creates the unscoped directory', async () => {
+			const path = await createProject(defaults({ name: '@acme/api', path: dir }), exec);
+
+			expect(path).toBe(join(dir, 'api'));
+			const pkg = await Bun.file(join(path, 'package.json')).json();
+			expect(pkg.name).toBe('@acme/api');
+		});
 	});
 });
 

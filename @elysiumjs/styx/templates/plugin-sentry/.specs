@@ -1,7 +1,7 @@
 {
 	"packages": {
 		"prod": [
-			"@elysiumjs/plugin-sentry@latest"
+			"@elysiumjs/plugin-sentry"
 		]
 	},
 	"module": {

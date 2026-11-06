@@ -32,6 +32,9 @@ export type KeyvWorkersKVOptions = {
 /** Workers KV refuses expirations shorter than 60 seconds. */
 const MIN_TTL_SECONDS = 60;
 
+/** Keys deleted at once by `clear()`, to stay within the subrequest limits. */
+const KV_DELETE_CHUNK = 50;
+
 /**
  * A Keyv store over Workers KV, for the caches of `@elysiumjs/mnemosyne`.
  *
@@ -97,6 +100,10 @@ export class KeyvWorkersKV {
 		await Promise.all(entries.map(({ key, value, ttl }) => this.set(key, value, ttl)));
 	}
 
+	/**
+	 * Deletes a key. It reads first, because the Keyv contract returns whether the key existed;
+	 * on eventually consistent KV this answer is best-effort.
+	 */
 	public async delete(key: string): Promise<boolean> {
 		const existed = await this.has(key);
 		await this.#kv().delete(this.#key(key));
@@ -120,7 +127,9 @@ export class KeyvWorkersKV {
 			names.push(...page.keys.map(({ name }) => name));
 			cursor = page.list_complete ? undefined : page.cursor;
 		} while (cursor);
-		await Promise.all(names.map((name) => kv.delete(name)));
+		for (let i = 0; i < names.length; i += KV_DELETE_CHUNK) {
+			await Promise.all(names.slice(i, i + KV_DELETE_CHUNK).map((name) => kv.delete(name)));
+		}
 	}
 
 	#kv(): WorkersKVNamespace {

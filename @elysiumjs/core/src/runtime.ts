@@ -29,6 +29,8 @@ export type ShutdownSignal = 'SIGINT' | 'SIGTERM';
  * Implementations ship as packages: `@elysiumjs/runtime-bun`, `@elysiumjs/runtime-node` and
  * `@elysiumjs/runtime-workers`. Set one with the `runtime` option of `@Application.register()`
  * or with {@link Runtime.use}.
+ *
+ * The runtime is process-wide: the last application constructed wins.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export interface Runtime {
@@ -64,6 +66,55 @@ export interface Runtime {
 	 * @returns A function that removes the handler.
 	 */
 	onShutdown(handler: () => void): () => void;
+
+	/**
+	 * The command line arguments after the script. Empty on runtimes without a command line.
+	 */
+	argv(): readonly string[];
+
+	/**
+	 * Writes text to the standard output or error stream. Runtimes without streams write to
+	 * the console instead.
+	 * @param stream The stream to write to.
+	 * @param text The text to write, as is.
+	 */
+	write(stream: 'stdout' | 'stderr', text: string): void;
+
+	/**
+	 * The interactive terminal, or `undefined` on runtimes without one.
+	 */
+	terminal(): RuntimeTerminal | undefined;
+}
+
+/**
+ * An interactive terminal, as exposed by a runtime.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export interface RuntimeTerminal {
+	/** The stream user input is read from. */
+	input: NodeJS.ReadableStream;
+
+	/** The stream output is written to. */
+	output: NodeJS.WritableStream;
+
+	/**
+	 * Turns raw mode on or off on the input, when supported.
+	 * @param on Whether raw mode is on.
+	 */
+	setRawMode?(on: boolean): void;
+
+	/** Clears the screen. */
+	clear(): void;
+
+	/**
+	 * Moves the cursor relative to its current position.
+	 * @param x The columns to move by.
+	 * @param y The rows to move by.
+	 */
+	moveCursor(x: number, y: number): void;
+
+	/** Clears the current line and moves the cursor to its start. */
+	clearLine(): void;
 }
 
 /**
@@ -108,7 +159,8 @@ export namespace Runtime {
 	export const find = (): Runtime | undefined => current;
 
 	/**
-	 * Sets the runtime to use.
+	 * Sets the runtime to use. The runtime is process-wide: when several applications are
+	 * constructed, the last one to set a runtime wins.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param runtime The runtime to use.
 	 */

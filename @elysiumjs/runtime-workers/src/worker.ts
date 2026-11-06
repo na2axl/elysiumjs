@@ -13,10 +13,10 @@
 // limitations under the License.
 
 import type { Application, Elysia, ModuleNode } from '@elysiumjs/core';
-import type { WorkersHandler } from './types';
+import type { WorkersHandler, WorkersMessageBatch } from './types';
 import type { WorkersHandlerMeta } from './workers';
 
-import { ModuleContext, Service } from '@elysiumjs/core';
+import { getLogger, ModuleContext, Service } from '@elysiumjs/core';
 
 import { NoWorkersHandlerError } from './errors';
 import { runInvocation } from './invocation';
@@ -56,10 +56,55 @@ const dispatch = async (
 };
 
 /**
+ * Runs the queue handlers matching the batch, then acks the messages no handler failed on and
+ * retries the others. A failing handler never rejects the batch.
+ */
+const dispatchQueue = async (handlers: Handler[], batch: WorkersMessageBatch): Promise<void> => {
+	const matching = handlers.filter(
+		(h) => h.kind === 'queue' && (h.key === batch.queue || h.key === '*')
+	);
+	if (matching.length === 0) throw new NoWorkersHandlerError('queue', batch.queue);
+
+	const failed = new Set<number>();
+	const log = (handler: Handler, error: unknown) =>
+		getLogger().error('Queue handler failed', {
+			queue: batch.queue,
+			handler: `${handler.cls.name}.${String(handler.method)}`,
+			error
+		});
+
+	for (const handler of matching) {
+		if (handler.each) {
+			for (const [index, message] of batch.messages.entries()) {
+				try {
+					await runHandler(handler, message);
+				} catch (error) {
+					failed.add(index);
+					log(handler, error);
+				}
+			}
+		} else {
+			try {
+				await runHandler(handler, batch);
+			} catch (error) {
+				batch.messages.forEach((_, index) => failed.add(index));
+				log(handler, error);
+			}
+		}
+	}
+
+	for (const [index, message] of batch.messages.entries()) {
+		if (failed.has(index)) message.retry();
+		else message.ack();
+	}
+};
+
+/**
  * Builds an application and returns the handlers a Cloudflare Worker module exports.
  *
  * - `fetch` serves the app's routes.
- * - `queue` hands each batch to the service methods marked `@Workers.queue(name)`.
+ * - `queue` hands each batch to the service methods marked `@Workers.queue(name)`, then acks or
+ *   retries each message on its own.
  * - `scheduled` calls the service methods marked `@Workers.cron(expression)`.
  *
  * Each invocation runs with its own env and execution context, read with `Workers.env()`,
@@ -88,14 +133,19 @@ export const createWorker = async <Env = Record<string, unknown>>(
 	return {
 		app: elysia,
 		fetch: (request, env, ctx) =>
-			runInvocation({ env: env as Record<string, unknown>, ctx }, async () =>
-				elysia.fetch(request)
-			),
+			runInvocation({ env: env as Record<string, unknown>, ctx }, async () => {
+				try {
+					return await elysia.fetch(request);
+				} finally {
+					// Disposal outlives the response: the runtime keeps the Worker alive until it ends.
+					Workers.context().waitUntil(Service.disposeRequestScope(request));
+				}
+			}),
 
 		queue: (batch, env, ctx) =>
 			runInvocation({ env: env as Record<string, unknown>, ctx }, async () => {
 				await app.boot();
-				await dispatch(handlers, 'queue', batch.queue, batch);
+				await dispatchQueue(handlers, batch);
 			}),
 
 		scheduled: (controller, env, ctx) =>

@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { RedisConnection } from '@elysiumjs/redis';
+
 import { InteractsWithConsole } from '@elysiumjs/core';
-import { RedisClient } from 'bun';
+import { bunRedis } from '@elysiumjs/redis';
 
 /**
  * Histogram for tracking distributions
@@ -163,7 +165,7 @@ class Gauge {
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export class PerformanceMonitor extends InteractsWithConsole {
-	private client?: RedisClient;
+	private client?: RedisConnection;
 	private metrics: Map<string, Histogram | Counter | Gauge> = new Map();
 	private timers: Map<string, number> = new Map();
 	private reportingInterval?: NodeJS.Timeout;
@@ -256,7 +258,7 @@ export class PerformanceMonitor extends InteractsWithConsole {
 	 * Initialize Redis reporting
 	 */
 	private async initializeReporting(redisUrl: string, interval: number): Promise<void> {
-		this.client = new RedisClient(redisUrl, {
+		this.client = bunRedis(redisUrl, {
 			enableAutoPipelining: true
 		});
 
@@ -342,7 +344,7 @@ export class PerformanceMonitor extends InteractsWithConsole {
 		this.workerConcurrency.set(concurrency);
 
 		// Update memory usage
-		const memUsage = process.memoryUsage();
+		const memUsage = globalThis.process?.memoryUsage?.() ?? { heapUsed: 0 };
 		this.workerMemoryUsage.set(memUsage.heapUsed / 1024 / 1024); // MB
 	}
 

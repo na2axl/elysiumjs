@@ -36,18 +36,33 @@ export type WorkersHandlerMeta = {
 	readonly key: string;
 	/** The method name. */
 	readonly method: PropertyKey;
+	/** Queue handlers only: whether the method receives one message at a time. */
+	readonly each?: boolean;
+};
+
+/**
+ * Options of `@Workers.queue`.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type WorkersQueueOptions = {
+	/** Receive one message at a time instead of the batch, so failures retry only that message. */
+	readonly each?: boolean;
 };
 
 const HANDLERS = Symbol('workers:handlers');
 
-const addHandler = (kind: WorkersHandlerMeta['kind'], key: string): MethodDecorator => {
+const addHandler = (
+	kind: WorkersHandlerMeta['kind'],
+	key: string,
+	each?: boolean
+): MethodDecorator => {
 	return (target, method) => {
 		if (typeof target === 'function') {
 			throw new TypeError(`@Workers.${kind}() goes on an instance method, not on a static one.`);
 		}
 		const cls = target.constructor;
 		const handlers: WorkersHandlerMeta[] = Metadata.getOwn(HANDLERS, cls) ?? [];
-		Metadata.define(HANDLERS, [...handlers, { kind, key, method }], cls);
+		Metadata.define(HANDLERS, [...handlers, { kind, key, method, ...(each ? { each } : {}) }], cls);
 	};
 };
 
@@ -100,10 +115,14 @@ export namespace Workers {
 
 	/**
 	 * Marks a method of a module service as the consumer of a queue. It receives the batch;
-	 * when it throws, the whole batch is retried.
+	 * when it throws, every message is retried. With `{ each: true }` it receives one message
+	 * at a time, and only the messages it throws on are retried. After all handlers ran, the
+	 * messages that no handler failed on are acked.
 	 * @param queue The queue name, or `*` for every queue.
+	 * @param options Set `each` to handle messages one by one.
 	 */
-	export const queue = (queue: string): MethodDecorator => addHandler('queue', queue);
+	export const queue = (queue: string, options?: WorkersQueueOptions): MethodDecorator =>
+		addHandler('queue', queue, options?.each);
 
 	/**
 	 * Marks a method of a module service as the handler of a cron trigger. It receives the

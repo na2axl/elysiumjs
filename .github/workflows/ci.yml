@@ -41,6 +41,48 @@ jobs:
       - name: Lint
         run: bun run lint
 
+      - name: Portability
+        run: |
+          bun run test:scripts
+          bun run check:portability
+
+  # The conformance scenarios, on each runtime: Bun, Node.js (Vitest) and workerd (Vitest in the
+  # Workers runtime).
+  conformance:
+    name: Conformance (${{ matrix.lane }})
+    needs: quality
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: [bun, node, workerd]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.3"
+
+      - uses: actions/setup-node@v4
+        if: matrix.lane != 'bun'
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # Every lane imports the packages through their built `dist`.
+      - name: Build
+        run: bun run build
+
+      # Vitest is called directly in the Node.js and workerd lanes: their `test:*` scripts rebuild
+      # through `pretest:*`, which the step above already did.
+      - name: Run the conformance suite
+        working-directory: "@elysiumjs/conformance"
+        run: ${{ matrix.lane == 'bun' && 'bun run test' || format('bunx vitest run -c vitest.{0}.config.ts', matrix.lane) }}
+
   # Late stage: build + test, needs services
   test:
     name: Build & Test

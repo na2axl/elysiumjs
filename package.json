@@ -21,6 +21,8 @@
 		"test:coverage": "turbo test:coverage",
 		"lint": "turbo lint",
 		"typecheck": "turbo typecheck",
+		"test:scripts": "bun test scripts/",
+		"check:portability": "bun scripts/check-portability.ts",
 		"clean": "turbo clean && rm -rf node_modules",
 		"dev": "turbo dev --filter='@elysiumjs/*'",
 		"format": "bun run --filter='@elysiumjs/*' format",

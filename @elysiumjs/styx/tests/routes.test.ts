@@ -21,6 +21,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { collectRoutes } from '../src/routes/collect';
 import { renderRoutes } from '../src/routes/render';
+import { DefaultApp } from './fixtures/default-app/src/app';
 import { RoutesApp } from './fixtures/routes-app/src/app';
 
 const fixture = join(import.meta.dir, 'fixtures', 'routes-app');
@@ -85,6 +86,19 @@ describe('collectRoutes', () => {
 
 		expect(modules).toEqual([]);
 		expect(missing).toEqual(['InlineController']);
+	});
+});
+
+describe('default exported controllers', () => {
+	it('routes:generate imports a default-exported controller under its class name', async () => {
+		const fixtureDir = join(import.meta.dir, 'fixtures', 'default-app');
+		const out = join(fixtureDir, 'src', 'routes.gen.ts');
+		const { modules } = await collectRoutes(fixtureDir, DefaultApp, out);
+		const output = renderRoutes(modules);
+
+		expect(output).toContain("import type { default as PostController } from './post.controller';");
+		expect(output).not.toContain('import type { default }');
+		expect(output).toContain("PostController['list']");
 	});
 });
 

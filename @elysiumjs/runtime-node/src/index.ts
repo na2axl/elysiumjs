@@ -14,11 +14,16 @@
 
 import type { Runtime } from '@elysiumjs/core';
 
+import { serveNode } from './serve';
+
+export { type FetchHandler, serveNode } from './serve';
+
 const SIGNALS = ['SIGINT', 'SIGTERM'] as const;
 
 /**
- * The Elysium runtime for Node.js. Elysia needs its Node adapter to listen there: set
- * `server: { adapter: node() }` (from `@elysiajs/node`) on the application.
+ * The Elysium runtime for Node.js. It serves the app's `fetch` handler on a `node:http` server
+ * through {@link serveNode}, a bridge used instead of an Elysia Node adapter because none is
+ * released for Elysia 2 yet (`@elysia/node` only has `2.0.0-exp.*` builds).
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export const runtime: Runtime = {
@@ -26,11 +31,26 @@ export const runtime: Runtime = {
 	env: () => process.env,
 	sleep: (ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
 	serve(app, port) {
-		app.listen(port);
+		serveNode(async (request) => app.fetch(request), port);
 	},
 	exit(code) {
 		process.exit(code);
 	},
+	argv: () => process.argv.slice(2),
+	write(stream, text) {
+		process[stream].write(text);
+	},
+	terminal: () => ({
+		input: process.stdin,
+		output: process.stdout,
+		setRawMode: (on) => process.stdin.setRawMode?.(on),
+		clear: () => void process.stdout.write('\x1Bc'),
+		moveCursor: (x, y) => void process.stdout.moveCursor?.(x, y),
+		clearLine: () => {
+			process.stdout.clearLine?.(0);
+			process.stdout.cursorTo?.(0);
+		}
+	}),
 	onShutdown(handler) {
 		for (const signal of SIGNALS) process.on(signal, handler);
 		return () => {

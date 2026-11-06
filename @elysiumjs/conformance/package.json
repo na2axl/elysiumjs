@@ -1,0 +1,35 @@
+{
+  "name": "@elysiumjs/conformance",
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "description": "Runtime conformance scenarios for the Elysium.js framework.",
+  "private": true,
+  "author": {
+    "name": "Axel Nana",
+    "email": "axel.nana@workbud.com"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test tests/bun",
+    "pretest:node": "bun run --cwd ../core build && bun run --cwd ../runtime-node build",
+    "test:node": "vitest run -c vitest.node.config.ts",
+    "pretest:workerd": "bun run --cwd ../core build && bun run --cwd ../runtime-workers build",
+    "test:workerd": "vitest run -c vitest.workerd.config.ts"
+  },
+  "type": "module",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": {
+    "@elysiumjs/core": "workspace:^",
+    "@elysiumjs/runtime-bun": "workspace:^",
+    "elysia": "^2.0.0-rc.1"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.6.0",
+    "@elysiumjs/runtime-node": "workspace:*",
+    "@elysiumjs/runtime-workers": "workspace:*",
+    "@swc/core": "^1.16.22",
+    "unplugin-swc": "^2.0.0",
+    "vitest": "^5.0.5"
+  }
+}

@@ -1,0 +1,120 @@
+// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+import type { Application } from '@elysiumjs/core';
+import type { AssertAdapter, Scenario, ScenarioDriver } from './types';
+
+import { resetContainer, Runtime } from '@elysiumjs/core';
+
+const EVENT_COUNT = 2;
+
+/** Reads the first events of a server-sent events body, then cancels the stream. */
+const readEvents = async (response: Response): Promise<string> => {
+	const reader = response.body!.getReader();
+	const decoder = new TextDecoder();
+	let text = '';
+	while ((text.match(/\n\n/g) ?? []).length < EVENT_COUNT) {
+		const { done, value } = await reader.read();
+		if (done) break;
+		text += decoder.decode(value, { stream: true });
+	}
+	await reader.cancel();
+	return text.split('\n\n').slice(0, EVENT_COUNT).join('\n\n') + '\n\n';
+};
+
+/** Asserts the status, headers and body of one response. */
+const checkResponse = async (
+	response: Response,
+	expect: Scenario['requests'][number]['expect'],
+	label: string,
+	assert: AssertAdapter
+): Promise<void> => {
+	assert.equal(response.status, expect.status, `${label}: status`);
+	for (const [name, value] of Object.entries(expect.headers ?? {})) {
+		const actual = response.headers.get(name) ?? '';
+		assert.equal(actual.startsWith(value), true, `${label}: header ${name} (${actual})`);
+	}
+	const streamed = (response.headers.get('content-type') ?? '').startsWith('text/event-stream');
+	if (streamed) {
+		const text = await readEvents(response);
+		if (expect.text !== undefined) assert.equal(text, expect.text, `${label}: text`);
+	} else if (expect.json !== undefined) {
+		assert.equal(
+			JSON.stringify(await response.json()),
+			JSON.stringify(expect.json),
+			`${label}: json`
+		);
+	} else if (expect.text !== undefined) {
+		assert.equal(await response.text(), expect.text, `${label}: text`);
+	} else {
+		await response.arrayBuffer();
+	}
+};
+
+/** The default driver: builds the app and hands each request to `elysia.handle`. */
+const handleDriver: ScenarioDriver = async (app) => {
+	const elysia = await app.build();
+	return (request) => elysia.handle(request);
+};
+
+/**
+ * Runs a scenario against a runtime: builds a fresh app, drives its requests through the
+ * driver (`elysia.handle` by default), runs the `after` hook, then shuts the app down and resets
+ * the container, also when the app factory or a request fails.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param s The scenario.
+ * @param runtime The runtime to run it on.
+ * @param assert The assertion adapter of the test framework.
+ * @param driver Builds the app and returns how a request reaches it, e.g. a Worker's `fetch`.
+ */
+export const runScenario = async (
+	s: Scenario,
+	runtime: Runtime,
+	assert: AssertAdapter,
+	driver: ScenarioDriver = handleDriver
+): Promise<void> => {
+	Runtime.use(runtime);
+	let app: Application | undefined;
+	let failure: { error: unknown } | undefined;
+	try {
+		app = await s.app();
+		const handle = await driver(app);
+		for (const [index, { request, expect }] of s.requests.entries()) {
+			await checkResponse(await handle(request()), expect, `${s.name} #${index + 1}`, assert);
+		}
+		await s.after?.(app, assert);
+	} catch (error) {
+		failure = { error };
+	}
+	await shutDown(app, failure);
+};
+
+/**
+ * Shuts the app down and resets the container, then rethrows the scenario's failure. A shutdown
+ * error is thrown only when the scenario itself passed, so it never masks the first failure.
+ */
+const shutDown = async (
+	app: Application | undefined,
+	failure: { error: unknown } | undefined
+): Promise<void> => {
+	try {
+		await app?.kernel.shutdown();
+	} catch (error) {
+		failure ??= { error };
+	} finally {
+		// The container is global to the process: leave it empty for the next scenario.
+		resetContainer();
+	}
+	if (failure) throw failure.error;
+};

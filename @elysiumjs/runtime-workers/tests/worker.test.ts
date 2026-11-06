@@ -210,6 +210,41 @@ describe('createWorker', () => {
 		await app.kernel.shutdown();
 	});
 
+	it('destroys request-scoped services through waitUntil once fetch resolves', async () => {
+		const destroyed: string[] = [];
+
+		@Service.register({ scope: ServiceScope.REQUEST })
+		class Scratch {
+			public onDestroy() {
+				destroyed.push('Scratch');
+			}
+		}
+
+		@Http.controller({ path: '/scratch' })
+		class ScratchController {
+			@Http.get()
+			public show(@Service.inject(Scratch) scratch: Scratch) {
+				return { ok: !!scratch };
+			}
+		}
+
+		@Module.register({ services: [Scratch], controllers: [ScratchController] })
+		class ScratchModule extends Module {}
+
+		@Application.register({ runtime, modules: [ScratchModule], openapi: false })
+		class ScratchApp extends Application {}
+
+		const app = new ScratchApp();
+		const worker = await createWorker(app);
+		const context = ctx();
+		const response = await worker.fetch(new Request('http://localhost/scratch'), {}, context);
+		expect(response.status).toBe(200);
+		expect(context.waited.length).toBeGreaterThan(0);
+		await Promise.all(context.waited);
+		expect(destroyed).toEqual(['Scratch']);
+		await app.kernel.shutdown();
+	});
+
 	it('fails a batch no service consumes', async () => {
 		@Module.register({})
 		class EmptyModule extends Module {}
@@ -220,6 +255,92 @@ describe('createWorker', () => {
 		const app = new EmptyApp();
 		const worker = await createWorker(app);
 		expect(worker.queue(batch('emails', []), {}, ctx())).rejects.toThrow(NoWorkersHandlerError);
+		await app.kernel.shutdown();
+	});
+
+	const trackedBatch = (queue: string, count: number) => {
+		const acked: string[] = [];
+		const retried: string[] = [];
+		const messages = Array.from({ length: count }, (_, i) => ({
+			id: String(i + 1),
+			timestamp: new Date(0),
+			body: i + 1,
+			attempts: 1,
+			ack: () => void acked.push(String(i + 1)),
+			retry: () => void retried.push(String(i + 1))
+		}));
+		const value: WorkersMessageBatch = { queue, messages, ackAll() {}, retryAll() {} };
+		return { value, acked, retried };
+	};
+
+	const appWith = async (services: any[]) => {
+		@Module.register({ services })
+		class QueueModule extends Module {}
+
+		@Application.register({
+			runtime,
+			modules: [WorkersModule.with({}), QueueModule],
+			openapi: false
+		})
+		class QueueApp extends Application {}
+
+		const app = new QueueApp();
+		return { app, worker: await createWorker(app) };
+	};
+
+	it('acks the good messages and retries only the failing one', async () => {
+		@Service.register()
+		class Jobs {
+			@Workers.queue('jobs', { each: true })
+			public run(message: { body: number }) {
+				if (message.body === 2) throw new Error('boom');
+			}
+		}
+		const { app, worker } = await appWith([Jobs]);
+		const { value, acked, retried } = trackedBatch('jobs', 3);
+		await worker.queue(value, {}, ctx());
+		expect(acked).toEqual(['1', '3']);
+		expect(retried).toEqual(['2']);
+		await app.kernel.shutdown();
+	});
+
+	it('does not rerun a succeeding handler when another fails', async () => {
+		const audited: number[] = [];
+
+		@Service.register()
+		class Jobs {
+			@Workers.queue('*', { each: true })
+			public audit(message: { body: number }) {
+				audited.push(message.body);
+			}
+
+			@Workers.queue('jobs', { each: true })
+			public run(message: { body: number }) {
+				if (message.body === 1) throw new Error('boom');
+			}
+		}
+		const { app, worker } = await appWith([Jobs]);
+		const { value, acked, retried } = trackedBatch('jobs', 2);
+		await worker.queue(value, {}, ctx());
+		expect(audited).toEqual([1, 2]);
+		expect(acked).toEqual(['2']);
+		expect(retried).toEqual(['1']);
+		await app.kernel.shutdown();
+	});
+
+	it('retries every message when a batch handler throws', async () => {
+		@Service.register()
+		class Jobs {
+			@Workers.queue('jobs')
+			public run() {
+				throw new Error('boom');
+			}
+		}
+		const { app, worker } = await appWith([Jobs]);
+		const { value, acked, retried } = trackedBatch('jobs', 2);
+		await worker.queue(value, {}, ctx());
+		expect(acked).toEqual([]);
+		expect(retried).toEqual(['1', '2']);
 		await app.kernel.shutdown();
 	});
 
@@ -300,6 +421,28 @@ describe('KeyvWorkersKV', () => {
 			await all.clear();
 		});
 		expect(data.size).toBe(0);
+	});
+
+	it('clear() deletes in chunks of 50', async () => {
+		const { kv, data } = memoryKV();
+		let inFlight = 0;
+		let maxInFlight = 0;
+		const slow: WorkersKVNamespace = {
+			...kv,
+			delete: async (key) => {
+				inFlight++;
+				maxInFlight = Math.max(maxInFlight, inFlight);
+				await new Promise((resolve) => setTimeout(resolve, 1));
+				await kv.delete(key);
+				inFlight--;
+			}
+		};
+		for (let i = 0; i < 120; i++) await kv.put(`k${i}`, 'v');
+		const store = new KeyvWorkersKV({ binding: 'CACHE' });
+		await inInvocation(slow, () => store.clear());
+		expect(data.size).toBe(0);
+		expect(maxInFlight).toBeLessThanOrEqual(50);
+		expect(maxInFlight).toBeGreaterThan(1);
 	});
 
 	it('needs an invocation, so it holds no binding', () => {

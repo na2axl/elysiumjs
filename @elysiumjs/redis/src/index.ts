@@ -12,10 +12,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export {
-	type RedisClientFactory,
-	type RedisConnectionProps,
-	type RedisModuleConfig,
-	Redis,
-	RedisModule
-} from './redis';
+export { type RedisClientFactory, type RedisConnection, bunRedis } from './connection';
+export { type RedisConnectionProps, type RedisModuleConfig, Redis, RedisModule } from './redis';

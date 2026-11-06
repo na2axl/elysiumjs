@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { RedisConnection } from '@elysiumjs/redis';
 import type { KeyvStoreAdapter } from 'cacheable';
 import type { KeyvEntry, StoredData } from 'keyv';
 
@@ -25,7 +26,7 @@ import { Redis } from '@elysiumjs/redis';
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export class KeyvRedis extends EventEmitter implements KeyvStoreAdapter {
-	#client?: Bun.RedisClient;
+	#client?: RedisConnection;
 	#namespace: string | undefined;
 	#keyPrefixSeparator = '::';
 	#clearBatchSize = 1000;
@@ -85,8 +86,8 @@ export class KeyvRedis extends EventEmitter implements KeyvStoreAdapter {
 	 * Resolves the Redis client on first use. The async path is always safe, even when the
 	 * Redis module has not been initialised yet (lazy boot).
 	 */
-	protected async getClient(): Promise<Bun.RedisClient> {
-		this.#client ??= await Service.resolve<Bun.RedisClient>(
+	protected async getClient(): Promise<RedisConnection> {
+		this.#client ??= await Service.resolve<RedisConnection>(
 			Redis.getConnectionName(this.#connection)
 		);
 		return this.#client;
@@ -134,7 +135,7 @@ export class KeyvRedis extends EventEmitter implements KeyvStoreAdapter {
 		key = this.createKeyPrefix(key, this.#namespace);
 
 		if (ttl) {
-			await client.set(key, value, 'PX', ttl);
+			await client.send('SET', [key, value, 'PX', String(ttl)]);
 		} else {
 			await client.set(key, value);
 		}
@@ -151,7 +152,7 @@ export class KeyvRedis extends EventEmitter implements KeyvStoreAdapter {
 			const prefixedKey = this.createKeyPrefix(key, this.#namespace);
 			if (ttl) {
 				// eslint-disable-next-line @typescript-eslint/naming-convention, @typescript-eslint/no-unsafe-argument
-				multi.push(client.set(prefixedKey, value, 'PX', ttl));
+				multi.push(client.send('SET', [prefixedKey, value, 'PX', String(ttl)]));
 			} else {
 				// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
 				multi.push(client.set(prefixedKey, value));
@@ -194,7 +195,7 @@ export class KeyvRedis extends EventEmitter implements KeyvStoreAdapter {
 				]);
 
 				// Parse the result
-				let [newCursor, keys] = result;
+				let [newCursor, keys] = result as [string | number, string[]];
 				cursor = newCursor.toString();
 
 				if (keys.length === 0) {
@@ -215,7 +216,7 @@ export class KeyvRedis extends EventEmitter implements KeyvStoreAdapter {
 	public async has(key: string): Promise<boolean> {
 		const client = await this.getClient();
 		key = this.createKeyPrefix(key, this.#namespace);
-		return client.exists(key);
+		return Number(await client.send('EXISTS', [key])) > 0;
 	}
 
 	public async hasMany(keys: string[]): Promise<boolean[]> {
@@ -225,7 +226,7 @@ export class KeyvRedis extends EventEmitter implements KeyvStoreAdapter {
 
 		for (const key of keys) {
 			const prefixedKey = this.createKeyPrefix(key, this.#namespace);
-			multi.push(client.exists(prefixedKey));
+			multi.push(client.send('EXISTS', [prefixedKey]).then((count) => Number(count) > 0));
 		}
 
 		return Promise.all(multi);
@@ -238,7 +239,7 @@ export class KeyvRedis extends EventEmitter implements KeyvStoreAdapter {
 		}
 
 		keys = keys.map((key) => this.createKeyPrefix(key, this.#namespace));
-		const values = await client.mget(...keys);
+		const values = await client.send('MGET', keys);
 
 		return values as Value[];
 	}
@@ -263,8 +264,8 @@ export class KeyvRedis extends EventEmitter implements KeyvStoreAdapter {
 	 * @param keys The keys to delete, already prefixed.
 	 * @returns The number of keys deleted.
 	 */
-	#remove(client: Bun.RedisClient, keys: string[]): Promise<number> {
-		return this.#useUnlink ? client.unlink(...keys) : client.del(...keys);
+	#remove(client: RedisConnection, keys: string[]): Promise<number> {
+		return this.#useUnlink ? (client.send('UNLINK', keys) as Promise<number>) : client.del(...keys);
 	}
 
 	public async *iterator<Value>(
@@ -278,7 +279,7 @@ export class KeyvRedis extends EventEmitter implements KeyvStoreAdapter {
 			const result = await client.send('SCAN', [cursor, 'MATCH', match, 'TYPE', 'string']);
 
 			// Parse the result
-			let [newCursor, keys] = result;
+			let [newCursor, keys] = result as [string | number, string[]];
 			cursor = newCursor.toString();
 
 			if (!namespace && !this.#noNamespaceAffectsAll) {
@@ -286,7 +287,7 @@ export class KeyvRedis extends EventEmitter implements KeyvStoreAdapter {
 			}
 
 			if (keys.length > 0) {
-				const values = await client.mget(...keys);
+				const values = (await client.send('MGET', keys)) as Array<string | null>;
 				for (const i of keys.keys()) {
 					const key = this.getKeyWithoutPrefix(keys[i], namespace);
 					const value = values[i];

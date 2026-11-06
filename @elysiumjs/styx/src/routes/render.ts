@@ -19,8 +19,10 @@ import type { HttpRouteDescription } from '@elysiumjs/core';
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export type ControllerRoutes = {
-	/** The exported name of the controller class. */
+	/** The exported name of the controller class, `default` for a default export. */
 	exportName: string;
+	/** The name of the controller class. Names a default export, which has no name of its own. */
+	className?: string;
 	/** The module specifier the generated file imports the class from. */
 	specifier: string;
 	/** The path of the controller. */
@@ -92,8 +94,12 @@ export const renderRoutes = (modules: ModuleRoutes[]): string => {
 
 	for (const module of modules) {
 		for (const controller of module.controllers) {
-			let name = controller.exportName;
-			for (let i = 2; names.has(name); i++) name = `${controller.exportName}$${i}`;
+			const preferred =
+				controller.exportName === 'default' && controller.className
+					? controller.className
+					: controller.exportName;
+			let name = preferred;
+			for (let i = 2; names.has(name); i++) name = `${preferred}$${i}`;
 			names.add(name);
 			local.set(controller, name);
 			const specifiers = imports.get(controller.specifier) ?? new Map<string, string>();

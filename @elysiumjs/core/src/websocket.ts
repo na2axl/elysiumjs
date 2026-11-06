@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ServerWebSocket } from 'bun';
 import type { Context, ErrorContext } from 'elysia';
-import type { Class, ConditionalPick, JsonObject, Primitive } from 'type-fest';
+import type { Class } from 'type-fest';
 import type { TSchema } from 'typebox';
 import type { Route } from './http';
 import type { ModuleNode } from './module-graph';
@@ -33,7 +32,7 @@ import { nextTick, Symbols } from './utils';
  * Properties required when declaring a websocket controller using the `@websocket()` decorator.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export type WebsocketProps<TWebsocketData = any> = {
+export type WebsocketProps = {
 	/**
 	 * The path of the websocket route.
 	 */
@@ -42,7 +41,44 @@ export type WebsocketProps<TWebsocketData = any> = {
 	/**
 	 * The options for the websocket server.
 	 */
-	options?: ConditionalPick<Bun.WebSocketHandler<TWebsocketData>, Primitive | JsonObject>;
+	options?: WebSocketHandlerOptions;
+};
+
+/**
+ * The options of the websocket server, shared by every runtime.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type WebSocketHandlerOptions = {
+	/** Seconds of inactivity after which a connection is closed. */
+	idleTimeout?: number;
+
+	/** The largest message accepted, in bytes. */
+	maxPayloadLength?: number;
+
+	/** Whether messages are compressed. */
+	perMessageDeflate?: boolean | Record<string, unknown>;
+};
+
+/**
+ * A websocket connection, as seen by controllers. Structural, so that it fits every runtime.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @template TData Data stored in the connection.
+ */
+export type ElysiumWebSocket<TData = unknown> = {
+	/** Sends a message to the client. */
+	send(data: string | BufferSource, compress?: boolean): unknown;
+
+	/** Closes the connection. */
+	close(code?: number, reason?: string): unknown;
+
+	/** The data stored in the connection. */
+	data: TData;
+
+	/** Subscribes the connection to a topic. */
+	subscribe(topic: string): unknown;
+
+	/** Publishes a message to every subscriber of a topic. */
+	publish(topic: string, data: string | BufferSource, compress?: boolean): unknown;
 };
 
 /**
@@ -50,7 +86,7 @@ export type WebsocketProps<TWebsocketData = any> = {
  * @author Axel Nana <axel.nana@workbud.com>
  * @template TData Additional data stored in the websocket connection.
  */
-export type WS<TData = unknown> = ServerWebSocket<
+export type WS<TData = unknown> = ElysiumWebSocket<
 	{
 		/**
 		 * Unique identifier for the websocket connection.

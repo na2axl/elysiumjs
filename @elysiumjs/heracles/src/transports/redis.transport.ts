@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { RedisConnection } from '@elysiumjs/redis';
 import type { JobStatusInfo, Transport, TransportEvent } from '../transport';
 
 import { InteractsWithConsole, Service } from '@elysiumjs/core';
 import { Redis } from '@elysiumjs/redis';
-import { RedisClient } from 'bun';
 import { uid } from 'radash';
 
 import { JobStatus } from '../job';
@@ -101,17 +101,17 @@ export class RedisTransport extends InteractsWithConsole implements Transport {
 	/**
 	 * Main Redis client for commands
 	 */
-	private commandClient: RedisClient = null!;
+	private commandClient: RedisConnection = null!;
 
 	/**
 	 * Dedicated client for pub/sub subscriptions
 	 */
-	private subscriberClient: RedisClient = null!;
+	private subscriberClient: RedisConnection = null!;
 
 	/**
 	 * Dedicated client for publishing messages
 	 */
-	private publisherClient: RedisClient = null!;
+	private publisherClient: RedisConnection = null!;
 
 	/**
 	 * Options for this transport
@@ -177,7 +177,7 @@ export class RedisTransport extends InteractsWithConsole implements Transport {
 	private async initializeClients(): Promise<void> {
 		// Main command client with auto-pipelining
 		// Resolved asynchronously: on a lazy boot the connection may not be built yet
-		const connection = await Service.resolve<RedisClient>(
+		const connection = await Service.resolve<RedisConnection>(
 			Redis.getConnectionName(this.options.connection)
 		);
 		this.commandClient = await connection.duplicate();
@@ -241,8 +241,8 @@ export class RedisTransport extends InteractsWithConsole implements Transport {
 			]);
 
 			// Verify connections
-			await this.commandClient.ping();
-			await this.publisherClient.ping();
+			await this.commandClient.send('PING', []);
+			await this.publisherClient.send('PING', []);
 
 			this.info(`RedisTransport started in ${this.mode} mode with ID: ${this.consumerId}`);
 
@@ -425,7 +425,11 @@ export class RedisTransport extends InteractsWithConsole implements Transport {
 			if (message.type === 'job:process') {
 				// Add job to stream
 				const messageData = this.serializeMessage(message);
-				const messageId = await this.commandClient.send('XADD', [streamKey, '*', ...messageData]);
+				const messageId = (await this.commandClient.send('XADD', [
+					streamKey,
+					'*',
+					...messageData
+				])) as string;
 
 				// Create job index entry
 				await this.indexJob({
@@ -450,10 +454,10 @@ export class RedisTransport extends InteractsWithConsole implements Transport {
 				});
 
 				// Notify subscribers about new job via pub/sub
-				await this.publisherClient.publish(
+				await this.publisherClient.send('PUBLISH', [
 					`${this.options.keyPrefix}:queue:${queueName}:new`,
 					messageId
-				);
+				]);
 
 				this.debug(`Job ${message.jobId} dispatched to queue ${queueName} with ID ${messageId}`);
 			} else if (message.type === 'job:status' || message.type === 'job:result') {
@@ -470,24 +474,24 @@ export class RedisTransport extends InteractsWithConsole implements Transport {
 				await this.updateJobIndex(message.jobId, message.dispatchId, queueName, message.status);
 
 				// Broadcast status update via pub/sub
-				await this.publisherClient.publish(
+				await this.publisherClient.send('PUBLISH', [
 					`${this.options.keyPrefix}:job:${message.jobId}:status`,
 					JSON.stringify({
 						status: message.status,
 						error: message.error,
 						timestamp: Date.now()
 					})
-				);
+				]);
 			} else if (message.type === 'job:cancel') {
 				// Send cancel command via pub/sub
-				await this.publisherClient.publish(
+				await this.publisherClient.send('PUBLISH', [
 					`${this.options.keyPrefix}:queue:${queueName}:control`,
 					JSON.stringify({
 						type: 'cancel',
 						jobId: message.jobId,
 						dispatchId: message.dispatchId
 					})
-				);
+				]);
 			} else {
 				// Handle other message types
 				const messageData = this.serializeMessage(message);
@@ -512,7 +516,8 @@ export class RedisTransport extends InteractsWithConsole implements Transport {
 	async getJobStatus(jobId: string, dispatchId: string, queueName: string): Promise<JobStatusInfo> {
 		try {
 			const statusKey = this.getJobStatusKey(jobId, dispatchId, queueName);
-			const jobData = await this.commandClient.hmget(statusKey, [
+			const jobData = (await this.commandClient.send('HMGET', [
+				statusKey,
 				'jobId',
 				'dispatchId',
 				'queue',
@@ -524,7 +529,7 @@ export class RedisTransport extends InteractsWithConsole implements Transport {
 				'completedAt',
 				'updatedAt',
 				'messageId'
-			]);
+			])) as Array<string | null> | null;
 
 			if (jobData && jobData[0]) {
 				return {
@@ -599,7 +604,7 @@ export class RedisTransport extends InteractsWithConsole implements Transport {
 
 			if (fields.length > 0) {
 				// Update status in Redis (auto-pipelined)
-				await this.commandClient.hmset(statusKey, fields);
+				await this.commandClient.send('HMSET', [statusKey, ...fields]);
 				await this.commandClient.expire(statusKey, this.options.statusTTL);
 
 				// Update index if status changed
@@ -608,13 +613,13 @@ export class RedisTransport extends InteractsWithConsole implements Transport {
 				}
 
 				// Notify about status change via pub/sub
-				await this.publisherClient.publish(
+				await this.publisherClient.send('PUBLISH', [
 					`${this.options.keyPrefix}:job:${jobId}:status`,
 					JSON.stringify({
 						...updates,
 						timestamp: Date.now()
 					})
-				);
+				]);
 
 				this.debug(`Updated job ${jobId} status: ${updates.status || 'fields updated'}`);
 			}
@@ -637,7 +642,8 @@ export class RedisTransport extends InteractsWithConsole implements Transport {
 
 			// Register worker in Redis
 			const workerKey = this.getWorkerKey(workerId);
-			await this.commandClient.hmset(workerKey, [
+			await this.commandClient.send('HMSET', [
+				workerKey,
 				'id',
 				workerId,
 				'status',
@@ -652,7 +658,7 @@ export class RedisTransport extends InteractsWithConsole implements Transport {
 			await this.commandClient.expire(workerKey, 60);
 
 			// Notify about worker registration via pub/sub
-			await this.publisherClient.publish(
+			await this.publisherClient.send('PUBLISH', [
 				`${this.options.keyPrefix}:worker:coordination`,
 				JSON.stringify({
 					type: 'worker:joined',
@@ -660,7 +666,7 @@ export class RedisTransport extends InteractsWithConsole implements Transport {
 					queues,
 					timestamp: Date.now()
 				})
-			);
+			]);
 
 			this.debug(`Registered worker ${workerId} for queues: ${queues.join(', ')}`);
 		} catch (error) {
@@ -678,14 +684,14 @@ export class RedisTransport extends InteractsWithConsole implements Transport {
 			await this.commandClient.del(workerKey);
 
 			// Notify about worker leaving
-			await this.publisherClient.publish(
+			await this.publisherClient.send('PUBLISH', [
 				`${this.options.keyPrefix}:worker:coordination`,
 				JSON.stringify({
 					type: 'worker:left',
 					workerId,
 					timestamp: Date.now()
 				})
-			);
+			]);
 
 			this.debug(`Unregistered worker ${workerId}`);
 		} catch (error) {
@@ -775,10 +781,10 @@ export class RedisTransport extends InteractsWithConsole implements Transport {
 		const member = `${jobId}:${dispatchId}`;
 
 		// Check if job exists in queue index
-		const score = await this.commandClient.zscore(
+		const score = await this.commandClient.send('ZSCORE', [
 			`${this.options.keyPrefix}:idx:queue:${queue}`,
 			member
-		);
+		]);
 
 		if (score) {
 			// Get status from status indices
@@ -792,10 +798,10 @@ export class RedisTransport extends InteractsWithConsole implements Transport {
 			];
 
 			for (const status of statuses) {
-				const exists = await this.commandClient.zscore(
+				const exists = await this.commandClient.send('ZSCORE', [
 					`${this.options.keyPrefix}:idx:status:${status}`,
 					member
-				);
+				]);
 
 				if (exists) {
 					return {
@@ -804,7 +810,7 @@ export class RedisTransport extends InteractsWithConsole implements Transport {
 						queue,
 						status,
 						priority: 10,
-						timestamp: score
+						timestamp: Number(score)
 					};
 				}
 			}
@@ -841,7 +847,7 @@ export class RedisTransport extends InteractsWithConsole implements Transport {
 		if (status.completedAt) fields.push('completedAt', status.completedAt);
 		if (status.messageId) fields.push('messageId', status.messageId);
 
-		await this.commandClient.hmset(statusKey, fields);
+		await this.commandClient.send('HMSET', [statusKey, ...fields]);
 		await this.commandClient.expire(statusKey, this.options.statusTTL);
 	}
 
@@ -874,7 +880,7 @@ export class RedisTransport extends InteractsWithConsole implements Transport {
 		try {
 			// Get all stream keys
 			const pattern = `${this.options.keyPrefix}:stream:*`;
-			const keys = await this.commandClient.keys(pattern);
+			const keys = (await this.commandClient.send('KEYS', [pattern])) as string[];
 
 			if (!Array.isArray(keys) || keys.length === 0) {
 				return ['default'];
@@ -947,10 +953,10 @@ export class RedisTransport extends InteractsWithConsole implements Transport {
 
 		// Clean up old job status keys
 		const statusPattern = `${this.options.keyPrefix}:status:*`;
-		const statusKeys = await this.commandClient.keys(statusPattern);
+		const statusKeys = (await this.commandClient.send('KEYS', [statusPattern])) as string[];
 
 		for (const key of statusKeys) {
-			const ttl = await this.commandClient.ttl(key);
+			const ttl = (await this.commandClient.send('TTL', [key])) as number;
 
 			// If key has no TTL or expired, delete it
 			if (ttl === -1 || ttl === -2) {
@@ -1128,9 +1134,9 @@ export class RedisTransport extends InteractsWithConsole implements Transport {
 
 		// Check Redis
 		const lockKey = `${this.options.keyPrefix}:lock:${queue}:${jobId}`;
-		const exists = await this.commandClient.exists(lockKey);
+		const exists = await this.commandClient.send('EXISTS', [lockKey]);
 
-		return exists;
+		return exists === true || Number(exists) > 0;
 	}
 
 	/**
@@ -1141,13 +1147,13 @@ export class RedisTransport extends InteractsWithConsole implements Transport {
 		const lockValue = `${this.consumerId}:${Date.now()}`;
 
 		// Try to acquire lock with NX (only if not exists)
-		const result = await this.commandClient.set(
+		const result = await this.commandClient.send('SET', [
 			lockKey,
 			lockValue,
 			'PX',
 			duration.toString(),
 			'NX'
-		);
+		]);
 
 		if (result === 'OK') {
 			// Store in local cache
@@ -1176,7 +1182,10 @@ export class RedisTransport extends InteractsWithConsole implements Transport {
 		this.jobLocks.delete(jobId);
 
 		// Notify via pub/sub that lock was released
-		await this.publisherClient.publish(`${this.options.keyPrefix}:lock:${queue}:released`, jobId);
+		await this.publisherClient.send('PUBLISH', [
+			`${this.options.keyPrefix}:lock:${queue}:released`,
+			jobId
+		]);
 
 		this.debug(`Released lock for job ${jobId} in queue ${queue}`);
 	}

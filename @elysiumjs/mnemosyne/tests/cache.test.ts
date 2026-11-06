@@ -43,7 +43,13 @@ const RedisClientFake = mock(function () {
 		exists: async (k: string) => data.has(k),
 		mget: async (...keys: string[]) => keys.map((k) => data.get(k) ?? null),
 		send: async (cmd: string, args: string[]) => {
-			if (cmd === 'UNLINK') return Number(data.delete(args[0]));
+			if (cmd === 'UNLINK') return args.filter((k) => data.delete(k)).length;
+			if (cmd === 'SET') {
+				data.set(args[0], args[1]);
+				return 'OK';
+			}
+			if (cmd === 'EXISTS') return Number(data.has(args[0]));
+			if (cmd === 'MGET') return args.map((k) => data.get(k) ?? null);
 			if (cmd === 'SCAN') {
 				const pattern = args[args.indexOf('MATCH') + 1] ?? '*';
 				const regex = new RegExp(`^${pattern.split('*').map(RegExp.escape).join('.*')}$`);

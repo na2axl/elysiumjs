@@ -32,6 +32,7 @@ import Value from 'typebox/value';
 
 import { getCommandName } from './command';
 import { ConsoleFormat, InteractsWithConsole } from './console';
+import { Container } from './container';
 import { initEnv } from './env';
 import { ElysiumError, InvalidControllerError } from './errors';
 import { Event } from './event';
@@ -75,6 +76,7 @@ export type AppProps = {
 	/**
 	 * The runtime the application runs on, from `@elysiumjs/runtime-bun`, `@elysiumjs/runtime-node`
 	 * or `@elysiumjs/runtime-workers`. Can be omitted when `Runtime.use()` was called before.
+	 * The runtime is process-wide: when several applications are constructed, the last one wins.
 	 */
 	runtime?: RuntimePort;
 
@@ -308,7 +310,7 @@ export abstract class Application extends InteractsWithConsole {
 	 * @param argv The command line arguments, without the executable and script.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 */
-	public async run(argv: string[] = process.argv.slice(2)): Promise<void> {
+	public async run(argv: readonly string[] = Runtime.get().argv()): Promise<void> {
 		this.installSignalHandlers();
 		try {
 			const { modules } = this.props();
@@ -334,7 +336,7 @@ export abstract class Application extends InteractsWithConsole {
 		return buildModuleGraph(modules ?? [], environment);
 	}
 
-	private async dispatch([action, ...rest]: string[]): Promise<void> {
+	private async dispatch([action, ...rest]: readonly string[]): Promise<void> {
 		switch (action) {
 			case undefined:
 				this.commandDescribe();
@@ -499,10 +501,21 @@ export abstract class Application extends InteractsWithConsole {
 	 * Initialises every module and builds every singleton service, once. An app from
 	 * {@link build} calls it on its first request; hosts call it before other work, such as a
 	 * queue batch or a scheduled event.
-	 * @throws When a module fails to initialise; later calls return the same failure.
+	 * @throws When a module or a singleton fails to initialise. Later calls retry the failed ones,
+	 * so that a transient failure does not break every later request.
 	 */
 	public boot(): Promise<void> {
-		return (this.#booting ??= this.kernel.bootEager());
+		if (this.#booting) return this.#booting;
+		const attempt = this.kernel.bootEager().catch((error) => {
+			if (this.#booting === attempt) {
+				this.#booting = undefined;
+				this.kernel.resetFailures();
+				Container.forgetFailures();
+			}
+			throw error;
+		});
+		this.#booting = attempt;
+		return attempt;
 	}
 
 	/** Starts the server: boots the kernel, builds the root Elysia app and listens. */
@@ -606,6 +619,7 @@ export abstract class Application extends InteractsWithConsole {
 	private setupServerHooks(): void {
 		this.#elysia
 			.onError('global', (e) => this.handleServerError(e as ServerError))
+			.onAfterResponse('global', (c) => Container.disposeRequestScope(c.request ?? c))
 			.onStart(async (elysia) => {
 				await this.onStart(elysia as unknown as Elysia<Route>);
 				Event.emit('elysium:server:start', elysia, this);

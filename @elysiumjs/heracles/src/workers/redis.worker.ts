@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import type { ModuleNode } from '@elysiumjs/core';
+import type { RedisConnection } from '@elysiumjs/redis';
 import type { JobClass } from '../job';
 import type { JobDispatchOptions } from '../queue';
 import type { TransportEvent } from '../transport';
@@ -20,7 +21,6 @@ import type { QueuedJob, QueueState, Worker, WorkerQueueOptions } from '../worke
 
 import { ModuleContext } from '@elysiumjs/core';
 import { Redis } from '@elysiumjs/redis';
-import { RedisClient } from 'bun';
 
 import { Job, JobOverlapBehavior, JobStatus, WithId } from '../job';
 import { JobRegistry } from '../registry';
@@ -93,7 +93,7 @@ export class RedisWorker extends BaseWorker<RedisTransport> {
 	/**
 	 * Metrics reporting client
 	 */
-	private metricsClient?: RedisClient;
+	private metricsClient?: RedisConnection;
 
 	/**
 	 * Metrics reporting timer
@@ -167,7 +167,8 @@ export class RedisWorker extends BaseWorker<RedisTransport> {
 		const metricsKey = `worker:${this.id}:metrics`;
 
 		try {
-			await this.metricsClient.hmset(metricsKey, [
+			await this.metricsClient.send('HMSET', [
+				metricsKey,
 				'jobsProcessed',
 				this.metrics.jobsProcessed.toString(),
 				'jobsFailed',

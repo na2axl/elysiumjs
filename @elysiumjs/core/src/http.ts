@@ -588,13 +588,26 @@ export namespace Http {
 
 				app.derive('local', () => ({ controller: getController() }));
 
+				/** Awaits what a request-scoped controller injects, so that it can be built synchronously. */
+				const prepareController =
+					props.scope === HttpControllerScope.REQUEST
+						? () => ModuleContext.run(node, () => Container.prepareClass(target))
+						: null;
+
 				const onRequest = Metadata.get('http:onRequest', target) ?? {};
 				if (onRequest.handler) {
+					const callOnRequest = (c: Context) => {
+						const controller = getController()();
+						return ModuleContext.run(node, () => onRequest.handler.call(controller, c));
+					};
 					app.onRequest((c) =>
-						Container.runInRequestScope(() => {
-							const controller = getController()();
-							return ModuleContext.run(node, () => onRequest.handler.call(controller, c));
-						}, c.request)
+						Container.runInRequestScope(
+							() =>
+								prepareController
+									? prepareController().then(() => callOnRequest(c as Context))
+									: callOnRequest(c as Context),
+							c.request
+						)
 					);
 				}
 
@@ -612,6 +625,8 @@ export namespace Http {
 
 					const readParameters = async (c: Context) => {
 						const parameters: any[] = [];
+
+						if (prepareController) await prepareController();
 
 						if (route.rawContext) {
 							parameters[route.rawContext.index] = c;
@@ -641,8 +656,8 @@ export namespace Http {
 
 						if (!isEmpty(route.services)) {
 							for (const service of route.services) {
-								parameters[service.index] = ModuleContext.run(node, () =>
-									Service.get(service.token)
+								parameters[service.index] = await ModuleContext.run(node, () =>
+									Container.resolveVisible(service.token)
 								);
 							}
 						}
@@ -908,7 +923,7 @@ export namespace Http {
 		...rest
 	}: RequestHandlerDecoratorProps & { method: HTTPMethod }): MethodDecorator => {
 		return function (target, propertyKey, descriptor) {
-			process.nextTick(() => {
+			queueMicrotask(() => {
 				registerHttpRequestHandler({
 					path,
 					handler: descriptor.value as HttpRequestHandler,

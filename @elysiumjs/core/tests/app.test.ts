@@ -26,7 +26,7 @@ import { Application } from '../src/app';
 import { Command } from '../src/command';
 import { Container } from '../src/container';
 import * as Env from '../src/env';
-import { Event } from '../src/event';
+import { Event, EventBus } from '../src/event';
 import { Http } from '../src/http';
 import { Kernel } from '../src/kernel';
 import { ConsoleLogger, LOGGER_SERVICE } from '../src/logger';
@@ -1011,6 +1011,119 @@ describe('Application class', () => {
 			expect(await response.json()).toMatchObject({ type: 'UNKNOWN' });
 			expect(initialised).toEqual(['greet']);
 			await instance.kernel.shutdown();
+		});
+
+		describe('boot retry', () => {
+			/** A module and a singleton whose onInit fail the given number of times. */
+			const makeFlaky = (failures: { module: number; service: number }, calls: string[]) => {
+				@Service.register({ name: 'retry.store', global: true })
+				class Store {
+					public ready = false;
+
+					public async onInit() {
+						await nextTick();
+						calls.push('service');
+						if (failures.service-- > 0) throw new Error('service failed');
+						this.ready = true;
+					}
+				}
+
+				@Module.register({ services: [Store] })
+				class FlakyModule extends Module {
+					public async onInit() {
+						await nextTick();
+						calls.push('module');
+						if (failures.module-- > 0) throw new Error('module failed');
+					}
+				}
+
+				@Application.register({ modules: [FlakyModule], openapi: false })
+				class FlakyApp extends Application {}
+
+				return new FlakyApp();
+			};
+
+			it('retries the boot after a module onInit fails once', async () => {
+				const calls: string[] = [];
+				const instance = makeFlaky({ module: 1, service: 0 }, calls);
+				await instance.build();
+
+				await expect(instance.boot()).rejects.toThrow('module failed');
+				await instance.boot();
+
+				expect(calls).toEqual(['module', 'module', 'service']);
+				expect((await Service.resolve<{ ready: boolean }>('retry.store')).ready).toBe(true);
+				await instance.kernel.shutdown();
+			});
+
+			it('retries a singleton whose onInit failed', async () => {
+				const calls: string[] = [];
+				const instance = makeFlaky({ module: 0, service: 1 }, calls);
+				await instance.build();
+
+				await expect(instance.boot()).rejects.toThrow('service failed');
+				await instance.boot();
+
+				expect(calls).toEqual(['module', 'service', 'service']);
+				expect((await Service.resolve<{ ready: boolean }>('retry.store')).ready).toBe(true);
+				await instance.kernel.shutdown();
+			});
+
+			it('shares one retry between concurrent boots', async () => {
+				const calls: string[] = [];
+				const instance = makeFlaky({ module: 1, service: 0 }, calls);
+				await instance.build();
+
+				await expect(instance.boot()).rejects.toThrow('module failed');
+				await Promise.all([instance.boot(), instance.boot()]);
+
+				expect(calls).toEqual(['module', 'module', 'service']);
+				await instance.kernel.shutdown();
+			});
+
+			it('wires the event listeners of a retried module once', async () => {
+				let failures = 1;
+				const received: unknown[] = [];
+
+				@Service.register()
+				class Listener {
+					@Event.on({ event: 'retry:evt' })
+					public handle(e: unknown) {
+						received.push(e);
+					}
+				}
+
+				@Module.register({ services: [Listener] })
+				class ListeningModule extends Module {
+					public async onInit() {
+						await nextTick();
+						if (failures-- > 0) throw new Error('module failed');
+					}
+				}
+
+				@Application.register({ modules: [ListeningModule], openapi: false })
+				class ListeningApp extends Application {}
+
+				const instance = new ListeningApp();
+				await instance.build();
+				await expect(instance.boot()).rejects.toThrow('module failed');
+				await instance.boot();
+
+				expect(EventBus.instance.listenerCount('retry:evt')).toBe(1);
+				await instance.kernel.shutdown();
+			});
+
+			it('keeps a successful boot', async () => {
+				const calls: string[] = [];
+				const instance = makeFlaky({ module: 0, service: 0 }, calls);
+				await instance.build();
+
+				await instance.boot();
+				await instance.boot();
+
+				expect(calls).toEqual(['module', 'service']);
+				await instance.kernel.shutdown();
+			});
 		});
 	});
 

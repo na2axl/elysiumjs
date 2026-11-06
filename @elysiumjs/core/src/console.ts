@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { WriteStream } from 'node:tty';
-
 import { isEmpty, omit } from 'radash';
+
+import { Runtime, RuntimeNotSupportedError } from './runtime';
 
 /**
  * ANSI color codes and styles for console output.
@@ -73,21 +73,20 @@ export class InteractsWithConsole {
 	 * Write a message to the console.
 	 * @param message The message to write.
 	 * @param newLine Whether to add a newline at the end (default: `true`).
-	 * @param out The output stream to write to (default: `process.stdout`). Hosts without
-	 * streams, such as Cloudflare Workers, write to the console instead.
+	 * @param out The stream to write to (default: `'stdout'`). The runtime decides how it is
+	 * written: hosts without streams, such as Cloudflare Workers, write to the console instead,
+	 * and so does the framework when no runtime is set yet.
 	 */
 	public write(
 		message: string,
 		newLine: boolean = true,
-		out: WriteStream | undefined = process.stdout
+		out: 'stdout' | 'stderr' = 'stdout'
 	): void {
-		if (typeof out?.write === 'function') {
-			out.write(message + (newLine ? '\n' : ''));
-		} else if (out !== undefined && out === process.stderr) {
-			console.error(message);
-		} else {
-			console.log(message);
-		}
+		const text = message + (newLine ? '\n' : '');
+		const runtime = Runtime.find();
+		if (runtime) runtime.write(out, text);
+		else if (out === 'stderr') globalThis.console.error(message);
+		else globalThis.console.log(message);
 	}
 
 	/**
@@ -126,7 +125,7 @@ export class InteractsWithConsole {
 	 * @param message The message to write.
 	 */
 	public error(message: string): void {
-		this.write(`${this.format('✖', ConsoleFormat.RED)} ${message}`, true, process.stderr);
+		this.write(`${this.format('✖', ConsoleFormat.RED)} ${message}`, true, 'stderr');
 	}
 
 	/**
@@ -135,7 +134,7 @@ export class InteractsWithConsole {
 	 * @param message The message to write.
 	 */
 	public debug(message: string): void {
-		if (process.env.DEBUG) {
+		if (Runtime.find()?.env().DEBUG) {
 			this.write(`🔍 ${message}`);
 		}
 	}
@@ -343,7 +342,7 @@ export class InteractsWithConsole {
 	 * Clear the console screen.
 	 */
 	public clear(): void {
-		process.stdout.write('\x1Bc');
+		this.terminal().clear();
 	}
 
 	/**
@@ -352,15 +351,25 @@ export class InteractsWithConsole {
 	 * @param y The y coordinate (row).
 	 */
 	public moveCursor(x: number, y: number): void {
-		process.stdout.moveCursor(x, y);
+		this.terminal().moveCursor(x, y);
 	}
 
 	/**
 	 * Clear the current line in the console.
 	 */
 	public clearLine(): void {
-		process.stdout.clearLine(0);
-		process.stdout.cursorTo(0);
+		this.terminal().clearLine();
+	}
+
+	/**
+	 * Gets the interactive terminal of the runtime.
+	 * @throws {RuntimeNotSupportedError} When the runtime has no terminal.
+	 */
+	private terminal() {
+		const runtime = Runtime.get();
+		const terminal = runtime.terminal();
+		if (!terminal) throw new RuntimeNotSupportedError('Interactive console', runtime.name);
+		return terminal;
 	}
 
 	// User Input Methods
@@ -372,10 +381,11 @@ export class InteractsWithConsole {
 	 * @returns The user's input.
 	 */
 	protected async prompt(question: string, defaultValue?: string): Promise<string> {
+		const terminal = this.terminal();
 		const readline = await loadReadline();
 		const rl = readline.createInterface({
-			input: process.stdin,
-			output: process.stdout
+			input: terminal.input,
+			output: terminal.output
 		});
 
 		const defaultText = defaultValue ? ` (default: ${defaultValue})` : '';
@@ -395,30 +405,31 @@ export class InteractsWithConsole {
 	 */
 	protected async promptPassword(question: string): Promise<string> {
 		// Create readline interface
+		const terminal = this.terminal();
 		const readline = await loadReadline();
 		const rl = readline.createInterface({
-			input: process.stdin,
-			output: process.stdout
+			input: terminal.input,
+			output: terminal.output
 		});
 
 		// Mute stdin echo
-		process.stdin.setRawMode?.(true);
+		terminal.setRawMode?.(true);
 
 		return new Promise<string>((resolve) => {
 			let password = '';
 
 			// Write question
-			process.stdout.write(`${question}: `);
+			terminal.output.write(`${question}: `);
 
 			// Handle keypress events
-			process.stdin.on('data', (data) => {
+			terminal.input.on('data', (data: Buffer | string) => {
 				const char = data.toString();
 
 				// Check for Enter key (carriage return)
 				if (char === '\r' || char === '\n') {
-					process.stdout.write('\n');
-					process.stdin.setRawMode?.(false);
-					process.stdin.removeAllListeners('data');
+					terminal.output.write('\n');
+					terminal.setRawMode?.(false);
+					terminal.input.removeAllListeners('data');
 					rl.close();
 					resolve(password);
 					return;
@@ -428,14 +439,14 @@ export class InteractsWithConsole {
 				if (char === '\b' || char === '\x7f') {
 					if (password.length > 0) {
 						password = password.slice(0, -1);
-						process.stdout.write('\b \b'); // Erase character from terminal
+						terminal.output.write('\b \b'); // Erase character from terminal
 					}
 					return;
 				}
 
 				// Add character to password
 				password += char;
-				process.stdout.write('*'); // Show asterisk instead of actual character
+				terminal.output.write('*'); // Show asterisk instead of actual character
 			});
 		});
 	}

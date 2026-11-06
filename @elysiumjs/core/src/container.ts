@@ -30,6 +30,7 @@ import {
 	ServiceNotReadyError,
 	ServiceNotVisibleError
 } from './errors';
+import { getLogger } from './logger';
 import { Metadata } from './metadata';
 import { ModuleContext } from './module-context';
 import { ServiceScope } from './service';
@@ -100,6 +101,8 @@ const globalScope = new Map<ServiceToken, ContainerEntry>();
 const moduleScopes = new Map<ModuleNode, Map<ServiceToken, ContainerEntry>>();
 const requestStorage = new AsyncLocalStorage<RequestStore>();
 const keyedRequestStores = new WeakMap<object, RequestStore>();
+/** The disposals of keyed scopes, so that a later dispose of the same key waits for them. */
+const keyedDisposals = new WeakMap<object, Promise<void>>();
 const building: ContainerEntry[] = [];
 const constructedEntries: { entry: ContainerEntry; instance: unknown }[] = [];
 
@@ -149,6 +152,24 @@ const construct = (entry: ContainerEntry): unknown => {
 };
 
 /**
+ * Calls `onDestroy` on the instances of a request store, dependants first, each in its owner's
+ * context. A failing hook is logged and does not stop the others.
+ */
+const destroyStore = async (store: RequestStore): Promise<void> => {
+	const entries = [...store.entries()].reverse();
+	store.clear();
+	for (const [entry, { instance }] of entries) {
+		const onDestroy = (instance as { onDestroy?: () => unknown } | null)?.onDestroy;
+		if (typeof onDestroy !== 'function') continue;
+		try {
+			await inOwnerContext(entry.owner, () => onDestroy.call(instance));
+		} catch (error) {
+			getLogger().error('Error while destroying', { target: `service ${entry.name}`, error });
+		}
+	}
+};
+
+/**
  * Builds (or reuses) the instance of an entry. Singletons are recorded once.
  */
 const instantiate = (entry: ContainerEntry): Instantiation => {
@@ -164,14 +185,31 @@ const instantiate = (entry: ContainerEntry): Instantiation => {
 		const existing = store.get(entry);
 		if (existing) return existing;
 		const instance = construct(entry);
-		const instantiation = { instance, ready: runOnInit(entry, instance) };
+		const instantiation: Instantiation = { instance, ready: undefined };
+		const ready = runOnInit(entry, instance);
+		if (ready) {
+			// Once settled, the instance is served synchronously; a failure is forgotten, so that
+			// the next resolution in the request builds it again.
+			instantiation.ready = ready.then(
+				() => {
+					instantiation.ready = undefined;
+				},
+				(error) => {
+					if (store.get(entry) === instantiation) store.delete(entry);
+					throw error;
+				}
+			);
+			instantiation.ready.catch(() => {});
+		}
 		store.set(entry, instantiation);
 		return instantiation;
 	}
 
 	if (entry.scope === ServiceScope.FACTORY) {
 		const instance = construct(entry);
-		return { instance, ready: runOnInit(entry, instance) };
+		const ready = runOnInit(entry, instance);
+		ready?.catch(() => {});
+		return { instance, ready };
 	}
 
 	if (entry.initFailure) throw entry.initFailure.error;
@@ -249,8 +287,19 @@ const prepare = async (entry: ContainerEntry, path: readonly ContainerEntry[]): 
 	);
 	for (const dependency of found) {
 		if (!dependency) continue;
-		if (dependency.entry.scope !== ServiceScope.SINGLETON) await prepare(dependency.entry, trail);
-		else await entryValueAsync(dependency.entry, trail);
+		if (dependency.entry.scope === ServiceScope.SINGLETON) {
+			await entryValueAsync(dependency.entry, trail);
+		} else if (
+			dependency.entry.scope === ServiceScope.REQUEST &&
+			!trail.some((e) => e.scope === ServiceScope.SINGLETON) &&
+			requestStorage.getStore()
+		) {
+			// Built ahead in the request store, so that the dependant finds it ready. Under a
+			// singleton, it is left to fail with a ScopeMismatchError when it is built.
+			await entryValueAsync(dependency.entry, trail);
+		} else {
+			await prepare(dependency.entry, trail);
+		}
 	}
 };
 
@@ -433,6 +482,38 @@ export namespace Container {
 	}
 
 	/**
+	 * Awaits everything `cls` injects, so that {@link make} can then build it synchronously:
+	 * module initialisation, singletons and, inside a request scope, request-scoped services
+	 * with an asynchronous `onInit`.
+	 * @param cls The class about to be built from the current module context.
+	 */
+	export function prepareClass(cls: Class<unknown>): Promise<void> {
+		return prepare(
+			{
+				token: cls,
+				name: cls.name,
+				scope: ServiceScope.FACTORY,
+				global: false,
+				owner: ModuleContext.current() ?? null,
+				create: () => undefined,
+				initialised: false,
+				cls
+			},
+			[]
+		);
+	}
+
+	/**
+	 * Awaits a service like {@link resolve}, but returns `null` when it is not visible from the
+	 * current module context, like {@link get}. A factory service is built once, with its `onInit` done.
+	 * @param service The service token.
+	 */
+	export async function resolveVisible(service: ServiceToken): Promise<unknown> {
+		const found = lookup(service, ModuleContext.current());
+		return found ? entryValueAsync(found.entry) : null;
+	}
+
+	/**
 	 * Builds `cls` with its injected dependencies, resolved from the current module context.
 	 * @throws {ServiceNotFoundError | ServiceNotVisibleError | EnvironmentSkippedModuleError}
 	 */
@@ -519,11 +600,44 @@ export namespace Container {
 	 */
 	export const runInRequestScope = <T>(fn: () => T, key?: object): T => {
 		let store = key ? keyedRequestStores.get(key) : requestStorage.getStore();
+		const owned = !key && !store;
 		if (!store) {
 			store = new Map();
 			if (key) keyedRequestStores.set(key, store);
 		}
-		return requestStorage.run(store, fn);
+		if (!owned) return requestStorage.run(store, fn);
+
+		const created = store;
+		let result: T;
+		try {
+			result = requestStorage.run(created, fn);
+		} catch (error) {
+			void destroyStore(created);
+			throw error;
+		}
+		if (!isPromise(result)) {
+			void destroyStore(created);
+			return result;
+		}
+		return result.finally(() => destroyStore(created)) as T;
+	};
+
+	/**
+	 * Ends the request scope of `key`: removes its store and calls `onDestroy` on its instances,
+	 * the last created first, each in its owner's module context. Errors are logged, never thrown.
+	 * Disposing a scope twice returns the first disposal, so that every caller, such as a host
+	 * that keeps the invocation alive until it ends, waits for the `onDestroy` work. Disposing a
+	 * scope that never existed does nothing.
+	 * @param key The object the scope was started with.
+	 */
+	export const disposeRequestScope = (key: object): Promise<void> => {
+		const store = keyedRequestStores.get(key);
+		const running = keyedDisposals.get(key);
+		if (!store) return running ?? Promise.resolve();
+		keyedRequestStores.delete(key);
+		const disposal = Promise.all([running, destroyStore(store)]).then(() => undefined);
+		keyedDisposals.set(key, disposal);
+		return disposal;
 	};
 
 	/** Whether the current code runs in a request scope. */
@@ -549,6 +663,25 @@ export namespace Container {
 				instance,
 				owner: entry.owner
 			}));
+
+	/**
+	 * Forgets the singletons whose `onInit` failed, so that the next resolution builds them
+	 * again.
+	 */
+	export function forgetFailures(): void {
+		const failed = new Set<ContainerEntry>();
+		for (const entries of [globalScope, ...moduleScopes.values()]) {
+			for (const entry of entries.values()) if (entry.initFailure) failed.add(entry);
+		}
+		for (const entry of failed) {
+			delete entry.instance;
+			delete entry.initPromise;
+			delete entry.initFailure;
+			entry.initialised = false;
+		}
+		const kept = constructedEntries.filter(({ entry }) => !failed.has(entry));
+		constructedEntries.splice(0, constructedEntries.length, ...kept);
+	}
 
 	/** Clears every scope and the construction record. */
 	export function reset(): void {

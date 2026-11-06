@@ -74,7 +74,8 @@ describe('RedisModule', () => {
 		app = await createTestingApp({ modules: [RedisModule.with(config)] });
 		await app.get('redis.connection.cache');
 		const client = Redis.getConnection('cache');
-		expect(client).toBe(clients[0] as any);
+		expect(clients).toHaveLength(1);
+		expect(typeof client.send).toBe('function');
 		expect(ClientMock).toHaveBeenCalledWith('redis://cache:6379', {});
 		expect(Redis.getConnection('cache')).toBe(client);
 	});
@@ -161,7 +162,7 @@ describe('RedisModule', () => {
 			modules: [RedisModule.with({ connections: { default: { url: 'redis://d:6379' } } })]
 		});
 		await app.get('redis.connection.default');
-		expect(Redis.getConnection()).toBe(clients[0] as any);
+		expect(Redis.getConnection()).toBe(Redis.getConnection('default'));
 		expect(ClientMock).toHaveBeenCalledTimes(1);
 	});
 
@@ -175,7 +176,7 @@ describe('RedisModule', () => {
 			]
 		});
 		await app.get('redis.connection.default');
-		expect(Redis.getDefaultConnection()).toBe(clients[0] as any);
+		expect(Redis.getDefaultConnection()).toBe(Redis.getConnection('default'));
 	});
 
 	it('rejects an unknown default connection', async () => {
