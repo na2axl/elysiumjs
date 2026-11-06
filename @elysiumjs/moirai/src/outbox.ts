@@ -23,6 +23,7 @@ import { uuidv7 } from './ids';
 
 type EffectHandler = (payload: unknown, row: OutboxRow) => unknown;
 const EFFECTS = new Map<string, EffectHandler>();
+const ATTEMPTS = new Map<string, (row: OutboxRow) => number | undefined>();
 
 /** The handler of a kind of effect, if any. */
 export const effectHandler = (kind: string): EffectHandler | undefined => EFFECTS.get(kind);
@@ -32,9 +33,16 @@ export const effectHandler = (kind: string): EffectHandler | undefined => EFFECT
  * @author Axel Nana <axel.nana@workbud.com>
  * @param kind The kind of effect.
  * @param handler Gets the payload and the row; throwing retries the row later.
+ * @param policy `attempts` gives the attempts of a row, when they differ from `maxRelayAttempts`.
  */
-export const registerEffect = (kind: string, handler: EffectHandler): void => {
+export const registerEffect = (
+	kind: string,
+	handler: EffectHandler,
+	policy: { attempts?: (row: OutboxRow) => number | undefined } = {}
+): void => {
 	EFFECTS.set(kind, handler);
+	if (policy.attempts) ATTEMPTS.set(kind, policy.attempts);
+	else ATTEMPTS.delete(kind);
 };
 
 const BASE_DELAY_MS = 5_000;
@@ -169,7 +177,8 @@ export namespace Outbox {
 				const error = asError(cause);
 				const attempts = row.attempts + 1;
 				const failedAt = new Date();
-				if (attempts >= config.maxRelayAttempts) {
+				const maxAttempts = ATTEMPTS.get(row.kind)?.(row) ?? config.maxRelayAttempts;
+				if (attempts >= maxAttempts) {
 					await inUnitOfWork(() =>
 						store.markDead(row.id, { attempts, lastError: error.message, deadAt: failedAt })
 					);

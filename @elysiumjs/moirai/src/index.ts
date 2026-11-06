@@ -37,13 +37,24 @@ export {
 } from './config';
 export {
 	CallForbiddenError,
+	DuplicateEventConsumerError,
 	IdempotencyConflictError,
 	IdempotencyKeyRequiredError,
 	IdempotencyKeyReusedError,
 	InvalidInputError,
 	MissingStoreError,
+	UnknownEventConsumerError,
 	UnknownEffectError
 } from './errors';
+export {
+	type EventCatalogue,
+	type EventHandlerOptions,
+	type EventMeta,
+	type EventName,
+	type EventPayload,
+	Event,
+	MOIRAI_EVENT_EFFECT
+} from './event';
 export { requestHash } from './hash';
 export { uuidv7 } from './ids';
 export { MoiraiModule, type MoiraiModuleConfig } from './moirai.module';
