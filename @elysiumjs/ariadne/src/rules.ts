@@ -52,7 +52,10 @@ export namespace FlowRules {
 		completedAt: null
 	});
 
-	/** Reserves a step: replay first, then finished, then a live lease, then the position. */
+	/**
+	 * Reserves a step: replay first, then finished, then a live lease (of any submission), then the
+	 * position. A granted claim answers the state the step runs on.
+	 */
 	export const claim = (
 		slot: FlowSlot,
 		input: FlowClaim,
@@ -69,16 +72,10 @@ export namespace FlowRules {
 			);
 		}
 		if (record.completedAt !== null) return refuse({ ok: false, reason: 'completed' });
-		const lease = live(slot.lease, now);
-		if (lease !== null) {
-			return refuse({
-				ok: false,
-				reason: lease.stepId === input.stepId ? 'in-flight' : 'unexpected-step'
-			});
-		}
+		if (live(slot.lease, now) !== null) return refuse({ ok: false, reason: 'in-flight' });
 		if (record.step !== input.expectStep) return refuse({ ok: false, reason: 'unexpected-step' });
 		return {
-			result: { ok: true },
+			result: { ok: true, state: record.state },
 			slot: {
 				record,
 				lease: {

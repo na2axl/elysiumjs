@@ -17,7 +17,7 @@ import type {
 	IdempotencyRecord,
 	IdempotencyStore,
 	InboxStore,
-	OutboxClaimFilter,
+	OutboxClaim,
 	OutboxRow,
 	OutboxStore
 } from '@elysiumjs/moirai';
@@ -97,8 +97,13 @@ export type DrizzleStoreOptions<T> = { table: T; connection?: string };
 
 /** Whether an error is a Postgres unique violation, from any driver. */
 const isUniqueViolation = (error: unknown): boolean => {
-	for (let e = error as { code?: unknown; cause?: unknown } | undefined; e; e = e.cause as never) {
-		if (e.code === '23505') return true;
+	for (
+		let e = error as { code?: unknown; errno?: unknown; cause?: unknown } | undefined;
+		e;
+		e = e.cause as never
+	) {
+		// postgres.js and node-postgres keep the SQLSTATE in `code`, Bun's SQL driver in `errno`.
+		if (e.code === '23505' || e.errno === '23505') return true;
 		if (e.cause === e) break;
 	}
 	return false;
@@ -150,28 +155,32 @@ export class DrizzleOutboxStore implements OutboxStore {
 		await this.db.insert(this.options.table).values(rows.map((row) => ({ ...row })));
 	}
 
-	public async claimDue(
-		now: Date,
-		limit: number,
-		filter: OutboxClaimFilter = {}
-	): Promise<readonly OutboxRow[]> {
-		if (filter.kinds?.length === 0 || filter.ids?.length === 0) return [];
+	public async claimDue(claim: OutboxClaim): Promise<readonly OutboxRow[]> {
+		const { now, leaseUntil, limit, kinds, ids } = claim;
+		if (kinds?.length === 0 || ids?.length === 0) return [];
 		const t = this.options.table;
-		return this.db
-			.select()
+		const due = this.db
+			.select({ id: t.id })
 			.from(t)
 			.where(
 				and(
 					isNull(t.dispatchedAt),
 					isNull(t.deadAt),
 					lte(t.availableAt, now),
-					filter.kinds ? inArray(t.kind, [...filter.kinds]) : undefined,
-					filter.ids ? inArray(t.id, [...filter.ids]) : undefined
+					kinds ? inArray(t.kind, [...kinds]) : undefined,
+					ids ? inArray(t.id, [...ids]) : undefined
 				)
 			)
 			.orderBy(asc(t.availableAt))
 			.limit(limit)
 			.for('update', { skipLocked: true });
+		const rows = await this.db
+			.update(t)
+			.set({ availableAt: leaseUntil })
+			.where(inArray(t.id, due))
+			.returning();
+		// The ids are UUIDv7, so they sort in creation order.
+		return rows.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 	}
 
 	public async markDispatched(id: string, dispatchedAt: Date): Promise<void> {

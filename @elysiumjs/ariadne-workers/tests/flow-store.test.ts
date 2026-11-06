@@ -93,13 +93,13 @@ describe('FlowStoreObject', () => {
 		expect(entry('f:1').storage.alarm).toBe(now + 3_600_000);
 		expect(await store.load('f:2')).toBeNull();
 
-		expect(await store.claim('f:1', claim('s1', 'a', null))).toEqual({ ok: true });
+		expect(await store.claim('f:1', claim('s1', 'a', null))).toEqual({ ok: true, state: null });
 		expect(await store.claim('f:1', claim('s1', 'a', null))).toEqual({
 			ok: false,
 			reason: 'in-flight'
 		});
 		await store.release('f:1', 's1');
-		expect(await store.claim('f:1', claim('s1', 'a', null))).toEqual({ ok: true });
+		expect(await store.claim('f:1', claim('s1', 'a', null))).toEqual({ ok: true, state: null });
 		expect(await store.commit('f:1', commit('s1', 'a', null))).toEqual({
 			ok: true,
 			replayed: false,

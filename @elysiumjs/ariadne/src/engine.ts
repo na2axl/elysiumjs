@@ -16,7 +16,7 @@ import type { DomainError } from '@elysiumjs/core';
 import type { FlowAdvance, FlowContext, FlowDescription, FlowRefusal, FlowStepRun } from './flow';
 import type { FlowRecord, FlowStore } from './store';
 
-import { Application, Service } from '@elysiumjs/core';
+import { Application, Service, userIdOf } from '@elysiumjs/core';
 
 import {
 	FlowCompletedError,
@@ -28,12 +28,7 @@ import {
 	InvalidFlowRequestError,
 	MissingFlowStoreError
 } from './errors';
-import {
-	FLOW_KEY_HEADER,
-	FLOW_OWNER_HEADER,
-	FLOW_STEP_HEADER,
-	FLOW_STEP_LEASE_SECONDS
-} from './store';
+import { FLOW_KEY_HEADER, FLOW_OWNER_HEADER, FLOW_STEP_HEADER } from './store';
 
 /**
  * The Elysia context the flow routes read.
@@ -54,8 +49,9 @@ export type FlowOptions = {
 	/** Where flows live. */
 	store: FlowStore | (() => FlowStore);
 	/**
-	 * The id of the signed-in user, which owns a user flow. Defaults to the `id` of `currentUser`
-	 * in the context, which `@Auth()` of themis sets.
+	 * The id of the signed-in user, which owns a user flow. Defaults to `currentUser` in the
+	 * context, which `@Auth()` of themis sets: the user when it is a string, else its `id`, else
+	 * its `sub`.
 	 */
 	user?: (http: FlowHttpContext) => string | undefined;
 };
@@ -79,10 +75,7 @@ const randomToken = (): string =>
 		byte.toString(16).padStart(2, '0')
 	).join('');
 
-const defaultUser = (http: FlowHttpContext): string | undefined => {
-	const id = (http.currentUser as { id?: unknown } | undefined)?.id;
-	return id === undefined || id === null ? undefined : String(id);
-};
+const defaultUser = (http: FlowHttpContext): string | undefined => userIdOf(http.currentUser);
 
 const isAdvance = (value: unknown): value is FlowAdvance<unknown> =>
 	(value as { '~flow'?: unknown } | null)?.['~flow'] === 'advance';
@@ -239,7 +232,7 @@ export class FlowEngine {
 			stepId,
 			step: stepName,
 			expectStep: record.step,
-			leaseSeconds: FLOW_STEP_LEASE_SECONDS
+			leaseSeconds: target.lease
 		});
 		if (!claim.ok) {
 			if (claim.reason === 'replay') return this.reply(claim.answer, await store.load(key));
@@ -257,15 +250,18 @@ export class FlowEngine {
 		let settled = false;
 		try {
 			const initial = this.flow.initial;
+			// The state the store held when the step was reserved: a refused attempt may have
+			// changed it since the flow was loaded. A flow that no step has touched yet starts from
+			// its initial state.
 			const before =
-				record.step === null
+				record.step === null && claim.state === null
 					? initial !== undefined
 						? await (controller as Record<string | symbol, Function>)[initial]!.call(
 								controller,
 								ctx
 							)
 						: {}
-					: record.state;
+					: claim.state;
 			const state = rewinding && target.onRewind ? await target.onRewind(before, ctx) : before;
 			const result = await run({ state, ctx });
 			if (isRefusal(result)) {

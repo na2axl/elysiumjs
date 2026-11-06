@@ -55,6 +55,7 @@ export {
 	MemoryIdempotencyStore,
 	MemoryInboxStore,
 	MemoryOutboxStore,
+	type OutboxClaim,
 	type OutboxClaimFilter,
 	type OutboxEffect,
 	type OutboxRow,

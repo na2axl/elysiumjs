@@ -109,7 +109,40 @@ class PlanFlow {
 const SECRET = 'j'.repeat(32);
 const users: Record<string, { id: string }> = { u1: { id: 'u1' }, u2: { id: 'u2' } };
 
-@Module.register({ controllers: [SignUpFlow, ProfileFlow, PlanFlow] })
+type Pin = { attempts: number };
+
+/** A first step that refuses: its attempts must add up from the first try. */
+@Flow.controller({ name: 'pin', ttl: 60, owner: 'guest' })
+class PinFlow {
+	@Flow.initial()
+	public initial(): Pin {
+		return { attempts: 0 };
+	}
+
+	@Flow.step({ lease: 120 })
+	public check(
+		@Http.body(t.Object({ pin: t.String() })) { pin }: { pin: string },
+		@Flow.state() state: Pin
+	) {
+		if (pin === '1234') return { attempts: state.attempts };
+		const attempts = state.attempts + 1;
+		return Flow.refuse({ attempts }, DomainError.badRequest(`Wrong pin (${attempts}).`), {
+			end: attempts >= 3
+		});
+	}
+}
+
+/** A user flow behind a guard whose user is the JWT claims. */
+@Flow.controller({ name: 'claims', ttl: 60, owner: 'user' })
+@Auth({ guards: ['claims'] })
+class ClaimsFlow {
+	@Flow.step()
+	public hello(@Flow.context() ctx: FlowContext) {
+		return { owner: ctx.owner };
+	}
+}
+
+@Module.register({ controllers: [SignUpFlow, ProfileFlow, PlanFlow, PinFlow, ClaimsFlow] })
 class FlowsModule extends Module {}
 
 const makeApp = (store: FlowStore) => {
@@ -117,7 +150,10 @@ const makeApp = (store: FlowStore) => {
 		modules: [
 			ThemisModule.with({
 				secret: 's'.repeat(32),
-				guards: { jwt: jwtGuard({ secret: SECRET, user: (claims) => users[claims.sub as string] }) }
+				guards: {
+					jwt: jwtGuard({ secret: SECRET, user: (claims) => users[claims.sub as string] }),
+					claims: jwtGuard({ secret: SECRET })
+				}
 			}),
 			AriadneModule.with({ store }),
 			FlowsModule
@@ -374,6 +410,104 @@ describe('flows over HTTP', () => {
 			flow: 'profile',
 			step: 'name'
 		});
+	});
+});
+
+describe('flow state between attempts', () => {
+	let testing: TestingHttpApp | undefined;
+
+	afterEach(async () => {
+		await testing?.shutdown();
+		testing = undefined;
+	});
+
+	const pin = async (store: FlowStore) => {
+		testing = await Application.testing({ app: makeApp(store) });
+		const http = testing.http;
+		const { flowKey, owner } = await (await http.post('/flows/pin')).json();
+		const check = (stepId: string, value: string) =>
+			http
+				.post('/flows/pin/check')
+				.header(FLOW_OWNER_HEADER, owner)
+				.header(FLOW_KEY_HEADER, flowKey)
+				.header(FLOW_STEP_HEADER, stepId)
+				.json({ pin: value });
+		return { flowKey, check };
+	};
+
+	it('keeps the state of a refused first step, and ends the flow on the last attempt', async () => {
+		const { check } = await pin(new MemoryFlowStore());
+		expect((await (await check('s1', '0000')).json()).detail).toBe('Wrong pin (1).');
+		expect((await (await check('s2', '0000')).json()).detail).toBe('Wrong pin (2).');
+		expect((await (await check('s3', '0000')).json()).detail).toBe('Wrong pin (3).');
+		expect((await check('s4', '1234')).status).toBe(410);
+	});
+
+	it('runs a step on the state the store holds when the step is reserved', async () => {
+		// The load of the second attempt happens before the first attempt is refused, and its claim
+		// after: the step must see the first refusal.
+		let gate: Promise<void> | undefined;
+		let paused: (() => void) | undefined;
+		class GatedStore extends MemoryFlowStore {
+			public override async load(key: string) {
+				const record = await super.load(key);
+				if (gate) {
+					const wait = gate;
+					gate = undefined;
+					paused?.();
+					await wait;
+				}
+				return record;
+			}
+		}
+		const store = new GatedStore();
+		const { check } = await pin(store);
+
+		let open!: () => void;
+		gate = new Promise((resolve) => (open = resolve));
+		const loaded = new Promise<void>((resolve) => (paused = resolve));
+		// The test client sends a request when it is awaited.
+		const second = (async () => await check('s2', '0000'))();
+		await loaded;
+		expect((await (await check('s1', '0000')).json()).detail).toBe('Wrong pin (1).');
+		open();
+		expect((await (await second).json()).detail).toBe('Wrong pin (2).');
+		expect((await (await check('s3', '0000')).json()).detail).toBe('Wrong pin (3).');
+	});
+
+	it('takes the lease of a step from its options', () => {
+		expect(Flow.describe(PinFlow)!.steps.get('check')!.lease).toBe(120);
+		expect(Flow.describe(PlanFlow)!.steps.get('pay')!.lease).toBe(30);
+	});
+
+	it('answers in-flight to another submission while a step runs', async () => {
+		const store = new MemoryFlowStore();
+		const { flowKey, check } = await pin(store);
+		await store.claim(`pin:${flowKey}`, {
+			stepId: 's1',
+			step: 'check',
+			expectStep: null,
+			leaseSeconds: 30
+		});
+		const busy = await check('s2', '0000');
+		expect(busy.status).toBe(409);
+		expect((await busy.json()).type).toBe('flow-step-in-progress');
+	});
+
+	it('reads the owner of a user flow from JWT claims', async () => {
+		testing = await Application.testing({ app: makeApp(new MemoryFlowStore()) });
+		const http = testing.http;
+		const auth = await bearer('u9');
+		const { flowKey } = await (
+			await http.post('/flows/claims').header('authorization', auth)
+		).json();
+		const hello = await http
+			.post('/flows/claims/hello')
+			.header('authorization', auth)
+			.header(FLOW_KEY_HEADER, flowKey)
+			.header(FLOW_STEP_HEADER, 's1')
+			.json({});
+		expect((await hello.json()).answer).toEqual({ owner: 'u9' });
 	});
 });
 

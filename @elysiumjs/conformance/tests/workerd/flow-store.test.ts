@@ -44,7 +44,7 @@ describe('FlowStoreObject (workerd)', () => {
 		const store = durableFlowStore(flows);
 		const key = `greeting:${crypto.randomUUID()}`;
 		await store.init(key, 'owner', 3600);
-		expect(await store.claim(key, claim('s1', 'name', null))).toEqual({ ok: true });
+		expect(await store.claim(key, claim('s1', 'name', null))).toEqual({ ok: true, state: null });
 		expect(await store.claim(key, claim('s1', 'name', null))).toEqual({
 			ok: false,
 			reason: 'in-flight'

@@ -103,43 +103,57 @@ export namespace Outbox {
 	 * Runs the due rows of the outbox through their `@Moirai.effect()` handlers. A row that fails
 	 * is retried later with an exponential backoff, and is dead after `maxRelayAttempts`. Delivery
 	 * is at least once, so handlers must tolerate a repeat.
+	 *
+	 * The claim, each row (its handler and its mark) and each failure run in units of work of their
+	 * own, so a handler whose statement fails rolls back alone and its failure is still recorded.
+	 * Call it outside a unit of work.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param relayOptions The rows to relay.
 	 */
-	export const relay = (relayOptions: RelayOptions = {}): Promise<RelaySummary> => {
+	export const relay = async (relayOptions: RelayOptions = {}): Promise<RelaySummary> => {
 		const config = options();
 		const store = outboxStore();
-		return inUnitOfWork(async () => {
-			const summary: RelaySummary = { dispatched: 0, retried: 0, dead: 0 };
-			const rows = await store.claimDue(new Date(), relayOptions.batch ?? config.relayBatch, {
+		const summary: RelaySummary = { dispatched: 0, retried: 0, dead: 0 };
+		const now = new Date();
+		const rows = await inUnitOfWork(() =>
+			store.claimDue({
+				now,
+				leaseUntil: new Date(now.getTime() + config.relayLease * 1000),
+				limit: relayOptions.batch ?? config.relayBatch,
 				kinds: relayOptions.kinds,
 				ids: relayOptions.ids
-			});
-			for (const row of rows) {
-				try {
+			})
+		);
+		for (const row of rows) {
+			try {
+				await inUnitOfWork(async () => {
 					const handler = effectHandler(row.kind);
 					if (!handler) throw new UnknownEffectError(row.kind);
 					await handler(row.payload, row);
 					await store.markDispatched(row.id, new Date());
-					summary.dispatched++;
-				} catch (cause) {
-					const error = asError(cause);
-					const attempts = row.attempts + 1;
-					const now = new Date();
-					if (attempts >= config.maxRelayAttempts) {
-						await store.markDead(row.id, { attempts, lastError: error.message, deadAt: now });
-						config.onDead?.(row, error);
-						getLogger().error('An outbox row is dead', { id: row.id, kind: row.kind, error });
-						summary.dead++;
-					} else {
-						const availableAt = new Date(now.getTime() + backoffMs(attempts));
-						await store.markFailed(row.id, { attempts, lastError: error.message, availableAt });
-						summary.retried++;
-					}
+				});
+				summary.dispatched++;
+			} catch (cause) {
+				const error = asError(cause);
+				const attempts = row.attempts + 1;
+				const failedAt = new Date();
+				if (attempts >= config.maxRelayAttempts) {
+					await inUnitOfWork(() =>
+						store.markDead(row.id, { attempts, lastError: error.message, deadAt: failedAt })
+					);
+					config.onDead?.(row, error);
+					getLogger().error('An outbox row is dead', { id: row.id, kind: row.kind, error });
+					summary.dead++;
+				} else {
+					const availableAt = new Date(failedAt.getTime() + backoffMs(attempts));
+					await inUnitOfWork(() =>
+						store.markFailed(row.id, { attempts, lastError: error.message, availableAt })
+					);
+					summary.retried++;
 				}
 			}
-			return summary;
-		});
+		}
+		return summary;
 	};
 
 	/**

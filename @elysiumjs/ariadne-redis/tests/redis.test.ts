@@ -63,14 +63,15 @@ const contract = (name: string, make: () => FlowStore) => {
 
 		it('claims, commits and replays a step', async () => {
 			const { store, key } = await fresh();
-			expect(await store.claim(key, claim('s1', 'a', null))).toEqual({ ok: true });
+			expect(await store.claim(key, claim('s1', 'a', null))).toEqual({ ok: true, state: null });
 			expect(await store.claim(key, claim('s1', 'a', null))).toEqual({
 				ok: false,
 				reason: 'in-flight'
 			});
+			// Another submission waits for the running one too.
 			expect(await store.claim(key, claim('s2', 'a', null))).toEqual({
 				ok: false,
-				reason: 'unexpected-step'
+				reason: 'in-flight'
 			});
 			expect(await store.commit(key, commit('s1', 'a', null))).toEqual({
 				ok: true,
@@ -124,14 +125,17 @@ const contract = (name: string, make: () => FlowStore) => {
 			await store.release(key, 'other');
 			expect((await store.claim(key, claim('s1', 'a', null))).ok).toBe(false);
 			await store.release(key, 's1');
-			expect(await store.claim(key, claim('s1', 'a', null))).toEqual({ ok: true });
+			expect(await store.claim(key, claim('s1', 'a', null))).toEqual({ ok: true, state: null });
 
 			await store.amend(key, { stepId: 'other', state: { tries: 9 }, end: false });
 			expect((await store.load(key))!.state).toBeNull();
 			await store.amend(key, { stepId: 's1', state: { tries: 1 }, end: false });
 			expect((await store.load(key))!.state).toEqual({ tries: 1 });
-			// The claim was given back.
-			expect(await store.claim(key, claim('s2', 'a', null))).toEqual({ ok: true });
+			// The claim was given back, and the next one runs on the amended state.
+			expect(await store.claim(key, claim('s2', 'a', null))).toEqual({
+				ok: true,
+				state: { tries: 1 }
+			});
 			await store.amend(key, { stepId: 's2', state: null, end: true });
 			expect(await store.load(key)).toBeNull();
 		});
@@ -201,7 +205,10 @@ describe('RedisFlowStore', () => {
 			}
 		} as never;
 		const store = new RedisFlowStore({ connection, prefix: 'app:flow:' });
-		expect(await store.claim('sign-up:k1', claim('s1', 'email', null))).toEqual({ ok: true });
+		expect(await store.claim('sign-up:k1', claim('s1', 'email', null))).toEqual({
+			ok: true,
+			state: null
+		});
 		expect(sent[0]!.slice(0, 1)).toEqual(['EVAL']);
 		expect(sent[0]!.slice(2, 6)).toEqual([
 			'3',
