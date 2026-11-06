@@ -1,0 +1,61 @@
+{
+  "name": "@elysiumjs/themis-redis",
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "description": "A Redis session store for @elysiumjs/themis.",
+  "private": false,
+  "author": {
+    "name": "Axel Nana",
+    "email": "axel.nana@workbud.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/na2axl/elysiumjs.git",
+    "directory": "@elysiumjs/themis-redis"
+  },
+  "homepage": "https://github.com/na2axl/elysiumjs/tree/main/@elysiumjs/themis-redis#readme",
+  "bugs": {
+    "url": "https://github.com/na2axl/elysiumjs/issues"
+  },
+  "scripts": {
+    "format": "prettier --write \"./src/**/*.ts\"",
+    "clean": "rimraf dist",
+    "build:js": "bun build ./src/index.ts --outdir ./dist --target browser --packages external --root ./src --minify-syntax --minify-whitespace",
+    "build:ts": "tsc",
+    "build": "bun run clean && bun run build:js && bun run build:ts",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "bun run build",
+    "test": "bun test",
+    "test:coverage": "bun test --coverage"
+  },
+  "keywords": [
+    "elysium",
+    "framework",
+    "typescript",
+    "authentication",
+    "redis",
+    "sessions"
+  ],
+  "type": "module",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md"
+  ],
+  "sideEffects": false,
+  "devDependencies": {
+    "@elysiumjs/core": "workspace:*",
+    "@elysiumjs/themis": "workspace:*"
+  },
+  "peerDependencies": {
+    "@elysiumjs/themis": "workspace:^",
+    "@elysiumjs/redis": "workspace:^"
+  }
+}

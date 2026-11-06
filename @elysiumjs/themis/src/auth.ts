@@ -15,7 +15,7 @@
 import type { HttpContext } from './context';
 import type { JwtVerifyOptions } from './jwt';
 
-import { Metadata, Middleware } from '@elysiumjs/core';
+import { Metadata, Middleware, Service } from '@elysiumjs/core';
 
 import { ApiKeys } from './api-keys';
 import { currentContext, themisConfig } from './context';
@@ -31,6 +31,36 @@ import { loadSession, Session } from './session';
 export interface Guard {
 	authenticate(context: HttpContext): Promise<unknown> | unknown;
 }
+
+/**
+ * A guard class, built once through the service container, so that its constructor gets its
+ * services injected like a middleware or a filter.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @example
+ * ```ts
+ * class DeviceGuard implements Guard {
+ * 	constructor(private readonly devices: DeviceRepository) {}
+ *
+ * 	public async authenticate(context: HttpContext) {
+ * 		const token = context.request.headers.get('x-device-token');
+ * 		return token ? this.devices.ownerOf(token) : undefined;
+ * 	}
+ * }
+ *
+ * ThemisModule.with({ secret, guards: { device: DeviceGuard } });
+ * ```
+ */
+export type GuardClass = new (...args: any[]) => Guard;
+
+const built = new WeakMap<GuardClass, Guard>();
+
+/** The guard of a config entry: the instance, or the class built through the container. */
+const guardOf = (entry: Guard | GuardClass): Guard => {
+	if (typeof entry !== 'function') return entry;
+	let guard = built.get(entry);
+	if (!guard) built.set(entry, (guard = Service.make<Guard>(entry)));
+	return guard;
+};
 
 const USER = 'currentUser';
 const GUARD = 'themis:guard';
@@ -131,9 +161,9 @@ export class AuthMiddleware extends Middleware {
 		const guards = themisConfig().guards ?? {};
 		const names = this.guards.length > 0 ? this.guards : Object.keys(guards);
 		for (const name of names) {
-			const guard = guards[name];
-			if (!guard) throw new UnknownGuardError(name);
-			const user = await guard.authenticate(context);
+			const entry = guards[name];
+			if (!entry) throw new UnknownGuardError(name);
+			const user = await guardOf(entry).authenticate(context);
 			if (user !== undefined && user !== null) {
 				context[USER] = user;
 				context[GUARD] = name;

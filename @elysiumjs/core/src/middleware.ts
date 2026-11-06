@@ -96,6 +96,49 @@ export const makeMiddlewares = (
  * @param plugin The Elysia plugin instance.
  * @param node The module the middlewares belong to, or `null` for application-level middlewares.
  */
+const ERROR_HOOKS = Symbol('elysium:middleware-error-hooks');
+
+type Enlisted = { middlewares: Middleware[]; node: ModuleNode | null };
+
+/** Remembers the middlewares a request went through, so that their onError runs if it fails. */
+const enlist = (context: any, middlewares: Middleware[], node: ModuleNode | null): void => {
+	const list: Enlisted[] = (context[ERROR_HOOKS] ??= []);
+	if (!list.some((entry) => entry.middlewares === middlewares)) list.push({ middlewares, node });
+};
+
+/**
+ * Runs the `onError` hook of the middlewares a failed request went through, innermost first.
+ * Called by the error handler before it builds the response; a failing hook is logged.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param context The context of the failed request, with its `error`.
+ */
+export const runErrorMiddlewares = async (context: any): Promise<void> => {
+	const list = (context?.[ERROR_HOOKS] as Enlisted[] | undefined) ?? [];
+	for (const { middlewares, node } of [...list].reverse()) {
+		const hooks = middlewares.filter(
+			(middleware) => middleware.onError !== Middleware.prototype.onError
+		);
+		if (hooks.length === 0) continue;
+		await executeMiddlewareChain(
+			hooks.map(
+				(middleware) =>
+					({
+						onError: async (c: any) => {
+							try {
+								await middleware.onError(c);
+							} catch (error) {
+								getLogger().error('An onError middleware failed', { error });
+							}
+						}
+					}) as unknown as Middleware
+			),
+			context,
+			'onError',
+			node
+		);
+	}
+};
+
 export const applyMiddlewares = (
 	middlewares: Class<Middleware>[],
 	plugin: AnyElysia,
@@ -133,6 +176,7 @@ export const applyMiddlewares = (
 	}
 
 	plugin.onBeforeHandle((c) => {
+		enlist(c, mi(), node);
 		return executeMiddlewareChain(mi(), c, 'onBeforeHandle', node);
 	});
 
@@ -230,6 +274,14 @@ export abstract class Middleware<TGuards extends string[] = string[]> {
 	 * @param _ctx The request context.
 	 */
 	public onBeforeHandle(_ctx: Context): any {}
+
+	/**
+	 * Called when the request fails, before the error response is built, such as to save what the
+	 * request changed or to set headers on the error response. Its context carries the `error`.
+	 * It cannot replace the response: exception filters do that.
+	 * @param _ctx The request context.
+	 */
+	public onError(_ctx: Context & { error: unknown }): any {}
 
 	/**
 	 * Called after the response has been sent.

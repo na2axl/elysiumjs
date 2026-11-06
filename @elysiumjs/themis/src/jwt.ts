@@ -18,6 +18,7 @@ import { DomainError } from '@elysiumjs/core';
 import { jwtVerify, SignJWT } from 'jose';
 
 import { utf8 } from './crypto';
+import { assertStrongSecret } from './errors';
 
 /**
  * The key of a token: a shared secret (HS256), or a key of an asymmetric algorithm such as EdDSA
@@ -62,10 +63,11 @@ export class InvalidTokenError extends DomainError {
 	}
 }
 
-const keyOf = (key: JwtKey) =>
-	'secret' in key
-		? { key: utf8(key.secret), algorithm: 'HS256' }
-		: { key: key.key, algorithm: key.algorithm };
+const keyOf = (key: JwtKey) => {
+	if (!('secret' in key)) return { key: key.key, algorithm: key.algorithm };
+	assertStrongSecret(key.secret, 'JWT secret');
+	return { key: utf8(key.secret), algorithm: 'HS256' };
+};
 
 export namespace Jwt {
 	/**

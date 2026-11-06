@@ -15,6 +15,7 @@
 import { DomainError } from '@elysiumjs/core';
 
 import { hmac, verifyHmac } from './crypto';
+import { assertStrongSecret } from './errors';
 
 /**
  * Raised when a signed URL was tampered with or has expired. Rendered as a 403 problem.
@@ -56,6 +57,7 @@ export namespace SignedUrl {
 		if (options.expiresIn !== undefined) {
 			target.searchParams.set('expires', String(Math.floor(Date.now() / 1000) + options.expiresIn));
 		}
+		assertStrongSecret(options.secret, 'signed URL secret');
 		target.searchParams.set('signature', await hmac(options.secret, signedPart(target)));
 		return target.toString();
 	};

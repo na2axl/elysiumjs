@@ -30,9 +30,12 @@ export interface PasswordHasher {
 	needsRehash(hash: string): boolean;
 }
 
+/** Workers cap PBKDF2 at 100,000 iterations. */
+const onWorkers = (): boolean => globalThis.navigator?.userAgent === 'Cloudflare-Workers';
+
 /**
- * Hashes passwords with PBKDF2-HMAC-SHA256 through WebCrypto, which every runtime has. Workers
- * cap PBKDF2 at 100,000 iterations, the default.
+ * Hashes passwords with PBKDF2-HMAC-SHA256 through WebCrypto, which every runtime has. The
+ * iterations default to 600,000, and to 100,000 on Cloudflare Workers, which cap PBKDF2 there.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export class Pbkdf2PasswordHasher implements PasswordHasher {
@@ -41,7 +44,7 @@ export class Pbkdf2PasswordHasher implements PasswordHasher {
 	constructor(private readonly options: { iterations?: number } = {}) {}
 
 	private get iterations(): number {
-		return this.options.iterations ?? 100_000;
+		return this.options.iterations ?? (onWorkers() ? 100_000 : 600_000);
 	}
 
 	public async hash(password: string): Promise<string> {
@@ -140,7 +143,7 @@ export class BunPasswordHasher implements PasswordHasher {
 let configured: PasswordHasher | undefined;
 const known: PasswordHasher[] = [];
 
-/** The default hasher: Argon2id on Bun, PBKDF2 elsewhere. */
+/** The default hasher: Argon2id on Bun, PBKDF2 elsewhere (600,000 iterations, 100,000 on Workers). */
 const defaultHasher = (): PasswordHasher =>
 	(configured ??= bunPassword() ? new BunPasswordHasher() : new Pbkdf2PasswordHasher());
 

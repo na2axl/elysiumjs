@@ -45,7 +45,7 @@ import { FILTER_LEVELS, routeFilterLevels, runFilters } from './filter';
 import { Kernel } from './kernel';
 import { getLogger } from './logger';
 import { Metadata } from './metadata';
-import { applyMiddlewares, middlewareStops } from './middleware';
+import { applyMiddlewares, middlewareStops, runErrorMiddlewares } from './middleware';
 import { ModuleContext } from './module-context';
 import { buildModuleGraph } from './module-graph';
 import { problemResponse, toProblem, unwrapParseError } from './problem';
@@ -736,6 +736,8 @@ export abstract class Application extends InteractsWithConsole {
 
 		// A middleware that stopped the request already chose its response.
 		if (middlewareStops.has(error)) return;
+
+		await runErrorMiddlewares(e);
 
 		// A thrown status is already a response.
 		if (error instanceof ElysiaStatus) {

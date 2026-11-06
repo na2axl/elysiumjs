@@ -20,7 +20,7 @@ import type {
 	UserInfoResponse
 } from 'oauth4webapi';
 
-import { DomainError } from '@elysiumjs/core';
+import { DomainError, getLogger } from '@elysiumjs/core';
 import * as oauth from 'oauth4webapi';
 
 import { Session } from './session';
@@ -216,10 +216,12 @@ export class OAuthClient {
 			return { tokens, claims, userInfo };
 		} catch (error) {
 			if (error instanceof DomainError) throw error;
-			const cause = error as { error?: string; error_description?: string; message?: string };
-			throw new OAuthCallbackError(
-				cause.error_description ?? cause.error ?? cause.message ?? 'unknown error'
-			);
+			// An OAuth error answered by the provider carries a code from the specification, safe to
+			// show. Anything else (a network failure, a bad response) stays in the logs.
+			const code = (error as { error?: unknown }).error;
+			if (typeof code === 'string' && /^[\w.-]+$/.test(code)) throw new OAuthCallbackError(code);
+			getLogger().warn('An OAuth callback failed', { error });
+			throw new OAuthCallbackError('the provider could not be reached or answered wrongly');
 		}
 	}
 }
