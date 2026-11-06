@@ -14,14 +14,30 @@
 
 export type { JobProps, JobClass, JobMetadata } from './job';
 export type { JobDispatchOptions, QueueOptions, JobDispatchId } from './queue';
-export type { JobStatusInfo, Transport, TransportClass, TransportEvent } from './transport';
+export type {
+	JobStatusInfo,
+	Transport,
+	TransportClass,
+	TransportEvent,
+	TransportProcessMessage
+} from './transport';
 export type { QueuedJob, QueueState, Worker, WorkerInfo, WorkerQueueOptions } from './worker';
 export type { RedisTransportOptions } from './transports/redis.transport';
 
+export { Cron, type CronSchedule, InvalidCronError } from './cron';
 export { HeraclesModule, type HeraclesModuleConfig } from './heracles.module';
-export { DuplicateJobError, QUEUES_SERVICE } from './registry';
+export { DuplicateJobError, JobRegistry, type JobRegistryEntry, QUEUES_SERVICE } from './registry';
+export {
+	type JobSchedule,
+	Schedule,
+	type ScheduledJob,
+	Scheduler,
+	type SchedulerOptions,
+	type ScheduleOptions,
+	schedulesOf
+} from './schedule';
 export { Heracles } from './heracles';
-export { Job, JobStatus, JobOverlapBehavior } from './job';
+export { Job, JobStatus, JobOverlapBehavior, WithId } from './job';
 export { Queue } from './queue';
 export { TransportMode } from './transport';
 export { RedisTransport } from './transports/redis.transport';

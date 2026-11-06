@@ -19,7 +19,12 @@ import type { JobRegistryEntry } from './registry';
 
 import { ElysiumError, KERNEL_SERVICE, Module, runAll, Service } from '@elysiumjs/core';
 
-import { HeraclesCleanCommand, HeraclesListCommand, HeraclesWorkCommand } from './commands';
+import {
+	HeraclesCleanCommand,
+	HeraclesListCommand,
+	HeraclesScheduleCommand,
+	HeraclesWorkCommand
+} from './commands';
 import { Queue } from './queue';
 import { DuplicateJobError, JobRegistry, QUEUES_SERVICE } from './registry';
 import { getJobMetadata } from './utils';
@@ -64,7 +69,12 @@ export class ConfiguredQueues {
  * @author Axel Nana <axel.nana@workbud.com>
  */
 @Module.register<HeraclesModuleConfig>({
-	commands: [HeraclesCleanCommand, HeraclesListCommand, HeraclesWorkCommand],
+	commands: [
+		HeraclesCleanCommand,
+		HeraclesListCommand,
+		HeraclesScheduleCommand,
+		HeraclesWorkCommand
+	],
 	services: (config) => [
 		{ name: QUEUES_SERVICE, global: true, factory: () => new ConfiguredQueues(config.queues ?? {}) }
 	]
