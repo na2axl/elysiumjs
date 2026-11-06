@@ -27,9 +27,16 @@ The build settings live in `hephaestus.config.ts` (`styx create --features hepha
 styx build --target workers
 ```
 
+With `--target node`, it bundles the app into one ES module for Node.js: the entry (`node.entry`, `./src/server.ts` by default, or `--entry`) builds the app with `@elysiumjs/runtime-node` and serves it. The bundle is written to `output.dir` as `node.outfile` (`server.js` by default), with every dependency inside except those listed in `node.external`. The bundler emits the decorator metadata the container reads, so no `tsc` step is needed. This target needs no config file either.
+
+```bash
+styx build --target node
+node dist/server.js
+```
+
 To provide the commands from the app itself instead, list `HephaestusModule` in its modules and install the package as a regular dependency.
 
-The classes behind the commands (`BinaryBuilder`, `WorkersBuilder`, `AssetEmbedder`, `DockerGenerator`) are exported for build scripts. Styx builds its own standalone executables with them.
+The classes behind the commands (`BinaryBuilder`, `WorkersBuilder`, `NodeBuilder`, `AssetEmbedder`, `DockerGenerator`) are exported for build scripts. Styx builds its own standalone executables with them.
 
 ## License
 

@@ -58,6 +58,13 @@ export const HephaestusConfigSchema = z.object({
 			outfile: z.string().default('worker.js')
 		})
 		.prefault({}),
+	node: z
+		.object({
+			entry: z.string().default('./src/server.ts'),
+			outfile: z.string().default('server.js'),
+			external: z.array(z.string()).default([])
+		})
+		.prefault({}),
 	assets: z
 		.object({
 			embed: z.array(z.string()).default([]),

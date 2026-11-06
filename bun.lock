@@ -92,6 +92,7 @@
       },
       "devDependencies": {
         "@elysiumjs/core": "workspace:*",
+        "@elysiumjs/runtime-node": "workspace:*",
         "elysia": "^2.0.0-rc.1",
       },
       "peerDependencies": {

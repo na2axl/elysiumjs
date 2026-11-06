@@ -17,30 +17,33 @@ import type { PlatformTarget } from '../types';
 import { Command, CommandArgumentType } from '@elysiumjs/core';
 
 import { BinaryBuilder } from '../builder/binary.builder';
+import { NodeBuilder } from '../builder/node.builder';
 import { WorkersBuilder } from '../builder/workers.builder';
 import { loadConfig } from '../config/loader';
 
 /**
- * Command used to build the project into a standalone binary (`--target binary`, the default) or
- * a Cloudflare Worker bundle compiled ahead of time (`--target workers`).
+ * Command used to build the project into a standalone binary (`--target binary`, the default), a
+ * Cloudflare Worker bundle compiled ahead of time (`--target workers`), or an ES module bundle for
+ * Node.js (`--target node`).
  * @author Axel Nana <axel.nana@workbud.com>
  */
 @Command.register()
 export class HephaestusBuildCommand extends Command {
 	public static readonly command: string = 'hephaestus:build';
 	public static readonly description: string =
-		'Build the project into a standalone binary, or a Cloudflare Worker bundle.';
+		'Build the project into a standalone binary, a Cloudflare Worker bundle, or a Node.js bundle.';
 	public static override readonly dev: boolean = true;
 
 	@Command.arg({
 		name: 'target',
 		required: false,
-		description: 'What to build: a standalone binary, or a Cloudflare Worker bundle',
+		description:
+			'What to build: a standalone binary, a Cloudflare Worker bundle, or a Node.js bundle',
 		type: CommandArgumentType.ENUM,
-		enum: ['binary', 'workers'],
+		enum: ['binary', 'workers', 'node'],
 		default: 'binary'
 	})
-	private target: 'binary' | 'workers' = 'binary';
+	private target: 'binary' | 'workers' | 'node' = 'binary';
 
 	@Command.arg({
 		name: 'entry',
@@ -76,6 +79,7 @@ export class HephaestusBuildCommand extends Command {
 
 	public async run(): Promise<void> {
 		if (this.target === 'workers') return this.buildWorker();
+		if (this.target === 'node') return this.buildNode();
 
 		try {
 			const config = await loadConfig();
@@ -130,6 +134,31 @@ export class HephaestusBuildCommand extends Command {
 			this.newLine();
 			this.success(
 				`Built ${result.outputPath} (${this.formatSize(result.size)}, ${this.formatSize(result.gzipSize)} gzipped, ${result.duration}ms)`
+			);
+		} catch (error: any) {
+			this.trace(error, 'Build failed');
+			process.exit(1);
+		}
+	}
+
+	/** Builds the Node.js bundle, run with `node`. */
+	private async buildNode(): Promise<void> {
+		try {
+			const config = await loadConfig(process.cwd(), { optional: true });
+			const spinner = this.spinner('Building for Node.js');
+			const result = await new NodeBuilder().build({
+				entry: this.entry ?? config.node.entry,
+				outdir: config.output.dir,
+				outfile: config.node.outfile,
+				external: config.node.external,
+				minify: config.build.minify,
+				sourcemap: config.build.sourcemap
+			});
+			spinner.complete('Build completed');
+
+			this.newLine();
+			this.success(
+				`Built ${result.outputPath} (${this.formatSize(result.size)}, ${result.duration}ms). Run it with: node ${result.outputPath}`
 			);
 		} catch (error: any) {
 			this.trace(error, 'Build failed');
