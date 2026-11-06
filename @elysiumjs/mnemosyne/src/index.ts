@@ -28,6 +28,7 @@ export type {
 export * from './database';
 export * from './model';
 export * from './repository';
+export { ModelResource, type ModelResourceOptions } from './resource';
 
 export * from './tenancy';
 export type { TenancyConfig, TenancyMode, ModelTenancyConfig } from './tenancy';
