@@ -13,6 +13,13 @@
 // limitations under the License.
 
 /**
+ * KNOWN GAP: this lane runs Elysia's just-in-time compiled handlers, built from strings through
+ * the Vitest integration's `unsafeEval`, while deployed Workers run handlers compiled ahead of
+ * time by `elysia/plugin/aot`, with no code generation. The AOT path is only covered by the
+ * `check:aot` and `check:wrangler` gates of `@elysiumjs/runtime-workers`, on one sample app. The
+ * AOT plugin compiles the single app a build entry exports, at build time (its Vite plugin only
+ * applies to `vite build`), while the scenarios build a fresh app per test in the test isolate.
+ *
  * Setup of the workerd lane, run in the test isolate before each test file.
  *
  * 1. Elysia compiles its route handlers with `new Function(...params, body)`. The Vitest
@@ -38,27 +45,42 @@ const splitParams = (args: unknown[]): unknown[] => {
 	return [...params, body];
 };
 
-globalThis.Function = new Proxy(globalThis.Function, {
-	construct: (target, args) => Reflect.construct(target, splitParams(args)),
-	apply: (target, _self, args) => Reflect.construct(target, splitParams(args))
-});
-
 type RejectionListener = (reason: unknown, promise: Promise<unknown>) => void;
 
-const reporters = process.listeners('unhandledRejection') as RejectionListener[];
-const pending = new Map<Promise<unknown>, unknown>();
+/** Wraps `Function` so that `unsafeEval` gets one name per parameter. */
+const installFunctionShim = (): void => {
+	globalThis.Function = new Proxy(globalThis.Function, {
+		construct: (target, args) => Reflect.construct(target, splitParams(args)),
+		apply: (target, _self, args) => Reflect.construct(target, splitParams(args))
+	});
+};
 
-for (const reporter of reporters) process.off('unhandledRejection', reporter);
+/** Reports a rejection to Vitest only when it is still unhandled on the next macrotask. */
+const installRejectionShim = (): void => {
+	const reporters = process.listeners('unhandledRejection') as RejectionListener[];
+	const pending = new Map<Promise<unknown>, unknown>();
 
-process.on('unhandledRejection', (reason: unknown, promise: Promise<unknown>) => {
-	pending.set(promise, reason);
-	setTimeout(() => {
-		if (!pending.has(promise)) return;
+	for (const reporter of reporters) process.off('unhandledRejection', reporter);
+
+	process.on('unhandledRejection', (reason: unknown, promise: Promise<unknown>) => {
+		pending.set(promise, reason);
+		setTimeout(() => {
+			if (!pending.has(promise)) return;
+			pending.delete(promise);
+			for (const reporter of reporters) reporter(reason, promise);
+		}, 0);
+	});
+
+	process.on('rejectionHandled', (promise: Promise<unknown>) => {
 		pending.delete(promise);
-		for (const reporter of reporters) reporter(reason, promise);
-	}, 0);
-});
+	});
+};
 
-process.on('rejectionHandled', (promise: Promise<unknown>) => {
-	pending.delete(promise);
-});
+// Setup files run once per test file, in one isolate: install the shims once, so that `Function`
+// is not wrapped twice and Vitest's reporters are not moved behind the deferral again.
+const lane = globalThis as typeof globalThis & { __elysiumLaneShim?: boolean };
+if (!lane.__elysiumLaneShim) {
+	lane.__elysiumLaneShim = true;
+	installFunctionShim();
+	installRejectionShim();
+}

@@ -21,6 +21,10 @@ import { defineConfig } from 'vitest/config';
 // their built `dist` (their `module` field): run `bun run build` first. As in the Node lane, SWC
 // compiles the legacy decorators and emits `design:paramtypes` for constructor injection.
 // `tests/workerd/setup.ts` explains the two shims the lane needs.
+//
+// KNOWN GAP: the scenarios run Elysia's just-in-time compiled handlers (code generated from
+// strings, through the integration's `unsafeEval`), not the ahead-of-time compiled handlers a
+// deployed Worker runs. See the top of `tests/workerd/setup.ts`.
 export default defineConfig({
 	plugins: [
 		swc.vite({
