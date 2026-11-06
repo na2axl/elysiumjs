@@ -27,7 +27,7 @@ import {
 
 import { MigrationGenerateCommand } from './commands/migration_generate.command';
 import { MigrationRunCommand } from './commands/migration_run.command';
-import { Database } from './database';
+import { closeConnection, Database } from './database';
 import { DrizzleRLSTenancy, DrizzleSchemaTenancy } from './tenancy';
 
 /**
@@ -101,7 +101,7 @@ export class DrizzleModule extends Module.configurable<DrizzleModuleConfig>({
 		await runAll(
 			names
 				.filter((name) => Service.isConstructed(name))
-				.map((name) => () => Service.get<DrizzleConnection>(name)?.$client.close())
+				.map((name) => () => closeConnection(Service.get<DrizzleConnection>(name)!))
 		);
 	}
 }

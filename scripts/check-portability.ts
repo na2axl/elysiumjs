@@ -68,14 +68,16 @@ export const ROOTS = [
 	'@elysiumjs/mnemosyne',
 	'@elysiumjs/redis',
 	'@elysiumjs/heracles',
-	'@elysiumjs/plugin-sentry'
-	// Not scanned until Wave 3 gives it a driver port: @elysiumjs/mnemosyne-drizzle (Bun SQL, Bun.Glob).
+	'@elysiumjs/plugin-sentry',
+	'@elysiumjs/mnemosyne-drizzle'
 ];
 
 /** Files exempt from the gate, per root. Globs are relative to the root. */
 export const ALLOW: Record<string, string[]> = {
 	// The Bun adapter of the Redis connection port.
-	'@elysiumjs/redis': ['src/connection.ts']
+	'@elysiumjs/redis': ['src/connection.ts'],
+	// The Bun SQL driver, and the CLI commands, which run on Bun (migration:generate calls drizzle-kit).
+	'@elysiumjs/mnemosyne-drizzle': ['src/drivers/bun-sql.ts', 'src/commands/**']
 };
 
 /**

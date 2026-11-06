@@ -12,7 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { basename, dirname } from 'node:path';
+/** The last segment of a path, with either separator. */
+const basename = (path: string): string => path.split(/[\\/]/).pop() ?? path;
+
+/** A path without its last segment. */
+const dirname = (path: string): string => path.replace(/[\\/][^\\/]*$/, '');
 
 /** A migration recorded as applied in `elysium_migrations`. */
 export type AppliedMigration = {

@@ -14,14 +14,15 @@
 
 import type { DatabaseCacheConfig, DatabaseDriver } from '@elysiumjs/mnemosyne';
 import type { DrizzleConfig } from 'drizzle-orm';
-import type { BunSQLDatabase } from 'drizzle-orm/bun-sql/postgres';
+import type { PgAsyncDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core';
+import type { DrizzleDriver } from './driver';
 
 import { ElysiumError } from '@elysiumjs/core';
 import { AbstractDatabase, getCurrentTenant, getTenancyConfig } from '@elysiumjs/mnemosyne';
 import { sql } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/bun-sql';
 
 import { DrizzleDatabaseCache } from './cache';
+import { MissingDriverError } from './driver';
 
 export { DEFAULT_CACHE_TTL, DrizzleDatabaseCache } from './cache';
 
@@ -32,7 +33,8 @@ export { DEFAULT_CACHE_TTL, DrizzleDatabaseCache } from './cache';
 /**
  * Connection configuration for Drizzle ORM.
  *
- * Extends `DrizzleConfig` with connection details and optional caching.
+ * Extends `DrizzleConfig` with the driver and optional caching. Without `driver`, `connection`
+ * or `client` connect with Bun SQL, on Bun only.
  *
  * @author Axel Nana <axel.nana@workbud.com>
  * @template TSchema The Drizzle schema type.
@@ -40,15 +42,64 @@ export { DEFAULT_CACHE_TTL, DrizzleDatabaseCache } from './cache';
 export type DrizzleConnectionProps<
 	TSchema extends Record<string, unknown> = Record<string, never>
 > = Omit<DrizzleConfig<TSchema>, 'cache'> &
-	({ connection: string | ({ url?: string } & Bun.SQLOptions) } | { client: Bun.SQL }) & {
+	(
+		| { driver: DrizzleDriver }
+		| { connection: string | ({ url?: string } & Record<string, unknown>) }
+		| { client: unknown }
+	) & {
 		cache?: true | DatabaseCacheConfig;
 	};
 
 /**
- * A Drizzle database connection backed by Bun's SQL driver.
+ * A Drizzle database connection, whatever its driver.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export type DrizzleConnection = BunSQLDatabase<Record<string, never>> & { $client: Bun.SQL };
+export type DrizzleConnection = PgAsyncDatabase<DrizzleQueryResultHKT, any> & { $client: any };
+
+/**
+ * The query results of a {@link DrizzleConnection}: rows, for `returning()` and selects. What
+ * `execute()` resolves to depends on the driver.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export interface DrizzleQueryResultHKT extends PgQueryResultHKT {
+	type: this['row'][];
+}
+
+/** The driver of each connection, to close it with. */
+const connectionDrivers = new WeakMap<object, DrizzleDriver>();
+
+/**
+ * The Bun SQL driver used when a connection sets none. Loaded on first use, on Bun only, so that
+ * other runtimes never load `bun`.
+ */
+const defaultDriver = (props: Record<string, unknown>, name: string): DrizzleDriver => {
+	// portability-allow: the default driver is Bun SQL, loaded on Bun only
+	if (typeof (globalThis as { Bun?: unknown }).Bun === 'undefined') {
+		throw new MissingDriverError(name);
+	}
+	const { drizzle } = (import.meta as unknown as { require(id: string): any }).require(
+		'drizzle-orm/bun-sql'
+	);
+	const client = 'client' in props ? { client: props.client } : { connection: props.connection };
+	return {
+		name: 'bun-sql',
+		connect: (config) => drizzle({ ...config, ...client }),
+		close: async (connection) => {
+			await connection.$client.close();
+		}
+	};
+};
+
+/**
+ * Closes the client of a connection through its driver.
+ * @internal
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param connection The connection.
+ */
+export const closeConnection = async (connection: DrizzleConnection): Promise<void> => {
+	const driver = connectionDrivers.get(connection);
+	if (driver) await driver.close(connection);
+};
 
 // ============================================================================
 // Transaction Tenant
@@ -118,7 +169,7 @@ export const assertTransactionTenant = (tx: DrizzleConnection, tenant: string): 
  * Drizzle-specific database manager.
  *
  * Implements the abstract database class with a driver that creates
- * Drizzle connections using Bun's built-in SQL client.
+ * Drizzle connections through the {@link DrizzleDriver} of each connection.
  *
  * @author Axel Nana <axel.nana@workbud.com>
  */
@@ -194,12 +245,27 @@ class DrizzleDatabase extends AbstractDatabase<DrizzleConnection, DrizzleConnect
 									config.cache.prefix
 								)
 							: undefined;
-			const connection = drizzle({ ...config, cache }) as DrizzleConnection;
+			const {
+				driver: chosen,
+				connection: _url,
+				client: _client,
+				cache: _cache,
+				...drizzleConfig
+			} = config as typeof config & {
+				driver?: DrizzleDriver;
+				connection?: unknown;
+				client?: unknown;
+			};
+			const driver = chosen ?? defaultDriver(config as Record<string, unknown>, name);
+			const connection = driver.connect({ ...drizzleConfig, cache } as never);
+			connectionDrivers.set(connection, driver);
 			if (cache === undefined) return connection;
 
 			// Transactions share the connection's cache: bypass it inside them, and invalidate
-			// what they mutate once they commit.
-			const transaction = connection.transaction.bind(connection);
+			// what they mutate once they commit. The method is looked up on each call, so that a
+			// database resolved per invocation (Hyperdrive) runs it on the current one.
+			const transaction: DrizzleConnection['transaction'] = (callback, txConfig) =>
+				Object.getPrototypeOf(connection).transaction.call(connection, callback, txConfig);
 			return Object.assign(connection, {
 				transaction: ((callback, txConfig) =>
 					cache.trackTransaction(() => transaction(callback, txConfig))) as typeof transaction
