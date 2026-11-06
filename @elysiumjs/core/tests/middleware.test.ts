@@ -79,11 +79,7 @@ describe('Middleware', () => {
 			}
 
 			// Check if metadata was set correctly
-			const middlewares = Metadata.get(
-				Symbols.middlewares,
-				TestController.prototype,
-				'testMethod'
-			);
+			const middlewares = Metadata.get(Symbols.middlewares, TestController.prototype, 'testMethod');
 			expect(middlewares).toBeDefined();
 			expect(middlewares).toBeArrayOfSize(2);
 			expect(middlewares).toContain(TestMiddleware1);
@@ -127,11 +123,7 @@ describe('Middleware', () => {
 			});
 
 			// Check if metadata was updated correctly
-			const middlewares = Metadata.get(
-				Symbols.middlewares,
-				TestController.prototype,
-				'testMethod'
-			);
+			const middlewares = Metadata.get(Symbols.middlewares, TestController.prototype, 'testMethod');
 			expect(middlewares).toBeDefined();
 			expect(middlewares).toBeArrayOfSize(2);
 			expect(middlewares).toContain(TestMiddleware1);
@@ -284,7 +276,13 @@ describe('Middleware', () => {
 	});
 
 	describe('applyMiddlewares', () => {
-		const hooks = ['onRequest', 'onTransform', 'onBeforeHandle', 'onAfterHandle', 'onAfterResponse'];
+		const hooks = [
+			'onRequest',
+			'onTransform',
+			'onBeforeHandle',
+			'onAfterHandle',
+			'onAfterResponse'
+		];
 
 		it('should build the middlewares in the module context and register the scoped hooks', async () => {
 			const plugin = Object.fromEntries(hooks.map((h) => [h, mock()])) as unknown as Elysia;

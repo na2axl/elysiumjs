@@ -35,7 +35,7 @@ import { runInterceptors } from './interceptor';
 import { Metadata } from './metadata';
 import { applyMiddlewares, executeMiddlewareChain, makeMiddlewares } from './middleware';
 import { ModuleContext } from './module-context';
-import { enforceRateLimit } from './rate-limit';
+import { enforceRateLimit, rateLimitOf } from './rate-limit';
 import { isSerializable, readFields, Resource } from './resource';
 import { Runtime } from './runtime';
 import { Service } from './service';
@@ -179,9 +179,6 @@ type HttpRequestHandlerMetadata = {
 	/** Whether the handler result is serialized through the response schema. */
 	serialize?: boolean;
 
-	/** The rate limit of the route, or `false` for none. */
-	rateLimit?: RateLimitOptions | false;
-
 	/** The exception filters of the route. */
 	filters?: FilterClass[];
 
@@ -203,7 +200,6 @@ type HttpRequestHandlerRegistrationProps = Pick<
 	| 'description'
 	| 'transactional'
 	| 'serialize'
-	| 'rateLimit'
 	| 'filters'
 	| 'interceptors'
 > & {
@@ -421,7 +417,6 @@ const registerHttpRequestHandler = (props: HttpRequestHandlerRegistrationProps) 
 		description,
 		transactional,
 		serialize,
-		rateLimit,
 		filters,
 		interceptors
 	} = props;
@@ -446,7 +441,6 @@ const registerHttpRequestHandler = (props: HttpRequestHandlerRegistrationProps) 
 		services,
 		transactional,
 		serialize,
-		rateLimit,
 		filters,
 		interceptors
 	});
@@ -497,12 +491,6 @@ export type HttpControllerProps = {
 	 * for all the request handlers in this controller.
 	 */
 	transactional?: boolean;
-
-	/**
-	 * The rate limit of every route of the controller that sets none, or `false` for none. Each
-	 * route counts on its own.
-	 */
-	rateLimit?: RateLimitOptions | false;
 
 	/**
 	 * Exception filters for every route of the controller. They run after the filters of the route,
@@ -561,12 +549,6 @@ export type RequestHandlerDecoratorProps = {
 	 * `true` when the route has a `response` schema.
 	 */
 	serialize?: boolean;
-
-	/**
-	 * The rate limit of this route, or `false` for none. Overrides the limit of the controller and
-	 * of the app.
-	 */
-	rateLimit?: RateLimitOptions | false;
 
 	/** Exception filters for this route. They run before those of the controller. */
 	filters?: FilterClass[];
@@ -949,8 +931,8 @@ export namespace Http {
 					const routeName = `${route.method.toUpperCase()} ${joinPath(props.path, route.path)}`;
 					/** The limit of the route, read on the first request: the app is created after it. */
 					let limit: RateLimitOptions | false | undefined;
-					const rateLimitOf = (): RateLimitOptions | false =>
-						(limit ??= route.rateLimit ?? props.rateLimit ?? appDefaultRateLimit() ?? false);
+					const routeRateLimit = (): RateLimitOptions | false =>
+						(limit ??= rateLimitOf(target, route.name) ?? appDefaultRateLimit() ?? false);
 
 					const handler = getHandler();
 					const filterLevels = [
@@ -989,7 +971,7 @@ export namespace Http {
 								);
 							},
 							async beforeHandle(c: Context) {
-								const limit = rateLimitOf();
+								const limit = routeRateLimit();
 								if (limit) {
 									await enforceRateLimit(limit, appRateLimit()?.store, {
 										request: c.request,

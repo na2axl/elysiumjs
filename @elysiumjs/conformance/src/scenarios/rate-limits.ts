@@ -14,17 +14,19 @@
 
 import type { Scenario } from './types';
 
-import { Application, Http, MemoryRateLimitStore, Module } from '@elysiumjs/core';
+import { Application, Http, MemoryRateLimitStore, Module, RateLimit } from '@elysiumjs/core';
 
 const make = async (): Promise<Application> => {
 	@Http.controller({ path: '/limited' })
 	class LimitedController {
-		@Http.get({ path: '/', rateLimit: { window: 60_000, max: 2, key: () => 'client' } })
+		@Http.get({ path: '/' })
+		@RateLimit({ window: 60_000, max: 2, key: () => 'client' })
 		public index() {
 			return 'ok';
 		}
 
-		@Http.get({ path: '/free', rateLimit: false })
+		@Http.get({ path: '/free' })
+		@RateLimit(false)
 		public free() {
 			return 'free';
 		}

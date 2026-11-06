@@ -19,7 +19,7 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { Application } from '../src/app';
 import { Http } from '../src/http';
 import { Module } from '../src/module';
-import { MemoryRateLimitStore } from '../src/rate-limit';
+import { MemoryRateLimitStore, RateLimit } from '../src/rate-limit';
 import { createTestingHttpApp } from '../src/testing';
 
 describe('MemoryRateLimitStore', () => {
@@ -43,30 +43,31 @@ const recording: RateLimitStore = {
 	}
 };
 
-@Http.controller({ path: '/limited', rateLimit: { window: 60_000, max: 2 } })
+@Http.controller({ path: '/limited' })
+@RateLimit({ window: 60_000, max: 2 })
 class LimitedController {
 	@Http.get({ path: '/a' })
 	public a() {
 		return { ok: true };
 	}
 
-	@Http.get({ path: '/b', rateLimit: { window: 60_000, max: 1, name: 'strict' } })
+	@Http.get({ path: '/b' })
+	@RateLimit({ window: 60_000, max: 1, name: 'strict' })
 	public b() {
 		return { ok: true };
 	}
 
-	@Http.get({ path: '/free', rateLimit: false })
+	@Http.get({ path: '/free' })
+	@RateLimit(false)
 	public free() {
 		return { ok: true };
 	}
 
-	@Http.get({
-		path: '/user',
-		rateLimit: {
-			window: 60_000,
-			max: 1,
-			key: ({ request }) => request.headers.get('x-user') ?? 'anonymous'
-		}
+	@Http.get({ path: '/user' })
+	@RateLimit({
+		window: 60_000,
+		max: 1,
+		key: ({ request }) => request.headers.get('x-user') ?? 'anonymous'
 	})
 	public user() {
 		return { ok: true };

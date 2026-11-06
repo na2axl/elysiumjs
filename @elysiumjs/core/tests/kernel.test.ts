@@ -237,7 +237,10 @@ describe('Kernel', () => {
 	});
 
 	it('lets onInit read its own module services without re-entering init', async () => {
-		@Module.register({ imports: [], services: [{ name: 'self.svc', global: true, factory: () => 7 }] })
+		@Module.register({
+			imports: [],
+			services: [{ name: 'self.svc', global: true, factory: () => 7 }]
+		})
 		class Leaf extends Module {}
 		@Module.register({
 			imports: [Leaf],

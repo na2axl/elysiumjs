@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { Metadata } from './metadata';
 import { DomainError } from './problem';
 
 /**
@@ -128,6 +129,43 @@ export class TooManyRequestsError extends DomainError {
 		});
 	}
 }
+
+const RATE_LIMIT = Symbol.for('elysium:RateLimit');
+
+/**
+ * Sets the rate limit of a route, or of every route of a controller. A limit on a route wins over
+ * the one of its controller, which wins over the app's default (`rateLimit` of
+ * `@Application.register()`). Pass `false` to turn the limit off. Each route counts on its own.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param limit The limit, or `false` for none.
+ * @example
+ * ```ts
+ * @Http.controller({ path: '/auth' })
+ * @RateLimit({ window: 60_000, max: 10 })
+ * class AuthController {
+ * 	@Http.post({ path: '/otp' })
+ * 	@RateLimit({ window: 60_000, max: 3, name: 'otp' })
+ * 	public sendOtp() {}
+ * }
+ * ```
+ */
+export const RateLimit =
+	(limit: RateLimitOptions | false) =>
+	(target: object, propertyKey?: string | symbol, _descriptor?: PropertyDescriptor): void => {
+		Metadata.define(RATE_LIMIT, limit, target, propertyKey);
+	};
+
+/**
+ * The limit `@RateLimit()` sets on a route, else on its controller.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param controller The controller class.
+ * @param method The name of the route method.
+ */
+export const rateLimitOf = (
+	controller: Function,
+	method: string | symbol
+): RateLimitOptions | false | undefined =>
+	Metadata.get(RATE_LIMIT, controller.prototype, method) ?? Metadata.get(RATE_LIMIT, controller);
 
 /** The store used when neither the limit nor the app sets one. */
 const defaultStore = new MemoryRateLimitStore();

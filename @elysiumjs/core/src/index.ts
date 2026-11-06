@@ -146,6 +146,7 @@ export {
 	type RateLimitOptions,
 	type RateLimitStore,
 	MemoryRateLimitStore,
+	RateLimit,
 	TooManyRequestsError
 } from './rate-limit';
 export {
