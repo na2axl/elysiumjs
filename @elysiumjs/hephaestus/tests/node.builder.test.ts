@@ -23,10 +23,19 @@ import { NodeBuilder } from '../src/builder/node.builder';
 
 const entry = join(import.meta.dir, 'fixtures', 'node', 'server.ts');
 
+/** The real Node.js binary: `bun run` puts a `node` that runs Bun first on the PATH. */
+const nodeBinary =
+	Bun.which('node', {
+		PATH: (process.env.PATH ?? '')
+			.split(':')
+			.filter((dir) => !/[\\/]bun-node-/.test(dir))
+			.join(':')
+	}) ?? 'node';
+
 /** Runs the bundle under `node`, waits until it listens, and requests a route. */
 const serveUnderNode = async (bundle: string, path: string) => {
 	const port = String(41000 + Math.floor(Math.random() * 1000));
-	const child = spawn('node', [bundle], { env: { ...process.env, PORT: port } });
+	const child = spawn(nodeBinary, [bundle], { env: { ...process.env, PORT: port } });
 	let output = '';
 	child.stdout.on('data', (chunk) => (output += chunk));
 	child.stderr.on('data', (chunk) => (output += chunk));
