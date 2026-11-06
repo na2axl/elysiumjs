@@ -12,7 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export { BindingNotFoundError, NoWorkersHandlerError, OutsideInvocationError } from './errors';
+export {
+	BindingNotFoundError,
+	DuplicateQueueConsumerError,
+	NoWorkersHandlerError,
+	OutsideInvocationError
+} from './errors';
 export { type Invocation, runInvocation } from './invocation';
 export { KeyvWorkersKV, type KeyvWorkersKVOptions } from './kv-store';
 export { type WorkersModuleConfig, WorkersModule } from './module';

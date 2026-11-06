@@ -237,6 +237,29 @@ Jobs in Heracles go through several statuses:
 
 ## Advanced Usage
 
+### Schedules
+
+`@Schedule(cron, { args })` dispatches a job on a cron, in UTC. The `heracles:schedule` command runs the schedules on Bun and Node.js; on Cloudflare Workers, the cron triggers do (see `@elysiumjs/heracles-workers`).
+
+With `fanOut`, a schedule selects the cases due at the tick and dispatches one job per case, so that each case retries and fails on its own. The named static method receives the tick (to the minute) and returns the cases; each job gets its case after `args`, and a dispatch id made of the job, the case `key` (its `id` by default) and the tick:
+
+```ts
+@Job.register({ queue: 'billing' })
+@Schedule('0 6 * * *', { fanOut: 'due' })
+@Once() // from @elysiumjs/moirai/heracles: one run per dispatch id
+class BillInvoice extends Job {
+	public static async due(tick: Date): Promise<{ id: string }[]> {
+		return invoices.dueAt(tick);
+	}
+
+	constructor(private readonly invoice: { id: string }) {
+		super();
+	}
+
+	protected async execute() {}
+}
+```
+
 ### Job Cancellation
 
 ```typescript

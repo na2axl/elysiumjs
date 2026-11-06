@@ -34,6 +34,7 @@ import {
 	BindingNotFoundError,
 	createRuntime,
 	createWorker,
+	DuplicateQueueConsumerError,
 	KeyvWorkersKV,
 	NoWorkersHandlerError,
 	OutsideInvocationError,
@@ -288,6 +289,53 @@ describe('createWorker', () => {
 		const app = new QueueApp();
 		return { app, worker: await createWorker(app) };
 	};
+
+	it('takes one consumer of a named queue next to catch-alls', async () => {
+		@Service.register()
+		class Billing {
+			@Workers.queue('jobs')
+			public run() {}
+
+			@Workers.queue('*', { each: true })
+			public any() {}
+		}
+		@Service.register()
+		class Audit {
+			@Workers.queue('*')
+			public any() {}
+		}
+		const { app } = await appWith([Billing, Audit]);
+		await app.kernel.shutdown();
+	});
+
+	it('refuses two consumers of one named queue', async () => {
+		@Service.register()
+		class Billing {
+			@Workers.queue('jobs')
+			public run() {}
+		}
+		@Service.register()
+		class Mail {
+			@Workers.queue('jobs', { each: true })
+			public run() {}
+
+			@Workers.queue('*', { each: true })
+			public any() {}
+		}
+		@Service.register()
+		class Audit {
+			@Workers.queue('*')
+			public any() {}
+		}
+
+		@Module.register({ services: [Billing, Mail] })
+		class TwiceModule extends Module {}
+		@Application.register({ runtime, modules: [TwiceModule], openapi: false })
+		class TwiceApp extends Application {}
+		const app = new TwiceApp();
+		await expect(createWorker(app)).rejects.toThrow(DuplicateQueueConsumerError);
+		await app.kernel.shutdown();
+	});
 
 	it('acks the good messages and retries only the failing one', async () => {
 		@Service.register()

@@ -18,7 +18,7 @@ import type { WorkersHandlerMeta } from './workers';
 
 import { getLogger, ModuleContext, Service } from '@elysiumjs/core';
 
-import { NoWorkersHandlerError } from './errors';
+import { DuplicateQueueConsumerError, NoWorkersHandlerError } from './errors';
 import { runInvocation } from './invocation';
 import { Workers } from './workers';
 
@@ -31,6 +31,21 @@ const collectHandlers = (app: Application): Handler[] =>
 			.serviceClasses(node)
 			.flatMap((cls) => Workers.handlersOf(cls).map((meta) => ({ ...meta, node, cls })))
 	);
+
+/** Refuses two consumers of one named queue. */
+const assertOneConsumerPerQueue = (handlers: Handler[]): void => {
+	const consumers = new Map<string, string[]>();
+	for (const handler of handlers) {
+		if (handler.kind !== 'queue' || handler.key === '*') continue;
+		const names = consumers.get(handler.key) ?? [];
+		const name = `${handler.cls.name}.${String(handler.method)}`;
+		if (!names.includes(name)) names.push(name);
+		consumers.set(handler.key, names);
+	}
+	for (const [queue, names] of consumers) {
+		if (names.length > 1) throw new DuplicateQueueConsumerError(queue, names);
+	}
+};
 
 /**
  * Disposes the request scope once the response body has been sent, or cancelled by the client,
@@ -181,8 +196,9 @@ const dispatchQueue = async (handlers: Handler[], batch: WorkersMessageBatch): P
  * Builds an application and returns the handlers a Cloudflare Worker module exports.
  *
  * - `fetch` serves the app's routes.
- * - `queue` hands each batch to the service methods marked `@Workers.queue(name)`, then acks or
- *   retries each message on its own.
+ * - `queue` hands each batch to the service method marked `@Workers.queue(name)`, and to those
+ *   marked `@Workers.queue('*')`, then acks or retries each message on its own. A named queue has
+ *   one consumer: two are refused when the Worker is created.
  * - `scheduled` calls the service methods marked `@Workers.cron(expression)`.
  *
  * Each invocation runs with its own env and execution context, read with `Workers.env()`,
@@ -207,6 +223,7 @@ export const createWorker = async <Env = Record<string, unknown>>(
 ): Promise<WorkersHandler<Env> & { readonly app: Elysia<any> }> => {
 	const elysia = await app.build();
 	const handlers = collectHandlers(app);
+	assertOneConsumerPerQueue(handlers);
 
 	return {
 		app: elysia,

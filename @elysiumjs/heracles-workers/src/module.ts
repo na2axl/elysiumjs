@@ -13,12 +13,32 @@
 // limitations under the License.
 
 import type { WorkersQueueMessage, WorkersScheduledController } from '@elysiumjs/runtime-workers';
+import type { DeadJob } from './consumer';
 
 import { getLogger, Module, Service } from '@elysiumjs/core';
 import { HeraclesModule, Scheduler } from '@elysiumjs/heracles';
 import { Workers } from '@elysiumjs/runtime-workers';
 
 import { runJobMessage } from './consumer';
+
+/**
+ * Configuration of the {@link HeraclesWorkersModule}.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type HeraclesWorkersConfig = {
+	/**
+	 * The queue binding that receives the jobs that failed their last retry, as they were sent with
+	 * a `failure` member, so that they can be looked at and sent again. Without it, they are logged
+	 * and dropped.
+	 */
+	deadLetterQueue?: string;
+	/** Called with each job that failed its last retry, such as to alert. A failing hook is logged. */
+	onDead?: (dead: DeadJob) => unknown;
+};
+
+/** The config of the module, or none when it is not visible. */
+const configOf = (): HeraclesWorkersConfig =>
+	Service.get<HeraclesWorkersConfig>(HeraclesWorkersModule.config) ?? {};
 
 /**
  * Consumes the Heracles jobs of every queue, and dispatches the scheduled jobs of each cron
@@ -30,15 +50,18 @@ export class HeraclesWorkersHandlers {
 	/** Runs the job a message carries. */
 	@Workers.queue('*', { each: true })
 	public async consume(message: WorkersQueueMessage): Promise<void> {
-		await runJobMessage(message);
+		await runJobMessage(message, configOf());
 	}
 
-	/** Dispatches the jobs whose `@Schedule()` expression is the cron of the trigger. */
+	/**
+	 * Dispatches the jobs whose `@Schedule()` expression is the cron of the trigger, at the time of
+	 * the trigger: a fan-out schedule selects its cases for that tick.
+	 */
 	@Workers.cron('*')
 	public async schedule(controller: WorkersScheduledController): Promise<void> {
 		for (const job of Scheduler.jobsFor(controller.cron)) {
 			try {
-				await Scheduler.dispatch(job);
+				await Scheduler.dispatch(job, new Date(controller.scheduledTime));
 			} catch (error) {
 				getLogger().error('Could not dispatch a scheduled job', {
 					job: job.name,
@@ -54,7 +77,8 @@ export class HeraclesWorkersHandlers {
  * Runs Heracles on Cloudflare Workers: consumes the jobs sent with `CloudflareQueueTransport`
  * from the Worker's queues (`queue` handler), and dispatches the `@Schedule()` jobs whose
  * expression is the cron of a trigger (`scheduled` handler). Declare each consumer queue and each
- * cron expression in the wrangler config.
+ * cron expression in the wrangler config. Use it as is, or with `.with({ deadLetterQueue, onDead })`
+ * to keep the jobs that failed their last retry.
  * @author Axel Nana <axel.nana@workbud.com>
  * @example
  * ```ts
@@ -72,4 +96,4 @@ export class HeraclesWorkersHandlers {
  * ```
  */
 @Module.register({ imports: [HeraclesModule], services: [HeraclesWorkersHandlers] })
-export class HeraclesWorkersModule extends Module {}
+export class HeraclesWorkersModule extends Module.configurable<HeraclesWorkersConfig>() {}

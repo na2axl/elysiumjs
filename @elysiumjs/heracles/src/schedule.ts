@@ -15,7 +15,7 @@
 import type { CronSchedule } from './cron';
 import type { Job, JobClass } from './job';
 
-import { getLogger, Metadata } from '@elysiumjs/core';
+import { ElysiumError, getLogger, Metadata } from '@elysiumjs/core';
 import { Redis } from '@elysiumjs/redis';
 
 import { Cron } from './cron';
@@ -31,13 +31,46 @@ const SCHEDULES = Symbol.for('elysium:heracles:Schedules');
 export type ScheduleOptions = {
 	/** The arguments the job is dispatched with. */
 	args?: unknown[];
+	/**
+	 * The static method of the job class that selects the cases due at a tick, such as the
+	 * invoices to bill. It receives the tick (UTC, to the minute) and returns the cases, JSON-safe.
+	 * Each case is dispatched as a job of its own, with the case after `args`, and with a dispatch
+	 * id made of the job, the case key and the tick, the same however often the tick is handled:
+	 * `@Once()` of `@elysiumjs/moirai/heracles` runs it once.
+	 */
+	fanOut?: string;
+	/** Names a case in its dispatch id. Defaults to its `id`, else its JSON. */
+	key?: (selected: any) => string;
 };
+
+/**
+ * Raised when `@Schedule()` names a fan-out method the job class does not have.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class InvalidScheduleError extends ElysiumError {
+	constructor(job: string, reason: string) {
+		super(`The schedule of ${job} ${reason}.`);
+	}
+}
+
+/** The default key of a case: its `id`, else its JSON. */
+const defaultKey = (selected: unknown): string =>
+	typeof selected === 'object' && selected !== null && 'id' in selected
+		? String((selected as { id: unknown }).id)
+		: JSON.stringify(selected);
 
 /**
  * A schedule of a job class.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export type JobSchedule = { readonly cron: CronSchedule; readonly args: unknown[] };
+export type JobSchedule = {
+	readonly cron: CronSchedule;
+	readonly args: unknown[];
+	/** The static method that selects the cases of a fan-out schedule. */
+	readonly fanOut?: string;
+	/** Names a case of a fan-out schedule. */
+	readonly key: (selected: unknown) => string;
+};
 
 /**
  * Dispatches a job on a cron schedule, in UTC. On Bun and Node.js, the `heracles:schedule`
@@ -48,6 +81,9 @@ export type JobSchedule = { readonly cron: CronSchedule; readonly args: unknown[
  * @param cron The cron expression (5 fields, or an alias such as `@daily`).
  * @param options The arguments of the dispatch.
  * @throws {InvalidCronError} When the expression is not valid.
+ *
+ * With `fanOut`, the schedule selects the cases due at the tick and dispatches one job per case,
+ * so that each case retries, fails and dead-letters on its own.
  * @example
  * ```ts
  * @Job.register({ queue: 'default' })
@@ -55,17 +91,40 @@ export type JobSchedule = { readonly cron: CronSchedule; readonly args: unknown[
  * class PurgeExpiredSessions extends Job {
  * 	protected async execute() {}
  * }
+ *
+ * @Job.register({ queue: 'billing' })
+ * @Schedule('0 6 * * *', { fanOut: 'due' })
+ * class BillInvoice extends Job {
+ * 	public static async due(tick: Date): Promise<{ id: string }[]> {
+ * 		return invoices.dueAt(tick);
+ * 	}
+ *
+ * 	constructor(private readonly invoice: { id: string }) {
+ * 		super();
+ * 	}
+ *
+ * 	protected async execute() {}
+ * }
  * ```
  */
 export const Schedule =
 	(cron: string, options: ScheduleOptions = {}) =>
 	(target: Function): void => {
+		const { fanOut } = options;
+		if (fanOut !== undefined && typeof (target as any)[fanOut] !== 'function') {
+			throw new InvalidScheduleError(
+				target.name,
+				`fans out with "${fanOut}", which is not a static method`
+			);
+		}
 		const schedules: JobSchedule[] = Metadata.getOwn(SCHEDULES, target) ?? [];
-		Metadata.define(
-			SCHEDULES,
-			[...schedules, { cron: Cron.parse(cron), args: options.args ?? [] }],
-			target
-		);
+		const schedule: JobSchedule = {
+			cron: Cron.parse(cron),
+			args: options.args ?? [],
+			key: options.key ?? defaultKey,
+			...(fanOut !== undefined ? { fanOut } : {})
+		};
+		Metadata.define(SCHEDULES, [...schedules, schedule], target);
 	};
 
 /**
@@ -135,12 +194,40 @@ export class Scheduler {
 	}
 
 	/**
-	 * Dispatches a scheduled job.
+	 * Dispatches a scheduled job: once, or once per case of a fan-out schedule.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param job The scheduled job.
+	 * @param at The tick. Defaults to now; it is taken to the minute, in UTC.
+	 * @returns The number of jobs dispatched.
 	 */
-	public static async dispatch(job: ScheduledJob): Promise<void> {
-		await Heracles.dispatch(job.jobClass, job.schedule.args as never);
+	public static async dispatch(job: ScheduledJob, at: Date = new Date()): Promise<number> {
+		const { schedule, jobClass, name } = job;
+		if (schedule.fanOut === undefined) {
+			await Heracles.dispatch(jobClass, schedule.args as never);
+			return 1;
+		}
+		const tick = new Date(Math.floor(at.getTime() / 60_000) * 60_000);
+		const select = (jobClass as unknown as Record<string, (tick: Date) => unknown>)[
+			schedule.fanOut
+		]!;
+		const cases = (await select.call(jobClass, tick)) as unknown[];
+		for (const selected of cases) {
+			await Heracles.dispatch(jobClass, [...schedule.args, selected] as never, {
+				dispatchId: Scheduler.dispatchIdOf(name, schedule.key(selected), tick)
+			});
+		}
+		return cases.length;
+	}
+
+	/**
+	 * The dispatch id of a case of a fan-out schedule: the same for one job, case and tick.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param job The job name.
+	 * @param key The key of the case.
+	 * @param tick The tick.
+	 */
+	public static dispatchIdOf(job: string, key: string, tick: Date): string {
+		return `schedule:${job}:${key}@${tick.toISOString()}`;
 	}
 
 	/** Whether the scheduler is running. */
@@ -198,7 +285,7 @@ export class Scheduler {
 				]);
 				if (taken !== 'OK') return;
 			}
-			await Scheduler.dispatch(job);
+			await Scheduler.dispatch(job, at);
 		} catch (error) {
 			getLogger().error('Could not dispatch a scheduled job', {
 				job: job.name,

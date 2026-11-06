@@ -18,9 +18,10 @@ import { Redis } from '@elysiumjs/redis';
 import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test';
 
 import { Cron, InvalidCronError } from '../src/cron';
+import { Heracles } from '../src/heracles';
 import { Job } from '../src/job';
 import { JobRegistry } from '../src/registry';
-import { Schedule, Scheduler, schedulesOf } from '../src/schedule';
+import { InvalidScheduleError, Schedule, Scheduler, schedulesOf } from '../src/schedule';
 
 const next = (expression: string, from: string) =>
 	Cron.next(Cron.parse(expression), new Date(from)).toISOString();
@@ -83,6 +84,7 @@ describe('Scheduler', () => {
 		const dispatched: unknown[][] = [];
 		const dispatch = spyOn(Scheduler, 'dispatch').mockImplementation(async (job) => {
 			dispatched.push(job.schedule.args);
+			return 1;
 		});
 		const locks = new Set<string>();
 		const connection = {
@@ -109,5 +111,58 @@ describe('Scheduler', () => {
 		]);
 		dispatch.mockRestore();
 		getConnection.mockRestore();
+	});
+
+	it('fans a schedule out: one job per case, with an id per job, case and tick', async () => {
+		const ticks: string[] = [];
+		@Job.register({ name: 'bill-invoice', queue: 'billing' })
+		@Schedule('0 6 * * *', { args: ['eu'], fanOut: 'due' })
+		class BillInvoice extends Job {
+			public static async due(tick: Date) {
+				ticks.push(tick.toISOString());
+				return [{ id: 'inv-1' }, { id: 'inv-2' }];
+			}
+
+			constructor(
+				public readonly region: string,
+				public readonly invoice: { id: string }
+			) {
+				super();
+			}
+
+			protected async execute(): Promise<void> {}
+		}
+		JobRegistry.set([['bill-invoice', { jobClass: BillInvoice as never, module: {} as never }]]);
+
+		const calls: unknown[][] = [];
+		const dispatch = spyOn(Heracles, 'dispatch').mockImplementation(async (...args: unknown[]) => {
+			calls.push(args.slice(1));
+			return { jobId: 'j', dispatchId: 'd' };
+		});
+		const [job] = Scheduler.jobsFor('0 6 * * *');
+		expect(await Scheduler.dispatch(job!, new Date('2026-11-06T06:00:42.123Z'))).toBe(2);
+		dispatch.mockRestore();
+
+		expect(ticks).toEqual(['2026-11-06T06:00:00.000Z']);
+		expect(calls).toEqual([
+			[
+				['eu', { id: 'inv-1' }],
+				{ dispatchId: 'schedule:bill-invoice:inv-1@2026-11-06T06:00:00.000Z' }
+			],
+			[
+				['eu', { id: 'inv-2' }],
+				{ dispatchId: 'schedule:bill-invoice:inv-2@2026-11-06T06:00:00.000Z' }
+			]
+		]);
+	});
+
+	it('refuses a fan-out method the job class does not have', () => {
+		expect(() => {
+			@Schedule('0 6 * * *', { fanOut: 'missing' })
+			class Broken extends Job {
+				protected async execute(): Promise<void> {}
+			}
+			return Broken;
+		}).toThrow(InvalidScheduleError);
 	});
 });

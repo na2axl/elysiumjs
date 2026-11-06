@@ -28,6 +28,7 @@ export { Cron, type CronSchedule, InvalidCronError } from './cron';
 export { HeraclesModule, type HeraclesModuleConfig } from './heracles.module';
 export { DuplicateJobError, JobRegistry, type JobRegistryEntry, QUEUES_SERVICE } from './registry';
 export {
+	InvalidScheduleError,
 	type JobSchedule,
 	Schedule,
 	type ScheduledJob,
