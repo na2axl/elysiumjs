@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 import type { RedisConnection } from '../src/connection';
-import type { RedisClientFactory, RedisConnection } from './connection';
 
 import { describe, expect, it } from 'bun:test';
 
