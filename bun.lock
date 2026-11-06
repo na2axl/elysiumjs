@@ -304,6 +304,26 @@
         "string-template": "^1.0.0",
       },
     },
+    "@elysiumjs/themis": {
+      "name": "@elysiumjs/themis",
+      "version": "0.0.0",
+      "dependencies": {
+        "jose": "^6.2.15",
+      },
+      "devDependencies": {
+        "@elysiumjs/core": "workspace:*",
+        "@elysiumjs/redis": "workspace:*",
+        "@elysiumjs/runtime-bun": "workspace:*",
+        "elysia": "^2.0.0-rc.1",
+      },
+      "peerDependencies": {
+        "@elysiumjs/core": "workspace:^",
+        "@elysiumjs/redis": "workspace:^",
+      },
+      "optionalPeers": [
+        "@elysiumjs/redis",
+      ],
+    },
     "create-elysium": {
       "name": "create-elysium",
       "version": "0.2.2",
@@ -469,6 +489,8 @@
     "@elysiumjs/runtime-workers": ["@elysiumjs/runtime-workers@workspace:@elysiumjs/runtime-workers"],
 
     "@elysiumjs/styx": ["@elysiumjs/styx@workspace:@elysiumjs/styx"],
+
+    "@elysiumjs/themis": ["@elysiumjs/themis@workspace:@elysiumjs/themis"],
 
     "@emnapi/runtime": ["@emnapi/runtime@1.11.3", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-Xz4Tpyki7XyrpbUK1jR1AhdAdaXyhhY4lZ3neLodmhpuWfy2PAQN5B46sAiU4liOXGLkHypn/qU+jvfWSCYYLA=="],
 
@@ -1063,6 +1085,8 @@
     "is-typedarray": ["is-typedarray@1.0.0", "", {}, "sha512-cyA56iCMHAh5CdzjJIa4aohJyeO1YbwLi3Jc35MmRU6poroFjIGZzUzupGiRPOjgHg9TLu43xbpwXk523fMxKA=="],
 
     "jju": ["jju@1.4.0", "", {}, "sha512-8wb9Yw966OSxApiCt0K3yNJL8pnNeIv+OEq2YMidz4FKP6nonSRoOXc80iXY4JaN2FC11B9qsNmDsm+ZOfMROA=="],
+
+    "jose": ["jose@6.2.15", "", {}, "sha512-qdF6ewcZARtef63fJ9AKKZPgxw+t7USH6HLXYcD4CrdmSvDp79rpJSPFEKc90QBeGS63u1KQtN2MZQHC0yDIzA=="],
 
     "joycon": ["joycon@3.1.1", "", {}, "sha512-34wB/Y7MW7bzjKRjUKTa46I2Z7eV62Rkhva+KkopW7Qvv/OSWBqvkSY7vusOPrNuZcUG3tApvdVgNB8POj3SPw=="],
 
