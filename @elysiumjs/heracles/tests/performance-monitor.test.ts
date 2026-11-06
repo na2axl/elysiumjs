@@ -293,3 +293,33 @@ describe('PerformanceMonitor', () => {
 		});
 	});
 });
+
+describe('PerformanceMonitor reporting', () => {
+	it('reports through the given client factory instead of a Bun client', async () => {
+		const sent: string[] = [];
+		const connection = {
+			connected: true,
+			connect: mock(async () => {}),
+			close: mock(() => {}),
+			set: mock(async (key: string) => void sent.push(`SET ${key}`)),
+			expire: mock(async () => 1),
+			send: mock(async (command: string) => void sent.push(command))
+		};
+		const factory = mock(() => connection as never);
+
+		const monitor = new PerformanceMonitor({
+			redisUrl: 'redis://metrics:6379',
+			client: factory,
+			enableReporting: true,
+			reportingInterval: 60_000,
+			keyPrefix: 'test:metrics'
+		});
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		await monitor.shutdown();
+
+		expect(factory).toHaveBeenCalledWith('redis://metrics:6379', { enableAutoPipelining: true });
+		expect(connection.connect).toHaveBeenCalled();
+		expect(sent.some((entry) => entry.startsWith('SET test:metrics:summary:'))).toBe(true);
+		expect(connection.close).toHaveBeenCalled();
+	});
+});
