@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import { t } from 'elysia';
+import { status as httpStatus } from 'http-status';
 
 import { ElysiumError } from './errors';
 
@@ -66,39 +67,16 @@ export type ProblemOptions = {
 /** The MIME type of problem details responses. */
 export const PROBLEM_CONTENT_TYPE = 'application/problem+json';
 
-const TITLES: Record<number, string> = {
-	400: 'Bad Request',
-	401: 'Unauthorized',
-	402: 'Payment Required',
-	403: 'Forbidden',
-	404: 'Not Found',
-	405: 'Method Not Allowed',
-	406: 'Not Acceptable',
-	408: 'Request Timeout',
-	409: 'Conflict',
-	410: 'Gone',
-	411: 'Length Required',
-	412: 'Precondition Failed',
-	413: 'Content Too Large',
-	415: 'Unsupported Media Type',
-	422: 'Unprocessable Content',
-	423: 'Locked',
-	428: 'Precondition Required',
-	429: 'Too Many Requests',
-	500: 'Internal Server Error',
-	501: 'Not Implemented',
-	502: 'Bad Gateway',
-	503: 'Service Unavailable',
-	504: 'Gateway Timeout'
-};
-
 /**
  * The standard reason phrase of an HTTP status, used as the default problem title.
  * @author Axel Nana <axel.nana@workbud.com>
  * @param status The HTTP status code.
  */
-export const statusTitle = (status: number): string =>
-	TITLES[status] ?? (status >= 500 ? 'Server Error' : status >= 400 ? 'Client Error' : 'Error');
+export const statusTitle = (status: number): string => {
+	const name = (httpStatus as Record<number, unknown>)[status];
+	if (typeof name === 'string') return name;
+	return status >= 500 ? 'Server Error' : status >= 400 ? 'Client Error' : 'Error';
+};
 
 /**
  * The fields of a {@link DomainError}.

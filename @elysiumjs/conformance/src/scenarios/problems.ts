@@ -88,7 +88,7 @@ export const problems: Scenario = {
 				headers: problemJson,
 				json: {
 					type: 'about:blank',
-					title: 'Unprocessable Content',
+					title: 'Unprocessable Entity',
 					status: 422,
 					detail: 'The request body is invalid.',
 					instance: '/p/signup',

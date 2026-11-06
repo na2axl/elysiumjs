@@ -106,7 +106,8 @@ describe('toProblem', () => {
 
 	it('names the standard status titles', () => {
 		expect(statusTitle(404)).toBe('Not Found');
-		expect(statusTitle(418)).toBe('Client Error');
+		expect(statusTitle(418)).toBe("I'm a teapot");
+		expect(statusTitle(499)).toBe('Client Error');
 		expect(statusTitle(599)).toBe('Server Error');
 	});
 
@@ -242,7 +243,7 @@ describe('problem details over HTTP', () => {
 		expect(response.status).toBe(422);
 		expect(await response.json()).toEqual({
 			type: 'about:blank',
-			title: 'Unprocessable Content',
+			title: 'Unprocessable Entity',
 			status: 422,
 			detail: 'The request body is invalid.',
 			instance: '/p/signup',
