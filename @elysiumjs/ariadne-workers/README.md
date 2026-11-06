@@ -33,7 +33,6 @@ import { durableFlowStore } from '@elysiumjs/ariadne-workers';
 import { Workers } from '@elysiumjs/runtime-workers';
 
 AriadneModule.with({
-	flows: [signUp],
 	store: durableFlowStore(() => Workers.binding('FLOWS'))
 });
 ```

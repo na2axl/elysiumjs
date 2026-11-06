@@ -16,7 +16,6 @@ import { RedisFlowStore } from '@elysiumjs/ariadne-redis';
 import { Redis } from '@elysiumjs/redis';
 
 AriadneModule.with({
-	flows: [signUp],
 	store: new RedisFlowStore({ connection: () => Redis.connection(), prefix: 'flow:' })
 });
 ```

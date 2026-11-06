@@ -119,3 +119,9 @@ export const FLOW_STEP_LEASE_SECONDS = 30;
 
 /** The header that carries the owner token of a guest flow. */
 export const FLOW_OWNER_HEADER = 'x-flow-owner';
+
+/** The header that carries the key of the flow a request is about. */
+export const FLOW_KEY_HEADER = 'x-flow-key';
+
+/** The header that carries the id of a step submission, which a retry repeats. */
+export const FLOW_STEP_HEADER = 'x-flow-step';

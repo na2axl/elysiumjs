@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { AnyFlow, FlowContext } from './flow';
+import type { DomainError } from '@elysiumjs/core';
+import type { FlowAdvance, FlowContext, FlowDescription, FlowRefusal, FlowStepRun } from './flow';
 import type { FlowRecord, FlowStore } from './store';
 
-import { DomainError, validationErrors } from '@elysiumjs/core';
-import Value from 'typebox/value';
+import { Application, Service } from '@elysiumjs/core';
 
 import {
 	FlowCompletedError,
@@ -25,45 +25,43 @@ import {
 	FlowStepInProgressError,
 	FlowUnexpectedStepError,
 	FlowUserRequiredError,
-	InvalidFlowBodyError
+	InvalidFlowRequestError,
+	MissingFlowStoreError
 } from './errors';
-import { Flow } from './flow';
-import { FLOW_OWNER_HEADER, FLOW_STEP_LEASE_SECONDS } from './store';
+import {
+	FLOW_KEY_HEADER,
+	FLOW_OWNER_HEADER,
+	FLOW_STEP_HEADER,
+	FLOW_STEP_LEASE_SECONDS
+} from './store';
 
 /**
- * The Elysia context a flow route reads.
+ * The Elysia context the flow routes read.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export type FlowHttpContext = {
 	request: Request;
-	body?: unknown;
 	query?: Record<string, string | undefined>;
 	set: { status?: number | string };
 	[key: string]: any;
 };
 
 /**
- * How flows are served.
+ * How flows are served, set by `AriadneModule.with()`.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export type FlowEngineOptions = {
+export type FlowOptions = {
 	/** Where flows live. */
 	store: FlowStore | (() => FlowStore);
-	/**
-	 * Runs before a flow starts and before its state is read, such as a rate limit by IP. A returned
-	 * error is the answer.
-	 */
-	admit?: (ctx: {
-		request: Request;
-		http: FlowHttpContext;
-		flow: string;
-	}) => DomainError | undefined | void | Promise<DomainError | undefined | void>;
 	/**
 	 * The id of the signed-in user, which owns a user flow. Defaults to the `id` of `currentUser`
 	 * in the context, which `@Auth()` of themis sets.
 	 */
 	user?: (http: FlowHttpContext) => string | undefined;
 };
+
+/** The injection token of the {@link FlowOptions}. */
+export const ARIADNE_OPTIONS = 'ariadne.options';
 
 const encoder = new TextEncoder();
 
@@ -86,17 +84,37 @@ const defaultUser = (http: FlowHttpContext): string | undefined => {
 	return id === undefined || id === null ? undefined : String(id);
 };
 
-const nonEmpty = (value: unknown): value is string => typeof value === 'string' && value.length > 0;
+const isAdvance = (value: unknown): value is FlowAdvance<unknown> =>
+	(value as { '~flow'?: unknown } | null)?.['~flow'] === 'advance';
+
+const isRefusal = (value: unknown): value is FlowRefusal<unknown> =>
+	(value as { '~flow'?: unknown } | null)?.['~flow'] === 'refuse';
+
+const engines = new WeakMap<FlowDescription, FlowEngine>();
 
 /**
- * Starts flows, reads where they stand and runs their steps, for the routes of one flow.
+ * Starts flows, reads where they stand and runs their steps, for one flow controller.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export class FlowEngine {
-	constructor(
-		private readonly flow: AnyFlow,
-		private readonly options: FlowEngineOptions
-	) {}
+	/** The engine of a flow. */
+	public static of(description: FlowDescription): FlowEngine {
+		let engine = engines.get(description);
+		if (!engine) engines.set(description, (engine = new FlowEngine(description)));
+		return engine;
+	}
+
+	constructor(private readonly flow: FlowDescription) {
+		engines.set(flow, this);
+	}
+
+	private get options(): FlowOptions {
+		const options = Service.exists(ARIADNE_OPTIONS)
+			? Service.get<FlowOptions>(ARIADNE_OPTIONS)
+			: null;
+		if (!options) throw new MissingFlowStoreError();
+		return options;
+	}
 
 	private get store(): FlowStore {
 		const { store } = this.options;
@@ -109,12 +127,10 @@ export class FlowEngine {
 
 	/** The steps the flow accepts next, and the earlier ones it may go back to. */
 	private position(record: FlowRecord): { next: string[]; back: string[] } {
-		if (record.step === null) {
-			return { next: this.flow.start ?? Object.keys(this.flow.steps).slice(0, 1), back: [] };
-		}
-		const current = this.flow.steps[record.step];
+		if (record.step === null) return { next: this.flow.start, back: [] };
+		const current = this.flow.steps.get(record.step);
 		if (!current) return { next: [], back: [] };
-		return { next: current.next(record.state), back: current.back ?? [] };
+		return { next: current.next(record.state), back: current.back };
 	}
 
 	private reply(answer: unknown, record: FlowRecord | null) {
@@ -129,15 +145,6 @@ export class FlowEngine {
 		const user = (this.options.user ?? defaultUser)(http);
 		if (user === undefined) throw new FlowUserRequiredError();
 		return user;
-	}
-
-	private async admit(http: FlowHttpContext): Promise<void> {
-		const refused = await this.options.admit?.({
-			request: http.request,
-			http,
-			flow: this.flow.name
-		});
-		if (refused) throw refused;
 	}
 
 	/** Loads a flow the caller owns, or throws: 410 when it expired, 403 when it is not theirs. */
@@ -156,34 +163,34 @@ export class FlowEngine {
 		reason: 'unexpected-step' | 'completed' | 'missing',
 		record: FlowRecord,
 		step: string
-	) {
+	): DomainError {
 		if (reason === 'completed') return new FlowCompletedError();
 		if (reason === 'missing') return new FlowExpiredError();
 		return new FlowUnexpectedStepError(step, this.position(record), record.lastAnswer);
 	}
 
-	/** `POST /{flow}`: starts a flow, and answers its key (and the owner token of a guest flow). */
-	public async start(http: FlowHttpContext) {
-		await this.admit(http);
+	/** `POST /flows/{flow}`: starts a flow, and answers its key (and the owner token of a guest flow). */
+	public async start(http: FlowHttpContext, _controller: object) {
 		const owner = this.flow.owner === 'user' ? this.user(http) : randomToken();
 		const flowKey = crypto.randomUUID();
-		await this.store.init(this.key(flowKey), owner, this.flow.ttlSeconds);
+		await this.store.init(this.key(flowKey), owner, this.flow.ttl);
 		http.set.status = 201;
 		return {
 			flowKey,
 			...(this.flow.owner === 'guest' ? { owner } : {}),
-			nextSteps: this.flow.start ?? Object.keys(this.flow.steps).slice(0, 1),
+			nextSteps: this.flow.start,
 			backSteps: []
 		};
 	}
 
-	/** `GET /{flow}?flowKey=`: where the flow stands, and the last answer. */
+	/** `GET /flows/{flow}`: where the flow of the `x-flow-key` header stands, and the last answer. */
 	public async state(http: FlowHttpContext) {
-		const flowKey = http.query?.flowKey;
-		if (!nonEmpty(flowKey)) {
-			throw new InvalidFlowBodyError([{ pointer: '/query/flowKey', message: 'is required' }]);
+		const flowKey = http.request.headers.get(FLOW_KEY_HEADER) ?? http.query?.flowKey ?? '';
+		if (flowKey === '') {
+			throw new InvalidFlowRequestError([
+				{ pointer: `/headers/${FLOW_KEY_HEADER}`, message: 'is required' }
+			]);
 		}
-		await this.admit(http);
 		const record = await this.owned(http, flowKey);
 		if (record.completedAt !== null) throw new FlowCompletedError();
 		const { next, back } = this.position(record);
@@ -196,32 +203,30 @@ export class FlowEngine {
 		};
 	}
 
-	/** `POST /{flow}/{step}`: runs a step, body `{ flowKey, stepId, ...body }`. */
-	public async step(http: FlowHttpContext, stepName: string) {
-		const target = this.flow.steps[stepName]!;
-		const fields = (
-			typeof http.body === 'object' && http.body !== null && !Array.isArray(http.body)
-				? http.body
-				: {}
-		) as Record<string, unknown>;
-		const { flowKey, stepId, ...rest } = fields;
+	/**
+	 * Runs a step for the request in the application context: claims it, gives `run` the state,
+	 * and commits what it returns. A repeated step id replays the stored answer.
+	 */
+	public async step(
+		stepName: string,
+		controller: object,
+		run: (input: FlowStepRun) => unknown
+	): Promise<{ answer: unknown; nextSteps: string[]; backSteps: string[] }> {
+		const http = Application.context.getStore()?.get('http:context') as FlowHttpContext;
+		const target = this.flow.steps.get(stepName)!;
+		const flowKey = http.request.headers.get(FLOW_KEY_HEADER) ?? '';
+		const stepId = http.request.headers.get(FLOW_STEP_HEADER) ?? '';
 		const missing = [
-			...(nonEmpty(flowKey) ? [] : [{ pointer: '/body/flowKey', message: 'is required' }]),
-			...(nonEmpty(stepId) ? [] : [{ pointer: '/body/stepId', message: 'is required' }])
+			...(flowKey ? [] : [{ pointer: `/headers/${FLOW_KEY_HEADER}`, message: 'is required' }]),
+			...(stepId ? [] : [{ pointer: `/headers/${FLOW_STEP_HEADER}`, message: 'is required' }])
 		];
-		if (missing.length > 0 || !nonEmpty(flowKey) || !nonEmpty(stepId)) {
-			throw new InvalidFlowBodyError(missing);
-		}
+		if (missing.length > 0) throw new InvalidFlowRequestError(missing);
 
 		const store = this.store;
 		const key = this.key(flowKey);
 		const record = await this.owned(http, flowKey);
 		const repeat = record.lastStepId === stepId;
 		if (record.completedAt !== null && !repeat) throw new FlowCompletedError();
-
-		const input = Value.Default(target.body, structuredClone(rest));
-		const errors = [...Value.Errors(target.body, input)];
-		if (errors.length > 0) throw new InvalidFlowBodyError(validationErrors('body', errors));
 
 		const { next, back } = this.position(record);
 		const rewinding = !next.includes(stepName) && back.includes(stepName);
@@ -243,43 +248,50 @@ export class FlowEngine {
 		}
 
 		const ctx: FlowContext = {
-			request: http.request,
-			http,
 			flow: this.flow.name,
 			flowKey,
+			stepId,
+			step: stepName,
 			owner: record.owner
 		};
 		let settled = false;
 		try {
-			const before = record.step === null ? this.flow.initial(ctx) : record.state;
-			const state = rewinding && target.onRewind ? await target.onRewind(ctx, before) : before;
-			const result = await target.run(ctx, state, input);
-			if (result instanceof DomainError) throw result;
-			if (Flow.isRefusal(result)) {
+			const initial = this.flow.initial;
+			const before =
+				record.step === null
+					? initial !== undefined
+						? await (controller as Record<string | symbol, Function>)[initial]!.call(
+								controller,
+								ctx
+							)
+						: {}
+					: record.state;
+			const state = rewinding && target.onRewind ? await target.onRewind(before, ctx) : before;
+			const result = await run({ state, ctx });
+			if (isRefusal(result)) {
 				// The claim is given back by amend.
 				await store.amend(key, { stepId, state: result.state, end: result.end });
 				settled = true;
 				throw result.refused;
 			}
+			const advance = isAdvance(result) ? result : { state, answer: result ?? null };
+			// A step that leads nowhere ends the flow.
+			const nextSteps = target.next(advance.state);
+			const terminal = nextSteps.length === 0;
 			const committed = await store.commit(key, {
 				stepId,
 				step: stepName,
 				expectStep: record.step,
-				state: result.state,
-				answer: result.answer,
-				terminal: result.terminal === true,
-				ttlSeconds: this.flow.ttlSeconds
+				state: advance.state,
+				answer: advance.answer,
+				terminal,
+				ttlSeconds: this.flow.ttl
 			});
-			if (!committed.ok)
+			if (!committed.ok) {
 				throw this.refusal(committed.reason, (await store.load(key)) ?? record, stepName);
+			}
 			settled = true;
-			if (result.terminal === true)
-				return { answer: committed.answer, nextSteps: [], backSteps: [] };
-			return {
-				answer: committed.answer,
-				nextSteps: target.next(result.state),
-				backSteps: target.back ?? []
-			};
+			return { answer: committed.answer, nextSteps, backSteps: terminal ? [] : target.back };
 		} finally {
 			if (!settled) await store.release(key, stepId);
 		}

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export { AriadneModule, type AriadneOptions } from './ariadne.module';
-export { FlowEngine, type FlowEngineOptions, type FlowHttpContext } from './engine';
+export { AriadneModule } from './ariadne.module';
+export { ARIADNE_OPTIONS, FlowEngine, type FlowHttpContext, type FlowOptions } from './engine';
 export {
 	FlowCompletedError,
 	FlowExpiredError,
@@ -21,22 +21,25 @@ export {
 	FlowStepInProgressError,
 	FlowUnexpectedStepError,
 	FlowUserRequiredError,
-	InvalidFlowBodyError,
-	InvalidFlowError
+	InvalidFlowError,
+	InvalidFlowRequestError,
+	MissingFlowStoreError
 } from './errors';
 export {
-	type AnyFlow,
 	Flow,
-	type FlowBody,
+	type FlowAdvance,
 	type FlowContext,
-	type FlowDefinition,
-	type FlowStep,
-	type FlowStepRefusal,
-	type FlowStepResult
+	type FlowControllerOptions,
+	type FlowDescription,
+	type FlowRefusal,
+	type FlowStepDescription,
+	type FlowStepOptions
 } from './flow';
 export { type FlowLease, FlowRules, type FlowSlot } from './rules';
 export {
+	FLOW_KEY_HEADER,
 	FLOW_OWNER_HEADER,
+	FLOW_STEP_HEADER,
 	FLOW_STEP_LEASE_SECONDS,
 	FLOW_TOMBSTONE_SECONDS,
 	type FlowAmend,

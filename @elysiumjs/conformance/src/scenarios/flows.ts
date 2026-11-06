@@ -14,34 +14,45 @@
 
 import type { Scenario } from './types';
 
-import { AriadneModule, Flow, FLOW_OWNER_HEADER, MemoryFlowStore } from '@elysiumjs/ariadne';
-import { Application, t } from '@elysiumjs/core';
+import {
+	AriadneModule,
+	Flow,
+	FLOW_KEY_HEADER,
+	FLOW_OWNER_HEADER,
+	FLOW_STEP_HEADER,
+	MemoryFlowStore
+} from '@elysiumjs/ariadne';
+import { Application, Http, Module, t } from '@elysiumjs/core';
+
+type Greeting = { name: string };
 
 const make = async (): Promise<Application> => {
-	const greeting = Flow.define({
-		name: 'greeting',
-		ttlSeconds: 600,
-		owner: 'guest',
-		initial: () => ({ name: '' }),
-		steps: {
-			name: {
-				body: t.Object({ name: t.String({ minLength: 1 }) }),
-				next: () => ['confirm'],
-				run: async (_ctx, state, { name }) => ({
-					state: { ...state, name },
-					answer: { hello: name }
-				})
-			},
-			confirm: {
-				body: t.Object({}),
-				next: () => [],
-				run: async (_ctx, state) => ({ state, answer: { done: state.name }, terminal: true })
-			}
+	@Flow.controller({ name: 'greeting', ttl: 600, owner: 'guest' })
+	class GreetingFlow {
+		@Flow.initial()
+		public initial(): Greeting {
+			return { name: '' };
 		}
-	});
+
+		@Flow.step({ next: ['confirm'] })
+		public name(
+			@Http.body(t.Object({ name: t.String({ minLength: 1 }) })) { name }: { name: string },
+			@Flow.state() state: Greeting
+		) {
+			return Flow.advance({ ...state, name }, { hello: name });
+		}
+
+		@Flow.step()
+		public confirm(@Flow.state() state: Greeting) {
+			return { done: state.name };
+		}
+	}
+
+	@Module.register({ controllers: [GreetingFlow] })
+	class GreetingModule extends Module {}
 
 	@Application.register({
-		modules: [AriadneModule.with({ flows: [greeting], store: new MemoryFlowStore() })],
+		modules: [AriadneModule.with({ store: new MemoryFlowStore() }), GreetingModule],
 		openapi: false
 	})
 	class FlowApp extends Application {}
@@ -58,8 +69,13 @@ const step =
 		const { flowKey, owner } = previous[0] as Started;
 		return new Request(`http://localhost/flows/greeting/${name}`, {
 			method: 'POST',
-			headers: { 'content-type': 'application/json', [FLOW_OWNER_HEADER]: owner },
-			body: JSON.stringify({ flowKey, stepId, ...body })
+			headers: {
+				'content-type': 'application/json',
+				[FLOW_OWNER_HEADER]: owner,
+				[FLOW_KEY_HEADER]: flowKey,
+				[FLOW_STEP_HEADER]: stepId
+			},
+			body: JSON.stringify(body)
 		});
 	};
 
@@ -97,8 +113,8 @@ export const flows: Scenario = {
 		{
 			request: (previous) => {
 				const { flowKey } = previous[0] as Started;
-				return new Request(`http://localhost/flows/greeting?flowKey=${flowKey}`, {
-					headers: { [FLOW_OWNER_HEADER]: 'forged' }
+				return new Request('http://localhost/flows/greeting', {
+					headers: { [FLOW_OWNER_HEADER]: 'forged', [FLOW_KEY_HEADER]: flowKey }
 				});
 			},
 			expect: { status: 403 }

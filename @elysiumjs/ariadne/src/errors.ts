@@ -17,8 +17,8 @@ import type { ProblemValidationError } from '@elysiumjs/core';
 import { DomainError, ElysiumError } from '@elysiumjs/core';
 
 /**
- * Raised when a flow is declared wrong: no steps, a name that is not kebab-case, a TTL that is
- * not positive, or an unknown step in `start` or `back`.
+ * Raised when a flow controller is declared wrong: no steps, a name that is not kebab-case, a TTL
+ * that is not positive, or an unknown step in `start` or `back`.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export class InvalidFlowError extends ElysiumError {
@@ -98,12 +98,22 @@ export class FlowUserRequiredError extends DomainError {
 }
 
 /**
- * The body of a step does not match its schema, or misses `flowKey` or `stepId`: a 422 problem
- * with one entry per mistake.
+ * A flow request without its `x-flow-key` or `x-flow-step` header: a 422 problem with one entry
+ * per missing header.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class InvalidFlowBodyError extends DomainError {
+export class InvalidFlowRequestError extends DomainError {
 	constructor(errors: ProblemValidationError[]) {
-		super({ status: 422, detail: 'The request body is invalid.', extensions: { errors } });
+		super({ status: 422, detail: 'The flow request is invalid.', extensions: { errors } });
+	}
+}
+
+/**
+ * Raised when a flow route runs before `AriadneModule.with()` set a store.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class MissingFlowStoreError extends ElysiumError {
+	constructor() {
+		super('No flow store is set. Import AriadneModule.with({ store }) in the application.');
 	}
 }

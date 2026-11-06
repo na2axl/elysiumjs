@@ -13,92 +13,114 @@
 // limitations under the License.
 
 import type { TestingHttpApp } from '@elysiumjs/core';
-import type { FlowStore } from '../src';
+import type { FlowContext, FlowStore } from '../src';
 
-import { Application, DomainError, t } from '@elysiumjs/core';
+import { Application, DomainError, Http, Module, t } from '@elysiumjs/core';
 import { Auth, Jwt, jwtGuard, ThemisModule } from '@elysiumjs/themis';
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { AriadneModule, Flow, FLOW_OWNER_HEADER, InvalidFlowError, MemoryFlowStore } from '../src';
+import {
+	AriadneModule,
+	Flow,
+	FLOW_KEY_HEADER,
+	FLOW_OWNER_HEADER,
+	FLOW_STEP_HEADER,
+	InvalidFlowError,
+	MemoryFlowStore
+} from '../src';
 
 type SignUp = { email?: string; attempts: number; rewound?: number };
 
 const effects: string[] = [];
 
-const signUp = Flow.define({
-	name: 'sign-up',
-	ttlSeconds: 900,
-	owner: 'guest',
-	initial: (): SignUp => ({ attempts: 0 }),
-	steps: {
-		email: {
-			body: t.Object({ email: t.String({ format: 'email' }) }),
-			next: () => ['code'],
-			back: ['email'],
-			onRewind: (_ctx, state) => ({ ...state, rewound: (state.rewound ?? 0) + 1 }),
-			run: async (_ctx, state, { email }) => {
-				effects.push(`mail:${email}`);
-				return { state: { ...state, email }, answer: { sentTo: email } };
-			}
-		},
-		code: {
-			body: t.Object({ code: t.String() }),
-			next: () => [],
-			run: async (_ctx, state, { code }) => {
-				if (code === 'boom') throw new Error('provider down');
-				if (code === 'later') return DomainError.conflict('Try again later.');
-				if (code !== '123456') {
-					const attempts = state.attempts + 1;
-					return Flow.refuse(
-						{ ...state, attempts },
-						DomainError.badRequest(`Wrong code (${attempts}).`),
-						{ end: attempts >= 3 }
-					);
-				}
-				return {
-					state,
-					answer: { welcome: state.email, attempts: state.attempts, rewound: state.rewound ?? 0 },
-					terminal: true
-				};
-			}
-		}
-	}
-});
+const EmailBody = t.Object({ email: t.String({ format: 'email' }) });
+const CodeBody = t.Object({ code: t.String() });
 
-const profile = Flow.define({
-	name: 'profile',
-	ttlSeconds: 60,
-	owner: 'user',
-	initial: (ctx) => ({ owner: ctx.owner }),
-	steps: {
-		name: {
-			body: t.Object({ name: t.String() }),
-			next: () => [],
-			run: async (ctx, state, { name }) => ({
-				state,
-				answer: { name, owner: (state as { owner: string }).owner, flow: ctx.flow },
-				terminal: true
-			})
-		}
+@Flow.controller({ name: 'sign-up', ttl: 900, owner: 'guest' })
+class SignUpFlow {
+	@Flow.initial()
+	public initial(): SignUp {
+		return { attempts: 0 };
 	}
-});
+
+	@Flow.step<SignUp>({
+		next: ['code'],
+		back: ['email'],
+		onRewind: (state) => ({ ...state, rewound: (state.rewound ?? 0) + 1 })
+	})
+	public email(
+		@Http.body(EmailBody) { email }: typeof EmailBody.static,
+		@Flow.state() state: SignUp
+	) {
+		effects.push(`mail:${email}`);
+		return Flow.advance({ ...state, email }, { sentTo: email });
+	}
+
+	@Flow.step()
+	public code(@Flow.state() state: SignUp, @Http.body(CodeBody) { code }: typeof CodeBody.static) {
+		if (code === 'boom') throw new Error('provider down');
+		if (code === 'later') throw DomainError.conflict('Try again later.');
+		if (code !== '123456') {
+			const attempts = state.attempts + 1;
+			return Flow.refuse(
+				{ ...state, attempts },
+				DomainError.badRequest(`Wrong code (${attempts}).`),
+				{ end: attempts >= 3 }
+			);
+		}
+		return { welcome: state.email, attempts: state.attempts, rewound: state.rewound ?? 0 };
+	}
+}
+
+@Flow.controller({ name: 'profile', path: '/me/profile-flow', ttl: 60, owner: 'user' })
+@Auth({ guards: ['jwt'] })
+class ProfileFlow {
+	@Flow.initial()
+	public initial(ctx: FlowContext) {
+		return { owner: ctx.owner };
+	}
+
+	@Flow.step({ name: 'name' })
+	public setName(
+		@Http.body(t.Object({ name: t.String() })) { name }: { name: string },
+		@Flow.state() state: { owner: string },
+		@Flow.context() ctx: FlowContext
+	) {
+		return { name, owner: state.owner, flow: ctx.flow, step: ctx.step };
+	}
+}
+
+type Plan = { plan?: string };
+
+@Flow.controller({ name: 'plan', ttl: 60, owner: 'guest', start: ['choose'] })
+class PlanFlow {
+	/** A free plan ends the flow, a paid one goes on to payment. */
+	@Flow.step<Plan>({ next: (state) => (state.plan === 'free' ? [] : ['pay']) })
+	public choose(@Http.body(t.Object({ plan: t.String() })) { plan }: { plan: string }) {
+		return Flow.advance({ plan }, { plan });
+	}
+
+	@Flow.step()
+	public pay() {
+		return { paid: true };
+	}
+}
 
 const SECRET = 'j'.repeat(32);
 const users: Record<string, { id: string }> = { u1: { id: 'u1' }, u2: { id: 'u2' } };
 
-const makeApp = (store: FlowStore, admit?: () => DomainError | undefined) => {
+@Module.register({ controllers: [SignUpFlow, ProfileFlow, PlanFlow] })
+class FlowsModule extends Module {}
+
+const makeApp = (store: FlowStore) => {
 	@Application.register({
 		modules: [
 			ThemisModule.with({
 				secret: 's'.repeat(32),
 				guards: { jwt: jwtGuard({ secret: SECRET, user: (claims) => users[claims.sub as string] }) }
 			}),
-			AriadneModule.with({
-				flows: [signUp, profile],
-				store,
-				admit,
-				authenticate: Auth({ guards: ['jwt'] })
-			})
+			AriadneModule.with({ store }),
+			FlowsModule
 		],
 		openapi: false
 	})
@@ -109,21 +131,34 @@ const makeApp = (store: FlowStore, admit?: () => DomainError | undefined) => {
 const bearer = async (sub: string) =>
 	`Bearer ${await Jwt.sign({}, { secret: SECRET, subject: sub, expiresIn: 60 })}`;
 
-describe('Flow.define', () => {
-	const step = { body: t.Object({}), next: () => [], run: async () => ({ state: {}, answer: {} }) };
+describe('Flow.controller', () => {
+	it('describes the flow from its steps', () => {
+		const description = Flow.describe(SignUpFlow)!;
+		expect(description.start).toEqual(['email']);
+		expect([...description.steps.keys()]).toEqual(['email', 'code']);
+		expect(description.steps.get('code')!.next({})).toEqual([]);
+		expect(Flow.describe(class {})).toBeUndefined();
+	});
 
-	it('refuses a flow without steps, with a bad name, a bad TTL or unknown steps', () => {
-		const base = { ttlSeconds: 1, owner: 'guest' as const, initial: () => ({}) };
-		expect(() => Flow.define({ ...base, name: 'a', steps: {} })).toThrow(InvalidFlowError);
-		expect(() => Flow.define({ ...base, name: 'Bad Name', steps: { a: step } })).toThrow(
-			'kebab-case'
-		);
-		expect(() => Flow.define({ ...base, name: 'a', ttlSeconds: 0, steps: { a: step } })).toThrow(
-			'ttlSeconds'
-		);
-		expect(() =>
-			Flow.define({ ...base, name: 'a', start: ['x'], steps: { a: { ...step, back: ['y'] } } })
-		).toThrow('unknown steps: x, y');
+	it('refuses a flow without steps, with a bad name, a bad ttl or unknown steps', () => {
+		const declare = (options: Parameters<typeof Flow.controller>[0], withStep = true) => {
+			class Target {
+				public a() {}
+			}
+			if (withStep) {
+				Flow.step({ back: ['y'] })(
+					Target.prototype,
+					'a',
+					Object.getOwnPropertyDescriptor(Target.prototype, 'a')!
+				);
+			}
+			Flow.controller(options)(Target);
+		};
+		const base = { name: 'a', ttl: 1, owner: 'guest' as const };
+		expect(() => declare(base, false)).toThrow(InvalidFlowError);
+		expect(() => declare({ ...base, name: 'Bad Name' })).toThrow('kebab-case');
+		expect(() => declare({ ...base, ttl: 0 })).toThrow('positive ttl');
+		expect(() => declare({ ...base, start: ['x'] })).toThrow('unknown steps: x, y');
 	});
 });
 
@@ -136,11 +171,8 @@ describe('flows over HTTP', () => {
 		effects.length = 0;
 	});
 
-	const guest = async (
-		store: FlowStore = new MemoryFlowStore(),
-		admit?: () => DomainError | undefined
-	) => {
-		testing = await Application.testing({ app: makeApp(store, admit) });
+	const guest = async (store: FlowStore = new MemoryFlowStore()) => {
+		testing = await Application.testing({ app: makeApp(store) });
 		const http = testing.http;
 		const started = await http.post('/flows/sign-up');
 		expect(started.status).toBe(201);
@@ -150,9 +182,11 @@ describe('flows over HTTP', () => {
 			http
 				.post(`/flows/sign-up/${name}`)
 				.header(FLOW_OWNER_HEADER, token)
-				.json({ flowKey, stepId, ...body });
+				.header(FLOW_KEY_HEADER, flowKey)
+				.header(FLOW_STEP_HEADER, stepId)
+				.json(body);
 		const state = (token = owner) =>
-			http.get(`/flows/sign-up?flowKey=${flowKey}`).header(FLOW_OWNER_HEADER, token);
+			http.get('/flows/sign-up').header(FLOW_OWNER_HEADER, token).header(FLOW_KEY_HEADER, flowKey);
 		return { http, flowKey, owner, step, state };
 	};
 
@@ -211,18 +245,20 @@ describe('flows over HTTP', () => {
 
 		const missing = await http
 			.post('/flows/sign-up/email')
-			.json({ flowKey: 'nope', stepId: 's1', email: 'ada@example.com' });
+			.header(FLOW_KEY_HEADER, 'nope')
+			.header(FLOW_STEP_HEADER, 's1')
+			.json({ email: 'ada@example.com' });
 		expect(missing.status).toBe(410);
 
 		const invalid = await step('email', 's1', { email: 'not an email' });
 		expect(invalid.status).toBe(422);
 		expect((await invalid.json()).errors[0].pointer).toBe('/body/email');
 
-		const bare = await http.post('/flows/sign-up/email').json({});
+		const bare = await http.post('/flows/sign-up/email').json({ email: 'ada@example.com' });
 		expect(bare.status).toBe(422);
 		expect((await bare.json()).errors.map((e: { pointer: string }) => e.pointer)).toEqual([
-			'/body/flowKey',
-			'/body/stepId'
+			`/headers/${FLOW_KEY_HEADER}`,
+			`/headers/${FLOW_STEP_HEADER}`
 		]);
 		expect((await http.get('/flows/sign-up')).status).toBe(422);
 	});
@@ -287,32 +323,64 @@ describe('flows over HTTP', () => {
 		expect((await step('email', 's2', { email: 'ada@example.com' })).status).toBe(409);
 	});
 
-	it('lets admit refuse a start', async () => {
-		testing = await Application.testing({
-			app: makeApp(new MemoryFlowStore(), () => new DomainError({ status: 429 }))
-		});
-		expect((await testing.http.post('/flows/sign-up')).status).toBe(429);
-	});
-
-	it('gives a user flow to the signed-in user', async () => {
+	it('ends the flow when next gives no step for the state', async () => {
 		testing = await Application.testing({ app: makeApp(new MemoryFlowStore()) });
 		const http = testing.http;
-		expect((await http.post('/flows/profile')).status).toBe(401);
+		const run = async (plan: string) => {
+			const { flowKey, owner } = await (await http.post('/flows/plan')).json();
+			const step = (name: string, stepId: string, body: object = {}) =>
+				http
+					.post(`/flows/plan/${name}`)
+					.header(FLOW_OWNER_HEADER, owner)
+					.header(FLOW_KEY_HEADER, flowKey)
+					.header(FLOW_STEP_HEADER, stepId)
+					.json(body);
+			return { chosen: await (await step('choose', 's1', { plan })).json(), step };
+		};
 
-		const started = await http.post('/flows/profile').header('authorization', await bearer('u1'));
+		const free = await run('free');
+		expect(free.chosen).toEqual({ answer: { plan: 'free' }, nextSteps: [], backSteps: [] });
+		expect((await free.step('pay', 's2')).status).toBe(410);
+
+		const paid = await run('pro');
+		expect(paid.chosen.nextSteps).toEqual(['pay']);
+		expect(await (await paid.step('pay', 's2')).json()).toEqual({
+			answer: { paid: true },
+			nextSteps: [],
+			backSteps: []
+		});
+	});
+
+	it('gives a user flow to the signed-in user, on the path of the controller', async () => {
+		testing = await Application.testing({ app: makeApp(new MemoryFlowStore()) });
+		const http = testing.http;
+		expect((await http.post('/me/profile-flow')).status).toBe(401);
+
+		const started = await http.post('/me/profile-flow').header('authorization', await bearer('u1'));
 		const { flowKey, owner } = await started.json();
 		expect(owner).toBeUndefined();
 
-		const other = await http
-			.post('/flows/profile/name')
-			.header('authorization', await bearer('u2'))
-			.json({ flowKey, stepId: 's1', name: 'Ada' });
-		expect(other.status).toBe(403);
+		const name = async (sub: string) =>
+			http
+				.post('/me/profile-flow/name')
+				.header('authorization', await bearer(sub))
+				.header(FLOW_KEY_HEADER, flowKey)
+				.header(FLOW_STEP_HEADER, 's1')
+				.json({ name: 'Ada' });
+		expect((await name('u2')).status).toBe(403);
+		expect((await (await name('u1')).json()).answer).toEqual({
+			name: 'Ada',
+			owner: 'u1',
+			flow: 'profile',
+			step: 'name'
+		});
+	});
+});
 
-		const done = await http
-			.post('/flows/profile/name')
-			.header('authorization', await bearer('u1'))
-			.json({ flowKey, stepId: 's1', name: 'Ada' });
-		expect((await done.json()).answer).toEqual({ name: 'Ada', owner: 'u1', flow: 'profile' });
+describe('AriadneModule', () => {
+	it('needs a store', async () => {
+		@Application.register({ modules: [AriadneModule.with({})], openapi: false })
+		class App extends Application {}
+		await expect(Application.testing({ app: App })).rejects.toThrow('store');
 	});
 });
