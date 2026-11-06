@@ -78,6 +78,7 @@ export const runScenario = async (
 ): Promise<void> => {
 	Runtime.use(runtime);
 	let app: Application | undefined;
+	let failure: { error: unknown } | undefined;
 	try {
 		app = await s.app();
 		const elysia = await app.build();
@@ -90,12 +91,27 @@ export const runScenario = async (
 			);
 		}
 		await s.after?.(app, assert);
-	} finally {
-		try {
-			await app?.kernel.shutdown();
-		} finally {
-			// The container is global to the process: leave it empty for the next scenario.
-			resetContainer();
-		}
+	} catch (error) {
+		failure = { error };
 	}
+	await shutDown(app, failure);
+};
+
+/**
+ * Shuts the app down and resets the container, then rethrows the scenario's failure. A shutdown
+ * error is thrown only when the scenario itself passed, so it never masks the first failure.
+ */
+const shutDown = async (
+	app: Application | undefined,
+	failure: { error: unknown } | undefined
+): Promise<void> => {
+	try {
+		await app?.kernel.shutdown();
+	} catch (error) {
+		failure ??= { error };
+	} finally {
+		// The container is global to the process: leave it empty for the next scenario.
+		resetContainer();
+	}
+	if (failure) throw failure.error;
 };

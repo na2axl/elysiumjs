@@ -92,4 +92,23 @@ describe('runScenario', () => {
 
 		expect(Service.keys('*')).toEqual([]);
 	});
+
+	it('rethrows the scenario error when shutdown fails too', async () => {
+		const scenario: Scenario = {
+			name: 'assertion and shutdown fail',
+			app: makeApp,
+			requests: [],
+			after: (app) => {
+				app.kernel.shutdown = async () => {
+					throw new Error('shutdown failed');
+				};
+				throw new Error('assertion failed');
+			}
+		};
+
+		await expect(runScenario(scenario, runtimeBun, expectAdapter)).rejects.toThrow(
+			'assertion failed'
+		);
+		expect(Service.keys('*')).toEqual([]);
+	});
 });
