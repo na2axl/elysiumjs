@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { ElysiumError } from '@elysiumjs/core';
+
 /**
  * The surface of a Redis client that the Elysium packages rely on. Any Redis client can be
  * plugged in by adapting it to this interface; everything else goes through {@link send}.
@@ -140,5 +142,12 @@ class BunRedisConnection implements RedisConnection {
  * that references Bun's Redis client.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export const bunRedis: RedisClientFactory = (url, options) =>
-	new BunRedisConnection(new Bun.RedisClient(url, options as Bun.RedisOptions));
+export const bunRedis: RedisClientFactory = (url, options) => {
+	if (typeof Bun === 'undefined') {
+		throw new ElysiumError(
+			'The default Redis client needs Bun. Pass `client: ioredis(...)` on Node.js, or ' +
+				'`client: upstash(...)` on Cloudflare Workers.'
+		);
+	}
+	return new BunRedisConnection(new Bun.RedisClient(url, options as Bun.RedisOptions));
+};

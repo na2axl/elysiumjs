@@ -14,4 +14,11 @@
 
 export { type RedisClientFactory, type RedisConnection, bunRedis } from './connection';
 export { type RedisConnectionProps, type RedisModuleConfig, Redis, RedisModule } from './redis';
+export {
+	type IoredisLike,
+	ioredis,
+	RedisFeatureNotSupportedError,
+	upstash,
+	type UpstashOptions
+} from './adapters';
 export { RedisRateLimitStore } from './rate-limit';
