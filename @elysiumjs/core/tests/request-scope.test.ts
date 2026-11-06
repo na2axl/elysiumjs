@@ -18,6 +18,7 @@ import { Application } from '../src/app';
 import { Container } from '../src/container';
 import { ElysiumError, OutsideRequestScopeError, ScopeMismatchError } from '../src/errors';
 import { Http, HttpControllerScope } from '../src/http';
+import { Middleware } from '../src/middleware';
 import { Module } from '../src/module';
 import { Service, ServiceScope } from '../src/service';
 
@@ -346,6 +347,57 @@ describe('Request scope', () => {
 			const instance = new RequestApp();
 			return { instance, app: await instance.build() };
 		};
+
+		it('runs app and module middlewares in the request scope of the handler', async () => {
+			const seen: Record<string, number> = {};
+
+			@Service.register({ scope: ServiceScope.REQUEST, global: true })
+			class GlobalState {
+				public readonly id = ++counter;
+			}
+
+			class AppLevel extends Middleware {
+				public onRequest() {
+					seen.app = Service.get(GlobalState).id;
+				}
+			}
+
+			class ModuleLevel extends Middleware {
+				public onBeforeHandle() {
+					seen.module = Service.get(RequestState).id;
+				}
+			}
+
+			@Http.controller({ path: '/scoped' })
+			class ScopedController {
+				@Http.get()
+				public show(
+					@Service.inject(RequestState) state: RequestState,
+					@Service.inject(GlobalState) global: GlobalState
+				) {
+					return { id: state.id, global: global.id };
+				}
+			}
+
+			@Middleware.register(ModuleLevel)
+			@Module.register({
+				services: [RequestState, GlobalState] as any,
+				controllers: [ScopedController]
+			})
+			class ScopedModule extends Module {}
+
+			@Middleware.register(AppLevel)
+			@Application.register({ modules: [ScopedModule], openapi: false })
+			class ScopedApp extends Application {}
+
+			const instance = new ScopedApp();
+			const app = await instance.build();
+			const response = await app.handle(new Request('http://localhost/scoped'));
+			expect(response.status).toBe(200);
+			const { id, global } = await response.json();
+			expect(seen).toEqual({ app: global, module: id });
+			await instance.kernel.shutdown();
+		});
 
 		it('gives each request its own instance, shared by the controller and the handler', async () => {
 			@Http.controller({ path: '/state', scope: HttpControllerScope.REQUEST })
