@@ -31,7 +31,15 @@ export const runtime: Runtime = {
 	env: () => process.env,
 	sleep: (ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
 	serve(app, port) {
-		serveNode(async (request) => app.fetch(request), port);
+		const server = serveNode(async (request) => app.fetch(request), port);
+		return {
+			close: () =>
+				new Promise<void>((resolve, reject) => {
+					server.close((error) => (error ? reject(error) : resolve()));
+					// Keep-alive sockets with no request in flight would hold the server open.
+					server.closeIdleConnections();
+				})
+		};
 	},
 	clientAddress: peerAddress,
 	exit(code) {

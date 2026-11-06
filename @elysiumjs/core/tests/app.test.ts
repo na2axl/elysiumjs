@@ -34,6 +34,7 @@ import { Metadata } from '../src/metadata';
 import { Middleware } from '../src/middleware';
 import { Module } from '../src/module';
 import { ModuleContext } from '../src/module-context';
+import { Runtime } from '../src/runtime';
 import { Service } from '../src/service';
 import { nextTick, Symbols } from '../src/utils';
 
@@ -276,7 +277,6 @@ describe('Application class', () => {
 
 			expect(initEnvSpy).toHaveBeenCalledWith(Bun.env);
 		});
-
 	});
 
 	describe('static methods', () => {
@@ -715,6 +715,25 @@ describe('Application class', () => {
 			await instance.elysia.stop();
 			expect(process.listeners('SIGINT')).toHaveLength(before);
 			expect(process.listeners('SIGTERM')).toHaveLength(signalListeners.SIGTERM.length);
+		});
+
+		it('should close the server handle the runtime returns on a signal', async () => {
+			const close = mock(async () => {});
+			const runtime = Runtime.get();
+			const serveSpy = spyOn(runtime, 'serve').mockImplementation(() => ({ close }));
+
+			@Application.register({ server: { port: 0 } })
+			class TestApp extends Application {}
+
+			const instance = new TestApp();
+			await instance.run(['serve']);
+			process.emit('SIGTERM');
+			await nextTick();
+			await nextTick();
+
+			expect(close).toHaveBeenCalledTimes(1);
+			expect(process.exit).toHaveBeenCalledWith(0);
+			serveSpy.mockRestore();
 		});
 
 		it('should print an ElysiumError raised in the graph phase and exit 1', async () => {

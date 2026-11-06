@@ -22,7 +22,7 @@ import type { InterceptorClass } from './interceptor';
 import type { ConfiguredModule, ModuleClass } from './module';
 import type { ModuleGraph, ModuleNode } from './module-graph';
 import type { ProblemOptions } from './problem';
-import type { Runtime as RuntimePort } from './runtime';
+import type { Runtime as RuntimePort, ServeHandle } from './runtime';
 import type { HttpOptions } from './security';
 import type { TestingApp, TestingAppOptions, TestingHttpApp, TestingOptions } from './testing';
 import type { ElysiaPlugin } from './utils';
@@ -172,6 +172,9 @@ export abstract class Application extends InteractsWithConsole {
 	#kernel: Kernel | undefined;
 	#booting: Promise<void> | undefined;
 	#removeShutdownHandler: (() => void) | undefined;
+
+	/** The server started by `serve`, when the runtime returns a handle to close it. */
+	#serving: ServeHandle | undefined;
 
 	private readonly _appContextStorage: AppContext = new AsyncLocalStorage();
 
@@ -420,6 +423,9 @@ export abstract class Application extends InteractsWithConsole {
 			this.removeSignalHandlers();
 			let code = 0;
 			try {
+				const serving = this.#serving;
+				this.#serving = undefined;
+				await serving?.close();
 				await this.#elysia?.stop();
 			} catch (error) {
 				code = 1;
@@ -578,7 +584,11 @@ export abstract class Application extends InteractsWithConsole {
 		await this.buildServer(false);
 
 		const runtime = Runtime.get();
-		runtime.serve(this.#elysia, server?.port ?? (parseInt(runtime.env().PORT ?? '', 10) || 3000));
+		this.#serving =
+			runtime.serve(
+				this.#elysia,
+				server?.port ?? (parseInt(runtime.env().PORT ?? '', 10) || 3000)
+			) ?? undefined;
 	}
 
 	/**

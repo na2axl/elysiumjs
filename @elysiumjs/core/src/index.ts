@@ -78,6 +78,7 @@ export {
 	UnexpectedStatusError
 } from './http-client';
 export {
+	type ServeHandle,
 	type ShutdownSignal,
 	Runtime,
 	RuntimeNotConfiguredError,

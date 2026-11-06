@@ -154,8 +154,11 @@ const handle = async (
 	try {
 		await writeResponse(await fetch(toRequest(req, url, controller.signal)), res);
 	} catch (error) {
-		// A client abort ends the body stream early: there is nothing left to answer.
-		if (controller.signal.aborted && isAbortError(error)) return;
+		// The client went away: an abort ended the body stream early, or the socket is already
+		// destroyed. There is nothing left to answer.
+		if ((controller.signal.aborted && isAbortError(error)) || res.destroyed || req.destroyed) {
+			return;
+		}
 		getLogger({ runtime: 'node' }).error('Failed to serve a request', {
 			method: req.method,
 			url: url.href,

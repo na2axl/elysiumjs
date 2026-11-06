@@ -23,6 +23,15 @@ import { ElysiumError } from './errors';
 export type ShutdownSignal = 'SIGINT' | 'SIGTERM';
 
 /**
+ * A server started by {@link Runtime.serve}, closed when the application shuts down.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type ServeHandle = {
+	/** Stops accepting connections and resolves once the server is closed. */
+	close(): Promise<void> | void;
+};
+
+/**
  * The host-specific operations the framework needs. Core never calls a host API directly
  * (`Bun.*`, `process.exit`, a server's `listen`): it asks the current runtime.
  *
@@ -50,9 +59,10 @@ export interface Runtime {
 	 * Starts serving the app on the given port.
 	 * @param app The root Elysia app.
 	 * @param port The port to listen on.
+	 * @returns A handle that closes the server, when stopping the Elysia app does not.
 	 * @throws {RuntimeNotSupportedError} On runtimes where the host owns the server.
 	 */
-	serve(app: AnyElysia, port: number): void;
+	serve(app: AnyElysia, port: number): ServeHandle | void;
 
 	/**
 	 * Ends the process with the given exit code. A no-op on runtimes without a process.

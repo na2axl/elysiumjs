@@ -18,9 +18,9 @@ import type { AddressInfo } from 'node:net';
 import { once } from 'node:events';
 import { request as httpRequest } from 'node:http';
 
-import { Application, Http, Module, resetContainer, Runtime } from '@elysiumjs/core';
+import { Application, getLogger, Http, Module, resetContainer, Runtime } from '@elysiumjs/core';
 import { runtime as runtimeNode, serveNode } from '@elysiumjs/runtime-node';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const ABORT_TIMEOUT_MS = 2000;
 const SETTLE_MS = 50;
@@ -188,6 +188,41 @@ describe('serveNode', () => {
 			});
 		});
 		expect(aborted).toBe(true);
+	});
+
+	it('logs nothing when the client goes away while the body is written', async () => {
+		const errors: unknown[] = [];
+		const logger = getLogger({ runtime: 'node' });
+		const spy = vi.spyOn(logger, 'error').mockImplementation((...args) => void errors.push(args));
+		const base = await start(
+			async () =>
+				new Response(
+					new ReadableStream({
+						async pull(controller) {
+							controller.enqueue(new TextEncoder().encode('chunk'));
+							await new Promise((resolve) => setTimeout(resolve, 5));
+						}
+					})
+				)
+		);
+
+		const client = httpRequest(base);
+		client.end();
+		const [response] = (await once(client, 'response')) as [IncomingMessage];
+		await once(response, 'data');
+		client.destroy();
+		await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+
+		spy.mockRestore();
+		expect(errors).toEqual([]);
+	});
+
+	it('closes the server through the handle runtime.serve returns', async () => {
+		const app = { fetch: async () => new Response('ok') } as never;
+		const handle = runtimeNode.serve(app, 0)!;
+		await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+
+		await handle.close();
 	});
 
 	it('serves an Elysium application end to end on Node', async () => {
