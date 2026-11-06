@@ -72,6 +72,7 @@ export const ROOTS = [
 	'@elysiumjs/mnemosyne-drizzle',
 	'@elysiumjs/heracles-workers',
 	'@elysiumjs/moirai',
+	'@elysiumjs/moirai-drizzle',
 	'@elysiumjs/themis',
 	'@elysiumjs/ariadne',
 	'@elysiumjs/ariadne-redis',

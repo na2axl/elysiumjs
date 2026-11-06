@@ -22,7 +22,7 @@
 		"prepublishOnly": "bun run build",
 		"test": "bun test",
 		"test:coverage": "bun test --coverage",
-		"build:js": "bun build ./src/index.ts ./src/drivers/bun-sql.ts ./src/drivers/postgres-js.ts ./src/drivers/node-postgres.ts ./src/drivers/hyperdrive.ts ./src/moirai.ts --outdir ./dist --target node --packages external --root ./src --minify-syntax --minify-whitespace",
+		"build:js": "bun build ./src/index.ts ./src/drivers/bun-sql.ts ./src/drivers/postgres-js.ts ./src/drivers/node-postgres.ts ./src/drivers/hyperdrive.ts --outdir ./dist --target node --packages external --root ./src --minify-syntax --minify-whitespace",
 		"build:ts": "tsc --emitDeclarationOnly"
 	},
 	"keywords": [
@@ -55,10 +55,6 @@
 		"./hyperdrive": {
 			"types": "./dist/drivers/hyperdrive.d.ts",
 			"import": "./dist/drivers/hyperdrive.js"
-		},
-		"./moirai": {
-			"types": "./dist/moirai.d.ts",
-			"import": "./dist/moirai.js"
 		}
 	},
 	"files": [
@@ -71,8 +67,7 @@
 		"@elysiumjs/mnemosyne": "workspace:^",
 		"@elysiumjs/runtime-workers": "workspace:^",
 		"pg": "^8.0.0",
-		"postgres": "^3.4.0",
-		"@elysiumjs/moirai": "workspace:^"
+		"postgres": "^3.4.0"
 	},
 	"dependencies": {
 		"drizzle-orm": "^1.0.0-rc.5",
@@ -87,8 +82,7 @@
 		"@types/prompts": "^2.4.9",
 		"pg": "8.16.3",
 		"postgres": "3.4.7",
-		"@elysiumjs/runtime-workers": "workspace:*",
-		"@elysiumjs/moirai": "workspace:*"
+		"@elysiumjs/runtime-workers": "workspace:*"
 	},
 	"peerDependenciesMeta": {
 		"@elysiumjs/runtime-workers": {
@@ -98,9 +92,6 @@
 			"optional": true
 		},
 		"postgres": {
-			"optional": true
-		},
-		"@elysiumjs/moirai": {
 			"optional": true
 		}
 	}

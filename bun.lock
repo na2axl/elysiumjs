@@ -222,7 +222,6 @@
       "devDependencies": {
         "@elysiumjs/core": "workspace:*",
         "@elysiumjs/mnemosyne": "workspace:*",
-        "@elysiumjs/moirai": "workspace:*",
         "@elysiumjs/runtime-bun": "workspace:*",
         "@elysiumjs/runtime-workers": "workspace:*",
         "@types/pg": "8.15.5",
@@ -233,13 +232,11 @@
       "peerDependencies": {
         "@elysiumjs/core": "workspace:^",
         "@elysiumjs/mnemosyne": "workspace:^",
-        "@elysiumjs/moirai": "workspace:^",
         "@elysiumjs/runtime-workers": "workspace:^",
         "pg": "^8.0.0",
         "postgres": "^3.4.0",
       },
       "optionalPeers": [
-        "@elysiumjs/moirai",
         "@elysiumjs/runtime-workers",
         "pg",
         "postgres",
@@ -266,6 +263,24 @@
       "optionalPeers": [
         "@elysiumjs/heracles",
       ],
+    },
+    "@elysiumjs/moirai-drizzle": {
+      "name": "@elysiumjs/moirai-drizzle",
+      "version": "0.0.0",
+      "dependencies": {
+        "drizzle-orm": "^1.0.0-rc.5",
+      },
+      "devDependencies": {
+        "@elysiumjs/core": "workspace:*",
+        "@elysiumjs/mnemosyne-drizzle": "workspace:*",
+        "@elysiumjs/moirai": "workspace:*",
+        "@elysiumjs/runtime-bun": "workspace:*",
+      },
+      "peerDependencies": {
+        "@elysiumjs/core": "workspace:^",
+        "@elysiumjs/mnemosyne-drizzle": "workspace:^",
+        "@elysiumjs/moirai": "workspace:^",
+      },
     },
     "@elysiumjs/plugin-sentry": {
       "name": "@elysiumjs/plugin-sentry",
@@ -531,6 +546,8 @@
     "@elysiumjs/mnemosyne-drizzle": ["@elysiumjs/mnemosyne-drizzle@workspace:@elysiumjs/mnemosyne-drizzle"],
 
     "@elysiumjs/moirai": ["@elysiumjs/moirai@workspace:@elysiumjs/moirai"],
+
+    "@elysiumjs/moirai-drizzle": ["@elysiumjs/moirai-drizzle@workspace:@elysiumjs/moirai-drizzle"],
 
     "@elysiumjs/plugin-sentry": ["@elysiumjs/plugin-sentry@workspace:@elysiumjs/plugin-sentry"],
 

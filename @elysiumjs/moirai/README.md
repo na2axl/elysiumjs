@@ -85,7 +85,7 @@ import {
 	DrizzleOutboxStore,
 	moiraiTables,
 	PgAdvisoryLock
-} from '@elysiumjs/mnemosyne-drizzle/moirai';
+} from '@elysiumjs/moirai-drizzle';
 
 export const billing = moiraiTables('billing');
 

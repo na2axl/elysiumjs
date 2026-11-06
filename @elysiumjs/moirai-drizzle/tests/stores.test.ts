@@ -23,7 +23,7 @@ import {
 	DrizzleOutboxStore,
 	moiraiTables,
 	PgAdvisoryLock
-} from '../src/moirai';
+} from '../src';
 import { fakeConnection } from './fake-sql';
 
 describe('moirai stores', () => {

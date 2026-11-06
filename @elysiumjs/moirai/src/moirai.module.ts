@@ -45,7 +45,7 @@ const build = <T>(option: StoreOption<T>): T =>
 /**
  * Provides the moirai stores and options as global services. Set the stores the app uses: the
  * memory ones (`MemoryIdempotencyStore`, ...) for tests, the Postgres ones of
- * `@elysiumjs/mnemosyne-drizzle/moirai` in production.
+ * `@elysiumjs/moirai-drizzle` in production.
  * @author Axel Nana <axel.nana@workbud.com>
  * @example
  * ```ts

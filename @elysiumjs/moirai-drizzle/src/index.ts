@@ -22,6 +22,7 @@ import type {
 	OutboxStore
 } from '@elysiumjs/moirai';
 
+import { Database } from '@elysiumjs/mnemosyne-drizzle';
 import { IdempotencyConflictError } from '@elysiumjs/moirai';
 import { and, asc, eq, inArray, isNull, lt, lte, sql } from 'drizzle-orm';
 import {
@@ -35,8 +36,6 @@ import {
 	timestamp,
 	uuid
 } from 'drizzle-orm/pg-core';
-
-import { Database } from './database';
 
 const at = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' });
 
