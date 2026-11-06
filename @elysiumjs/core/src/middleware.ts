@@ -150,7 +150,7 @@ export const applyMiddlewares = (
  * @author Axel Nana <axel.nana@workbud.com>
  * @template TGuards The list of guards for the middleware.
  */
-export abstract class Middleware<TGuards extends string[] = []> {
+export abstract class Middleware<TGuards extends string[] = string[]> {
 	/**
 	 * Registers a list of middlewares to be applied on a controller or endpoint.
 	 * @author Axel Nana <axel.nana@workbud.com>

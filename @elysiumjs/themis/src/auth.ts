@@ -111,19 +111,25 @@ export type AuthOptions = {
 	optional?: boolean;
 };
 
-const AUTH_OPTIONS = Symbol.for('elysium:themis:auth');
+const OPTIONAL = Symbol.for('elysium:themis:auth-optional');
 
 /**
  * Authenticates the requests of a route or a controller with the guards of ThemisModule, and puts
  * the user in the request (`Auth.user()`, and `currentUser` in the context, which cerberus can
  * read with `getSubject: (ctx) => ctx.currentUser`).
+ *
+ * It tries the guards named with `AuthMiddleware.guards([...])`, in order, or all of them.
  * @author Axel Nana <axel.nana@workbud.com>
+ * @example
+ * ```ts
+ * @Middleware.register(AuthMiddleware.guards(['jwt']))
+ * class TokensController {}
+ * ```
  */
 export class AuthMiddleware extends Middleware {
 	public override async onBeforeHandle(context: HttpContext): Promise<void> {
-		const options = (Metadata.get(AUTH_OPTIONS, this.constructor) ?? {}) as AuthOptions;
 		const guards = themisConfig().guards ?? {};
-		const names = options.guards ?? Object.keys(guards);
+		const names = this.guards.length > 0 ? this.guards : Object.keys(guards);
 		for (const name of names) {
 			const guard = guards[name];
 			if (!guard) throw new UnknownGuardError(name);
@@ -134,34 +140,21 @@ export class AuthMiddleware extends Middleware {
 				return;
 			}
 		}
-		if (!options.optional) throw new UnauthenticatedError();
+		if (Metadata.get(OPTIONAL, this.constructor) !== true) throw new UnauthenticatedError();
 	}
 }
 
 /**
- * Requires an authenticated user on a route, or on every route of a controller. Requests without
- * one get a 401 problem, unless `optional` is set.
+ * Authenticates a controller or a route with {@link AuthMiddleware}: `guards` names the guards
+ * to try, and `optional` lets requests without a user through.
  * @author Axel Nana <axel.nana@workbud.com>
- * @param options The guards to try, and whether the user is optional.
- * @example
- * ```ts
- * @Http.controller({ path: '/me' })
- * @Auth()
- * class MeController {
- * 	@Http.get()
- * 	public show() {
- * 		return Auth.user<User>();
- * 	}
- *
- * 	@Http.get({ path: '/tokens' })
- * 	@Auth({ guards: ['jwt'] })
- * 	public tokens() {}
- * }
- * ```
  */
 export function Auth(options: AuthOptions = {}): ClassDecorator & MethodDecorator {
-	class ConfiguredAuthMiddleware extends AuthMiddleware {}
-	Metadata.define(AUTH_OPTIONS, options, ConfiguredAuthMiddleware);
+	const base = (
+		options.guards ? AuthMiddleware.guards(options.guards) : AuthMiddleware
+	) as typeof AuthMiddleware;
+	class ConfiguredAuthMiddleware extends base {}
+	if (options.optional) Metadata.define(OPTIONAL, true, ConfiguredAuthMiddleware);
 	return Middleware.register(ConfiguredAuthMiddleware);
 }
 

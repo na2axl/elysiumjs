@@ -22,6 +22,7 @@ import {
 	apiKeyGuard,
 	ApiKeys,
 	Auth,
+	AuthMiddleware,
 	Csrf,
 	CsrfMiddleware,
 	Jwt,
@@ -85,6 +86,12 @@ class MeController {
 	@Http.get({ path: '/jwt-only' })
 	@Auth({ guards: ['jwt'] })
 	public jwtOnly() {
+		return { guard: Auth.guard() };
+	}
+
+	@Http.get({ path: '/api-key-only' })
+	@Middleware.register(AuthMiddleware.guards(['apiKey']))
+	public apiKeyOnly() {
 		return { guard: Auth.guard() };
 	}
 }
@@ -258,6 +265,13 @@ describe('sessions, auth and CSRF', () => {
 		});
 		expect((await http.get('/me').header('x-api-key', 'sk_wrong')).status).toBe(401);
 		expect((await http.get('/me/jwt-only').header('x-api-key', apiKey.key)).status).toBe(401);
+		// The guards of core's Middleware.guards() pick the guards too.
+		expect(
+			await (await http.get('/me/api-key-only').header('x-api-key', apiKey.key)).json()
+		).toEqual({ guard: 'apiKey' });
+		expect(
+			(await http.get('/me/api-key-only').header('authorization', `Bearer ${token}`)).status
+		).toBe(401);
 		expect((await http.get('/me').header('authorization', 'Bearer a.b.c')).status).toBe(401);
 		expect((await (await http.get('/public')).json()).signedIn).toBe(false);
 	});

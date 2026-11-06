@@ -64,7 +64,7 @@ class MeController {
 }
 ```
 
-- `@Auth()` tries the configured guards in order, and `@Auth({ guards })` only the named ones. A custom guard implements `Guard`.
+- `@Auth()` tries the configured guards in order, and `@Auth({ guards })` only the named ones. It registers `AuthMiddleware`, so `@Middleware.register(AuthMiddleware.guards(['jwt']))` does the same as `@Auth({ guards: ['jwt'] })`. A custom guard implements `Guard`.
 - A request no guard accepts answers a 401 problem. `@Auth({ optional: true })` lets it through, and `Auth.check()` tells whether a user is signed in.
 - The user is available through `Auth.user()` and `ctx.currentUser`, so cerberus can read it with `getSubject: (ctx) => ctx.currentUser`.
 - `Auth.login(id)` signs a user in on the session (and regenerates it), and `Auth.logout()` signs them out.
