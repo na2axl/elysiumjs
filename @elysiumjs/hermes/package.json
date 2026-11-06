@@ -34,7 +34,8 @@
     "pino-pretty": "^13.2.0"
   },
   "devDependencies": {
-    "@elysiumjs/core": "workspace:*"
+    "@elysiumjs/core": "workspace:*",
+    "@elysiumjs/runtime-bun": "workspace:*"
   },
   "peerDependencies": {
     "@elysiumjs/core": "workspace:^"

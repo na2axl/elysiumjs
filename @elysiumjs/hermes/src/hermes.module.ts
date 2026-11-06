@@ -15,12 +15,18 @@ import type { HermesConfig } from './types';
 
 import { LOGGER_SERVICE, Module } from '@elysiumjs/core';
 
+import { JsonConsoleLogger } from './services/json-console.logger';
 import { HermesLogger } from './services/logger.service';
 import { DEFAULT_CONFIG } from './types';
 
+/** `console` on Cloudflare Workers, where pino's Node streams are not available; `pino` elsewhere. */
+const defaultTransport = (): 'pino' | 'console' =>
+	globalThis.navigator?.userAgent === 'Cloudflare-Workers' ? 'console' : 'pino';
+
 /**
  * Provides the {@link HermesLogger} as global services, by its class and as `logger`
- * (the same instance), built from the module config.
+ * (the same instance), built from the module config. With `transport: 'console'` (the default
+ * on Cloudflare Workers), `logger` is a {@link JsonConsoleLogger} instead.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 @Module.register<HermesConfig>({
@@ -29,7 +35,10 @@ import { DEFAULT_CONFIG } from './types';
 		{
 			name: LOGGER_SERVICE,
 			global: true,
-			factory: (_config, get) => get<HermesLogger>(HermesLogger)
+			factory: (_config, get) =>
+				(config.transport ?? defaultTransport()) === 'console'
+					? new JsonConsoleLogger(config)
+					: get<HermesLogger>(HermesLogger)
 		}
 	]
 })
