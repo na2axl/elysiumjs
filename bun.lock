@@ -115,6 +115,22 @@
         "@elysiumjs/redis": "workspace:^",
       },
     },
+    "@elysiumjs/heracles-workers": {
+      "name": "@elysiumjs/heracles-workers",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@elysiumjs/core": "workspace:*",
+        "@elysiumjs/heracles": "workspace:*",
+        "@elysiumjs/redis": "workspace:*",
+        "@elysiumjs/runtime-workers": "workspace:*",
+        "elysia": "^2.0.0-rc.1",
+      },
+      "peerDependencies": {
+        "@elysiumjs/core": "workspace:^",
+        "@elysiumjs/heracles": "workspace:^",
+        "@elysiumjs/runtime-workers": "workspace:^",
+      },
+    },
     "@elysiumjs/hermes": {
       "name": "@elysiumjs/hermes",
       "version": "0.4.3",
@@ -405,6 +421,8 @@
     "@elysiumjs/hephaestus": ["@elysiumjs/hephaestus@workspace:@elysiumjs/hephaestus"],
 
     "@elysiumjs/heracles": ["@elysiumjs/heracles@workspace:@elysiumjs/heracles"],
+
+    "@elysiumjs/heracles-workers": ["@elysiumjs/heracles-workers@workspace:@elysiumjs/heracles-workers"],
 
     "@elysiumjs/hermes": ["@elysiumjs/hermes@workspace:@elysiumjs/hermes"],
 
