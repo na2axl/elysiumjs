@@ -16,7 +16,9 @@ import type { ElysiaOpenAPIConfig } from '@elysia/openapi';
 import type { AnyElysia, ErrorContext } from 'elysia';
 import type { TSchema } from 'typebox';
 import type { CommandClass } from './command';
+import type { FilterClass, FilterContext, FilterLevel } from './filter';
 import type { ElysiaApp, Route } from './http';
+import type { InterceptorClass } from './interceptor';
 import type { ConfiguredModule, ModuleClass } from './module';
 import type { ModuleGraph, ModuleNode } from './module-graph';
 import type { ProblemOptions } from './problem';
@@ -37,6 +39,7 @@ import { Container } from './container';
 import { initEnv } from './env';
 import { ElysiumError, InvalidControllerError } from './errors';
 import { Event } from './event';
+import { FILTER_LEVELS, routeFilterLevels, runFilters } from './filter';
 import { Kernel } from './kernel';
 import { getLogger } from './logger';
 import { Metadata } from './metadata';
@@ -109,6 +112,15 @@ export type AppProps = {
 	 * the status of validation errors.
 	 */
 	problems?: ProblemOptions;
+
+	/**
+	 * Exception filters for every request, run after the filters of the route, the controller and
+	 * the module, and before the default problem details rendering.
+	 */
+	filters?: FilterClass[];
+
+	/** Interceptors around every request handler, outside those of the modules. */
+	interceptors?: InterceptorClass[];
 };
 
 /** The options of the root Elysia app. */
@@ -146,6 +158,9 @@ export abstract class Application extends InteractsWithConsole {
 	// @ts-expect-error The property is not initialized in the constructor.
 	#elysia: Elysia<Route>;
 	#debug: boolean;
+	/** The filter levels of each route of the built server, keyed by `METHOD path`. */
+	#routeFilters = new Map<string, FilterLevel[]>();
+	#appFilters: FilterLevel = { filters: [], node: null };
 	#kernel: Kernel | undefined;
 	#booting: Promise<void> | undefined;
 	#removeShutdownHandler: (() => void) | undefined;
@@ -592,8 +607,23 @@ export abstract class Application extends InteractsWithConsole {
 		applyMiddlewares(middlewares, this.#elysia, null);
 
 		await this.serveModules();
+		this.indexRouteFilters();
 
 		Event.emit('elysium:server:after-init', this, this);
+	}
+
+	/** Maps each route of the built server to the filter levels of its handler. */
+	private indexRouteFilters(): void {
+		this.#appFilters = { filters: this.props().filters ?? [], node: null };
+		this.#routeFilters.clear();
+		for (const route of this.#elysia.routes as {
+			method: string;
+			path: string;
+			handler: unknown;
+		}[]) {
+			const levels = routeFilterLevels.get(route.handler as Function);
+			if (levels?.length) this.#routeFilters.set(`${route.method} ${route.path}`, levels);
+		}
 	}
 
 	/** Lets every module hook into the root app, then mounts the controllers of each module. */
@@ -664,6 +694,15 @@ export abstract class Application extends InteractsWithConsole {
 			if (Number(error.status) >= 500 && !(await this.reportError(e))) return;
 			return error;
 		}
+
+		const route = (e as { route?: string }).route;
+		const routeLevels =
+			((e as unknown as Record<symbol, unknown>)[FILTER_LEVELS] as FilterLevel[] | undefined) ??
+			(route ? this.#routeFilters.get(`${e.request.method} ${route}`) : undefined) ??
+			[];
+		const levels = [...routeLevels, this.#appFilters];
+		const filtered = await runFilters(levels, error, e as unknown as FilterContext);
+		if (filtered) return filtered.response;
 
 		const { problems } = this.props();
 		const problem = toProblem(error, {

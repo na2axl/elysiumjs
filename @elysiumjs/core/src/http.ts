@@ -16,6 +16,8 @@ import type { Context as ElysiaContext, SSEPayload } from 'elysia';
 import type { Class, MergeDeep } from 'type-fest';
 import type { Static, TSchema } from 'typebox';
 import type { AppHttpContext } from '.';
+import type { FilterClass, FilterLevel } from './filter';
+import type { InterceptorClass } from './interceptor';
 import type { Middleware } from './middleware';
 import type { Module } from './module';
 import type { ModuleNode } from './module-graph';
@@ -27,6 +29,7 @@ import { assign, isEmpty, objectify } from 'radash';
 import { Application } from './app';
 import { Container } from './container';
 import { Event } from './event';
+import { FILTER_LEVELS, routeFilterLevels } from './filter';
 import { Metadata } from './metadata';
 import { applyMiddlewares, executeMiddlewareChain, makeMiddlewares } from './middleware';
 import { ModuleContext } from './module-context';
@@ -168,6 +171,12 @@ type HttpRequestHandlerMetadata = {
 	 * queries running for that handler will be wrapped in that transaction.
 	 */
 	transactional?: boolean;
+
+	/** The exception filters of the route. */
+	filters?: FilterClass[];
+
+	/** The interceptors around the handler. */
+	interceptors?: InterceptorClass[];
 };
 
 /**
@@ -176,7 +185,15 @@ type HttpRequestHandlerMetadata = {
  */
 type HttpRequestHandlerRegistrationProps = Pick<
 	HttpRequestHandlerMetadata,
-	'path' | 'method' | 'handler' | 'response' | 'operationId' | 'description' | 'transactional'
+	| 'path'
+	| 'method'
+	| 'handler'
+	| 'response'
+	| 'operationId'
+	| 'description'
+	| 'transactional'
+	| 'filters'
+	| 'interceptors'
 > & {
 	target: Object;
 	propertyKey: string | symbol;
@@ -382,8 +399,18 @@ const registerHttpRequestHandler = (props: HttpRequestHandlerRegistrationProps) 
 	const middlewares = Metadata.get(Symbols.middlewares, props.target, props.propertyKey) ?? [];
 	const services = Metadata.get(Symbols.services, props.target, props.propertyKey) ?? [];
 
-	const { path, method, handler, target, response, operationId, description, transactional } =
-		props;
+	const {
+		path,
+		method,
+		handler,
+		target,
+		response,
+		operationId,
+		description,
+		transactional,
+		filters,
+		interceptors
+	} = props;
 
 	const metadata: HttpRequestHandlerMetadata[] =
 		Metadata.get(Symbols.http, target.constructor) ?? [];
@@ -403,7 +430,9 @@ const registerHttpRequestHandler = (props: HttpRequestHandlerRegistrationProps) 
 		operationId,
 		description,
 		services,
-		transactional
+		transactional,
+		filters,
+		interceptors
 	});
 
 	Metadata.define(Symbols.http, metadata, target.constructor);
@@ -452,6 +481,18 @@ export type HttpControllerProps = {
 	 * for all the request handlers in this controller.
 	 */
 	transactional?: boolean;
+
+	/**
+	 * Exception filters for every route of the controller. They run after the filters of the route,
+	 * and before those of the module and the app.
+	 */
+	filters?: FilterClass[];
+
+	/**
+	 * Interceptors around every handler of the controller, inside those of the module and the app,
+	 * and outside those of the route.
+	 */
+	interceptors?: InterceptorClass[];
 };
 
 /**
@@ -491,6 +532,12 @@ export type RequestHandlerDecoratorProps = {
 	 * for this request handler.
 	 */
 	transactional?: boolean;
+
+	/** Exception filters for this route. They run before those of the controller. */
+	filters?: FilterClass[];
+
+	/** Interceptors around this handler, inside those of the controller. */
+	interceptors?: InterceptorClass[];
 };
 
 /**
@@ -523,6 +570,15 @@ export type HttpControllerDescription = {
 	path: Route;
 	/** The routes of the controller. */
 	routes: HttpRouteDescription[];
+};
+
+/** The module level of exception filters, shared by every controller of a module. */
+const moduleFilterLevels = new WeakMap<ModuleNode, FilterLevel>();
+
+const moduleFilterLevel = (node: ModuleNode): FilterLevel => {
+	let level = moduleFilterLevels.get(node);
+	if (!level) moduleFilterLevels.set(node, (level = { filters: node.props.filters ?? [], node }));
+	return level;
 };
 
 export namespace Http {
@@ -571,6 +627,9 @@ export namespace Http {
 					prefix: props.path,
 					name: `${node.id}:${target.name}`
 				});
+
+				const controllerFilters: FilterLevel = { filters: props.filters ?? [], node };
+				const moduleFilters = moduleFilterLevel(node);
 
 				const getController = (() => {
 					if (props.scope === HttpControllerScope.SERVER) {
@@ -758,6 +817,14 @@ export namespace Http {
 
 					const mi = makeMiddlewares(route.middlewares, node);
 
+					const handler = getHandler();
+					const filterLevels = [
+						{ filters: route.filters ?? [], node },
+						controllerFilters,
+						moduleFilters
+					].filter((level) => level.filters.length > 0);
+					routeFilterLevels.set(handler, filterLevels);
+
 					// The route is built from metadata at runtime, so Elysia cannot infer its types here.
 					const addRoute = app.route as unknown as (
 						method: string,
@@ -772,6 +839,8 @@ export namespace Http {
 						route.path,
 						{
 							async transform(c: Context) {
+								// Read by the error hook, which gets the same context object.
+								(c as unknown as Record<symbol, unknown>)[FILTER_LEVELS] = filterLevels;
 								if (
 									isValidator &&
 									!(await ModuleContext.run(node, () => route.body!.validator!.authorize(c)))
@@ -811,7 +880,7 @@ export namespace Http {
 							response: route.response,
 							params: isEmpty(params) ? undefined : t.Object(params)
 						},
-						getHandler()
+						handler
 					);
 				}
 

@@ -135,3 +135,9 @@ export {
 	toProblem,
 	validationErrors
 } from './problem';
+export {
+	type ExceptionFilter,
+	type FilterClass,
+	type FilterContext,
+	Catch
+} from './filter';

@@ -15,7 +15,9 @@
 import type { Elysia } from 'elysia';
 import type { Class } from 'type-fest';
 import type { CommandClass } from './command';
+import type { FilterClass } from './filter';
 import type { Route } from './http';
+import type { InterceptorClass } from './interceptor';
 import type { ServiceDefinition } from './service';
 
 import { InvalidModuleError, MissingModuleConfigError } from './errors';
@@ -66,6 +68,18 @@ export type ModuleProps<TConfig = unknown> = {
 
 	/** Environments (`NODE_ENV` values) in which the module is active. */
 	env?: string[];
+
+	/**
+	 * Exception filters for the routes of this module's controllers. They run after the filters
+	 * of the route and the controller, and before those of the app.
+	 */
+	filters?: FilterClass[];
+
+	/**
+	 * Interceptors around the handlers of this module's controllers, inside those of the app and
+	 * outside those of the controller.
+	 */
+	interceptors?: InterceptorClass[];
 };
 
 /**
