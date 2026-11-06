@@ -75,8 +75,6 @@ export const ROOTS = [
 
 /** Files exempt from the gate, per root. Globs are relative to the root. */
 export const ALLOW: Record<string, string[]> = {
-	// The Bun adapter of the Redis connection port.
-	'@elysiumjs/redis': ['src/connection.ts'],
 	// The Bun SQL driver, and the CLI commands, which run on Bun (migration:generate calls drizzle-kit).
 	'@elysiumjs/mnemosyne-drizzle': ['src/drivers/bun-sql.ts', 'src/commands/**']
 };

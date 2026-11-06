@@ -16,7 +16,7 @@ import type { RedisClientFactory, RedisConnection } from './connection';
 import { Module, needsDefaultAlias, runAll, Service, ServiceNotFoundError } from '@elysiumjs/core';
 import { omit } from 'radash';
 
-import { bunRedis } from './connection';
+import { bunRedis } from './adapters/bun';
 
 /**
  * Properties used to create a new redis connection.
