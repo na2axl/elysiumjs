@@ -17,7 +17,7 @@ import type { OutboxEffect, OutboxRow } from './stores';
 import { DATABASE_TRANSACTION_SERVICE, getLogger, Service } from '@elysiumjs/core';
 import { UnitOfWork } from '@elysiumjs/mnemosyne';
 
-import { inboxStore, options, outboxStore } from './config';
+import { currentStoreSet, inboxStore, inStoreSet, options, outboxStore } from './config';
 import { UnknownEffectError } from './errors';
 import { uuidv7 } from './ids';
 
@@ -73,6 +73,8 @@ export type RelayOptions = {
 	ids?: readonly string[];
 	/** The rows claimed at once. Defaults to the `relayBatch` option. */
 	batch?: number;
+	/** The store set whose outbox relays. Defaults to the current set. */
+	stores?: string;
 };
 
 const asError = (error: unknown): Error =>
@@ -101,8 +103,8 @@ export namespace Outbox {
 		};
 
 	/**
-	 * Writes effects to the outbox, in the open unit of work: they happen if and only if it
-	 * commits. Once it has, the effects relay (see the `relayOnCommit` option).
+	 * Writes effects to the outbox of the current store set, in the open unit of work: they happen
+	 * if and only if it commits. Once it has, the effects relay (see the `relayOnCommit` option).
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param effects The effects.
 	 * @returns The ids of the rows, in order.
@@ -121,14 +123,15 @@ export namespace Outbox {
 			dispatchedAt: null,
 			deadAt: null
 		}));
-		await outboxStore().insert(rows);
+		const stores = currentStoreSet();
+		await outboxStore(stores).insert(rows);
 
-		const config = options();
+		const config = options(stores);
 		if (config.relayOnCommit) {
 			const ids = rows.filter((row) => row.availableAt <= now).map((row) => row.id);
 			if (ids.length > 0) {
 				await UnitOfWork.afterCommit(() => {
-					const work = relay({ ids }).catch((error) =>
+					const work = relay({ ids, stores }).catch((error) =>
 						getLogger().error('The outbox relay after a commit failed', { error })
 					);
 					if (config.defer) config.defer(work);
@@ -140,7 +143,8 @@ export namespace Outbox {
 	};
 
 	/**
-	 * Runs the due rows of the outbox through their `@Outbox.handle()` handlers. A row that fails
+	 * Runs the due rows of the outbox of a store set through their `@Outbox.handle()` handlers,
+	 * with that set current. A row that fails
 	 * is retried later with an exponential backoff, and is dead after `maxRelayAttempts`. Delivery
 	 * is at least once, so handlers must tolerate a repeat.
 	 *
@@ -150,7 +154,10 @@ export namespace Outbox {
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param relayOptions The rows to relay.
 	 */
-	export const relay = async (relayOptions: RelayOptions = {}): Promise<RelaySummary> => {
+	export const relay = (relayOptions: RelayOptions = {}): Promise<RelaySummary> =>
+		inStoreSet(relayOptions.stores, () => relayRows(relayOptions));
+
+	const relayRows = async (relayOptions: RelayOptions): Promise<RelaySummary> => {
 		const config = options();
 		const store = outboxStore();
 		const summary: RelaySummary = { dispatched: 0, retried: 0, dead: 0 };
@@ -201,7 +208,7 @@ export namespace Outbox {
 	 * Relays every due row, batch after batch, such as from a cron trigger. Stops when a batch
 	 * dispatches nothing.
 	 * @author Axel Nana <axel.nana@workbud.com>
-	 * @param relayOptions The kinds to relay and the batch size.
+	 * @param relayOptions The kinds to relay, the batch size and the store set.
 	 */
 	export const sweep = async (
 		relayOptions: Omit<RelayOptions, 'ids'> = {}
@@ -219,8 +226,8 @@ export namespace Outbox {
 
 export namespace Inbox {
 	/**
-	 * Runs work unless this consumer already processed the message. Call it in the consumer's unit
-	 * of work, so that a failure rolls the record back and the redelivery runs the work again.
+	 * Runs work unless this consumer already processed the message, as recorded in the inbox of the
+	 * current store set. Call it in the consumer's unit of work, so that a failure rolls the record back and the redelivery runs the work again.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param message The id of the message and the name of the consumer.
 	 * @param work The work.

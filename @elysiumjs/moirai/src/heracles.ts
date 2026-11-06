@@ -19,6 +19,7 @@ import { DATABASE_TRANSACTION_SERVICE, ElysiumError, Service } from '@elysiumjs/
 import { Heracles, JobRegistry } from '@elysiumjs/heracles';
 import { UnitOfWork } from '@elysiumjs/mnemosyne';
 
+import { inStoreSet } from './config';
 import { Inbox, registerEffect } from './outbox';
 
 /** The kind of the effects that dispatch a Heracles job. */
@@ -71,7 +72,8 @@ export class InvalidOnceJobError extends ElysiumError {
  * Made for the jobs of a `Scheduler`, whose dispatch id names the scheduler, the case and the
  * tick. Without a database module, the record and the work run without a transaction.
  * @author Axel Nana <axel.nana@workbud.com>
- * @param options The inbox consumer. Defaults to the job name.
+ * @param options The inbox consumer, which defaults to the job name, and the store set of the inbox,
+ * which defaults to the current set.
  * @example
  * ```ts
  * @Job.register({ queue: 'billing' })
@@ -80,7 +82,7 @@ export class InvalidOnceJobError extends ElysiumError {
  * ```
  */
 export const Once =
-	(options: { consumer?: string } = {}) =>
+	(options: { consumer?: string; stores?: string } = {}) =>
 	(target: Function): void => {
 		const proto = target.prototype as { execute?: (...args: unknown[]) => unknown };
 		const execute = proto.execute;
@@ -94,7 +96,8 @@ export const Once =
 				Inbox.once({ messageId: this.dispatchId, consumer }, async () => {
 					await execute.apply(this, args);
 				});
-			if (Service.exists(DATABASE_TRANSACTION_SERVICE)) await UnitOfWork.run(work);
-			else await work();
+			await inStoreSet(options.stores, () =>
+				Service.exists(DATABASE_TRANSACTION_SERVICE) ? UnitOfWork.run(work) : work()
+			);
 		};
 	};

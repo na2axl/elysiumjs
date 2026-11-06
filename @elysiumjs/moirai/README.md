@@ -46,11 +46,11 @@ return Moirai.ask(WalletBalance, { walletId });
 ```
 
 - A refusal is a value. `Moirai.execute()` and `Moirai.ask()` return the DomainError that refused the call, and their return type lists it next to the result. A controller that returns it sends it as the problem of its route, and typed clients see it under its status. Check one with `isDomainError(outcome)`.
-- An input that does not match the schema is refused with a 400 `VALIDATION_FAILED` problem, with one entry per mistake.
+- An input that does not match the schema is refused with a 422 `VALIDATION_FAILED` problem, with one entry per mistake.
 - When `authorize(input)` returns `false`, the call is refused with a 403 `FORBIDDEN` problem.
 - An action runs in a unit of work, or joins the one already open. A transient failure retries in a new unit of work, up to 3 attempts. Transient failures are errors with `transient: true`, and Postgres serialization failures and deadlocks. `retry: { attempts, isTransient }` sets them per action, such as to retry a returned optimistic-concurrency error; `retry: false` never retries. A transient DomainError that outlasts the attempts is returned.
 - A handler refuses a call by returning a `DomainError`, or throwing one. The unit of work then rolls back, nothing is stored for idempotency, and the error is returned to the caller. An action that joined an open unit of work hands it up: the unit rolls back when its opener returns it too.
-- An idempotent action needs a key, or it is refused with a 428 `IDEMPOTENCY_KEY_REQUIRED` problem. A repeat with the same key and input replays the stored response, as JSON; with another input, it is refused with a 422 `IDEMPOTENCY_KEY_REUSED` problem.
+- An idempotent action needs a key, or it is refused with a 400 `IDEMPOTENCY_KEY_REQUIRED` problem. A repeat with the same key and input replays the stored response, as JSON; with another input, it is refused with a 422 `IDEMPOTENCY_KEY_REUSED` problem.
 - A key belongs to its owner: the current user by default (`currentUserId()` of core, else `anonymous`), or what `scope(input)` of the action or `Moirai.execute(..., { scope })` returns, such as a tenant and a user. Another owner presenting the same key runs the action on its own.
 - `serializeBy` makes calls that share a key run one after the other, so a double tap waits for the first call and replays its response.
 
@@ -142,3 +142,43 @@ MoiraiModule.with({
 ```
 
 The memory stores (`MemoryIdempotencyStore`, `MemoryOutboxStore`, `MemoryInboxStore` and `MemoryActionLock`) are meant for tests and single-process apps. The memory outbox and inbox drop what a unit of work that rolls back wrote, like a database table.
+
+### Store sets
+
+Named store sets give each part of an app its own stores, such as the outbox and inbox tables of each domain. The stores outside `stores` are the `default` set, and a named set that leaves a store out shares the one of the default set. A named set takes the options of the default set, and may override them.
+
+```ts
+const billing = moiraiTables('billing');
+const ledger = moiraiTables('ledger');
+
+MoiraiModule.with({
+	idempotency: () => new DrizzleIdempotencyStore({ table: tables.idempotencyKeys }),
+	lock: () => new PgAdvisoryLock(),
+	stores: {
+		billing: {
+			outbox: () => new DrizzleOutboxStore({ table: billing.outbox }),
+			inbox: () => new DrizzleInboxStore({ table: billing.inbox })
+		},
+		ledger: {
+			outbox: () => new DrizzleOutboxStore({ table: ledger.outbox }),
+			inbox: () => new DrizzleInboxStore({ table: ledger.inbox }),
+			relayBatch: 20
+		}
+	}
+});
+
+@Action.register({ input: ChargeInput, stores: 'billing' })
+class Charge extends Action { ... }
+
+class Ledger {
+	@Event.on('invoice.issued', { consumer: 'ledger.record', stores: 'ledger' })
+	public record(payload: { invoiceId: string }) { ... }
+}
+```
+
+- An action with `stores` runs with its set current: its idempotency store, its lock and its options come from the set, and `Outbox.enqueue()`, `Event.publish()` and the actions it runs without `stores` use the set too.
+- An event is delivered through the outbox of its publisher's set. A handler with `stores` records the events it handled in the inbox of its set, and writes its own effects and events to the outbox of its set; without `stores`, it runs in the set of the delivery.
+- `Outbox.relay({ stores })` and `Outbox.sweep({ stores })` relay the outbox of one set, such as one cron trigger per domain. The relay that follows a commit relays the set the rows went to.
+- `@Once({ stores })` records the dispatch ids of a job in the inbox of a set.
+- `Moirai.using(stores, work)` runs other code with a set current, such as a webhook handler that writes to the outbox of its domain.
+

@@ -14,6 +14,8 @@
 
 import type { ActionLock, IdempotencyStore, InboxStore, OutboxStore } from './stores';
 
+import { AsyncLocalStorage } from 'node:async_hooks';
+
 import { Service } from '@elysiumjs/core';
 
 import { MissingStoreError } from './errors';
@@ -24,6 +26,19 @@ export const MOIRAI_OUTBOX_STORE = 'moirai.outbox';
 export const MOIRAI_INBOX_STORE = 'moirai.inbox';
 export const MOIRAI_ACTION_LOCK = 'moirai.lock';
 export const MOIRAI_OPTIONS = 'moirai.options';
+
+/** The name of the store set `MoiraiModule` sets outside its `stores` map. */
+export const DEFAULT_STORE_SET = 'default';
+
+/**
+ * The service name of a store or of the options of a store set: the base name for the default
+ * set, `<base>:<set>` for a named one, such as `moirai.outbox:billing`.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param base The service name in the default set, such as {@link MOIRAI_OUTBOX_STORE}.
+ * @param set The name of the store set.
+ */
+export const storeServiceName = (base: string, set: string): string =>
+	set === DEFAULT_STORE_SET ? base : `${base}:${set}`;
 
 /**
  * How moirai runs actions and relays the outbox.
@@ -84,16 +99,36 @@ export const DEFAULT_OPTIONS: MoiraiOptions = {
 	relayLease: 300
 };
 
-/** The moirai options, or the defaults when MoiraiModule is not loaded. */
-export const options = (): MoiraiOptions =>
-	(Service.exists(MOIRAI_OPTIONS) ? Service.get<MoiraiOptions>(MOIRAI_OPTIONS) : null) ??
-	DEFAULT_OPTIONS;
+const currentSet = new AsyncLocalStorage<string>();
+
+/** The store set current in this async context: the one of the running action, relay or handler. */
+export const currentStoreSet = (): string => currentSet.getStore() ?? DEFAULT_STORE_SET;
+
+/** Runs work with a store set current, or in the current one when `set` is undefined. */
+export const inStoreSet = <T>(set: string | undefined, work: () => T): T =>
+	set === undefined || set === currentSet.getStore() ? work() : currentSet.run(set, work);
+
+const lookup = <T>(name: string): T | null => (Service.exists(name) ? Service.get<T>(name) : null);
+
+/**
+ * The options of a store set: the defaults, then the options of the default set, then the ones the
+ * named set overrides.
+ */
+export const options = (set: string = currentStoreSet()): MoiraiOptions => {
+	const base = lookup<MoiraiOptions>(MOIRAI_OPTIONS) ?? DEFAULT_OPTIONS;
+	if (set === DEFAULT_STORE_SET) return base;
+	const own = lookup<Partial<MoiraiOptions>>(storeServiceName(MOIRAI_OPTIONS, set));
+	return own ? { ...base, ...own } : base;
+};
 
 const store =
-	<T>(token: string, name: string) =>
-	(): T => {
-		const found = Service.exists(token) ? Service.get<T>(token) : null;
-		if (!found) throw new MissingStoreError(name);
+	<T>(base: string, kind: string) =>
+	(set: string = currentStoreSet()): T => {
+		// A named set that does not set a store shares the one of the default set.
+		const found =
+			lookup<T>(storeServiceName(base, set)) ??
+			(set === DEFAULT_STORE_SET ? null : lookup<T>(base));
+		if (!found) throw new MissingStoreError(kind, set);
 		return found;
 	};
 

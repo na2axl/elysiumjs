@@ -27,13 +27,15 @@ export {
 	Query
 } from './action';
 export {
+	DEFAULT_STORE_SET,
 	isTransientError,
 	MOIRAI_ACTION_LOCK,
 	MOIRAI_IDEMPOTENCY_STORE,
 	MOIRAI_INBOX_STORE,
 	MOIRAI_OPTIONS,
 	MOIRAI_OUTBOX_STORE,
-	type MoiraiOptions
+	type MoiraiOptions,
+	storeServiceName
 } from './config';
 export {
 	CallForbiddenError,
@@ -43,6 +45,7 @@ export {
 	IdempotencyKeyReusedError,
 	InvalidInputError,
 	MissingStoreError,
+	ReservedStoreSetError,
 	UnknownEventConsumerError,
 	UnknownEffectError
 } from './errors';
@@ -57,7 +60,7 @@ export {
 } from './event';
 export { requestHash } from './hash';
 export { uuidv7 } from './ids';
-export { MoiraiModule, type MoiraiModuleConfig } from './moirai.module';
+export { MoiraiModule, type MoiraiModuleConfig, type MoiraiStoreSet } from './moirai.module';
 export {
 	type RelayOptions,
 	type RelaySummary,

@@ -24,7 +24,7 @@ import {
 import { UnitOfWork } from '@elysiumjs/mnemosyne';
 import Value from 'typebox/value';
 
-import { actionLock, idempotencyStore, options } from './config';
+import { actionLock, idempotencyStore, inStoreSet, options } from './config';
 import {
 	CallForbiddenError,
 	IdempotencyKeyRequiredError,
@@ -133,6 +133,12 @@ export type ActionOptions<S extends TSchema = TSchema> = {
 	transactional?: boolean;
 	/** The database connection of the unit of work. Defaults to `default`. */
 	connection?: string;
+	/**
+	 * The store set of the action, from the `stores` of `MoiraiModule`: its idempotency store, its
+	 * lock, its options, and the outbox that the effects and events of the call go to. Defaults to
+	 * the current set: the one of the action that runs it, else the default set.
+	 */
+	stores?: string;
 	/**
 	 * Serializes the calls that give the same key, so that a double tap waits for the first call
 	 * and replays it instead of racing it. Needs a `lock` store.
@@ -277,15 +283,28 @@ export namespace Moirai {
 		input: InputOf<C>,
 		call: { idempotencyKey?: string; scope?: string } = {}
 	): Promise<ActionOutcome<C>> =>
-		settle(() => run(action, input, call)) as Promise<ActionOutcome<C>>;
+		settle(() => {
+			const props = Metadata.get(ACTION, action) as (ActionOptions & { name: string }) | undefined;
+			if (!props) throw new TypeError(`${action.name} is not marked with @Action.register().`);
+			return inStoreSet(props.stores, () => run(action, props, input, call));
+		}) as Promise<ActionOutcome<C>>;
+
+	/**
+	 * Runs work with a store set current, so that `Outbox.enqueue()`, `Event.publish()`,
+	 * `Inbox.once()` and the actions it runs without a `stores` option use that set, such as in a
+	 * webhook handler that writes to the outbox of its domain.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param stores The name of the store set.
+	 * @param work The work.
+	 */
+	export const using = <T>(stores: string, work: () => T): T => inStoreSet(stores, work);
 
 	const run = async <C extends ActionClass>(
 		action: C,
+		props: ActionOptions & { name: string },
 		input: InputOf<C>,
 		call: { idempotencyKey?: string; scope?: string }
 	): Promise<ResultOf<C>> => {
-		const props = Metadata.get(ACTION, action) as (ActionOptions & { name: string }) | undefined;
-		if (!props) throw new TypeError(`${action.name} is not marked with @Action.register().`);
 		const { name, idempotent = false, transactional = true, retry = true } = props;
 		const config = options();
 
