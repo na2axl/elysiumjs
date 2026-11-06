@@ -15,7 +15,7 @@
 import type { Application } from '@elysiumjs/core';
 import type { ControllerRoutes, ModuleRoutes } from './render';
 
-import { dirname, join, relative, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 
 import { Http } from '@elysiumjs/core';
 
@@ -69,6 +69,22 @@ const locateControllers = async (
 	return found;
 };
 
+/**
+ * The local name of a default-exported controller: its class name, or for an anonymous class, a
+ * name derived from its file, such as `UserProfileController` for `user-profile.controller.ts`.
+ * An anonymous class is named `default`, or `<file>_default` by Bun.
+ */
+const defaultName = ({ file, className }: { file: string; className: string }): string => {
+	if (className && className !== 'default' && !className.endsWith('_default')) return className;
+	const stem = basename(file).replace(/\.[cm]?[jt]sx?$/, '');
+	const name = stem
+		.split(/[^A-Za-z0-9]+/)
+		.filter(Boolean)
+		.map((part) => part[0]!.toUpperCase() + part.slice(1))
+		.join('');
+	return /^[A-Za-z_$]/.test(name) ? name : `_${name}`;
+};
+
 /** The import specifier of `file` from the folder of `outFile`, without the extension. */
 const specifierFor = (outFile: string, file: string): string => {
 	const path = relative(dirname(outFile), file)
@@ -111,7 +127,7 @@ export const collectRoutes = async (
 			}
 			controllers.push({
 				exportName: source.exportName,
-				...(source.exportName === 'default' ? { className: source.className } : {}),
+				...(source.exportName === 'default' ? { className: defaultName(source) } : {}),
 				specifier: specifierFor(outFile, source.file),
 				path: description.path,
 				routes: description.routes
