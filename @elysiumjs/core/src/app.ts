@@ -149,10 +149,12 @@ export type ServerError = ErrorContext & { code?: string; error: any };
  * - `db:transactions`: the open database transactions, keyed by the connection they run on.
  * - `db:tx`: the transaction open on the default database connection. Kept for existing callers;
  *   prefer `db:transactions`.
+ * - `uow:frame`: the outermost unit of work, which collects the hooks run after it commits or
+ *   rolls back (`@elysiumjs/mnemosyne`).
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export type AppContext = AsyncLocalStorage<
-	Map<'tenant' | 'http:context' | 'db:transactions' | 'db:tx', unknown>
+	Map<'tenant' | 'http:context' | 'db:transactions' | 'db:tx' | 'uow:frame', unknown>
 >;
 
 /** Context used when no application instance exists, for instance under `Application.testing`. */

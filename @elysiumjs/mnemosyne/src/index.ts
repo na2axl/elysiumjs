@@ -29,6 +29,7 @@ export * from './database';
 export * from './model';
 export * from './repository';
 export { ModelResource, type ModelResourceOptions } from './resource';
+export { type TransactionRunner, Transactional, UnitOfWork, withUnitOfWork } from './unit-of-work';
 export {
 	type CursorPage,
 	type FilterOperator,
