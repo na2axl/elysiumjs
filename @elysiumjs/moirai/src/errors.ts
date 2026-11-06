@@ -103,3 +103,30 @@ export class UnknownEffectError extends ElysiumError {
 		);
 	}
 }
+
+/**
+ * Raised when two event handlers have the same consumer name.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class DuplicateEventConsumerError extends ElysiumError {
+	constructor(public readonly consumer: string) {
+		super(`Two event handlers are named "${consumer}". Give one of them another consumer.`);
+	}
+}
+
+/**
+ * Raised when an event is delivered to a handler this process does not have. The delivery
+ * retries, so a process that imports the handler later can still handle it.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class UnknownEventConsumerError extends ElysiumError {
+	constructor(
+		public readonly consumer: string,
+		public readonly event: string
+	) {
+		super(
+			`No @Event.on('${event}') handler is named "${consumer}" here. Handlers register ` +
+				'when their module is imported, so the process that relays must import it.'
+		);
+	}
+}

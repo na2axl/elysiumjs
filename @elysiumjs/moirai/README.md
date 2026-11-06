@@ -85,6 +85,38 @@ await Outbox.enqueue(job(SendReceiptJob, [order.id]));
 
 Effect handlers register when their module is imported, `@elysiumjs/moirai/heracles` included. A process that relays the outbox, such as a cron sweeper, imports the modules of the effects it relays.
 
+## Events
+
+An event says what happened. It is published in the unit of work that made it happen, and each handler gets it once that unit commits, never when it rolls back:
+
+```ts
+import type { EventMeta } from '@elysiumjs/moirai';
+
+import { Event } from '@elysiumjs/moirai';
+
+declare module '@elysiumjs/moirai' {
+	interface EventCatalogue {
+		'wallet.credited': { walletId: string; amount: number };
+	}
+}
+
+// In an action:
+await Event.publish('wallet.credited', { walletId: wallet.id, amount: input.amount });
+
+class Receipts {
+	@Event.on('wallet.credited', { consumer: 'billing.send-receipt', retry: { attempts: 5 } })
+	public async send(payload: { walletId: string; amount: number }, meta: EventMeta) {
+		/* ... */
+	}
+}
+```
+
+- `EventCatalogue` types the names and the payloads of `Event.publish()` and `@Event.on()`. While it is empty, any name and payload are accepted.
+- Each handler gets its own delivery through the outbox, so it retries and dies on its own (`retry: { attempts }`, `retry: false` for one attempt, else `maxRelayAttempts`). Delivery is at least once.
+- Each handler records the events it handled in the inbox, in the unit of work of its own writes, so a repeated delivery does nothing. `consumer` names that record and defaults to `Class.method`: keep it when the method is renamed. Two handlers with one consumer throw `DuplicateEventConsumerError`.
+- `meta` gives the id of the event, its name, when it was published and the attempt.
+- Events need the `outbox` and `inbox` stores. Handlers register when their module is imported, so the process that relays imports them.
+
 ## Stores
 
 ```ts
@@ -109,4 +141,4 @@ MoiraiModule.with({
 });
 ```
 
-The memory stores (`MemoryIdempotencyStore`, `MemoryOutboxStore`, `MemoryInboxStore` and `MemoryActionLock`) are meant for tests and single-process apps.
+The memory stores (`MemoryIdempotencyStore`, `MemoryOutboxStore`, `MemoryInboxStore` and `MemoryActionLock`) are meant for tests and single-process apps. The memory outbox and inbox drop what a unit of work that rolls back wrote, like a database table.

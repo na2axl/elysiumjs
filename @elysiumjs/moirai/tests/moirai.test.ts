@@ -32,6 +32,8 @@ import {
 	backoffMs,
 	CallForbiddenError,
 	DEFAULT_OPTIONS_FOR_TESTS,
+	DuplicateEventConsumerError,
+	Event,
 	IdempotencyConflictError,
 	IdempotencyKeyRequiredError,
 	IdempotencyKeyReusedError,
@@ -45,6 +47,7 @@ import {
 	MissingStoreError,
 	Moirai,
 	MOIRAI_ACTION_LOCK,
+	MOIRAI_EVENT_EFFECT,
 	MOIRAI_IDEMPOTENCY_STORE,
 	MOIRAI_INBOX_STORE,
 	MOIRAI_OPTIONS,
@@ -482,6 +485,79 @@ describe('inbox', () => {
 			true
 		);
 		expect(done).toEqual(['a', 'c']);
+	});
+});
+
+describe('events', () => {
+	const handled: string[] = [];
+
+	class Billing {
+		@Event.on('order.paid', { consumer: 'billing.invoice' })
+		public invoice(payload: { order: string }, meta: { attempt: number }) {
+			handled.push(`invoice:${payload.order}:${meta.attempt}`);
+		}
+
+		@Event.on('order.paid', { consumer: 'billing.flaky', retry: { attempts: 2 } })
+		public static flaky(payload: { order: string; fail?: boolean }) {
+			if (payload.fail) throw new Error('down');
+			handled.push(`flaky:${payload.order}`);
+		}
+	}
+
+	beforeEach(() => {
+		handled.length = 0;
+		expect(Billing).toBeDefined();
+	});
+
+	it('delivers an event to each handler once the unit of work commits', async () => {
+		await UnitOfWork.run(async () => {
+			await Event.publish('order.paid', { order: 'o1' });
+			expect(handled).toEqual([]);
+		});
+		expect(handled.sort()).toEqual(['flaky:o1', 'invoice:o1:1']);
+		expect(outbox.rows.map((row) => row.kind)).toEqual([MOIRAI_EVENT_EFFECT, MOIRAI_EVENT_EFFECT]);
+		expect(Event.consumersOf('order.paid')).toEqual(['billing.invoice', 'billing.flaky']);
+	});
+
+	it('delivers nothing when the unit of work rolls back', async () => {
+		await expect(
+			UnitOfWork.run(async () => {
+				await Event.publish('order.paid', { order: 'o2' });
+				throw new Error('refused');
+			})
+		).rejects.toThrow('refused');
+		expect(handled).toEqual([]);
+		expect(outbox.rows).toEqual([]);
+	});
+
+	it('retries each handler on its own, and handles an event once per handler', async () => {
+		setOptions({ relayOnCommit: false });
+		await UnitOfWork.run(() => Event.publish('order.paid', { order: 'o3', fail: true }));
+		expect(await Outbox.sweep()).toEqual({ dispatched: 1, retried: 1, dead: 0 });
+		expect(handled).toEqual(['invoice:o3:1']);
+
+		// The flaky handler has two attempts: the second failure is its last.
+		const flaky = outbox.rows.find((row) => row.dispatchedAt === null)!;
+		await outbox.insert([{ ...flaky, availableAt: new Date(0) }]);
+		expect(await Outbox.relay()).toEqual({ dispatched: 0, retried: 0, dead: 1 });
+
+		// A repeated delivery of a handled event does nothing.
+		const invoice = outbox.rows.find((row) => row.dispatchedAt !== null)!;
+		await outbox.insert([
+			{ ...invoice, id: 'again', dispatchedAt: null, availableAt: new Date(0) }
+		]);
+		expect(await Outbox.relay({ ids: ['again'] })).toEqual({ dispatched: 1, retried: 0, dead: 0 });
+		expect(handled).toEqual(['invoice:o3:1']);
+	});
+
+	it('refuses two handlers with one consumer name', () => {
+		expect(() => {
+			class Twice {
+				@Event.on('order.paid', { consumer: 'billing.invoice' })
+				public again() {}
+			}
+			return Twice;
+		}).toThrow(DuplicateEventConsumerError);
 	});
 });
 

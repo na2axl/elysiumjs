@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { UnitOfWork } from '@elysiumjs/mnemosyne';
+
 import { IdempotencyConflictError } from './errors';
 
 /**
@@ -182,6 +184,10 @@ export class MemoryOutboxStore implements OutboxStore {
 
 	public async insert(rows: readonly OutboxRow[]): Promise<void> {
 		for (const row of rows) this.#rows.set(row.id, { ...row });
+		// Like a database table, the rows of a unit of work that rolls back are gone.
+		UnitOfWork.afterRollback(() => {
+			for (const row of rows) this.#rows.delete(row.id);
+		});
 	}
 
 	public async claimDue(claim: OutboxClaim): Promise<readonly OutboxRow[]> {
@@ -237,6 +243,8 @@ export class MemoryInboxStore implements InboxStore {
 		const key = `${consumer}\u0000${messageId}`;
 		if (this.#seen.has(key)) return false;
 		this.#seen.add(key);
+		// Like a database table, the record of a unit of work that rolls back is gone.
+		UnitOfWork.afterRollback(() => void this.#seen.delete(key));
 		return true;
 	}
 }

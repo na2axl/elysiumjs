@@ -25,7 +25,9 @@ import {
 import { withUnitOfWork } from '@elysiumjs/mnemosyne';
 import {
 	Action,
+	Event,
 	MemoryIdempotencyStore,
+	MemoryInboxStore,
 	MemoryOutboxStore,
 	Moirai,
 	MoiraiModule,
@@ -41,6 +43,11 @@ const make = async (): Promise<Application> => {
 		public send(payload: { balance: number }) {
 			wallet.mails.push(`credited:${payload.balance}`);
 		}
+
+		@Event.on('conformance.wallet.topped-up', { consumer: 'conformance.audit' })
+		public audit(payload: { amount: number }) {
+			wallet.mails.push(`event:${payload.amount}`);
+		}
 	}
 
 	@Action.register({
@@ -55,6 +62,7 @@ const make = async (): Promise<Application> => {
 				kind: 'conformance.wallet.credited',
 				payload: { balance: wallet.balance }
 			});
+			await Event.publish('conformance.wallet.topped-up', { amount: input.amount });
 			return { balance: wallet.balance };
 		}
 	}
@@ -92,7 +100,8 @@ const make = async (): Promise<Application> => {
 		modules: [
 			MoiraiModule.with({
 				idempotency: () => new MemoryIdempotencyStore(),
-				outbox: () => new MemoryOutboxStore()
+				outbox: () => new MemoryOutboxStore(),
+				inbox: () => new MemoryInboxStore()
 			}),
 			WalletModule
 		],
@@ -112,7 +121,8 @@ const topUp = (key: string | null, amount: number) => () =>
 
 /**
  * An idempotent action replays its response for a repeated key, refuses a missing key (428) and
- * a reused key with another input (422), and its outbox effect relays once it commits.
+ * a reused key with another input (422), and its outbox effect and its event relay once it
+ * commits.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export const actions: Scenario = {
@@ -125,7 +135,7 @@ export const actions: Scenario = {
 		{ request: topUp(null, 10), expect: { status: 428 } },
 		{
 			request: () => new Request('http://localhost/wallet'),
-			expect: { status: 200, json: { balance: 10, mails: ['credited:10'] } }
+			expect: { status: 200, json: { balance: 10, mails: ['credited:10', 'event:10'] } }
 		}
 	]
 };
