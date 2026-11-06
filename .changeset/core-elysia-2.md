@@ -1,8 +1,8 @@
 ---
-'@elysiumjs/core': major
+'@elysiumjs/core': minor
 '@elysiumjs/argus': minor
 '@elysiumjs/mnemosyne': minor
-'@elysiumjs/plugin-sentry': major
+'@elysiumjs/plugin-sentry': minor
 '@elysiumjs/runtime-bun': patch
 '@elysiumjs/runtime-node': patch
 '@elysiumjs/runtime-workers': patch
