@@ -21,7 +21,7 @@ import type { ModuleNode } from './module-graph';
 import { Elysia } from 'elysia';
 import { websocket } from 'elysia/websocket';
 
-import { Event } from './event';
+import { Lifecycle } from './lifecycle';
 import { Metadata } from './metadata';
 import { applyMiddlewares } from './middleware';
 import { ModuleContext } from './module-context';
@@ -134,7 +134,7 @@ export namespace Websocket {
 				const drain = metadata.drain && inModule(metadata.drain);
 				const error = metadata.error
 					? inModule(metadata.error)
-					: (e: WSError) => Event.emit('elysium:error', e.error);
+					: (e: WSError) => Lifecycle.emit('elysium:error', e.error);
 
 				const app = new Elysia({ name: `${node.id}:${target.name}` }).use(websocket());
 

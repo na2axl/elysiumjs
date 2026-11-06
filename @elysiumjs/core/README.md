@@ -19,7 +19,7 @@ bun install @elysiumjs/core
 - WebSocket support
 - WAMP protocol integration
 - Command-line interface (`@elysiumjs/styx`), with support for custom commands
-- Event system
+- Lifecycle events
 - Caching (memory and Redis)
 - PostgreSQL database support with Drizzle ORM
 - Model classes and repositories for database interactions

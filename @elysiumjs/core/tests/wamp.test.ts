@@ -18,7 +18,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, mock, spyOn } fr
 import { Elysia } from 'elysia';
 
 import { InvalidModuleConfigError, ServiceNotFoundError } from '../src/errors';
-import { Event } from '../src/event';
+import { Lifecycle } from '../src/lifecycle';
 import { ConsoleLogger, LOGGER_SERVICE } from '../src/logger';
 import { Metadata } from '../src/metadata';
 import { Service } from '../src/service';
@@ -245,7 +245,7 @@ describe('WampModule', () => {
 
 	it('logs an error and reports an app error once the retries are exhausted', async () => {
 		const errors: unknown[] = [];
-		Event.on('elysium:error', (e) => {
+		Lifecycle.on('elysium:error', (e) => {
 			errors.push(e.data);
 		});
 		app = await createTestingApp({
@@ -283,13 +283,13 @@ describe('WampModule', () => {
 				new Error('Failed to establish WAMP connection default after 2 attempts')
 			);
 		} finally {
-			Event.off('elysium:error');
+			Lifecycle.off('elysium:error');
 		}
 	});
 
 	it('reports wampy errors as app errors naming the connection and url', async () => {
 		const errors: Error[] = [];
-		Event.on('elysium:error', (e) => {
+		Lifecycle.on('elysium:error', (e) => {
 			errors.push(e.data as Error);
 		});
 		const onError = mock();
@@ -313,13 +313,13 @@ describe('WampModule', () => {
 			);
 			expect(errors[0]!.cause).toBe(wampyError);
 		} finally {
-			Event.off('elysium:error');
+			Lifecycle.off('elysium:error');
 		}
 	});
 
 	it('reports non-Error wampy errors as app errors', async () => {
 		const errors: Error[] = [];
-		Event.on('elysium:error', (e) => {
+		Lifecycle.on('elysium:error', (e) => {
 			errors.push(e.data as Error);
 		});
 		app = await createTestingApp({
@@ -344,7 +344,7 @@ describe('WampModule', () => {
 			expect(errors[1]!.message).toBe('An error occurred in WAMP connection main (ws://main/ws)');
 			expect(errors[1]).not.toHaveProperty('cause');
 		} finally {
-			Event.off('elysium:error');
+			Lifecycle.off('elysium:error');
 		}
 	});
 
@@ -393,7 +393,7 @@ describe('WampModule', () => {
 
 	it('reports a failing onOpen as an app error instead of throwing', async () => {
 		const errors: unknown[] = [];
-		Event.on('elysium:error', (e) => {
+		Lifecycle.on('elysium:error', (e) => {
 			errors.push(e.data);
 		});
 		const onOpen = mock(async () => {
@@ -409,7 +409,7 @@ describe('WampModule', () => {
 
 		expect(onOpen).toHaveBeenCalledTimes(1);
 		expect(errors).toContainEqual(new Error('open handler failed'));
-		Event.off('elysium:error');
+		Lifecycle.off('elysium:error');
 	});
 
 	it('does not call onOpen when shut down while connecting', async () => {
@@ -515,7 +515,7 @@ describe('Wamp controllers', () => {
 
 	it('logs and reports failed registrations and subscriptions as app errors', async () => {
 		const errors: Error[] = [];
-		Event.on('elysium:error', (e) => {
+		Lifecycle.on('elysium:error', (e) => {
 			errors.push(e.data as Error);
 		});
 		app = await createTestingApp({ modules: [WampModule.with(config)] });
@@ -544,7 +544,7 @@ describe('Wamp controllers', () => {
 				['Failed to subscribe to WAMP topic test.topic on connection other', subscribeError]
 			]);
 		} finally {
-			Event.off('elysium:error');
+			Lifecycle.off('elysium:error');
 		}
 	});
 });

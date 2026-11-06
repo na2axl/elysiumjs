@@ -1,6 +1,6 @@
 # @elysiumjs/heracles-workers
 
-Runs [Heracles](../heracles) jobs on Cloudflare Workers: Cloudflare Queues carry the jobs, and cron triggers dispatch the `@Schedule()` jobs.
+Runs [Heracles](../heracles) jobs on Cloudflare Workers: Cloudflare Queues carry the jobs, and cron triggers dispatch the scheduled jobs.
 
 ## Installation
 
@@ -44,8 +44,8 @@ class App extends Application {}
 }
 ```
 
-- A completed job is acked. A failed job is retried after its `retryDelay` while its attempts stay within `maxRetries`, then acked and logged.
+- A completed job is acked. A failed job is retried after its `retryDelay` while its attempts stay within `maxRetries`. After its last retry, it is logged and acked; with `HeraclesWorkersModule.with({ deadLetterQueue: 'JOBS_DLQ', onDead })`, it is also sent to that queue binding, as it was sent with a `failure` member (error, attempts, time), and handed to `onDead`.
 - A job scheduled for later is delayed with `delaySeconds`, up to the 12 hours Cloudflare Queues allow.
 - Cloudflare Queues keep no job status and cannot cancel a message: `getJobStatus()` throws, and cancellations are dropped with a warning.
-- Each cron trigger dispatches the jobs whose `@Schedule()` expression is exactly the trigger's expression. Times are UTC.
+- Each cron trigger dispatches the jobs of `@Scheduler.job()` and the `Scheduler` classes whose expression is exactly the trigger's expression, at the trigger's time: a scheduler selects its cases for that tick. Times are UTC.
 - Messages that carry no Heracles job are left to the Worker's other queue consumers.

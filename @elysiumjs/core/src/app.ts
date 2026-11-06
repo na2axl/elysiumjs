@@ -40,9 +40,9 @@ import { ConsoleFormat, InteractsWithConsole } from './console';
 import { Container } from './container';
 import { Env, initEnv } from './env';
 import { ElysiumError, InvalidControllerError } from './errors';
-import { Event } from './event';
 import { FILTER_LEVELS, routeFilterLevels, runFilters } from './filter';
 import { Kernel } from './kernel';
+import { Lifecycle } from './lifecycle';
 import { getLogger } from './logger';
 import { Metadata } from './metadata';
 import { applyMiddlewares, middlewareStops, runErrorMiddlewares } from './middleware';
@@ -413,7 +413,7 @@ export abstract class Application extends InteractsWithConsole {
 		const message = error instanceof Error ? error.message : String(error);
 		this.error(message);
 		if (!(error instanceof ElysiumError) && this.isDebug) this.trace(error as Error);
-		Event.emit('elysium:error', error);
+		Lifecycle.emit('elysium:error', error);
 		await this.#kernel?.shutdown();
 		return this.exit(1);
 	}
@@ -482,7 +482,7 @@ export abstract class Application extends InteractsWithConsole {
 	private async bootKernel(eager: boolean): Promise<void> {
 		await this.kernel.register();
 		if (eager) await this.boot();
-		Event.emit('elysium:app:launched', this, this);
+		Lifecycle.emit('elysium:app:launched', this, this);
 	}
 
 	/**
@@ -631,7 +631,7 @@ export abstract class Application extends InteractsWithConsole {
 			}
 		});
 
-		Event.emit('elysium:server:before-init', this, this);
+		Lifecycle.emit('elysium:server:before-init', this, this);
 
 		// Keeps a tenant already resolved by a middleware, which runs before this hook.
 		this.#elysia.derive('global', (ctx) => ({
@@ -658,7 +658,7 @@ export abstract class Application extends InteractsWithConsole {
 		await this.serveModules();
 		this.indexRouteFilters();
 
-		Event.emit('elysium:server:after-init', this, this);
+		Lifecycle.emit('elysium:server:after-init', this, this);
 	}
 
 	/** Maps each route of the built server to the filter levels of its handler. */
@@ -715,11 +715,11 @@ export abstract class Application extends InteractsWithConsole {
 			.onAfterResponse('global', (c) => Container.disposeRequestScope(c.request ?? c))
 			.onStart(async (elysia) => {
 				await this.onStart(elysia as unknown as Elysia<Route>);
-				Event.emit('elysium:server:start', elysia, this);
+				Lifecycle.emit('elysium:server:start', elysia, this);
 			})
 			.onStop(async (elysia) => {
 				await this.onStop(elysia as unknown as Elysia<Route>);
-				Event.emit('elysium:server:stop', elysia, this);
+				Lifecycle.emit('elysium:server:stop', elysia, this);
 				this.removeSignalHandlers();
 				await this.#kernel?.shutdown();
 				this._appContextStorage.disable();
@@ -782,7 +782,7 @@ export abstract class Application extends InteractsWithConsole {
 	private async reportError(e: ServerError): Promise<boolean> {
 		if (!(await this.onError(e))) return false;
 
-		Event.emit('elysium:error', e);
+		Lifecycle.emit('elysium:error', e);
 		this.trace({
 			name: 'HttpError',
 			message: 'Unexpected error while handling HTTP request',

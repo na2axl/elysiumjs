@@ -1,9 +1,9 @@
-import type { Context, EventData } from '@elysiumjs/core';
+import type { Context, LifecycleEvent } from '@elysiumjs/core';
 import type { MainModule } from '#hero/hero.module';
 import type { User, UserInsert } from '#hero/models/user.model';
 import type { Class } from 'type-fest';
 
-import { Event, Http, HttpControllerScope, Service, t } from '@elysiumjs/core';
+import { Http, HttpControllerScope, Lifecycle, Service, t } from '@elysiumjs/core';
 import { Heracles } from '@elysiumjs/heracles';
 import { HermesLogger } from '@elysiumjs/hermes';
 import { Cache } from '@elysiumjs/mnemosyne';
@@ -65,7 +65,7 @@ export class UserController {
 		@co() c: UserController
 	) {
 		// const user = await this.userService.userRepository.insert(b);
-		Event.emit('user:add', b);
+		Lifecycle.emit('user:add', b);
 		return b;
 	}
 
@@ -87,8 +87,8 @@ export class UserController {
 		return { data: this.userService.data.shift(), id: uid(12), event: 'notification' };
 	}
 
-	@Event.on({ event: 'user:add' })
-	private static addFromEvent(e: EventData<User>) {
+	@Lifecycle.on({ event: 'user:add' })
+	private static addFromEvent(e: LifecycleEvent<User>) {
 		const us = Service.get<UserService>('user.service')!;
 		us.data.push(e.data);
 		void Heracles.dispatch(EmailJob, [e.data.email, 'Hello from Elysium!']);

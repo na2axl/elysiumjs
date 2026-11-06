@@ -13,12 +13,12 @@
 // limitations under the License.
 
 import type { Class } from 'type-fest';
-import type { EventData, EventListenerMeta } from './event';
+import type { LifecycleEvent, LifecycleListenerMeta } from './lifecycle';
 import type { ModuleNode } from './module-graph';
 
 import { Container } from './container';
-import { EventListenerNotSupportedError } from './errors';
-import { EventBus, getEventListeners } from './event';
+import { LifecycleListenerNotSupportedError } from './errors';
+import { getLifecycleListeners, LifecycleBus } from './lifecycle';
 import { ModuleContext } from './module-context';
 
 /**
@@ -27,14 +27,14 @@ import { ModuleContext } from './module-context';
  */
 export type WiredListener = {
 	readonly event: string;
-	readonly wrapper: (data: EventData<any>) => Promise<void>;
+	readonly wrapper: (data: LifecycleEvent<any>) => Promise<void>;
 };
 
 const handlerFor = (
 	node: ModuleNode,
 	cls: Class<any>,
-	meta: EventListenerMeta
-): ((data: EventData<any>) => Promise<void>) => {
+	meta: LifecycleListenerMeta
+): ((data: LifecycleEvent<any>) => Promise<void>) => {
 	const method = meta.method as keyof Class<any>;
 	return async (data) => {
 		try {
@@ -44,7 +44,7 @@ const handlerFor = (
 				return instance[method](data);
 			});
 		} catch (e: unknown) {
-			EventBus.instance.emitError(e);
+			LifecycleBus.instance.emitError(e);
 		}
 	};
 };
@@ -57,24 +57,24 @@ const handlerFor = (
  * @param owned The module's own classes (services and controllers).
  * @param services The subset of `owned` registered as services in the module.
  * @returns The listeners added, so they can be removed on shutdown.
- * @throws {EventListenerNotSupportedError} For an instance listener on a non-service class.
+ * @throws {LifecycleListenerNotSupportedError} For an instance listener on a non-service class.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export function wireEventListeners(
+export function wireLifecycleListeners(
 	node: ModuleNode,
 	owned: readonly Class<any>[],
 	services: ReadonlySet<Class<any>>
 ): WiredListener[] {
 	const plan = [...new Set(owned)].flatMap((cls) =>
-		getEventListeners(cls).map((meta) => {
+		getLifecycleListeners(cls).map((meta) => {
 			if (!meta.static && !services.has(cls)) {
-				throw new EventListenerNotSupportedError(cls.name, String(meta.method), node.id);
+				throw new LifecycleListenerNotSupportedError(cls.name, String(meta.method), node.id);
 			}
 			return { meta, wrapper: handlerFor(node, cls, meta) };
 		})
 	);
 
-	const bus = EventBus.instance;
+	const bus = LifecycleBus.instance;
 	return plan.map(({ meta, wrapper }) => {
 		if (meta.mode === 'once') {
 			meta.prepend ? bus.prependOnceListener(meta.event, wrapper) : bus.once(meta.event, wrapper);

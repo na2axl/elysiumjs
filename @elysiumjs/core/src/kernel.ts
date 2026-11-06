@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import type { Class } from 'type-fest';
-import type { WiredListener } from './event-wiring';
+import type { WiredListener } from './lifecycle-wiring';
 import type { Module } from './module';
 import type { ModuleGraph, ModuleNode } from './module-graph';
 import type { ServiceDefinition } from './service';
@@ -23,8 +23,8 @@ import { isEqual } from 'radash';
 
 import { Container } from './container';
 import { ConflictingModuleConfigError, ElysiumError } from './errors';
-import { EventBus } from './event';
-import { wireEventListeners } from './event-wiring';
+import { LifecycleBus } from './lifecycle';
+import { wireLifecycleListeners } from './lifecycle-wiring';
 import { getLogger } from './logger';
 import { Metadata } from './metadata';
 import { getModuleProps } from './module';
@@ -215,7 +215,7 @@ export class Kernel {
 		const own = this.ownClasses.get(node);
 		// Wired before onInit, which may emit events; removed again when it fails, so that a
 		// retried initialisation does not wire them twice.
-		const listeners = own ? wireEventListeners(node, own.owned, own.services) : [];
+		const listeners = own ? wireLifecycleListeners(node, own.owned, own.services) : [];
 		this.wired.push(...listeners);
 		const fail = (error: unknown): never => {
 			this.initialising.delete(node);
@@ -274,14 +274,15 @@ export class Kernel {
 	/** Removes event listeners wired by {@link initOwn}. */
 	private unwire(listeners: readonly WiredListener[]): void {
 		const removed = new Set(listeners);
-		for (const { event, wrapper } of listeners) EventBus.instance.removeListener(event, wrapper);
+		for (const { event, wrapper } of listeners)
+			LifecycleBus.instance.removeListener(event, wrapper);
 		const kept = this.wired.filter((listener) => !removed.has(listener));
 		this.wired.splice(0, this.wired.length, ...kept);
 	}
 
 	private async runShutdown(): Promise<void> {
 		for (const { event, wrapper } of this.wired.splice(0)) {
-			EventBus.instance.removeListener(event, wrapper);
+			LifecycleBus.instance.removeListener(event, wrapper);
 		}
 
 		const targets = [

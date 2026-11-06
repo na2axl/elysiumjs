@@ -72,7 +72,7 @@ A binding belongs to the invocation, so only request-scoped services, factories 
 
 ### Queues and cron triggers
 
-Mark methods of module services with `@Workers.queue(name)` or `@Workers.cron(expression)`. Each handler runs in its module, in a request scope of its own. A queue handler receives the batch, and the whole batch is retried when it throws. A cron handler receives the scheduled controller; the expression must match the one in the wrangler config. `*` matches every queue or cron. A batch or event no handler matches throws `NoWorkersHandlerError`.
+Mark methods of module services with `@Workers.queue(name)` or `@Workers.cron(expression)`. Each handler runs in its module, in a request scope of its own. A queue handler receives the batch, and the whole batch is retried when it throws. A cron handler receives the scheduled controller; the expression must match the one in the wrangler config. `*` matches every queue or cron. A batch or event no handler matches throws `NoWorkersHandlerError`. A named queue has one consumer, so that each message is acked or retried by one decision: two handlers of the same queue throw `DuplicateQueueConsumerError` when the Worker is created. `*` handlers, such as observers, are not counted.
 
 ```ts
 @Service.register()

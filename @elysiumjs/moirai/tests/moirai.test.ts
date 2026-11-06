@@ -22,11 +22,11 @@ import {
 	Service,
 	t
 } from '@elysiumjs/core';
-import { Job, JobRegistry } from '@elysiumjs/heracles';
+import { Job, JobRegistry, WithId } from '@elysiumjs/heracles';
 import { UnitOfWork, withUnitOfWork } from '@elysiumjs/mnemosyne';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { HERACLES_JOB_EFFECT, job } from '../src/heracles';
+import { HERACLES_JOB_EFFECT, InvalidOnceJobError, job, Once } from '../src/heracles';
 import {
 	backoffMs,
 	CommandForbiddenError,
@@ -513,6 +513,31 @@ describe('heracles jobs', () => {
 			kind: HERACLES_JOB_EFFECT,
 			payload: { job: 'elysium.heracles.job.receipt', args: ['o-1'], options: { delay: 1000 } }
 		});
+	});
+
+	it('runs a @Once() job once per dispatch id, in a unit of work', async () => {
+		const billed: string[] = [];
+		@Job.register({ name: 'bill', queue: 'billing' })
+		@Once()
+		class BillJob extends Job {
+			constructor(public readonly invoice: string) {
+				super();
+			}
+			protected async execute() {
+				billed.push(this.invoice);
+			}
+		}
+		JobRegistry.set([
+			['elysium.heracles.job.bill', { jobClass: BillJob as never, module: null as never }]
+		]);
+
+		const delivery = (dispatchId: string) => new (WithId(BillJob, 'job-1', dispatchId))('inv-1');
+		await delivery('schedule:bill:inv-1@t1').run();
+		await delivery('schedule:bill:inv-1@t1').run();
+		await delivery('schedule:bill:inv-1@t2').run();
+		expect(billed).toEqual(['inv-1', 'inv-1']);
+		expect(log).toEqual(['BEGIN', 'COMMIT', 'BEGIN', 'COMMIT', 'BEGIN', 'COMMIT']);
+		expect(() => Once()(class NotAJob {})).toThrow(InvalidOnceJobError);
 	});
 });
 

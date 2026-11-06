@@ -14,9 +14,10 @@
 
 import type { TransportProcessMessage } from '@elysiumjs/heracles';
 import type { WorkersExecutionContext, WorkersMessageBatch } from '@elysiumjs/runtime-workers';
+import type { DeadJob, HeraclesWorkersConfig } from '../src';
 
 import { Application, Http, Module, Service } from '@elysiumjs/core';
-import { Heracles, HeraclesModule, Job, Schedule } from '@elysiumjs/heracles';
+import { Heracles, HeraclesModule, Job, Scheduler } from '@elysiumjs/heracles';
 import { createRuntime, createWorker } from '@elysiumjs/runtime-workers';
 import { beforeEach, describe, expect, it } from 'bun:test';
 
@@ -25,7 +26,7 @@ import { CloudflareQueueTransport, HeraclesWorkersModule } from '../src';
 const ran: string[] = [];
 
 @Job.register({ name: 'greet', queue: 'jobs', maxRetries: 2, retryDelay: 30_000 })
-@Schedule('*/5 * * * *', { args: ['cron'] })
+@Scheduler.job('*/5 * * * *', { args: ['cron'] })
 class GreetJob extends Job {
 	constructor(private readonly who: string) {
 		super();
@@ -51,11 +52,17 @@ class GreetModule extends Module {}
 
 const ctx = (): WorkersExecutionContext => ({ waitUntil() {}, passThroughOnException() {} });
 
-const setup = async () => {
+const setup = async (workers?: HeraclesWorkersConfig) => {
 	const sent: { body: TransportProcessMessage; options?: { delaySeconds?: number } }[] = [];
+	const dead: unknown[] = [];
 	const JOBS = {
 		async send(body: TransportProcessMessage, options?: { delaySeconds?: number }) {
 			sent.push({ body: structuredClone(body), options });
+		}
+	};
+	const JOBS_DLQ = {
+		async send(body: unknown) {
+			dead.push(structuredClone(body));
 		}
 	};
 
@@ -67,7 +74,7 @@ const setup = async () => {
 					jobs: { transport: CloudflareQueueTransport, transportOptions: { binding: 'JOBS' } }
 				}
 			}),
-			HeraclesWorkersModule,
+			workers ? HeraclesWorkersModule.with(workers) : HeraclesWorkersModule,
 			GreetModule
 		],
 		openapi: false
@@ -76,8 +83,8 @@ const setup = async () => {
 
 	const app = new App();
 	const worker = await createWorker(app);
-	const env = { JOBS };
-	return { app, worker, env, sent };
+	const env = { JOBS, JOBS_DLQ };
+	return { app, worker, env, sent, dead };
 };
 
 const batchOf = (bodies: unknown[], attempts = 1) => {
@@ -136,6 +143,30 @@ describe('Heracles on Cloudflare Workers', () => {
 		await worker.queue(last.batch, env, ctx());
 		expect(last.retried).toEqual([]);
 		expect(last.acked).toEqual([0]);
+		await app.kernel.shutdown();
+	});
+
+	it('sends a job that failed its last retry to the dead letter queue, and to onDead', async () => {
+		const buried: DeadJob[] = [];
+		const { app, worker, env, sent, dead } = await setup({
+			deadLetterQueue: 'JOBS_DLQ',
+			onDead: (job) => void buried.push(job)
+		});
+		await worker.fetch(new Request('http://localhost/greet/fail', { method: 'POST' }), env, ctx());
+
+		const last = batchOf([sent[0]!.body], 3);
+		await worker.queue(last.batch, env, ctx());
+		expect(last.acked).toEqual([0]);
+		expect(dead).toEqual([
+			expect.objectContaining({
+				type: 'job:process',
+				job: sent[0]!.body.job,
+				args: ['fail'],
+				failure: expect.objectContaining({ error: 'cannot greet', attempts: 3 })
+			})
+		]);
+		expect(buried).toHaveLength(1);
+		expect(buried[0]).toMatchObject({ job: sent[0]!.body.job, queue: 'jobs', attempts: 3 });
 		await app.kernel.shutdown();
 	});
 

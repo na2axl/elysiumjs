@@ -18,9 +18,16 @@ import { Redis } from '@elysiumjs/redis';
 import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test';
 
 import { Cron, InvalidCronError } from '../src/cron';
+import { Heracles } from '../src/heracles';
 import { Job } from '../src/job';
 import { JobRegistry } from '../src/registry';
-import { Schedule, Scheduler, schedulesOf } from '../src/schedule';
+import {
+	clearSchedulers,
+	DuplicateSchedulerError,
+	Scheduler,
+	ScheduleRunner,
+	schedulesOf
+} from '../src/schedule';
 
 const next = (expression: string, from: string) =>
 	Cron.next(Cron.parse(expression), new Date(from)).toISOString();
@@ -51,8 +58,8 @@ describe('Cron', () => {
 });
 
 @Job.register({ name: 'scheduled-report', queue: 'reports' })
-@Schedule('*/5 * * * *', { args: ['daily'] })
-@Schedule('0 0 * * *')
+@Scheduler.job('*/5 * * * *', { args: ['daily'] })
+@Scheduler.job('0 0 * * *')
 class ReportJob extends Job {
 	protected async execute(): Promise<void> {}
 }
@@ -60,6 +67,7 @@ class ReportJob extends Job {
 describe('Scheduler', () => {
 	afterEach(() => {
 		JobRegistry.clear();
+		clearSchedulers();
 		setSystemTime();
 	});
 
@@ -83,6 +91,7 @@ describe('Scheduler', () => {
 		const dispatched: unknown[][] = [];
 		const dispatch = spyOn(Scheduler, 'dispatch').mockImplementation(async (job) => {
 			dispatched.push(job.schedule.args);
+			return 1;
 		});
 		const locks = new Set<string>();
 		const connection = {
@@ -95,8 +104,8 @@ describe('Scheduler', () => {
 		const getConnection = spyOn(Redis, 'getConnection').mockReturnValue(connection);
 
 		setSystemTime(new Date('2026-11-06T03:04:59.990Z'));
-		const a = new Scheduler({ redis: 'default' });
-		const b = new Scheduler({ redis: 'default' });
+		const a = new ScheduleRunner({ redis: 'default' });
+		const b = new ScheduleRunner({ redis: 'default' });
 		a.start();
 		b.start();
 		await new Promise((resolve) => setTimeout(resolve, 50));
@@ -109,5 +118,70 @@ describe('Scheduler', () => {
 		]);
 		dispatch.mockRestore();
 		getConnection.mockRestore();
+	});
+
+	it('fans a scheduler out: one job per case, with an id per scheduler, case and tick', async () => {
+		@Job.register({ name: 'bill-invoice', queue: 'billing' })
+		class BillInvoice extends Job {
+			constructor(
+				public readonly region: string,
+				public readonly invoice: string
+			) {
+				super();
+			}
+
+			protected async execute(): Promise<void> {}
+		}
+
+		const ticks: string[] = [];
+		@Scheduler.register({ cron: '0 6 * * *', job: BillInvoice, name: 'daily-billing' })
+		class DailyBilling extends Scheduler<typeof BillInvoice> {
+			public async fanOut(tick: Date) {
+				ticks.push(tick.toISOString());
+				return ['inv-1', 'inv-2'].map((id) => ({ key: id, args: ['eu', id] as [string, string] }));
+			}
+		}
+		expect(DailyBilling).toBeDefined();
+
+		const calls: unknown[][] = [];
+		const dispatch = spyOn(Heracles, 'dispatch').mockImplementation(async (...args: unknown[]) => {
+			calls.push(args);
+			return { jobId: 'j', dispatchId: 'd' };
+		});
+		const [job] = Scheduler.jobsFor('0 6 * * *');
+		expect(job!.name).toBe('daily-billing');
+		expect(await Scheduler.dispatch(job!, new Date('2026-11-06T06:00:42.123Z'))).toBe(2);
+		dispatch.mockRestore();
+
+		expect(ticks).toEqual(['2026-11-06T06:00:00.000Z']);
+		expect(calls).toEqual([
+			[
+				BillInvoice,
+				['eu', 'inv-1'],
+				{ dispatchId: 'schedule:daily-billing:inv-1@2026-11-06T06:00:00.000Z' }
+			],
+			[
+				BillInvoice,
+				['eu', 'inv-2'],
+				{ dispatchId: 'schedule:daily-billing:inv-2@2026-11-06T06:00:00.000Z' }
+			]
+		]);
+	});
+
+	it('refuses two schedulers with one name', () => {
+		class Noop extends Job {
+			protected async execute(): Promise<void> {}
+		}
+		const declare = () => {
+			@Scheduler.register({ cron: '@daily', job: Noop, name: 'twice' })
+			class Twice extends Scheduler<typeof Noop> {
+				public fanOut() {
+					return [];
+				}
+			}
+			return Twice;
+		};
+		declare();
+		expect(declare).toThrow(DuplicateSchedulerError);
 	});
 });

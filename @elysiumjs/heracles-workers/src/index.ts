@@ -12,8 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export { isJobMessage, runJobMessage } from './consumer';
-export { HeraclesWorkersHandlers, HeraclesWorkersModule } from './module';
+export { type DeadJob, type DeadLetterOptions, isJobMessage, runJobMessage } from './consumer';
+export {
+	type HeraclesWorkersConfig,
+	HeraclesWorkersHandlers,
+	HeraclesWorkersModule
+} from './module';
 export {
 	CloudflareQueueTransport,
 	type CloudflareQueueTransportOptions,

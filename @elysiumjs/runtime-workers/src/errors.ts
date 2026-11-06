@@ -52,3 +52,18 @@ export class NoWorkersHandlerError extends ElysiumError {
 		);
 	}
 }
+
+/**
+ * Thrown when the Worker is created and two service methods consume the same queue. A queue has
+ * one consumer, so that every message is acked or retried by one decision; `*` handlers are not
+ * counted.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class DuplicateQueueConsumerError extends ElysiumError {
+	constructor(
+		public readonly queue: string,
+		public readonly consumers: string[]
+	) {
+		super(`The queue "${queue}" has more than one consumer: ${consumers.join(', ')}. Keep one.`);
+	}
+}

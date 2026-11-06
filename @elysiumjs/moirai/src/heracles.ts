@@ -12,12 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { JobClass, JobDispatchOptions } from '@elysiumjs/heracles';
+import type { Job, JobClass, JobDispatchOptions } from '@elysiumjs/heracles';
 import type { OutboxEffect } from './stores';
 
+import { DATABASE_TRANSACTION_SERVICE, ElysiumError, Service } from '@elysiumjs/core';
 import { Heracles, JobRegistry } from '@elysiumjs/heracles';
+import { UnitOfWork } from '@elysiumjs/mnemosyne';
 
 import { registerEffect } from './command';
+import { Inbox } from './outbox';
 
 /** The kind of the effects that dispatch a Heracles job. */
 export const HERACLES_JOB_EFFECT = 'heracles.job';
@@ -52,3 +55,47 @@ export const job = <TClass extends JobClass<any>>(
 	if (!name) throw new Error(`${jobClass.name} is not registered in a module's jobs.`);
 	return { kind: HERACLES_JOB_EFFECT, payload: { job: name, args, options } satisfies JobPayload };
 };
+
+/**
+ * Raised when `@Once()` goes on a class without an `execute()` method.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class InvalidOnceJobError extends ElysiumError {
+	constructor(name: string) {
+		super(`@Once() goes on a Heracles job class with an execute() method, which ${name} has not.`);
+	}
+}
+
+/**
+ * Runs a Heracles job once per dispatch id: its `execute()` runs in a unit of work with an inbox
+ * record of the dispatch id, so a delivery that comes again, or a tick handled twice, does nothing.
+ * Made for the jobs of a `Scheduler`, whose dispatch id names the scheduler, the case and the
+ * tick. Without a database module, the record and the work run without a transaction.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param options The inbox consumer. Defaults to the job name.
+ * @example
+ * ```ts
+ * @Job.register({ queue: 'billing' })
+ * @Once()
+ * class BillInvoice extends Job { ... }
+ * ```
+ */
+export const Once =
+	(options: { consumer?: string } = {}) =>
+	(target: Function): void => {
+		const proto = target.prototype as { execute?: (...args: unknown[]) => unknown };
+		const execute = proto.execute;
+		if (typeof execute !== 'function') throw new InvalidOnceJobError(target.name);
+		proto.execute = async function (this: Job, ...args: unknown[]) {
+			const consumer =
+				options.consumer ??
+				JobRegistry.all().find((entry) => entry.jobClass === this.constructor)?.name ??
+				target.name;
+			const work = () =>
+				Inbox.once({ messageId: this.dispatchId, consumer }, async () => {
+					await execute.apply(this, args);
+				});
+			if (Service.exists(DATABASE_TRANSACTION_SERVICE)) await UnitOfWork.run(work);
+			else await work();
+		};
+	};

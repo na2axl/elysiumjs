@@ -12,19 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { EventData } from '../src/event';
+import type { LifecycleEvent } from '../src/lifecycle';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { EventListenerNotSupportedError } from '../src/errors';
-import { Event, EventBus } from '../src/event';
+import { LifecycleListenerNotSupportedError } from '../src/errors';
+import { Lifecycle, LifecycleBus } from '../src/lifecycle';
 import { Module } from '../src/module';
 import { Service } from '../src/service';
 import { createTestingApp } from '../src/testing';
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 10));
 
-describe('module-scoped @Event listeners', () => {
+describe('module-scoped @Lifecycle listeners', () => {
 	let app: Awaited<ReturnType<typeof createTestingApp>> | undefined;
 
 	afterEach(async () => {
@@ -32,24 +32,24 @@ describe('module-scoped @Event listeners', () => {
 		app = undefined;
 	});
 
-	it('adds no listener when a class with @Event.on is declared', () => {
-		const before = EventBus.instance.listenerCount('el:import');
+	it('adds no listener when a class with @Lifecycle.on is declared', () => {
+		const before = LifecycleBus.instance.listenerCount('el:import');
 
 		class Declared {
-			@Event.on({ event: 'el:import' })
+			@Lifecycle.on({ event: 'el:import' })
 			public static handle() {}
 		}
 
 		expect(Declared).toBeDefined();
-		expect(EventBus.instance.listenerCount('el:import')).toBe(before);
+		expect(LifecycleBus.instance.listenerCount('el:import')).toBe(before);
 	});
 
 	it('wires a static listener when the module initialises, and removes it on shutdown', async () => {
 		const calls: unknown[] = [];
 
 		class Listener {
-			@Event.on({ event: 'el:static' })
-			public static handle(e: EventData<string>) {
+			@Lifecycle.on({ event: 'el:static' })
+			public static handle(e: LifecycleEvent<string>) {
 				calls.push(e.data);
 			}
 		}
@@ -58,22 +58,22 @@ describe('module-scoped @Event listeners', () => {
 		class M extends Module {}
 
 		app = await createTestingApp({ modules: [M], boot: 'eager' });
-		expect(EventBus.instance.listenerCount('el:static')).toBe(1);
-		Event.emit('el:static', 'a');
+		expect(LifecycleBus.instance.listenerCount('el:static')).toBe(1);
+		Lifecycle.emit('el:static', 'a');
 		await tick();
 		expect(calls).toEqual(['a']);
 
 		await app.shutdown();
 		app = undefined;
-		expect(EventBus.instance.listenerCount('el:static')).toBe(0);
-		Event.emit('el:static', 'b');
+		expect(LifecycleBus.instance.listenerCount('el:static')).toBe(0);
+		Lifecycle.emit('el:static', 'b');
 		await tick();
 		expect(calls).toEqual(['a']);
 	});
 
 	it('does not double-register across two boot/shutdown cycles', async () => {
 		class Listener {
-			@Event.on({ event: 'el:cycle' })
+			@Lifecycle.on({ event: 'el:cycle' })
 			public static handle() {}
 		}
 
@@ -83,9 +83,9 @@ describe('module-scoped @Event listeners', () => {
 		for (let i = 0; i < 2; i++) {
 			const booted = await createTestingApp({ modules: [M], boot: 'eager' });
 			await booted.kernel.initModule(booted.kernel.graph.nodes[0]);
-			expect(EventBus.instance.listenerCount('el:cycle')).toBe(1);
+			expect(LifecycleBus.instance.listenerCount('el:cycle')).toBe(1);
 			await booted.shutdown();
-			expect(EventBus.instance.listenerCount('el:cycle')).toBe(0);
+			expect(LifecycleBus.instance.listenerCount('el:cycle')).toBe(0);
 		}
 	});
 
@@ -98,7 +98,7 @@ describe('module-scoped @Event listeners', () => {
 
 		@Service.register({ name: 'el.listener' })
 		class Listener {
-			@Event.on({ event: 'el:instance' })
+			@Lifecycle.on({ event: 'el:instance' })
 			public handle() {
 				receivers.push(this);
 				seen.push(Service.get('el.peer'));
@@ -109,8 +109,8 @@ describe('module-scoped @Event listeners', () => {
 		class M extends Module {}
 
 		app = await createTestingApp({ modules: [M], boot: 'eager' });
-		Event.emit('el:instance', {});
-		Event.emit('el:instance', {});
+		Lifecycle.emit('el:instance', {});
+		Lifecycle.emit('el:instance', {});
 		await tick();
 
 		expect(receivers).toHaveLength(2);
@@ -123,12 +123,12 @@ describe('module-scoped @Event listeners', () => {
 		const order: string[] = [];
 
 		class Listener {
-			@Event.once({ event: 'el:once' })
+			@Lifecycle.once({ event: 'el:once' })
 			public static first() {
 				order.push('once');
 			}
 
-			@Event.on({ event: 'el:once', prepend: true })
+			@Lifecycle.on({ event: 'el:once', prepend: true })
 			public static early() {
 				order.push('early');
 			}
@@ -138,20 +138,20 @@ describe('module-scoped @Event listeners', () => {
 		class M extends Module {}
 
 		app = await createTestingApp({ modules: [M], boot: 'eager' });
-		Event.emit('el:once', {});
-		Event.emit('el:once', {});
+		Lifecycle.emit('el:once', {});
+		Lifecycle.emit('el:once', {});
 		await tick();
 		expect(order).toEqual(['early', 'once', 'early']);
 	});
 
 	it('routes handler errors to elysium:error', async () => {
 		const errors: unknown[] = [];
-		const collect = (e: EventData<unknown>) => {
+		const collect = (e: LifecycleEvent<unknown>) => {
 			errors.push(e.data);
 		};
 
 		class Listener {
-			@Event.on({ event: 'el:boom' })
+			@Lifecycle.on({ event: 'el:boom' })
 			public static handle() {
 				throw new Error('boom');
 			}
@@ -160,20 +160,20 @@ describe('module-scoped @Event listeners', () => {
 		@Module.register({ controllers: [Listener] })
 		class M extends Module {}
 
-		Event.on('elysium:error', collect);
+		Lifecycle.on('elysium:error', collect);
 		try {
 			app = await createTestingApp({ modules: [M], boot: 'eager' });
-			Event.emit('el:boom', {});
+			Lifecycle.emit('el:boom', {});
 			await tick();
 			expect((errors[0] as Error).message).toBe('boom');
 		} finally {
-			EventBus.instance.removeListener('elysium:error', collect);
+			LifecycleBus.instance.removeListener('elysium:error', collect);
 		}
 	});
 
 	it('does not wire listeners of a module that is not initialised (lazy boot)', async () => {
 		class Listener {
-			@Event.on({ event: 'el:lazy' })
+			@Lifecycle.on({ event: 'el:lazy' })
 			public static handle() {}
 		}
 
@@ -181,14 +181,14 @@ describe('module-scoped @Event listeners', () => {
 		class M extends Module {}
 
 		app = await createTestingApp({ modules: [M], boot: 'lazy' });
-		expect(EventBus.instance.listenerCount('el:lazy')).toBe(0);
+		expect(LifecycleBus.instance.listenerCount('el:lazy')).toBe(0);
 		await app.kernel.initModule(app.kernel.graph.nodes[0]);
-		expect(EventBus.instance.listenerCount('el:lazy')).toBe(1);
+		expect(LifecycleBus.instance.listenerCount('el:lazy')).toBe(1);
 	});
 
 	it('rejects an instance listener on a class that is not a service', async () => {
 		class NotAService {
-			@Event.on({ event: 'el:bad' })
+			@Lifecycle.on({ event: 'el:bad' })
 			public handle() {}
 		}
 
@@ -199,15 +199,15 @@ describe('module-scoped @Event listeners', () => {
 			() => null,
 			(e: unknown) => e
 		);
-		expect(failure).toBeInstanceOf(EventListenerNotSupportedError);
-		expect(EventBus.instance.listenerCount('el:bad')).toBe(0);
+		expect(failure).toBeInstanceOf(LifecycleListenerNotSupportedError);
+		expect(LifecycleBus.instance.listenerCount('el:bad')).toBe(0);
 	});
 
-	it('keeps the functional Event.on registering immediately', () => {
+	it('keeps the functional Lifecycle.on registering immediately', () => {
 		const handler = () => {};
-		const before = EventBus.instance.listenerCount('el:fn');
-		Event.on('el:fn', handler);
-		expect(EventBus.instance.listenerCount('el:fn')).toBe(before + 1);
-		EventBus.instance.removeListener('el:fn', handler);
+		const before = LifecycleBus.instance.listenerCount('el:fn');
+		Lifecycle.on('el:fn', handler);
+		expect(LifecycleBus.instance.listenerCount('el:fn')).toBe(before + 1);
+		LifecycleBus.instance.removeListener('el:fn', handler);
 	});
 });
