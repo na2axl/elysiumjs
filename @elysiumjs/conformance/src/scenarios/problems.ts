@@ -24,29 +24,29 @@ class InsufficientFunds extends DomainError.for('INSUFFICIENT_FUNDS', 409) {
 }
 
 const make = async (): Promise<Application> => {
-	@Http.controller({ path: '/p' })
+	@Http.controller('/p')
 	class ProblemController {
-		@Http.get({ path: '/missing' })
+		@Http.get('/missing')
 		public missing() {
 			throw new NotFoundError('No such post.', { extensions: { postId: 7 } });
 		}
 
-		@Http.post({ path: '/pay' })
+		@Http.post('/pay')
 		public pay(): { paid: true } | InsufficientFunds {
 			return new InsufficientFunds(3);
 		}
 
-		@Http.get({ path: '/status' })
+		@Http.get('/status')
 		public status(@Http.context() c: any) {
 			throw c.status(403, 'no');
 		}
 
-		@Http.get({ path: '/boom' })
+		@Http.get('/boom')
 		public boom() {
 			throw new Error('boom');
 		}
 
-		@Http.post({ path: '/signup' })
+		@Http.post('/signup')
 		public signup(@Http.body(t.Object({ email: t.String(), age: t.Number() })) body: unknown) {
 			return body;
 		}

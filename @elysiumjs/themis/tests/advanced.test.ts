@@ -161,14 +161,14 @@ describe('OAuth and passkeys over HTTP', () => {
 			}
 		});
 
-		@Http.controller({ path: '/auth' })
+		@Http.controller('/auth')
 		class AuthController {
-			@Http.get({ path: '/start' })
+			@Http.get('/start')
 			public async start() {
 				return { url: String(await client.authorize({ prompt: 'consent' })) };
 			}
 
-			@Http.get({ path: '/callback' })
+			@Http.get('/callback')
 			public async callback(@Http.context() c: { request: Request }) {
 				const { claims, userInfo, tokens } = await client.callback(c.request.url);
 				return {
@@ -179,22 +179,22 @@ describe('OAuth and passkeys over HTTP', () => {
 				};
 			}
 
-			@Http.get({ path: '/passkey/register' })
+			@Http.get('/passkey/register')
 			public register() {
 				return keys.registrationOptions({ id: 'u1', name: 'ada' });
 			}
 
-			@Http.post({ path: '/passkey/register' })
+			@Http.post('/passkey/register')
 			public verifyRegister(@Http.body() body: never) {
 				return keys.verifyRegistration(body);
 			}
 
-			@Http.get({ path: '/passkey/login' })
+			@Http.get('/passkey/login')
 			public login() {
 				return keys.authenticationOptions({ id: 'u1' });
 			}
 
-			@Http.post({ path: '/passkey/login' })
+			@Http.post('/passkey/login')
 			public verifyLogin(@Http.body() body: never) {
 				return keys.verifyAuthentication(body);
 			}

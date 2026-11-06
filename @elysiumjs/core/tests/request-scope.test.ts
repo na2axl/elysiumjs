@@ -368,7 +368,7 @@ describe('Request scope', () => {
 				}
 			}
 
-			@Http.controller({ path: '/scoped' })
+			@Http.controller('/scoped')
 			class ScopedController {
 				@Http.get()
 				public show(
@@ -400,7 +400,7 @@ describe('Request scope', () => {
 		});
 
 		it('gives each request its own instance, shared by the controller and the handler', async () => {
-			@Http.controller({ path: '/state', scope: HttpControllerScope.REQUEST })
+			@Http.controller('/state', { scope: HttpControllerScope.REQUEST })
 			class StateController {
 				constructor(@Service.inject(RequestState) public state: RequestState) {}
 
@@ -434,7 +434,7 @@ describe('Request scope', () => {
 				}
 			}
 
-			@Http.controller({ path: '/session', scope: HttpControllerScope.REQUEST })
+			@Http.controller('/session', { scope: HttpControllerScope.REQUEST })
 			class SessionController {
 				constructor(@Service.inject(Session) public session: Session) {}
 
@@ -465,7 +465,7 @@ describe('Request scope', () => {
 				}
 			}
 
-			@Http.controller({ path: '/made' })
+			@Http.controller('/made')
 			class MadeController {
 				@Http.get()
 				public show(@Service.inject(Made) made: Made) {
@@ -481,7 +481,7 @@ describe('Request scope', () => {
 		});
 
 		it('still injects null for a route parameter whose service is not registered', async () => {
-			@Http.controller({ path: '/missing' })
+			@Http.controller('/missing')
 			class MissingController {
 				@Http.get()
 				public show(@Service.inject('missing.service') missing: unknown) {
@@ -508,7 +508,7 @@ describe('Request scope', () => {
 
 			const seen: boolean[] = [];
 
-			@Http.controller({ path: '/hooked', scope: HttpControllerScope.REQUEST })
+			@Http.controller('/hooked', { scope: HttpControllerScope.REQUEST })
 			class HookedController {
 				constructor(@Service.inject(Session) public session: Session) {}
 
@@ -548,14 +548,14 @@ describe('Request scope', () => {
 				}
 			}
 
-			@Http.controller({ path: '/dispose' })
+			@Http.controller('/dispose')
 			class DisposeController {
-				@Http.get({ path: '/ok' })
+				@Http.get('/ok')
 				public ok(@Service.inject(Outer) outer: Outer) {
 					return { ok: !!outer };
 				}
 
-				@Http.get({ path: '/fail' })
+				@Http.get('/fail')
 				public fail(@Service.inject(Outer) _outer: Outer) {
 					throw new Error('handler failed');
 				}
@@ -573,7 +573,7 @@ describe('Request scope', () => {
 		});
 
 		it('fails a server-scoped controller that depends on a request-scoped service', async () => {
-			@Http.controller({ path: '/captive' })
+			@Http.controller('/captive')
 			class CaptiveController {
 				constructor(@Service.inject(RequestState) public state: RequestState) {}
 

@@ -14,6 +14,7 @@ bun add @elysiumjs/themis-redis   # or @elysiumjs/themis-workers
 
 ```ts
 import { Application, Middleware } from '@elysiumjs/core';
+import { Redis } from '@elysiumjs/redis';
 import {
 	apiKeyGuard,
 	CsrfMiddleware,
@@ -23,16 +24,15 @@ import {
 	ThemisModule
 } from '@elysiumjs/themis';
 import { RedisSessionStore } from '@elysiumjs/themis-redis';
-import { Redis } from '@elysiumjs/redis';
 
 @Application.register({
 	modules: [
 		ThemisModule.with({
 			secret: env.APP_SECRET,
 			session: {
-					store: new RedisSessionStore({ connection: () => Redis.connection() }),
-					ttl: 60 * 60 * 24 * 7
-				},
+				store: new RedisSessionStore({ connection: () => Redis.connection() }),
+				ttl: 60 * 60 * 24 * 7
+			},
 			guards: {
 				session: sessionGuard({ user: (id) => users.find(id) }),
 				jwt: jwtGuard({ secret: env.JWT_SECRET, user: (claims) => users.find(claims.sub) }),
@@ -54,7 +54,7 @@ class App extends Application {}
 import { Http } from '@elysiumjs/core';
 import { Auth } from '@elysiumjs/themis';
 
-@Http.controller({ path: '/me' })
+@Http.controller('/me')
 @Auth()
 class MeController {
 	@Http.get()
@@ -62,7 +62,7 @@ class MeController {
 		return Auth.user();
 	}
 
-	@Http.get({ path: '/tokens' })
+	@Http.get('/tokens')
 	@Auth({ guards: ['jwt'] })
 	public tokens() {
 		/* ... */
@@ -70,7 +70,7 @@ class MeController {
 }
 ```
 
-- `@Auth()` tries the configured guards in order, and `@Auth({ guards })` only the named ones. A guard is an object that implements `Guard`, or a guard class, which is built once through the service container so that its constructor gets services injected. It registers `AuthMiddleware`, so `@Middleware.register(AuthMiddleware.guards(['jwt']))` does the same as `@Auth({ guards: ['jwt'] })`. 
+- `@Auth()` tries the configured guards in order, and `@Auth({ guards })` only the named ones. A guard is an object that implements `Guard`, or a guard class, which is built once through the service container so that its constructor gets services injected. It registers `AuthMiddleware`, so `@Middleware.register(AuthMiddleware.guards(['jwt']))` does the same as `@Auth({ guards: ['jwt'] })`.
 - A request no guard accepts answers a 401 problem. `@Auth({ optional: true })` lets it through, and `Auth.check()` tells whether a user is signed in.
 - The user is available through `Auth.user()` and `ctx.currentUser`, so cerberus can read it with `getSubject: (ctx) => ctx.currentUser`.
 - `Auth.login(id)` signs a user in on the session (and regenerates it), and `Auth.logout()` signs them out.

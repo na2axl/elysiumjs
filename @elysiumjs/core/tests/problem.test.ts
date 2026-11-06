@@ -187,46 +187,46 @@ describe('problem details over HTTP', () => {
 		}
 	}
 
-	@Http.controller({ path: '/p' })
+	@Http.controller('/p')
 	class ProblemController {
-		@Http.post({ path: '/even' })
+		@Http.post('/even')
 		public even(@Http.body(EvenBody as never) body: unknown) {
 			return body;
 		}
 
 		@Middleware.register(Witness)
-		@Http.get({ path: '/witnessed' })
+		@Http.get('/witnessed')
 		public witnessed() {
 			throw new ConflictError('no');
 		}
 
-		@Http.get({ path: '/domain' })
+		@Http.get('/domain')
 		public domain() {
 			throw new InsufficientFundsError(5);
 		}
 
-		@Http.get({ path: '/returned' })
+		@Http.get('/returned')
 		public returned(): { paid: true } | InsufficientFundsError {
 			return new InsufficientFundsError(2);
 		}
 
-		@Http.get({ path: '/status' })
+		@Http.get('/status')
 		public status(@Http.context() c: any) {
 			throw c.status(404, 'nope');
 		}
 
-		@Http.get({ path: '/boom' })
+		@Http.get('/boom')
 		public boom() {
 			throw new Error('boom');
 		}
 
 		@Middleware.register(Stop)
-		@Http.get({ path: '/stopped' })
+		@Http.get('/stopped')
 		public stopped() {
 			return { stopped: false };
 		}
 
-		@Http.post({ path: '/signup' })
+		@Http.post('/signup')
 		public signup(
 			@Http.body(t.Object({ email: t.String({ format: 'email' }), age: t.Number() })) body: unknown
 		) {

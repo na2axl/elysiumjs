@@ -17,7 +17,7 @@ import type { Scenario } from './types';
 import { Application, Http, Module } from '@elysiumjs/core';
 
 const make = async (): Promise<Application> => {
-	@Http.controller({ path: '/boom' })
+	@Http.controller('/boom')
 	class BoomController {
 		@Http.get()
 		public explode() {

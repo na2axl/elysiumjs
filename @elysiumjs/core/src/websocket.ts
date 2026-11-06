@@ -29,22 +29,6 @@ import { Service } from './service';
 import { nextTick, Symbols } from './utils';
 
 /**
- * Properties required when declaring a websocket controller using the `@websocket()` decorator.
- * @author Axel Nana <axel.nana@workbud.com>
- */
-export type WebsocketProps = {
-	/**
-	 * The path of the websocket route.
-	 */
-	path: Route;
-
-	/**
-	 * The options for the websocket server.
-	 */
-	options?: WebSocketHandlerOptions;
-};
-
-/**
  * The options of the websocket server, shared by every runtime.
  * @author Axel Nana <axel.nana@workbud.com>
  */
@@ -111,9 +95,15 @@ export namespace Websocket {
 	 * `onAfterResponse` run once the socket is upgraded: there is no response to read or replace.
 	 *
 	 * @author Axel Nana <axel.nana@workbud.com>
-	 * @param props The websocket route properties.
+	 * @param path The path of the websocket route.
+	 * @param options The options of the websocket server.
+	 * @example
+	 * ```ts
+	 * @Websocket.controller('/chat', { idleTimeout: 60 })
+	 * class ChatController {}
+	 * ```
 	 */
-	export const controller = (props: WebsocketProps) => {
+	export const controller = (path: Route, options: WebSocketHandlerOptions = {}) => {
 		return function (target: Class<any>) {
 			async function handleWebsocket(node: ModuleNode): Promise<Elysia> {
 				await nextTick();
@@ -142,14 +132,14 @@ export namespace Websocket {
 				const middlewares = Metadata.get(Symbols.middlewares, target) ?? [];
 				applyMiddlewares(middlewares, app, node);
 
-				app.ws(props.path, {
+				app.ws(path, {
 					open,
 					close,
 					message,
 					drain,
 					error,
 					body: metadata.body,
-					...props.options
+					...options
 				});
 
 				return app;

@@ -38,9 +38,9 @@ class GreetJob extends Job {
 	}
 }
 
-@Http.controller({ path: '/greet' })
+@Http.controller('/greet')
 class GreetController {
-	@Http.post({ path: '/:who' })
+	@Http.post('/:who')
 	public async greet(@Http.context() c: { params: { who: string } }) {
 		await Heracles.dispatch(GreetJob, [c.params.who]);
 		return { queued: true };

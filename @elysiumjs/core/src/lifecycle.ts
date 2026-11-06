@@ -14,8 +14,6 @@
 
 import { EventEmitter } from 'node:events';
 
-import { isString } from 'radash';
-
 import { ElysiumError } from './errors';
 import { Metadata } from './metadata';
 import { Symbols } from './utils';
@@ -157,9 +155,15 @@ export namespace Lifecycle {
 	 * Static methods are called on the class. Instance methods require a class registered as a
 	 * service: they run on the instance the container resolves.
 	 * @author Axel Nana <axel.nana@workbud.com>
-	 * @param options The decorator options.
+	 * @param event The event name.
+	 * @param options Whether the listener goes first (`prepend`).
+	 * @example
+	 * ```ts
+	 * @Lifecycle.on('elysium:error')
+	 * public static report(e: LifecycleEvent<Error>) {}
+	 * ```
 	 */
-	export function on(options: Omit<ListenProps, 'mode'>): MethodDecorator;
+	export function on(event: string, options?: Omit<ListenProps, 'mode' | 'event'>): MethodDecorator;
 
 	/**
 	 * Registers an event listener for the specified event.
@@ -173,25 +177,29 @@ export namespace Lifecycle {
 	): void;
 
 	export function on<TData, TSource = any>(
-		event: string | Omit<ListenProps, 'mode'>,
-		handler?: LifecycleHandler<TData, TSource> | never
+		event: string,
+		handler?: LifecycleHandler<TData, TSource> | Omit<ListenProps, 'mode' | 'event'>
 	): MethodDecorator | void {
-		if (isString(event)) {
-			LifecycleBus.instance.on(event, handler!);
-		} else {
-			return function (target, propertyKey) {
-				recordListener(target, propertyKey, 'on', event);
-			};
+		if (typeof handler === 'function') {
+			LifecycleBus.instance.on(event, handler);
+			return;
 		}
+		return function (target, propertyKey) {
+			recordListener(target, propertyKey, 'on', { ...handler, event });
+		};
 	}
 
 	/**
 	 * Marks a method as an event listener that listens for the event only once.
 	 * Like {@link Lifecycle.on}, the decorator is metadata-only and the kernel wires it per module.
 	 * @author Axel Nana <axel.nana@workbud.com>
-	 * @param options The decorator options.
+	 * @param event The event name.
+	 * @param options Whether the listener goes first (`prepend`).
 	 */
-	export function once(options: Omit<ListenProps, 'mode'>): MethodDecorator;
+	export function once(
+		event: string,
+		options?: Omit<ListenProps, 'mode' | 'event'>
+	): MethodDecorator;
 
 	/**
 	 * Registers an event listener for the specified event that listens for the event only once.
@@ -205,16 +213,16 @@ export namespace Lifecycle {
 	): void;
 
 	export function once<TData, TSource = any>(
-		event: string | Omit<ListenProps, 'mode'>,
-		handler?: LifecycleHandler<TData, TSource> | never
+		event: string,
+		handler?: LifecycleHandler<TData, TSource> | Omit<ListenProps, 'mode' | 'event'>
 	): MethodDecorator | void {
-		if (isString(event)) {
-			LifecycleBus.instance.once(event, handler!);
-		} else {
-			return function (target, propertyKey) {
-				recordListener(target, propertyKey, 'once', event);
-			};
+		if (typeof handler === 'function') {
+			LifecycleBus.instance.once(event, handler);
+			return;
 		}
+		return function (target, propertyKey) {
+			recordListener(target, propertyKey, 'once', { ...handler, event });
+		};
 	}
 
 	/**
@@ -239,11 +247,11 @@ export namespace Lifecycle {
 	 * @param options The decorator options.
 	 * @throws {ElysiumError} If `options.mode` is neither `on` nor `once`.
 	 */
-	export const listen = (options: ListenProps): MethodDecorator => {
-		if (options.mode === 'on') {
-			return on(options);
-		} else if (options.mode === 'once') {
-			return once(options);
+	export const listen = ({ mode, event, ...options }: ListenProps): MethodDecorator => {
+		if (mode === 'on') {
+			return on(event, options);
+		} else if (mode === 'once') {
+			return once(event, options);
 		}
 
 		throw new ElysiumError("Unknown mode provided to @listen. Use either 'on' or 'once'.");

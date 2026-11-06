@@ -40,9 +40,9 @@ const JWT_SECRET = 'j'.repeat(32);
 const users: Record<string, { id: string; name: string }> = { u1: { id: 'u1', name: 'Ada' } };
 let apiKey: { key: string; hash: string };
 
-@Http.controller({ path: '/session' })
+@Http.controller('/session')
 class SessionController {
-	@Http.post({ path: '/visit' })
+	@Http.post('/visit')
 	public visit() {
 		const session = Session.current();
 		const visits = (session.get<number>('visits') ?? 0) + 1;
@@ -50,43 +50,43 @@ class SessionController {
 		return { visits };
 	}
 
-	@Http.post({ path: '/flash' })
+	@Http.post('/flash')
 	public flash() {
 		Session.current().flash('notice', 'saved');
 		return {};
 	}
 
-	@Http.get({ path: '/read' })
+	@Http.get('/read')
 	public read() {
 		return { notice: Session.current().get('notice') ?? null, csrf: Csrf.token() };
 	}
 
-	@Http.post({ path: '/login', body: t.Object({ id: t.String() }) })
+	@Http.post('/login', { body: t.Object({ id: t.String() }) })
 	public login(@Http.body() body: { id: string }) {
 		Auth.login(body.id);
 		return { ok: true };
 	}
 
-	@Http.post({ path: '/login-then-refuse', body: t.Object({ id: t.String() }) })
+	@Http.post('/login-then-refuse', { body: t.Object({ id: t.String() }) })
 	public loginThenRefuse(@Http.body() body: { id: string }) {
 		Auth.login(body.id);
 		throw new ConflictError('signed in, but refused');
 	}
 
-	@Http.post({ path: '/big' })
+	@Http.post('/big')
 	public big() {
 		Session.current().set('blob', 'x'.repeat(5000));
 		return {};
 	}
 
-	@Http.post({ path: '/logout' })
+	@Http.post('/logout')
 	public logout() {
 		Auth.logout();
 		return { ok: true };
 	}
 }
 
-@Http.controller({ path: '/me' })
+@Http.controller('/me')
 @Auth()
 class MeController {
 	@Http.get()
@@ -94,13 +94,13 @@ class MeController {
 		return { user: Auth.user(), guard: Auth.guard() };
 	}
 
-	@Http.get({ path: '/jwt-only' })
+	@Http.get('/jwt-only')
 	@Auth({ guards: ['jwt'] })
 	public jwtOnly() {
 		return { guard: Auth.guard() };
 	}
 
-	@Http.get({ path: '/api-key-only' })
+	@Http.get('/api-key-only')
 	@Middleware.register(AuthMiddleware.guards(['apiKey']))
 	public apiKeyOnly() {
 		return { guard: Auth.guard() };
@@ -123,7 +123,7 @@ class DeviceGuard implements Guard {
 	}
 }
 
-@Http.controller({ path: '/device' })
+@Http.controller('/device')
 class DeviceController {
 	@Http.get()
 	@Auth({ guards: ['device'] })
@@ -132,7 +132,7 @@ class DeviceController {
 	}
 }
 
-@Http.controller({ path: '/public' })
+@Http.controller('/public')
 class PublicController {
 	@Http.get()
 	@Auth({ optional: true })

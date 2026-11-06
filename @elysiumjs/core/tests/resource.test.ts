@@ -123,19 +123,19 @@ describe('Resource.serialize', () => {
 	});
 });
 
-@Http.controller({ path: '/users' })
+@Http.controller('/users')
 class UserController {
-	@Http.get({ path: '/:id', response: UserResource })
+	@Http.get('/:id', { response: UserResource })
 	public show() {
 		return row;
 	}
 
-	@Http.get({ path: '/', response: { 200: t.Array(UserResource) } })
+	@Http.get('/', { response: { 200: t.Array(UserResource) } })
 	public list() {
 		return [row, { ...row, id: 'u2', name: 'Grace' }];
 	}
 
-	@Http.get({ path: '/raw/:id', response: t.Object({ id: t.String() }), serialize: false })
+	@Http.get('/raw/:id', { response: t.Object({ id: t.String() }), serialize: false })
 	public raw() {
 		return { id: 'u1' };
 	}

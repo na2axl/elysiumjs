@@ -68,7 +68,7 @@ describe('collectRoutes', () => {
 	});
 
 	it('reports controllers declared outside the project sources', async () => {
-		@Http.controller({ path: '/inline' })
+		@Http.controller('/inline')
 		class InlineController {
 			@Http.get()
 			public index() {

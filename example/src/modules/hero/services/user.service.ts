@@ -22,7 +22,7 @@ export class UserService {
 		return this.userRepository.find(id);
 	}
 
-	@Lifecycle.on({ event: 'user:say' })
+	@Lifecycle.on('user:say')
 	private static sayFromEvent(e: LifecycleEvent<string>) {
 		const logger = Service.get(HermesLogger)!;
 		logger.info(`from source: ${e.source} with event: ${e.data}`);

@@ -60,7 +60,7 @@ export class RequestState {
 @Module.register({ services: [ClockService, GreetingService], exports: [ClockService, 'greeting'] })
 export class SharedModule extends Module {}
 
-@Http.controller({ path: '/report', scope: HttpControllerScope.REQUEST })
+@Http.controller('/report', { scope: HttpControllerScope.REQUEST })
 export class ReportController {
 	constructor(
 		// Resolved from the parameter type, which the bundler keeps as a class reference.

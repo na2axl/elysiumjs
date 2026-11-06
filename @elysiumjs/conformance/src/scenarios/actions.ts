@@ -59,16 +59,16 @@ const make = async (): Promise<Application> => {
 		}
 	}
 
-	@Http.controller({ path: '/wallet' })
+	@Http.controller('/wallet')
 	class WalletController {
-		@Http.post({ path: '/top-up' })
+		@Http.post('/top-up')
 		public topUp(@Http.context() c: { body: unknown; request: Request }) {
 			return Moirai.execute(TopUp, c.body as { amount: number }, {
 				idempotencyKey: c.request.headers.get('idempotency-key') ?? undefined
 			});
 		}
 
-		@Http.get({ path: '/' })
+		@Http.get('/')
 		public show() {
 			return wallet;
 		}

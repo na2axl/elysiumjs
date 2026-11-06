@@ -33,14 +33,14 @@ const make = async (): Promise<Application> => {
 		draft: false
 	};
 
-	@Http.controller({ path: '/posts' })
+	@Http.controller('/posts')
 	class PostController {
-		@Http.get({ path: '/:id', response: PostResource })
+		@Http.get('/:id', { response: PostResource })
 		public show() {
 			return post;
 		}
 
-		@Http.get({ path: '/', response: t.Array(PostResource) })
+		@Http.get('/', { response: t.Array(PostResource) })
 		public list() {
 			return [post, { ...post, id: 'p2', title: 'World' }];
 		}

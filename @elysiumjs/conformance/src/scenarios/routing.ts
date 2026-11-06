@@ -18,14 +18,14 @@ import { Application, Http, Module } from '@elysiumjs/core';
 import { t } from 'elysia';
 
 const make = async (): Promise<Application> => {
-	@Http.controller({ path: '/items' })
+	@Http.controller('/items')
 	class ItemsController {
-		@Http.get({ path: '/:id' })
+		@Http.get('/:id')
 		public show(@Http.param('id') id: string, @Http.query(t.Object({ q: t.String() })) query: any) {
 			return { id, q: query.q };
 		}
 
-		@Http.post({ path: '/' })
+		@Http.post('/')
 		public create(@Http.body(t.Object({ name: t.String() })) body: { name: string }) {
 			return { created: body.name };
 		}

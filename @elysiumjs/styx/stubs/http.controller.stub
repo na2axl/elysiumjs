@@ -1,6 +1,6 @@
 import { Http, HttpControllerScope } from '@elysiumjs/core';
 
-@Http.controller({ path: '{path}', scope: HttpControllerScope.{scope} })
+@Http.controller('{path}', { scope: HttpControllerScope.{scope} })
 export class {name} {
     @Http.get()
     public async get() {

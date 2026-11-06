@@ -67,8 +67,6 @@ export type FlowRefusal<S> = {
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export type FlowControllerOptions = Omit<HttpControllerProps, 'path'> & {
-	/** The name of the flow, in kebab-case. */
-	name: string;
 	/** The path of the flow's routes. Defaults to `/flows/{name}`. */
 	path?: string;
 	/** How long the flow lives after its last step, in seconds. */
@@ -85,8 +83,6 @@ export type FlowControllerOptions = Omit<HttpControllerProps, 'path'> & {
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export type FlowStepOptions<S = any> = Omit<RequestHandlerDecoratorProps, 'method' | 'path'> & {
-	/** The name of the step, and the last segment of its path. Defaults to the method name. */
-	name?: string;
 	/**
 	 * The steps that may follow, or a function of the state the step produced. The flow ends when
 	 * they are none, which is the default.
@@ -150,9 +146,11 @@ export namespace Flow {
 	 * (`POST /flows/{name}`), one that tells where it stands (`GET /flows/{name}`), and one route per
 	 * `@Flow.step()`.
 	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param name The name of the flow, in kebab-case.
+	 * @param options The options of the flow.
 	 * @example
 	 * ```ts
-	 * @Flow.controller({ name: 'sign-up', ttl: 900, owner: 'guest' })
+	 * @Flow.controller('sign-up', { ttl: 900, owner: 'guest' })
 	 * class SignUpFlow {
 	 * 	@Flow.initial()
 	 * 	public initial() {
@@ -166,9 +164,9 @@ export namespace Flow {
 	 * }
 	 * ```
 	 */
-	export const controller = (options: FlowControllerOptions): ClassDecorator => {
+	export const controller = (name: string, options: FlowControllerOptions): ClassDecorator => {
 		return (target) => {
-			const { name, path, ttl, owner, start, ...http } = options;
+			const { path, ttl, owner, start, ...http } = options;
 			if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(name)) {
 				throw new InvalidFlowError(name, 'needs a kebab-case name');
 			}
@@ -201,12 +199,12 @@ export namespace Flow {
 				Http.context()(proto, key, 0);
 				decorator(proto, key, Object.getOwnPropertyDescriptor(proto, key)!);
 			};
-			route('ariadne:start', Http.post({ path: '/' }), function (this: object, http: any) {
+			route('ariadne:start', Http.post('/'), function (this: object, http: any) {
 				return engine.start(http, this);
 			});
-			route('ariadne:state', Http.get({ path: '/' }), (http: any) => engine.state(http));
+			route('ariadne:state', Http.get('/'), (http: any) => engine.state(http));
 
-			Http.controller({ ...http, path: (path ?? `/flows/${name}`) as `/${string}` })(target as any);
+			Http.controller((path ?? `/flows/${name}`) as `/${string}`, http)(target as any);
 		};
 	};
 
@@ -218,10 +216,20 @@ export namespace Flow {
 	 * The step returns {@link advance}, {@link refuse}, or an answer that keeps the state. A
 	 * returned or thrown error commits nothing, and the client may retry the same step id.
 	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param name The name of the step, and the last segment of its path. Defaults to the method
+	 * name, and can be left out: `@Flow.step({ next: ['code'] })`.
+	 * @param options The options of the step.
 	 */
-	export const step = <S = any>(options: FlowStepOptions<S> = {}): MethodDecorator => {
+	export function step<S = any>(name: string, options?: FlowStepOptions<S>): MethodDecorator;
+	export function step<S = any>(options?: FlowStepOptions<S>): MethodDecorator;
+	export function step<S = any>(
+		nameOrOptions?: string | FlowStepOptions<S>,
+		maybeOptions: FlowStepOptions<S> = {}
+	): MethodDecorator {
+		const stepName = typeof nameOrOptions === 'string' ? nameOrOptions : undefined;
+		const options = typeof nameOrOptions === 'string' ? maybeOptions : (nameOrOptions ?? {});
 		return (target, key, descriptor) => {
-			const { name: stepName, next, back, onRewind, lease, ...http } = options;
+			const { next, back, onRewind, lease, ...http } = options;
 			const name = stepName ?? String(key);
 			if (lease !== undefined && !(lease > 0)) {
 				throw new InvalidFlowError(
@@ -253,9 +261,9 @@ export namespace Flow {
 			};
 			Object.defineProperty(wrapped, 'name', { value: original.name });
 			(descriptor as PropertyDescriptor).value = wrapped;
-			Http.post({ ...http, path: `/${name}` })(target, key, descriptor);
+			Http.post(`/${name}`, http)(target, key, descriptor);
 		};
-	};
+	}
 
 	/**
 	 * Marks the method that builds the state before the first step. It receives the

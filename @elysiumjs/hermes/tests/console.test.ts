@@ -124,19 +124,19 @@ describe('JsonConsoleLogger', () => {
 	});
 });
 
-@Http.controller({ path: '/logs' })
+@Http.controller('/logs')
 class LogController {
-	@Http.get({ path: '/ok/:id' })
+	@Http.get('/ok/:id')
 	public ok() {
 		return { ok: true };
 	}
 
-	@Http.get({ path: '/missing' })
+	@Http.get('/missing')
 	public missing() {
 		throw new NotFoundError('nope');
 	}
 
-	@Http.get({ path: '/boom' })
+	@Http.get('/boom')
 	public boom() {
 		throw new Error('boom');
 	}

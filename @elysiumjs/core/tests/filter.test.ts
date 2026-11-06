@@ -94,24 +94,24 @@ class AppFilter implements ExceptionFilter {
 	}
 }
 
-@Http.controller({ path: '/f', filters: [SkippedFilter, ControllerFilter] })
+@Http.controller('/f', { filters: [SkippedFilter, ControllerFilter] })
 class FilteredController {
-	@Http.get({ path: '/route', filters: [RouteFilter] })
+	@Http.get('/route', { filters: [RouteFilter] })
 	public route(@Http.query() query: { reason: string }) {
 		throw new PaymentError(query.reason);
 	}
 
-	@Http.get({ path: '/throwing', filters: [ThrowingFilter] })
+	@Http.get('/throwing', { filters: [ThrowingFilter] })
 	public throwing() {
 		throw new PaymentError('declined');
 	}
 
-	@Http.get({ path: '/generic' })
+	@Http.get('/generic')
 	public generic() {
 		throw new Error('generic');
 	}
 
-	@Http.get({ path: '/domain' })
+	@Http.get('/domain')
 	public domain() {
 		throw new ConflictError('taken');
 	}

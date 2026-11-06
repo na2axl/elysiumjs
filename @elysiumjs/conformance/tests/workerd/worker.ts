@@ -71,14 +71,14 @@ class Feed {
 	}
 }
 
-@Http.controller({ path: '/io' })
+@Http.controller('/io')
 class IoController {
-	@Http.get({ path: '/feed' })
+	@Http.get('/feed')
 	public feed(@Service.inject('conformance.feed') feed: Feed) {
 		return { first: feed.first, boots: feed.boots };
 	}
 
-	@Http.get({ path: '/next' })
+	@Http.get('/next')
 	public async next(@Service.inject('conformance.feed') feed: Feed) {
 		try {
 			return { chunk: await feed.next() };

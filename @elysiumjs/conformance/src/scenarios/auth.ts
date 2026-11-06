@@ -26,18 +26,18 @@ const TOKEN =
 const make = async (): Promise<Application> => {
 	const users: Record<string, { id: string; name: string }> = { u1: { id: 'u1', name: 'Ada' } };
 
-	@Http.controller({ path: '/me' })
+	@Http.controller('/me')
 	@Auth()
 	class MeController {
-		@Http.get({ path: '/' })
+		@Http.get('/')
 		public me(@Http.context() c: { currentUser: unknown }) {
 			return { user: Auth.user(), same: c.currentUser === Auth.user(), guard: Auth.guard() };
 		}
 	}
 
-	@Http.controller({ path: '/password' })
+	@Http.controller('/password')
 	class PasswordController {
-		@Http.post({ path: '/' })
+		@Http.post('/')
 		public async check() {
 			Password.use(new Pbkdf2PasswordHasher());
 			const hash = await Password.hash('correct horse');

@@ -14,7 +14,7 @@
 
 import { Http } from '@elysiumjs/core';
 
-@Http.controller({ path: '/posts' })
+@Http.controller('/posts')
 export default class PostController {
 	@Http.get()
 	public list(): string[] {

@@ -149,7 +149,7 @@ describe('@Lifecycle.on handlers and module context', () => {
 		class PrivateSvc {}
 
 		class Listener {
-			@Lifecycle.on({ event: 'ctx:probe' })
+			@Lifecycle.on('ctx:probe')
 			public static onProbe() {
 				try {
 					seen.push(Service.get('private.svc') ?? null);

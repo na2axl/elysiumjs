@@ -32,7 +32,7 @@ class TokenMiddleware extends Middleware {
 	}
 }
 
-@Websocket.controller({ path: '/chat' })
+@Websocket.controller('/chat')
 @Middleware.register(TokenMiddleware)
 class ChatController {
 	@Websocket.onMessage()
@@ -48,7 +48,7 @@ class EarlyTokenMiddleware extends Middleware {
 	}
 }
 
-@Websocket.controller({ path: '/feed' })
+@Websocket.controller('/feed')
 @Middleware.register(EarlyTokenMiddleware)
 class FeedController {
 	@Websocket.onMessage()
@@ -57,9 +57,9 @@ class FeedController {
 	}
 }
 
-@Http.controller({ path: '/health' })
+@Http.controller('/health')
 class HealthController {
-	@Http.get({ path: '/' })
+	@Http.get('/')
 	public get() {
 		return 'ok';
 	}
@@ -78,10 +78,10 @@ class ResponseGuardMiddleware extends Middleware {
 	}
 }
 
-@Http.controller({ path: '/secret' })
+@Http.controller('/secret')
 @Middleware.register(ResponseGuardMiddleware)
 class SecretController {
-	@Http.post({ path: '/' })
+	@Http.post('/')
 	public post() {
 		return 'secret';
 	}

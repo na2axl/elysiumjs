@@ -33,11 +33,11 @@ class TenantHeader extends Middleware {
 	}
 }
 
-@Http.controller({ path: '/me/follows' })
+@Http.controller('/me/follows')
 class FollowController {
 	public constructor(@Service.inject('follows') private readonly follows: FollowService) {}
 
-	@Http.post({ path: '/:id' })
+	@Http.post('/:id')
 	public follow(
 		@Http.param('id', t.String({ minLength: 3 })) id: string,
 		@Http.body(t.Object({ note: t.Optional(t.String()) })) body: { note?: string }

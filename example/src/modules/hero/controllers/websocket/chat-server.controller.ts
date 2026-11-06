@@ -6,7 +6,7 @@ import { HermesLogger } from '@elysiumjs/hermes';
 
 import { UserModel } from '#hero/models/user.model';
 
-@Websocket.controller({ path: '/chat', options: { idleTimeout: 10 } })
+@Websocket.controller('/chat', { idleTimeout: 10 })
 export class ChatServerController {
 	public constructor(@Service.inject() public logger: HermesLogger) {}
 

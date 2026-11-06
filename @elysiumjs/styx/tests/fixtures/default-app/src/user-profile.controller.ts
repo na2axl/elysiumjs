@@ -14,7 +14,7 @@
 
 import { Http } from '@elysiumjs/core';
 
-@Http.controller({ path: '/profiles' })
+@Http.controller('/profiles')
 export default class {
 	@Http.get()
 	public show(): { handle: string } {

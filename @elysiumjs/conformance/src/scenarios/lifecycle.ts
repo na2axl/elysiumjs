@@ -29,7 +29,7 @@ const make = async (): Promise<Application> => {
 		}
 	}
 
-	@Http.controller({ path: '/health' })
+	@Http.controller('/health')
 	class HealthController {
 		@Http.get()
 		public show() {

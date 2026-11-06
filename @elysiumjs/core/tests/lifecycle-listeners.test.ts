@@ -36,7 +36,7 @@ describe('module-scoped @Lifecycle listeners', () => {
 		const before = LifecycleBus.instance.listenerCount('el:import');
 
 		class Declared {
-			@Lifecycle.on({ event: 'el:import' })
+			@Lifecycle.on('el:import')
 			public static handle() {}
 		}
 
@@ -48,7 +48,7 @@ describe('module-scoped @Lifecycle listeners', () => {
 		const calls: unknown[] = [];
 
 		class Listener {
-			@Lifecycle.on({ event: 'el:static' })
+			@Lifecycle.on('el:static')
 			public static handle(e: LifecycleEvent<string>) {
 				calls.push(e.data);
 			}
@@ -73,7 +73,7 @@ describe('module-scoped @Lifecycle listeners', () => {
 
 	it('does not double-register across two boot/shutdown cycles', async () => {
 		class Listener {
-			@Lifecycle.on({ event: 'el:cycle' })
+			@Lifecycle.on('el:cycle')
 			public static handle() {}
 		}
 
@@ -98,7 +98,7 @@ describe('module-scoped @Lifecycle listeners', () => {
 
 		@Service.register({ name: 'el.listener' })
 		class Listener {
-			@Lifecycle.on({ event: 'el:instance' })
+			@Lifecycle.on('el:instance')
 			public handle() {
 				receivers.push(this);
 				seen.push(Service.get('el.peer'));
@@ -123,12 +123,12 @@ describe('module-scoped @Lifecycle listeners', () => {
 		const order: string[] = [];
 
 		class Listener {
-			@Lifecycle.once({ event: 'el:once' })
+			@Lifecycle.once('el:once')
 			public static first() {
 				order.push('once');
 			}
 
-			@Lifecycle.on({ event: 'el:once', prepend: true })
+			@Lifecycle.on('el:once', { prepend: true })
 			public static early() {
 				order.push('early');
 			}
@@ -151,7 +151,7 @@ describe('module-scoped @Lifecycle listeners', () => {
 		};
 
 		class Listener {
-			@Lifecycle.on({ event: 'el:boom' })
+			@Lifecycle.on('el:boom')
 			public static handle() {
 				throw new Error('boom');
 			}
@@ -173,7 +173,7 @@ describe('module-scoped @Lifecycle listeners', () => {
 
 	it('does not wire listeners of a module that is not initialised (lazy boot)', async () => {
 		class Listener {
-			@Lifecycle.on({ event: 'el:lazy' })
+			@Lifecycle.on('el:lazy')
 			public static handle() {}
 		}
 
@@ -188,7 +188,7 @@ describe('module-scoped @Lifecycle listeners', () => {
 
 	it('rejects an instance listener on a class that is not a service', async () => {
 		class NotAService {
-			@Lifecycle.on({ event: 'el:bad' })
+			@Lifecycle.on('el:bad')
 			public handle() {}
 		}
 

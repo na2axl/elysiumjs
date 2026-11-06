@@ -14,14 +14,14 @@ import { UserModel } from '#hero/models/user.model';
 import { UserService } from '#hero/services/user.service';
 import { co, mo } from '#hero/utils/decorators';
 
-@Http.controller({ path: '/users', scope: HttpControllerScope.SERVER, tags: ['users'] })
+@Http.controller('/users', { scope: HttpControllerScope.SERVER, tags: ['users'] })
 export class UserController {
 	public constructor(
 		@Service.inject('user.service') public readonly userService: UserService,
 		public id: string = uid(8)
 	) {}
 
-	@Http.get({
+	@Http.get('/', {
 		response: t.Array(UserModel.selectSchema),
 		operationId: 'users.list',
 		description: 'Get all users',
@@ -42,13 +42,13 @@ export class UserController {
 		return list!;
 	}
 
-	@Http.del({ response: t.Array(UserModel.selectSchema) })
+	@Http.del('/', { response: t.Array(UserModel.selectSchema) })
 	private async deleteAll(@Http.context() c: Context) {
 		await Cache.memory.del(`${c.tenant}:users:list`);
 		return this.userService.userRepository.deleteAll();
 	}
 
-	@Http.get({ path: '/:id', response: UserModel.selectSchema })
+	@Http.get('/:id', { response: UserModel.selectSchema })
 	private async getUser(
 		@Http.param('id', t.String({ format: 'uuid' })) id: string,
 		@Http.context() c: Context
@@ -58,7 +58,7 @@ export class UserController {
 		return user;
 	}
 
-	@Http.post({ response: UserModel.selectSchema })
+	@Http.post('/', { response: UserModel.selectSchema })
 	private async post(
 		@Http.body(UserModel.insertSchema) b: UserInsert,
 		@Http.query() q: any,
@@ -69,7 +69,7 @@ export class UserController {
 		return b;
 	}
 
-	@Http.patch({ response: UserModel.selectSchema })
+	@Http.patch('/', { response: UserModel.selectSchema })
 	private patch(
 		@Http.body(UserModel.updateSchema) b: UserInsert,
 		@Http.query() q: any,
@@ -78,7 +78,7 @@ export class UserController {
 		return b;
 	}
 
-	@Http.sse({ path: '/:id/notifications' })
+	@Http.sse('/:id/notifications')
 	private async sse(@Http.query() q: any, @Http.context() c: Context) {
 		while (isEmpty(this.userService.data)) {
 			await Bun.sleep(10);
@@ -87,7 +87,7 @@ export class UserController {
 		return { data: this.userService.data.shift(), id: uid(12), event: 'notification' };
 	}
 
-	@Lifecycle.on({ event: 'user:add' })
+	@Lifecycle.on('user:add')
 	private static addFromEvent(e: LifecycleEvent<User>) {
 		const us = Service.get<UserService>('user.service')!;
 		us.data.push(e.data);

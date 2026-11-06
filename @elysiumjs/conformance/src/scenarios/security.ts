@@ -18,9 +18,9 @@ import { Application, Http, Module } from '@elysiumjs/core';
 import { t } from 'elysia';
 
 const make = async (): Promise<Application> => {
-	@Http.controller({ path: '/s' })
+	@Http.controller('/s')
 	class SecurityController {
-		@Http.post({ path: '/echo' })
+		@Http.post('/echo')
 		public echo(@Http.body(t.Object({ text: t.String() })) body: { text: string }) {
 			return body;
 		}

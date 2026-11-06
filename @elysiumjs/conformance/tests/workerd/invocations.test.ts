@@ -59,7 +59,7 @@ describe('request scope disposal under waitUntil', () => {
 			}
 		}
 
-		@Http.controller({ path: '/slow' })
+		@Http.controller('/slow')
 		class SlowController {
 			@Http.get()
 			public show(@Service.inject(SlowSession) session: SlowSession) {

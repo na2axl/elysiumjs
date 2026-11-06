@@ -142,7 +142,7 @@ export abstract class TransformInterceptor {
 	 * ```ts
 	 * const Envelope = TransformInterceptor.with<Post[], { data: Post[] }>((data) => ({ data }));
 	 *
-	 * @Http.controller({ path: '/posts', interceptors: [Envelope] })
+	 * @Http.controller('/posts', { interceptors: [Envelope] })
 	 * ```
 	 */
 	public static with<TIn = unknown, TOut = unknown>(

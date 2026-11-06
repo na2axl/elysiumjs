@@ -18,7 +18,7 @@ import { Application, Env, Http, Module, Secret } from '@elysiumjs/core';
 import { t } from 'elysia';
 
 const make = async (): Promise<Application> => {
-	@Http.controller({ path: '/config' })
+	@Http.controller('/config')
 	class ConfigController {
 		@Http.get()
 		public show() {

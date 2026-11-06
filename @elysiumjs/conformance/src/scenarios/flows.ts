@@ -27,7 +27,7 @@ import { Application, Http, Module, t } from '@elysiumjs/core';
 type Greeting = { name: string };
 
 const make = async (): Promise<Application> => {
-	@Flow.controller({ name: 'greeting', ttl: 600, owner: 'guest' })
+	@Flow.controller('greeting', { ttl: 600, owner: 'guest' })
 	class GreetingFlow {
 		@Flow.initial()
 		public initial(): Greeting {
