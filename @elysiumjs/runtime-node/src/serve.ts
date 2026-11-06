@@ -39,10 +39,40 @@ const toHeaders = (raw: readonly string[]): Headers => {
 	return headers;
 };
 
-/** Builds the absolute URL of a request from its path and `Host` header. */
+/**
+ * The path and query of a request-target. An origin-form target (`/a`, also `//a/b`) is kept as
+ * is, a literal path. An absolute-form target (`http://other/a`) only gives its path and query:
+ * the `Host` header always names the host, so the target can never redirect a request to another.
+ */
+const pathOf = (target: string): string => {
+	if (target.startsWith('/')) return target;
+	try {
+		const absolute = new URL(target);
+		if (absolute.protocol === 'http:' || absolute.protocol === 'https:') {
+			return `${absolute.pathname}${absolute.search}`;
+		}
+	} catch {
+		// Not a URL either: reported below.
+	}
+	throw new TypeError(`Unsupported request-target: ${target}`);
+};
+
+/** Builds the absolute URL of a request: the `Host` header's origin, then the target's path. */
 const toUrl = (req: IncomingMessage): URL => {
 	const protocol = (req.socket as TLSSocket).encrypted ? 'https' : 'http';
-	return new URL(req.url ?? '/', `${protocol}://${req.headers.host ?? 'localhost'}`);
+	const host = req.headers.host ?? 'localhost';
+	let origin: URL;
+	try {
+		origin = new URL(`${protocol}://${host}`);
+	} catch {
+		throw new TypeError(`Invalid Host header: ${host}`);
+	}
+	const bare = origin.pathname === '/' && !origin.search && !origin.hash;
+	if (!bare || origin.username || origin.password) {
+		throw new TypeError(`Invalid Host header: ${host}`);
+	}
+	// Concatenated, not resolved against the origin: `//x/y` stays a path on this host.
+	return new URL(`${origin.origin}${pathOf(req.url ?? '/')}`);
 };
 
 /** Converts a Node request to a web `Request` whose body streams from the socket. */
@@ -81,6 +111,14 @@ const fail = (res: ServerResponse, status: number): void => {
 	res.writeHead(status).end();
 };
 
+const ABORT_ERROR_CODES = new Set(['ABORT_ERR', 'ERR_STREAM_PREMATURE_CLOSE']);
+
+/** Whether an error only reports that the stream was cut short by an abort. */
+const isAbortError = (error: unknown): boolean =>
+	error instanceof Error &&
+	(error.name === 'AbortError' ||
+		ABORT_ERROR_CODES.has((error as NodeJS.ErrnoException).code ?? ''));
+
 const handle = async (
 	fetch: FetchHandler,
 	req: IncomingMessage,
@@ -96,6 +134,7 @@ const handle = async (
 	try {
 		url = toUrl(req);
 	} catch {
+		// Every failure to form the URL comes from the client's Host header or request-target.
 		fail(res, STATUS_BAD_REQUEST);
 		return;
 	}
@@ -104,7 +143,7 @@ const handle = async (
 		await writeResponse(await fetch(toRequest(req, url, controller.signal)), res);
 	} catch (error) {
 		// A client abort ends the body stream early: there is nothing left to answer.
-		if (controller.signal.aborted) return;
+		if (controller.signal.aborted && isAbortError(error)) return;
 		getLogger({ runtime: 'node' }).error('Failed to serve a request', {
 			method: req.method,
 			url: url.href,
@@ -119,6 +158,10 @@ const handle = async (
  * socket (`Readable.toWeb`, `duplex: 'half'`), response bodies stream to it, status and headers
  * are copied (every `set-cookie` header is kept), and the request `signal` aborts when the client
  * disconnects before the response is complete.
+ *
+ * The `Host` header always names the request's host: an origin-form target such as `//x/y` is a
+ * path on that host, and an absolute-form target (`GET http://other/a`) only contributes its path
+ * and query. A `Host` header that is not a bare host, or a target that is neither form, gets a 400.
  *
  * This bridge exists because no Elysia 2 Node adapter is released yet (`@elysia/node` only has
  * `2.0.0-exp.*` builds, and `@elysiajs/node` targets Elysia 1).

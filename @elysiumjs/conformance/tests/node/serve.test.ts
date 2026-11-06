@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Server } from 'node:http';
+import type { IncomingMessage, Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
 import { once } from 'node:events';
@@ -23,6 +23,7 @@ import { runtime as runtimeNode, serveNode } from '@elysiumjs/runtime-node';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const ABORT_TIMEOUT_MS = 2000;
+const SETTLE_MS = 50;
 
 let server: Server | undefined;
 
@@ -37,6 +38,21 @@ afterEach(async () => {
 	await new Promise((resolve) => server?.close(resolve) ?? resolve(undefined));
 	server = undefined;
 });
+
+/** Sends a GET with a raw request-target and Host header, which `fetch` would normalise. */
+const rawGet = async (
+	base: string,
+	path: string,
+	host: string
+): Promise<{ status: number; body: string }> => {
+	const { port } = new URL(base);
+	const client = httpRequest({ host: '127.0.0.1', port, path, headers: { host } });
+	client.end();
+	const [response] = (await once(client, 'response')) as [IncomingMessage];
+	let body = '';
+	for await (const chunk of response) body += chunk;
+	return { status: response.statusCode ?? 0, body };
+};
 
 const streamOf = (...chunks: string[]) =>
 	new ReadableStream<Uint8Array>({
@@ -89,6 +105,50 @@ describe('serveNode', () => {
 		expect(response.headers.getSetCookie()).toEqual(['a=1; Path=/', 'b=2; Path=/']);
 	});
 
+	it('keeps the Host header authoritative over an origin-form path that starts with //', async () => {
+		const base = await start(async (req) => new Response(req.url));
+
+		const { status, body } = await rawGet(base, '//evil.example/admin?x=1', 'real.test');
+
+		expect(status).toBe(200);
+		const url = new URL(body);
+		expect(url.host).toBe('real.test');
+		expect(url.pathname).toBe('//evil.example/admin');
+		expect(url.search).toBe('?x=1');
+	});
+
+	it('keeps only the path and query of an absolute-form target, on the Host header host', async () => {
+		const base = await start(async (req) => new Response(req.url));
+
+		const { status, body } = await rawGet(base, 'https://other.example/x?q=1', 'real.test');
+
+		expect(status).toBe(200);
+		expect(body).toBe('http://real.test/x?q=1');
+	});
+
+	it('answers 400 to a Host header that is not a bare host', async () => {
+		const base = await start(async (req) => new Response(req.url));
+
+		const { status } = await rawGet(base, '/ok', 'real.test/evil');
+
+		expect(status).toBe(400);
+	});
+
+	it('leaves the request signal alone when the response completes', async () => {
+		let signal: AbortSignal | undefined;
+		const base = await start(async (req) => {
+			signal = req.signal;
+			return new Response(streamOf('done'));
+		});
+
+		const response = await fetch(base);
+		expect(await response.text()).toBe('done');
+		// The server closes its side once the body is flushed: let that settle before checking.
+		await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+
+		expect(signal?.aborted).toBe(false);
+	});
+
 	it('answers 500 when the handler throws', async () => {
 		const base = await start(async () => {
 			throw new Error('boom');
@@ -115,7 +175,7 @@ describe('serveNode', () => {
 
 		const client = httpRequest(base);
 		client.end();
-		const [response] = (await once(client, 'response')) as [import('node:http').IncomingMessage];
+		const [response] = (await once(client, 'response')) as [IncomingMessage];
 		await once(response, 'data');
 		client.destroy();
 
