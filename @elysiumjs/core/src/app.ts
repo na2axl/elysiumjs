@@ -763,7 +763,11 @@ export abstract class Application extends InteractsWithConsole {
 
 		if (problem.status >= 500 && !(await this.reportError(e))) return;
 
-		return problemResponse(problem);
+		// Headers set by the request, such as by an onError middleware, go on the problem response.
+		const headers = Object.fromEntries(
+			Object.entries(e.set?.headers ?? {}).map(([name, value]) => [name, String(value)])
+		);
+		return problemResponse(problem, headers);
 	}
 
 	/**

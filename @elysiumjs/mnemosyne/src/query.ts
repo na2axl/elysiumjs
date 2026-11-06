@@ -342,16 +342,19 @@ export namespace Query {
 
 		let after: unknown[] | undefined;
 		if (typeof query.cursor === 'string' && query.cursor !== '') {
-			after = decodeCursor(query.cursor, sort.length);
-			if (!after) {
+			const decoded = decodeCursor(query.cursor, sort.length);
+			// Each value must read as the type of its sort key, so that a crafted cursor answers a
+			// 400 instead of reaching the database.
+			const values = decoded?.map((value, index) => {
+				if (value === null) return { value: null };
+				if (!['string', 'number', 'boolean'].includes(typeof value)) return { error: 'bad' };
+				const { field, column } = sort[index]!;
+				return readValue(typeOf(spec, field, column), String(value));
+			});
+			if (!values || values.some((read) => 'error' in read)) {
 				fail('cursor', 'is not a cursor of this listing', 'cursor');
 			} else {
-				after = after.map((value, index) => {
-					const { field, column } = sort[index]!;
-					return typeOf(spec, field, column) === 'date' && typeof value === 'string'
-						? new Date(value)
-						: value;
-				});
+				after = values.map((read) => (read as { value: unknown }).value);
 			}
 		}
 

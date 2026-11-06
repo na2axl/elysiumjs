@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { ColumnMetadata } from '../src/interfaces';
+
 import { describe, expect, it } from 'bun:test';
 import { t } from 'elysia';
 
-import type { ColumnMetadata } from '../src/interfaces';
-
-import { createSchemaFromModel, AbstractModel } from '../src/model';
+import { AbstractModel, createSchemaFromModel } from '../src/model';
 
 // Hand-crafted column metadata for testing
 const userColumns: ColumnMetadata[] = [
@@ -25,7 +25,13 @@ const userColumns: ColumnMetadata[] = [
 	{ name: 'name', dataType: 'string', nullable: false, hasDefault: false, isPrimaryKey: false },
 	{ name: 'age', dataType: 'number', nullable: false, hasDefault: false, isPrimaryKey: false },
 	{ name: 'email', dataType: 'string', nullable: false, hasDefault: false, isPrimaryKey: false },
-	{ name: 'is_confirmed', dataType: 'boolean', nullable: false, hasDefault: true, isPrimaryKey: false },
+	{
+		name: 'is_confirmed',
+		dataType: 'boolean',
+		nullable: false,
+		hasDefault: true,
+		isPrimaryKey: false
+	}
 ];
 
 describe('Model', () => {
@@ -69,7 +75,13 @@ describe('Model', () => {
 		it('should make all fields optional in update mode', () => {
 			const columns: ColumnMetadata[] = [
 				{ name: 'id', dataType: 'uuid', nullable: false, hasDefault: true, isPrimaryKey: true },
-				{ name: 'name', dataType: 'string', nullable: false, hasDefault: false, isPrimaryKey: false },
+				{
+					name: 'name',
+					dataType: 'string',
+					nullable: false,
+					hasDefault: false,
+					isPrimaryKey: false
+				}
 			];
 
 			const schema = createSchemaFromModel(columns, { mode: 'update' });
@@ -82,8 +94,20 @@ describe('Model', () => {
 		it('should make fields with defaults optional in create mode', () => {
 			const columns: ColumnMetadata[] = [
 				{ name: 'id', dataType: 'uuid', nullable: false, hasDefault: true, isPrimaryKey: true },
-				{ name: 'status', dataType: 'string', nullable: false, hasDefault: true, isPrimaryKey: false },
-				{ name: 'name', dataType: 'string', nullable: false, hasDefault: false, isPrimaryKey: false },
+				{
+					name: 'status',
+					dataType: 'string',
+					nullable: false,
+					hasDefault: true,
+					isPrimaryKey: false
+				},
+				{
+					name: 'name',
+					dataType: 'string',
+					nullable: false,
+					hasDefault: false,
+					isPrimaryKey: false
+				}
 			];
 
 			const schema = createSchemaFromModel(columns, { mode: 'create' });
@@ -96,7 +120,7 @@ describe('Model', () => {
 
 		it('should handle nullable columns', () => {
 			const columns: ColumnMetadata[] = [
-				{ name: 'bio', dataType: 'string', nullable: true, hasDefault: false, isPrimaryKey: false },
+				{ name: 'bio', dataType: 'string', nullable: true, hasDefault: false, isPrimaryKey: false }
 			];
 
 			const schema = createSchemaFromModel(columns, { mode: 'select' });
@@ -124,16 +148,76 @@ describe('Model', () => {
 
 		it('should handle all supported data types', () => {
 			const allTypeColumns: ColumnMetadata[] = [
-				{ name: 'col_string', dataType: 'string', nullable: false, hasDefault: false, isPrimaryKey: false },
-				{ name: 'col_uuid', dataType: 'uuid', nullable: false, hasDefault: false, isPrimaryKey: false },
-				{ name: 'col_number', dataType: 'number', nullable: false, hasDefault: false, isPrimaryKey: false },
-				{ name: 'col_boolean', dataType: 'boolean', nullable: false, hasDefault: false, isPrimaryKey: false },
-				{ name: 'col_array', dataType: 'array', nullable: false, hasDefault: false, isPrimaryKey: false },
-				{ name: 'col_json', dataType: 'json', nullable: false, hasDefault: false, isPrimaryKey: false },
-				{ name: 'col_date', dataType: 'date', nullable: false, hasDefault: false, isPrimaryKey: false },
-				{ name: 'col_datetime', dataType: 'datetime', nullable: false, hasDefault: false, isPrimaryKey: false },
-				{ name: 'col_bigint', dataType: 'bigint', nullable: false, hasDefault: false, isPrimaryKey: false },
-				{ name: 'col_buffer', dataType: 'buffer', nullable: false, hasDefault: false, isPrimaryKey: false },
+				{
+					name: 'col_string',
+					dataType: 'string',
+					nullable: false,
+					hasDefault: false,
+					isPrimaryKey: false
+				},
+				{
+					name: 'col_uuid',
+					dataType: 'uuid',
+					nullable: false,
+					hasDefault: false,
+					isPrimaryKey: false
+				},
+				{
+					name: 'col_number',
+					dataType: 'number',
+					nullable: false,
+					hasDefault: false,
+					isPrimaryKey: false
+				},
+				{
+					name: 'col_boolean',
+					dataType: 'boolean',
+					nullable: false,
+					hasDefault: false,
+					isPrimaryKey: false
+				},
+				{
+					name: 'col_array',
+					dataType: 'array',
+					nullable: false,
+					hasDefault: false,
+					isPrimaryKey: false
+				},
+				{
+					name: 'col_json',
+					dataType: 'json',
+					nullable: false,
+					hasDefault: false,
+					isPrimaryKey: false
+				},
+				{
+					name: 'col_date',
+					dataType: 'date',
+					nullable: false,
+					hasDefault: false,
+					isPrimaryKey: false
+				},
+				{
+					name: 'col_datetime',
+					dataType: 'datetime',
+					nullable: false,
+					hasDefault: false,
+					isPrimaryKey: false
+				},
+				{
+					name: 'col_bigint',
+					dataType: 'bigint',
+					nullable: false,
+					hasDefault: false,
+					isPrimaryKey: false
+				},
+				{
+					name: 'col_buffer',
+					dataType: 'buffer',
+					nullable: false,
+					hasDefault: false,
+					isPrimaryKey: false
+				}
 			];
 
 			const schema = createSchemaFromModel(allTypeColumns, { mode: 'select' });
@@ -154,7 +238,13 @@ describe('Model', () => {
 		it('should default to select mode when no mode is specified', () => {
 			const columns: ColumnMetadata[] = [
 				{ name: 'id', dataType: 'uuid', nullable: false, hasDefault: true, isPrimaryKey: true },
-				{ name: 'name', dataType: 'string', nullable: false, hasDefault: false, isPrimaryKey: false },
+				{
+					name: 'name',
+					dataType: 'string',
+					nullable: false,
+					hasDefault: false,
+					isPrimaryKey: false
+				}
 			];
 
 			const schema = createSchemaFromModel(columns);
@@ -170,12 +260,17 @@ describe('Model', () => {
 			const mockAdapter = {
 				getTableName: () => 'users',
 				getColumns: () => userColumns,
-				createTenantTable: (table: any, tenant: string) => table,
+				createTenantTable: (table: any, tenant: string) => table
 			};
 
 			const mockTable = { _tableName: 'users' };
 
-			class UserModel extends AbstractModel('users', { id: 'uuid', name: 'text' }, mockAdapter, mockTable) {}
+			class UserModel extends AbstractModel(
+				'users',
+				{ id: 'uuid', name: 'text' },
+				mockAdapter,
+				mockTable
+			) {}
 
 			// Check if the model class has the correct static properties
 			expect(UserModel.tableName).toBe('users');
@@ -196,16 +291,33 @@ describe('Model', () => {
 				getColumns: (table: any) => {
 					getColumnsSpy.called = true;
 					return [
-						{ name: 'id', dataType: 'uuid' as const, nullable: false, hasDefault: true, isPrimaryKey: true },
-						{ name: 'title', dataType: 'string' as const, nullable: false, hasDefault: false, isPrimaryKey: false },
+						{
+							name: 'id',
+							dataType: 'uuid' as const,
+							nullable: false,
+							hasDefault: true,
+							isPrimaryKey: true
+						},
+						{
+							name: 'title',
+							dataType: 'string' as const,
+							nullable: false,
+							hasDefault: false,
+							isPrimaryKey: false
+						}
 					];
 				},
-				createTenantTable: (table: any, tenant: string) => table,
+				createTenantTable: (table: any, tenant: string) => table
 			};
 
 			const mockTable = { _tableName: 'products' };
 
-			class ProductModel extends AbstractModel('products', { id: 'uuid', title: 'text' }, mockAdapter, mockTable) {}
+			class ProductModel extends AbstractModel(
+				'products',
+				{ id: 'uuid', title: 'text' },
+				mockAdapter,
+				mockTable
+			) {}
 
 			// The adapter's getColumns should have been called during model creation
 			expect(getColumnsSpy.called).toBe(true);
@@ -220,7 +332,7 @@ describe('Model', () => {
 			const mockAdapter = {
 				getTableName: () => 'items',
 				getColumns: () => [],
-				createTenantTable: (table: any, tenant: string) => table,
+				createTenantTable: (table: any, tenant: string) => table
 			};
 
 			const mockTable = { _tableName: 'items' };

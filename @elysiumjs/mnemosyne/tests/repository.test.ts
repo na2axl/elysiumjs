@@ -21,7 +21,7 @@ import { AbstractRepository } from '../src/repository';
 const mockDriver = {
 	createConnection: mock((config: any) => ({ mockConnection: true, config })),
 	withTransaction: mock((conn: any, cb: any) => cb(conn)),
-	getRawClient: mock((conn: any) => ({ rawClient: true })),
+	getRawClient: mock((conn: any) => ({ rawClient: true }))
 };
 
 // Create a concrete database class for testing
@@ -40,7 +40,7 @@ const MockModel = {
 	insertSchema: {},
 	updateSchema: {},
 	selectSchema: {},
-	supportTenancy: false,
+	supportTenancy: false
 } as any;
 
 describe('AbstractRepository', () => {
@@ -70,16 +70,36 @@ describe('AbstractRepository', () => {
 
 			// Create a concrete subclass since AbstractRepository returns an abstract class
 			class ConcreteRepository extends TestRepository {
-				public async all() { return []; }
-				public async paginate() { return { page: 1, data: [], total: 0 }; }
-				public async find() { return null; }
-				public async findBy() { return null; }
-				public async insert(data: any) { return data; }
-				public async update(id: any, data: any) { return data; }
-				public async updateAll(data: any) { return [data]; }
-				public async delete(id: any) { return {}; }
-				public async deleteAll() { return []; }
-				public async exists(id: any) { return false; }
+				public async all() {
+					return [];
+				}
+				public async paginate() {
+					return { page: 1, data: [], total: 0 };
+				}
+				public async find() {
+					return null;
+				}
+				public async findBy() {
+					return null;
+				}
+				public async insert(data: any) {
+					return data;
+				}
+				public async update(id: any, data: any) {
+					return data;
+				}
+				public async updateAll(data: any) {
+					return [data];
+				}
+				public async delete(id: any) {
+					return {};
+				}
+				public async deleteAll() {
+					return [];
+				}
+				public async exists(id: any) {
+					return false;
+				}
 			}
 
 			const repo = new ConcreteRepository();
@@ -99,16 +119,36 @@ describe('AbstractRepository', () => {
 			// Create a concrete subclass with a custom connection
 			class CustomRepository extends TestRepository {
 				public static readonly connection = 'custom';
-				public async all() { return []; }
-				public async paginate() { return { page: 1, data: [], total: 0 }; }
-				public async find() { return null; }
-				public async findBy() { return null; }
-				public async insert(data: any) { return data; }
-				public async update(id: any, data: any) { return data; }
-				public async updateAll(data: any) { return [data]; }
-				public async delete(id: any) { return {}; }
-				public async deleteAll() { return []; }
-				public async exists(id: any) { return false; }
+				public async all() {
+					return [];
+				}
+				public async paginate() {
+					return { page: 1, data: [], total: 0 };
+				}
+				public async find() {
+					return null;
+				}
+				public async findBy() {
+					return null;
+				}
+				public async insert(data: any) {
+					return data;
+				}
+				public async update(id: any, data: any) {
+					return data;
+				}
+				public async updateAll(data: any) {
+					return [data];
+				}
+				public async delete(id: any) {
+					return {};
+				}
+				public async deleteAll() {
+					return [];
+				}
+				public async exists(id: any) {
+					return false;
+				}
 			}
 
 			const repo = new CustomRepository();
@@ -126,16 +166,36 @@ describe('AbstractRepository', () => {
 
 			// Create a concrete subclass implementing all abstract methods
 			class ConcreteRepository extends TestRepository {
-				public async all() { return []; }
-				public async paginate() { return { page: 1, data: [], total: 0 }; }
-				public async find() { return null; }
-				public async findBy() { return null; }
-				public async insert(data: any) { return data; }
-				public async update(id: any, data: any) { return data; }
-				public async updateAll(data: any) { return [data]; }
-				public async delete(id: any) { return {}; }
-				public async deleteAll() { return []; }
-				public async exists(id: any) { return false; }
+				public async all() {
+					return [];
+				}
+				public async paginate() {
+					return { page: 1, data: [], total: 0 };
+				}
+				public async find() {
+					return null;
+				}
+				public async findBy() {
+					return null;
+				}
+				public async insert(data: any) {
+					return data;
+				}
+				public async update(id: any, data: any) {
+					return data;
+				}
+				public async updateAll(data: any) {
+					return [data];
+				}
+				public async delete(id: any) {
+					return {};
+				}
+				public async deleteAll() {
+					return [];
+				}
+				public async exists(id: any) {
+					return false;
+				}
 			}
 
 			const repo = new ConcreteRepository();
@@ -148,16 +208,36 @@ describe('AbstractRepository', () => {
 			const TestRepository = AbstractRepository(MockModel, db);
 
 			class ConcreteRepository extends TestRepository {
-				public async all() { return []; }
-				public async paginate() { return { page: 1, data: [], total: 0 }; }
-				public async find() { return null; }
-				public async findBy() { return null; }
-				public async insert(data: any) { return data; }
-				public async update(id: any, data: any) { return data; }
-				public async updateAll(data: any) { return [data]; }
-				public async delete(id: any) { return {}; }
-				public async deleteAll() { return []; }
-				public async exists(id: any) { return false; }
+				public async all() {
+					return [];
+				}
+				public async paginate() {
+					return { page: 1, data: [], total: 0 };
+				}
+				public async find() {
+					return null;
+				}
+				public async findBy() {
+					return null;
+				}
+				public async insert(data: any) {
+					return data;
+				}
+				public async update(id: any, data: any) {
+					return data;
+				}
+				public async updateAll(data: any) {
+					return [data];
+				}
+				public async delete(id: any) {
+					return {};
+				}
+				public async deleteAll() {
+					return [];
+				}
+				public async exists(id: any) {
+					return false;
+				}
 			}
 
 			const repo = new ConcreteRepository();

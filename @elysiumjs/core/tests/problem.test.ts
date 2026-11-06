@@ -135,8 +135,39 @@ describe('problem details over HTTP', () => {
 		}
 	}
 
+	const seenErrors: unknown[] = [];
+
+	/** Sees the error of a failed request, and sets a header on its response. */
+	class Witness extends Middleware {
+		public onError(c: { error: unknown; set: { headers: Record<string, string> } }) {
+			seenErrors.push(c.error);
+			c.set.headers['x-witness'] = 'seen';
+		}
+	}
+
+	class EvenBody {
+		static readonly schema = t.Object({ n: t.Number() });
+		static async authorize() {
+			return true;
+		}
+		static async validate(c: { body: { n: number } }) {
+			return c.body.n % 2 === 0;
+		}
+	}
+
 	@Http.controller({ path: '/p' })
 	class ProblemController {
+		@Http.post({ path: '/even' })
+		public even(@Http.body(EvenBody as never) body: unknown) {
+			return body;
+		}
+
+		@Middleware.register(Witness)
+		@Http.get({ path: '/witnessed' })
+		public witnessed() {
+			throw DomainError.conflict('no');
+		}
+
 		@Http.get({ path: '/domain' })
 		public domain() {
 			throw new InsufficientFundsError(5);
@@ -275,5 +306,23 @@ describe('problem details over HTTP', () => {
 			.body('{bad');
 		expect(unparsable.status).toBe(400);
 		expect(reported).toEqual([]);
+	});
+
+	it('answers a problem when a custom validator refuses the body', async () => {
+		const http = await start();
+		const refused = await http.post('/p/even').json({ n: 3 });
+		expect(refused.status).toBe(400);
+		expect(refused.headers.get('content-type')).toBe(PROBLEM_CONTENT_TYPE);
+		expect((await refused.json()).detail).toBe('The request body is invalid.');
+		expect((await http.post('/p/even').json({ n: 4 })).status).toBe(200);
+	});
+
+	it('runs the onError middlewares of a failed request before its problem is built', async () => {
+		const http = await start();
+		const response = await http.get('/p/witnessed');
+		expect(response.status).toBe(409);
+		expect(response.headers.get('x-witness')).toBe('seen');
+		expect(seenErrors).toHaveLength(1);
+		expect((await http.get('/p/domain')).headers.get('x-witness')).toBeNull();
 	});
 });

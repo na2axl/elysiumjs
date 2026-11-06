@@ -100,8 +100,11 @@ const ERROR_HOOKS = Symbol('elysium:middleware-error-hooks');
 
 type Enlisted = { middlewares: Middleware[]; node: ModuleNode | null };
 
-/** Remembers the middlewares a request went through, so that their onError runs if it fails. */
-const enlist = (context: any, middlewares: Middleware[], node: ModuleNode | null): void => {
+/**
+ * Remembers the middlewares a request went through, so that their onError runs if it fails.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export const enlist = (context: any, middlewares: Middleware[], node: ModuleNode | null): void => {
 	const list: Enlisted[] = (context[ERROR_HOOKS] ??= []);
 	if (!list.some((entry) => entry.middlewares === middlewares)) list.push({ middlewares, node });
 };
