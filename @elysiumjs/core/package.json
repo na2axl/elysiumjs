@@ -2,7 +2,7 @@
   "name": "@elysiumjs/core",
   "version": "0.11.0",
   "license": "Apache-2.0",
-  "description": "A super-charged web framework for Bun, built on top of ElysiaJS.",
+  "description": "A structured web framework built on ElysiaJS, for Bun, Node.js and Cloudflare Workers.",
   "private": false,
   "author": "Workbud Technologies Inc.",
   "repository": {

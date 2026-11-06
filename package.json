@@ -5,6 +5,7 @@
 	"workspaces": {
 		"packages": [
 			"@elysiumjs/*",
+			"conformance",
 			"create-elysium",
 			"example"
 		],

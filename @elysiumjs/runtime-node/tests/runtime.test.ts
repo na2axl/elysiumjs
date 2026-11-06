@@ -16,7 +16,7 @@ import type { AnyElysia } from 'elysia';
 
 import { describe, expect, it, mock } from 'bun:test';
 
-// The bridge opens a real port: tests/node/serve.test.ts in @elysiumjs/conformance covers it.
+// The bridge opens a real port: conformance/tests/node/serve.test.ts covers it.
 const serveNode = mock();
 mock.module('../src/serve', () => ({ serveNode, peerAddress: mock() }));
 

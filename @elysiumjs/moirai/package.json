@@ -2,7 +2,7 @@
   "name": "@elysiumjs/moirai",
   "version": "0.1.0",
   "license": "Apache-2.0",
-  "description": "Commands, queries, idempotency, outbox and inbox for the Elysium.js framework.",
+  "description": "Actions, queries, idempotency, outbox, inbox and domain events for the Elysium.js framework.",
   "private": false,
   "author": {
     "name": "Axel Nana",

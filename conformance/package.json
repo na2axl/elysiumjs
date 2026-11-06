@@ -11,11 +11,11 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "bun test tests/bun",
-    "pretest:node": "bun run --cwd ../core build && bun run --cwd ../mnemosyne build && bun run --cwd ../moirai build && bun run --cwd ../themis build && bun run --cwd ../ariadne build && bun run --cwd ../runtime-node build",
+    "pretest:node": "bun run --cwd ../@elysiumjs/core build && bun run --cwd ../@elysiumjs/mnemosyne build && bun run --cwd ../@elysiumjs/moirai build && bun run --cwd ../@elysiumjs/themis build && bun run --cwd ../@elysiumjs/ariadne build && bun run --cwd ../@elysiumjs/runtime-node build",
     "test:node": "vitest run -c vitest.node.config.ts",
-    "pretest:workerd": "bun run --cwd ../core build && bun run --cwd ../mnemosyne build && bun run --cwd ../moirai build && bun run --cwd ../themis build && bun run --cwd ../ariadne build && bun run --cwd ../ariadne-workers build && bun run --cwd ../runtime-workers build",
+    "pretest:workerd": "bun run --cwd ../@elysiumjs/core build && bun run --cwd ../@elysiumjs/mnemosyne build && bun run --cwd ../@elysiumjs/moirai build && bun run --cwd ../@elysiumjs/themis build && bun run --cwd ../@elysiumjs/ariadne build && bun run --cwd ../@elysiumjs/ariadne-workers build && bun run --cwd ../@elysiumjs/runtime-workers build",
     "test:workerd": "vitest run -c vitest.workerd.config.ts",
-    "pretest:workerd-aot": "bun run --cwd ../core build && bun run --cwd ../mnemosyne build && bun run --cwd ../moirai build && bun run --cwd ../themis build && bun run --cwd ../ariadne build && bun run --cwd ../ariadne-workers build && bun run --cwd ../runtime-workers build && bun scripts/build-aot.ts",
+    "pretest:workerd-aot": "bun run --cwd ../@elysiumjs/core build && bun run --cwd ../@elysiumjs/mnemosyne build && bun run --cwd ../@elysiumjs/moirai build && bun run --cwd ../@elysiumjs/themis build && bun run --cwd ../@elysiumjs/ariadne build && bun run --cwd ../@elysiumjs/ariadne-workers build && bun run --cwd ../@elysiumjs/runtime-workers build && bun scripts/build-aot.ts",
     "test:workerd-aot": "vitest run -c vitest.workerd-aot.config.ts"
   },
   "type": "module",
