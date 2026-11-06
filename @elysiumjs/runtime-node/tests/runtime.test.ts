@@ -16,7 +16,11 @@ import type { AnyElysia } from 'elysia';
 
 import { describe, expect, it, mock } from 'bun:test';
 
-import { runtime } from '../src';
+// The bridge opens a real port: tests/node/serve.test.ts in @elysiumjs/conformance covers it.
+const serveNode = mock();
+mock.module('../src/serve', () => ({ serveNode }));
+
+const { runtime } = await import('../src');
 
 describe('runtime', () => {
 	it('is named node', () => {
@@ -34,10 +38,21 @@ describe('runtime', () => {
 		expect(performance.now() - start).toBeGreaterThanOrEqual(4);
 	});
 
-	it('serves through the app listen method', () => {
-		const app = { listen: mock() } as unknown as AnyElysia;
+	it('serves the app fetch handler through the node:http bridge', async () => {
+		const response = new Response('ok');
+		const app = { listen: mock(), fetch: mock(() => response) } as unknown as AnyElysia;
 		runtime.serve(app, 1234);
-		expect(app.listen).toHaveBeenCalledWith(1234);
+
+		expect(app.listen).not.toHaveBeenCalled();
+		expect(serveNode).toHaveBeenCalledTimes(1);
+		const [fetch, port] = serveNode.mock.calls[0] as unknown as [
+			(req: Request) => Promise<Response>,
+			number
+		];
+		expect(port).toBe(1234);
+		const request = new Request('http://localhost/');
+		expect(await fetch(request)).toBe(response);
+		expect(app.fetch).toHaveBeenCalledWith(request);
 	});
 
 	it('exits through process.exit', () => {

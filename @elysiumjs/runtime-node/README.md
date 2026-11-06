@@ -20,7 +20,7 @@ class App extends Application {}
 
 The package exports `runtime`; rename it at import if you like: `import { runtime as nodeRuntime } from '@elysiumjs/runtime-node'`.
 
-Uses `process.env`, timers, Elysia's `listen`, `process.exit` and `SIGINT`/`SIGTERM` handlers. Elysia needs its Node adapter: set `server: { adapter: node() }` from `@elysiajs/node`.
+Uses `process.env`, timers, `process.exit` and `SIGINT`/`SIGTERM` handlers. It serves the app on a `node:http` server through `serveNode`, a bridge to Elysia's `fetch` handler (no Elysia 2 Node adapter is released yet), so no adapter needs to be configured.
 
 ## License
 

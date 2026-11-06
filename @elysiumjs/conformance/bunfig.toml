@@ -1,5 +1,2 @@
 [test]
 root = "./tests"
-
-[run]
-bun = true
