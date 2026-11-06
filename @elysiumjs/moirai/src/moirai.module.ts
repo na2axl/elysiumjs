@@ -13,13 +13,13 @@
 // limitations under the License.
 
 import type { MoiraiOptions } from './config';
-import type { CommandLock, IdempotencyStore, InboxStore, OutboxStore } from './stores';
+import type { ActionLock, IdempotencyStore, InboxStore, OutboxStore } from './stores';
 
 import { Module } from '@elysiumjs/core';
 
 import {
 	DEFAULT_OPTIONS,
-	MOIRAI_COMMAND_LOCK,
+	MOIRAI_ACTION_LOCK,
 	MOIRAI_IDEMPOTENCY_STORE,
 	MOIRAI_INBOX_STORE,
 	MOIRAI_OPTIONS,
@@ -36,7 +36,7 @@ export type MoiraiModuleConfig = Partial<MoiraiOptions> & {
 	idempotency?: StoreOption<IdempotencyStore>;
 	outbox?: StoreOption<OutboxStore>;
 	inbox?: StoreOption<InboxStore>;
-	lock?: StoreOption<CommandLock>;
+	lock?: StoreOption<ActionLock>;
 };
 
 const build = <T>(option: StoreOption<T>): T =>
@@ -64,7 +64,7 @@ const build = <T>(option: StoreOption<T>): T =>
 			[MOIRAI_IDEMPOTENCY_STORE, idempotency],
 			[MOIRAI_OUTBOX_STORE, outbox],
 			[MOIRAI_INBOX_STORE, inbox],
-			[MOIRAI_COMMAND_LOCK, lock]
+			[MOIRAI_ACTION_LOCK, lock]
 		];
 		return [
 			{ name: MOIRAI_OPTIONS, global: true, factory: () => ({ ...DEFAULT_OPTIONS, ...rest }) },
