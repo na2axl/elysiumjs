@@ -12,13 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { exists } from 'node:fs/promises';
+import { access } from 'node:fs/promises';
 
 import { Command, CommandArgumentType } from '@elysiumjs/core';
-import prompts from 'prompts';
 
 import { stripPublicSchema } from '../migrations';
 import { getMigrationsPath, getProjectPath } from './project';
+
+/** Whether a path exists. `node:fs/promises` has no `exists` outside Bun, and this module loads on every runtime. */
+const exists = (path: string): Promise<boolean> =>
+	access(path).then(
+		() => true,
+		() => false
+	);
 
 /** Lists the SQL files of the migrations directory, as absolute paths. */
 const listSqlFiles = async (migrationsPath: string): Promise<string[]> => {
@@ -46,6 +52,8 @@ export class MigrationGenerateCommand extends Command {
 
 	public async run(): Promise<void> {
 		if (!this.name) {
+			// Loaded on use: prompts needs Node.js streams, which Workers bundles leave out.
+			const { default: prompts } = await import('prompts');
 			const answers = await prompts(
 				[
 					{

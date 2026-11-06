@@ -162,10 +162,10 @@ export const getSessionTenant = async (
 	const config = getTenancyConfig();
 	const varName = config.rls?.sessionVariable ?? 'app.current_tenant';
 
-	// Bun SQL returns the rows as an array, not as a `{ rows }` result.
-	const [row] = (await db.execute(
-		sql`SELECT current_setting(${varName}, true) as tenant`
-	)) as unknown as Array<{ tenant: string | null }>;
+	// Bun SQL and postgres.js return the rows as an array, node-postgres as a `{ rows }` result.
+	const result = (await db.execute(sql`SELECT current_setting(${varName}, true) as tenant`)) as
+		Array<{ tenant: string | null }> | { rows: Array<{ tenant: string | null }> };
+	const [row] = Array.isArray(result) ? result : result.rows;
 	return row?.tenant || null;
 };
 

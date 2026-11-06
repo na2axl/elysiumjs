@@ -36,7 +36,7 @@
   "scripts": {
     "format": "prettier --write \"./src/**/*.ts\"",
     "clean": "rimraf dist",
-    "build:js": "bun build ./src/index.ts --outdir ./dist --target bun -e zod -e @elysiumjs/core --root ./src --minify-syntax --minify-whitespace",
+    "build:js": "bun build ./src/index.ts --outdir ./dist --target bun -e zod -e @elysiumjs/core -e elysia -e 'elysia/*' --root ./src --minify-syntax --minify-whitespace",
     "build:ts": "tsc",
     "build": "bun run clean && bun run build:js && bun run build:ts",
     "test": "bun test",
@@ -49,7 +49,8 @@
   },
   "devDependencies": {
     "@elysiumjs/core": "workspace:*",
-    "elysia": "^2.0.0-rc.1"
+    "elysia": "^2.0.0-rc.1",
+    "@elysiumjs/runtime-node": "workspace:*"
   },
   "peerDependencies": {
     "@elysiumjs/core": "workspace:^",

@@ -15,3 +15,4 @@
 export * from './clean.command';
 export * from './list.command';
 export * from './work.command';
+export * from './schedule.command';

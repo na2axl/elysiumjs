@@ -70,6 +70,17 @@ describe('WorkersBuilder', () => {
 		expect(await Bun.file(join(outdir, 'api.js.map')).exists()).toBe(true);
 	});
 
+	it('leaves Node.js modules imported by their bare names to workerd', async () => {
+		const result = await new WorkersBuilder().build({
+			entry: join(fixtures, 'node-modules.ts'),
+			outdir,
+			minify: false,
+			sourcemap: false
+		});
+		const bundle = await Bun.file(result.outputPath).text();
+		expect(bundle).toMatch(/from ["']node:events["']/);
+	});
+
 	it('fails when the entry does not export its Elysia app', async () => {
 		expect(
 			new WorkersBuilder().build({ entry: join(fixtures, 'no-app.ts'), outdir })

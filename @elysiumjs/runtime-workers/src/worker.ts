@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import type { Application, Elysia, ModuleNode } from '@elysiumjs/core';
-import type { WorkersHandler, WorkersMessageBatch } from './types';
+import type { WorkersHandler, WorkersMessageBatch, WorkersQueueMessage } from './types';
 import type { WorkersHandlerMeta } from './workers';
 
 import { getLogger, ModuleContext, Service } from '@elysiumjs/core';
@@ -101,8 +101,39 @@ const dispatch = async (
 };
 
 /**
+ * Wraps a message so that a handler can settle it itself (`ack()`, or `retry()` with a delay); a
+ * settled message is left as the handler settled it.
+ */
+const settleable = (
+	message: WorkersQueueMessage,
+	settled: Set<WorkersQueueMessage>
+): WorkersQueueMessage => ({
+	get id() {
+		return message.id;
+	},
+	get timestamp() {
+		return message.timestamp;
+	},
+	get body() {
+		return message.body;
+	},
+	get attempts() {
+		return message.attempts;
+	},
+	ack: () => {
+		settled.add(message);
+		message.ack();
+	},
+	retry: (options) => {
+		settled.add(message);
+		message.retry(options);
+	}
+});
+
+/**
  * Runs the queue handlers matching the batch, then acks the messages no handler failed on and
- * retries the others. A failing handler never rejects the batch.
+ * retries the others, except those a handler settled itself. A failing handler never rejects the
+ * batch.
  */
 const dispatchQueue = async (handlers: Handler[], batch: WorkersMessageBatch): Promise<void> => {
 	const matching = handlers.filter(
@@ -111,6 +142,7 @@ const dispatchQueue = async (handlers: Handler[], batch: WorkersMessageBatch): P
 	if (matching.length === 0) throw new NoWorkersHandlerError('queue', batch.queue);
 
 	const failed = new Set<number>();
+	const settled = new Set<WorkersQueueMessage>();
 	const log = (handler: Handler, error: unknown) =>
 		getLogger().error('Queue handler failed', {
 			queue: batch.queue,
@@ -122,7 +154,7 @@ const dispatchQueue = async (handlers: Handler[], batch: WorkersMessageBatch): P
 		if (handler.each) {
 			for (const [index, message] of batch.messages.entries()) {
 				try {
-					await runHandler(handler, message);
+					await runHandler(handler, settleable(message, settled));
 				} catch (error) {
 					failed.add(index);
 					log(handler, error);
@@ -139,6 +171,7 @@ const dispatchQueue = async (handlers: Handler[], batch: WorkersMessageBatch): P
 	}
 
 	for (const [index, message] of batch.messages.entries()) {
+		if (settled.has(message)) continue;
 		if (failed.has(index)) message.retry();
 		else message.ack();
 	}

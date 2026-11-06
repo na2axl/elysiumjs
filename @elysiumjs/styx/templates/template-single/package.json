@@ -2,26 +2,7 @@
 	"name": "{PROJECT_NAME}",
 	"type": "module",
 	"private": true,
-	"scripts": {
-		"dev": "bun --watch styx serve",
-		"routes": "styx routes:generate",
-		"typecheck": "styx routes:generate && tsc --noEmit"
-	},
 	"imports": {
 		"#root/*": "./src/*.ts"
-	},
-	"devDependencies": {
-		"@types/bun": "latest",
-		"drizzle-kit": "^1.0.0-rc.5",
-		"@elysiumjs/styx": "latest"
-	},
-	"peerDependencies": {
-		"typescript": "^7.0.2"
-	},
-	"dependencies": {
-		"@elysiumjs/core": "latest",
-		"@elysiumjs/hermes": "latest",
-		"@elysiumjs/redis": "latest",
-		"@elysiumjs/mnemosyne-drizzle": "latest"
 	}
 }

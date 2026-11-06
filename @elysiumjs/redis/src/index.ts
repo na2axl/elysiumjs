@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export { type RedisClientFactory, type RedisConnection, bunRedis } from './connection';
+export { type RedisClientFactory, type RedisConnection } from './connection';
 export { type RedisConnectionProps, type RedisModuleConfig, Redis, RedisModule } from './redis';
+export { bunRedis } from './adapters/bun';
+export { type IoredisLike, ioredis } from './adapters/ioredis';
+export { upstash, type UpstashOptions } from './adapters/upstash';
+export { RedisFeatureNotSupportedError } from './errors';
 export { RedisRateLimitStore } from './rate-limit';

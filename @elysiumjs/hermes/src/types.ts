@@ -26,6 +26,11 @@ export interface HermesConfig {
 	level: LogLevel;
 	format: LogFormat;
 	transports?: TransportConfig[];
+	/**
+	 * Where log lines go: `pino`, or `console` for JSON lines through `console` with no
+	 * dependency. Defaults to `console` on Cloudflare Workers and `pino` elsewhere.
+	 */
+	transport?: 'pino' | 'console';
 }
 
 export const DEFAULT_CONFIG: HermesConfig = {

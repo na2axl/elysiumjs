@@ -12,9 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Runtime } from '@elysiumjs/core';
+import type { OutputLevel, Runtime } from '@elysiumjs/core';
 
 import { RuntimeNotSupportedError } from '@elysiumjs/core';
+
+/** The console method of each level. */
+const CONSOLE_METHODS: Record<OutputLevel, 'debug' | 'info' | 'warn' | 'error'> = {
+	trace: 'debug',
+	debug: 'debug',
+	info: 'info',
+	warn: 'warn',
+	error: 'error',
+	fatal: 'error'
+};
 
 /**
  * Options of {@link createRuntime}.
@@ -48,11 +58,10 @@ export const createRuntime = (options: WorkersRuntimeOptions = {}): Runtime => (
 	},
 	exit() {},
 	argv: () => [],
-	write(stream, text) {
-		// console adds its own newline.
+	write(stream, text, level) {
+		// console adds its own newline, and Workers Logs takes the level of a line from its method.
 		const line = text.endsWith('\n') ? text.slice(0, -1) : text;
-		if (stream === 'stderr') console.error(line);
-		else console.log(line);
+		console[level ? CONSOLE_METHODS[level] : stream === 'stderr' ? 'error' : 'log'](line);
 	},
 	terminal: () => undefined,
 	clientAddress: (request) => request.headers.get('cf-connecting-ip') ?? undefined,

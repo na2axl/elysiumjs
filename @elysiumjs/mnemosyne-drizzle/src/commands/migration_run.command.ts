@@ -12,13 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { readdir } from 'node:fs/promises';
+import { join } from 'node:path';
+
 import { Command, CommandArgumentType } from '@elysiumjs/core';
 import { isValidTenantId } from '@elysiumjs/mnemosyne';
-import prompts from 'prompts';
 
 import { Database } from '../database';
 import { getMigrationName, planMigrations } from '../migrations';
 import { getMigrationsPath } from './project';
+
+/**
+ * Lists the `.sql` files under a folder, at any depth, as absolute paths.
+ * @param folder The migrations folder.
+ */
+const listMigrationFiles = async (folder: string): Promise<string[]> => {
+	const entries = await readdir(folder, { recursive: true, withFileTypes: true }).catch(
+		(error: NodeJS.ErrnoException) => {
+			if (error.code === 'ENOENT') return [];
+			throw error;
+		}
+	);
+	return entries
+		.filter((entry) => entry.isFile() && entry.name.endsWith('.sql'))
+		.map((entry) => join(entry.parentPath, entry.name));
+};
 
 /**
  * Execute migration files.
@@ -117,13 +135,7 @@ export class MigrationRunCommand extends Command {
 				appliedAt: row.applied_at
 			}));
 
-			const filesIt = new Bun.Glob('**/*.sql').scan({
-				cwd: getMigrationsPath(),
-				absolute: true,
-				onlyFiles: true
-			});
-
-			const files = await Array.fromAsync(filesIt);
+			const files = await listMigrationFiles(getMigrationsPath());
 			const { pending: sqlFiles, renames } = planMigrations(files, completedMigrations);
 
 			for (const { from, to } of renames) {
@@ -176,6 +188,8 @@ export class MigrationRunCommand extends Command {
 			return false;
 		}
 
+		// Loaded on use: prompts needs Node.js streams, which Workers bundles leave out.
+		const { default: prompts } = await import('prompts');
 		const answers = await prompts(
 			[
 				{

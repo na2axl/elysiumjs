@@ -25,7 +25,8 @@ export { pgTable, getTableBuilders } from './table';
 
 // Re-exports
 export { Database, DEFAULT_CACHE_TTL, DrizzleDatabaseCache, TenantMismatchError } from './database';
-export type { DrizzleConnectionProps, DrizzleConnection } from './database';
+export type { DrizzleConnectionProps, DrizzleConnection, DrizzleQueryResultHKT } from './database';
+export { type DrizzleDriver, type DrizzleDriverConfig, MissingDriverError } from './driver';
 export {
 	DrizzleModel,
 	createSchemaFromDrizzle,

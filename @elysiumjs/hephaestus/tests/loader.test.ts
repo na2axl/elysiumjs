@@ -39,6 +39,7 @@ describe('loadConfig', () => {
 		const config = await loadConfig(tempDir, { optional: true });
 		expect(config.output.name).toBe(basename(tempDir));
 		expect(config.workers).toEqual({ entry: './src/worker.ts', outfile: 'worker.js' });
+		expect(config.node).toEqual({ entry: './src/server.ts', outfile: 'server.js', external: [] });
 	});
 
 	it('should load a JSON config file', async () => {

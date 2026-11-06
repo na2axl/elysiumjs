@@ -13,6 +13,7 @@
 // limitations under the License.
 
 export { type BuildResult, BinaryBuilder } from './binary.builder';
+export { type NodeBuildOptions, type NodeBuildResult, NodeBuilder } from './node.builder';
 export {
 	type WorkersBuildOptions,
 	type WorkersBuildResult,
