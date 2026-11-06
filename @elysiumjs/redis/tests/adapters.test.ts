@@ -14,6 +14,7 @@
 
 import { EventEmitter } from 'node:events';
 
+import { ElysiumError } from '@elysiumjs/core';
 import { describe, expect, it } from 'bun:test';
 
 import { ioredis, RedisFeatureNotSupportedError, upstash } from '../src';
@@ -152,5 +153,12 @@ describe('upstash', () => {
 		await expect(connection.subscribe('c', () => {})).rejects.toBeInstanceOf(
 			RedisFeatureNotSupportedError
 		);
+	});
+
+	it('refuses a connection without a REST URL or a token', () => {
+		expect(() => upstash({ token: 't0k' })(undefined as unknown as string, {})).toThrow(
+			ElysiumError
+		);
+		expect(() => upstash({ token: '' })('https://db.upstash.io', {})).toThrow(/REST token/);
 	});
 });

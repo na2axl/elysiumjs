@@ -242,5 +242,12 @@ class UpstashConnection implements RedisConnection {
  */
 export const upstash =
 	(options: UpstashOptions): RedisClientFactory =>
-	(url) =>
-		new UpstashConnection(options.url ?? url, options.token, options.fetch ?? fetch);
+	(url) => {
+		const restUrl = options.url ?? url;
+		if (!restUrl || !options.token) {
+			throw new ElysiumError(
+				'The Upstash Redis connection needs a REST URL and a REST token. Set the connection URL (or the url option) and the token option.'
+			);
+		}
+		return new UpstashConnection(restUrl, options.token, options.fetch ?? fetch);
+	};
