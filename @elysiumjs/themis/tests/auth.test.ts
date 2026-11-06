@@ -15,7 +15,7 @@
 import type { TestingHttpApp, TestResponse } from '@elysiumjs/core';
 import type { Guard, SessionStore } from '../src';
 
-import { Application, DomainError, Http, Middleware, Module, Service, t } from '@elysiumjs/core';
+import { Application, ConflictError, Http, Middleware, Module, Service, t } from '@elysiumjs/core';
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import {
@@ -70,7 +70,7 @@ class SessionController {
 	@Http.post({ path: '/login-then-refuse', body: t.Object({ id: t.String() }) })
 	public loginThenRefuse(@Http.body() body: { id: string }) {
 		Auth.login(body.id);
-		throw DomainError.conflict('signed in, but refused');
+		throw new ConflictError('signed in, but refused');
 	}
 
 	@Http.post({ path: '/big' })

@@ -12,7 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Application, DATABASE_TRANSACTION_SERVICE, getLogger, Service } from '@elysiumjs/core';
+import {
+	Application,
+	DATABASE_TRANSACTION_SERVICE,
+	DomainError,
+	getLogger,
+	Service
+} from '@elysiumjs/core';
 
 /** A callback run once the unit of work has committed or rolled back. */
 type Hook = () => unknown | Promise<unknown>;
@@ -21,6 +27,11 @@ type Hook = () => unknown | Promise<unknown>;
 type Frame = { afterCommit: Hook[]; afterRollback: Hook[] };
 
 const FRAME = 'uow:frame';
+
+/** Carries a returned DomainError through the transaction, so that it rolls back. */
+class Refusal {
+	constructor(public readonly error: DomainError) {}
+}
 
 /** Runs a callback in a database transaction, joining the one open on the connection. */
 export type TransactionRunner = <T>(callback: () => Promise<T>, connection?: string) => Promise<T>;
@@ -56,9 +67,17 @@ export const withUnitOfWork =
 		store.set(FRAME, frame);
 		let result: T;
 		try {
-			result = await Application.context.run(store, () => transaction(callback, connection));
+			result = await Application.context.run(store, () =>
+				transaction(async () => {
+					const value = await callback();
+					// A returned DomainError refuses the work: it rolls back like a thrown one.
+					if (value instanceof DomainError) throw new Refusal(value);
+					return value;
+				}, connection)
+			);
 		} catch (error) {
 			await runHooks(frame.afterRollback, 'afterRollback');
+			if (error instanceof Refusal) return error.error as T;
 			throw error;
 		}
 		await runHooks(frame.afterCommit, 'afterCommit');
@@ -70,6 +89,10 @@ export namespace UnitOfWork {
 	 * Runs a callback in a unit of work: one transaction on the connection that every repository
 	 * call made from the callback uses. When a unit of work is already open, the callback joins
 	 * it, so services compose without knowing which of them opened it.
+	 *
+	 * A callback that returns a `DomainError` rolls the work back, like one that throws, and the
+	 * error is returned. A joined callback hands it to the one that opened the unit of work, which
+	 * rolls back when it returns it too.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param callback The work to run.
 	 * @param options The connection of the transaction. Defaults to `default`.
@@ -117,7 +140,7 @@ export namespace UnitOfWork {
 
 /**
  * Runs a method in a unit of work (see {@link UnitOfWork.run}): a new transaction, or the one
- * already open.
+ * already open. A method that returns a `DomainError` rolls back.
  * @author Axel Nana <axel.nana@workbud.com>
  * @param options The connection of the transaction. Defaults to `default`.
  * @example

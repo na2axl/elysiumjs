@@ -14,25 +14,16 @@
 
 import { DomainError, ElysiumError } from '@elysiumjs/core';
 
-/**
- * Raised when a route needs an authenticated user and the request has none. Rendered as a 401
- * problem.
- * @author Axel Nana <axel.nana@workbud.com>
- */
-export class UnauthenticatedError extends DomainError {
-	constructor() {
-		super({ status: 401, detail: 'Authentication is required.' });
-	}
-}
+export { UnauthenticatedError } from '@elysiumjs/core';
 
 /**
  * Raised when an unsafe request of a cookie session carries no valid CSRF token. Rendered as a 403
  * problem.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class CsrfTokenMismatchError extends DomainError {
+export class CsrfTokenMismatchError extends DomainError.for('CSRF_TOKEN_MISMATCH', 403) {
 	constructor() {
-		super({ status: 403, detail: 'The CSRF token is missing or does not match.' });
+		super('The CSRF token is missing or does not match.');
 	}
 }
 

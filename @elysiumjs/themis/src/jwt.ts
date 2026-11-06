@@ -57,9 +57,9 @@ export type JwtVerifyOptions = JwtKey & {
  * audience. Rendered as a 401 problem.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class InvalidTokenError extends DomainError {
+export class InvalidTokenError extends DomainError.for('UNAUTHENTICATED', 401) {
 	constructor(reason: string) {
-		super({ status: 401, detail: `The token is invalid: ${reason}.` });
+		super(`The token is invalid: ${reason}.`);
 	}
 }
 

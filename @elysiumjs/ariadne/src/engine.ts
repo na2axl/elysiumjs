@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { DomainError } from '@elysiumjs/core';
 import type { FlowAdvance, FlowContext, FlowDescription, FlowRefusal, FlowStepRun } from './flow';
 import type { FlowRecord, FlowStore } from './store';
 
-import { Application, Service, userIdOf } from '@elysiumjs/core';
+import { Application, DomainError, Service, userIdOf } from '@elysiumjs/core';
 
 import {
 	FlowCompletedError,
@@ -264,6 +263,8 @@ export class FlowEngine {
 					: claim.state;
 			const state = rewinding && target.onRewind ? await target.onRewind(before, ctx) : before;
 			const result = await run({ state, ctx });
+			// A returned DomainError refuses the step like a thrown one: nothing is committed.
+			if (result instanceof DomainError) throw result;
 			if (isRefusal(result)) {
 				// The claim is given back by amend.
 				await store.amend(key, { stepId, state: result.state, end: result.end });

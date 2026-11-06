@@ -64,9 +64,9 @@ export interface PasskeyRepository {
  * Raised when a passkey registration or sign-in does not verify. Rendered as a 400 problem.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class PasskeyVerificationError extends DomainError {
+export class PasskeyVerificationError extends DomainError.for('PASSKEY_VERIFICATION_FAILED', 400) {
 	constructor(reason: string) {
-		super({ status: 400, detail: `The passkey could not be verified: ${reason}.` });
+		super(`The passkey could not be verified: ${reason}.`);
 	}
 }
 

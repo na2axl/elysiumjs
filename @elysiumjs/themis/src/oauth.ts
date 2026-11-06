@@ -30,9 +30,9 @@ import { Session } from './session';
  * a failed code exchange. Rendered as a 400 problem.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class OAuthCallbackError extends DomainError {
+export class OAuthCallbackError extends DomainError.for('OAUTH_CALLBACK_FAILED', 400) {
 	constructor(reason: string) {
-		super({ status: 400, detail: `The sign-in could not be completed: ${reason}.` });
+		super(`The sign-in could not be completed: ${reason}.`);
 	}
 }
 

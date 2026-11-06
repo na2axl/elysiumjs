@@ -20,7 +20,7 @@ import { Application } from '../src/app';
 import { Catch } from '../src/filter';
 import { Http } from '../src/http';
 import { Module } from '../src/module';
-import { DomainError } from '../src/problem';
+import { ConflictError, DomainError } from '../src/problem';
 import { Service } from '../src/service';
 import { createTestingHttpApp } from '../src/testing';
 
@@ -113,7 +113,7 @@ class FilteredController {
 
 	@Http.get({ path: '/domain' })
 	public domain() {
-		throw DomainError.conflict('taken');
+		throw new ConflictError('taken');
 	}
 }
 

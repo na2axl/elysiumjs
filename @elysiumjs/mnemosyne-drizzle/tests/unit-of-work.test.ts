@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Service } from '@elysiumjs/core';
+import { ConflictError, Service } from '@elysiumjs/core';
 import { Transactional, UnitOfWork, withUnitOfWork } from '@elysiumjs/mnemosyne';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import * as d from 'drizzle-orm/pg-core';
@@ -117,5 +117,28 @@ describe('units of work', () => {
 
 		expect(await new TransferService().transfer()).toBe('done');
 		expect(timeline()).toEqual(['BEGIN', 'tx:update', 'tx:update', 'COMMIT']);
+	});
+
+	it('rolls back a unit, or a @Transactional method, that returns a DomainError, and returns it', async () => {
+		const repository = new AccountRepository();
+		const outcome = await UnitOfWork.run(async () => {
+			UnitOfWork.afterRollback(() => void events.push('rolled back'));
+			await repository.update(1, { balance: 0 });
+			// A joined unit hands the error up; the outermost one rolls back when it returns it.
+			return UnitOfWork.run(async () => new ConflictError('taken'));
+		});
+
+		expect(outcome).toBeInstanceOf(ConflictError);
+		expect(timeline()).toEqual(['BEGIN', 'tx:update', 'ROLLBACK']);
+		expect(events).toEqual(['rolled back']);
+
+		class Refuser {
+			@Transactional()
+			public async refuse() {
+				return new ConflictError('no');
+			}
+		}
+		expect(await new Refuser().refuse()).toBeInstanceOf(ConflictError);
+		expect(timeline().slice(-2)).toEqual(['BEGIN', 'ROLLBACK']);
 	});
 });

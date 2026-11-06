@@ -12,10 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { t } from 'elysia';
+import { HTTPError, t } from 'elysia';
 import { status as httpStatus } from 'http-status';
-
-import { ElysiumError } from './errors';
 
 /**
  * An error response in the RFC 9457 "problem details" format, sent as
@@ -23,16 +21,20 @@ import { ElysiumError } from './errors';
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export type ProblemDetails = {
-	/** A URI reference that identifies the problem type. `about:blank` when the status says it all. */
+	/** A URI reference that identifies the problem type: the slug of its code, under `typeBase`. */
 	type: string;
 	/** A short summary of the problem type. */
 	title: string;
 	/** The HTTP status code. */
 	status: number;
+	/** The stable machine-readable code of the problem, such as `NOT_FOUND`. */
+	code?: string;
 	/** An explanation specific to this occurrence. */
 	detail?: string;
 	/** A URI reference that identifies this occurrence: the request path. */
 	instance?: string;
+	/** The id of the request, to find it in the logs. */
+	requestId?: string;
 	[extension: string]: unknown;
 };
 
@@ -55,13 +57,20 @@ export type ProblemValidationError = {
  */
 export type ProblemOptions = {
 	/**
-	 * Prefixed to the `type` of a `DomainError` when it is relative, such as
-	 * `https://api.example.com/problems/`.
+	 * The base of every problem `type`, such as `https://api.example.com/problems`: a problem of
+	 * code `INSUFFICIENT_FUNDS` gets `https://api.example.com/problems/insufficient-funds`. Without
+	 * it, `type` is the slug alone.
 	 */
 	typeBase?: string;
 
 	/** The status of request validation errors. Defaults to 422. */
 	validationStatus?: 400 | 422;
+
+	/**
+	 * The id of a request, served as `requestId` in its problems. Defaults to a valid
+	 * `x-request-id` header, or a random UUID.
+	 */
+	requestId?: (request: Request) => string;
 };
 
 /** The MIME type of problem details responses. */
@@ -79,83 +88,251 @@ export const statusTitle = (status: number): string => {
 };
 
 /**
- * The fields of a {@link DomainError}.
- * @author Axel Nana <axel.nana@workbud.com>
- */
-export type DomainErrorProps = {
-	/** The HTTP status code. */
-	status: number;
-	/** A URI reference for the problem type. Defaults to `about:blank`. */
-	type?: string;
-	/** A short summary of the problem type. Defaults to the status reason phrase. */
-	title?: string;
-	/** An explanation specific to this occurrence. */
-	detail?: string;
-	/** Extra members of the problem details, such as `balance` or `retryAfter`. */
-	extensions?: Record<string, unknown>;
-};
-
-/**
- * An error the application expects and reports to the client, rendered as problem details with
- * its own status. Throw it from handlers, services and middlewares, or subclass it per problem.
+ * The problem codes of the application, declared by merging into this interface: one key per code.
+ * Once it has keys, `DomainError.for()` takes only those codes and the ones of the framework
+ * ({@link ElysiumProblemCode}); while it has none, any string is a code.
  * @author Axel Nana <axel.nana@workbud.com>
  * @example
  * ```ts
- * class InsufficientFundsError extends DomainError {
- *   constructor(balance: number) {
- *     super({ status: 409, type: 'insufficient-funds', title: 'Insufficient funds', extensions: { balance } });
+ * declare module '@elysiumjs/core' {
+ *   interface ProblemCatalogue {
+ *     INSUFFICIENT_FUNDS: true;
+ *     ACCOUNT_CLOSED: true;
  *   }
  * }
  * ```
  */
-export class DomainError extends ElysiumError {
-	public readonly status: number;
-	public readonly type: string;
+// biome-ignore lint/suspicious/noEmptyInterface: extended by applications through declaration merging.
+export interface ProblemCatalogue {}
+
+/**
+ * The problem codes the framework packages answer with. An application that keeps its own
+ * catalogue lists them too, so that its clients know every code.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export const ELYSIUM_PROBLEM_CODES = {
+	/** 400: a request that cannot be read, such as a malformed body or invalid query. */
+	BAD_REQUEST: 'BAD_REQUEST',
+	/** 400 or 422: request values that do not match their schema; carries `errors`. */
+	VALIDATION_FAILED: 'VALIDATION_FAILED',
+	/** 401: the request has no valid credentials. */
+	UNAUTHENTICATED: 'UNAUTHENTICATED',
+	/** 403: the caller may not do this. */
+	FORBIDDEN: 'FORBIDDEN',
+	/** 404: no such resource or route. */
+	NOT_FOUND: 'NOT_FOUND',
+	/** 409: the request conflicts with the current state. */
+	CONFLICT: 'CONFLICT',
+	/** 413: the body is larger than the body limit. */
+	PAYLOAD_TOO_LARGE: 'PAYLOAD_TOO_LARGE',
+	/** 429: carries `retryAfter` and the Retry-After header. */
+	RATE_LIMITED: 'RATE_LIMITED',
+	/** 500: an unexpected failure. */
+	INTERNAL_ERROR: 'INTERNAL_ERROR',
+	/** 403: the CSRF token of a cookie session is missing or does not match (themis). */
+	CSRF_TOKEN_MISMATCH: 'CSRF_TOKEN_MISMATCH',
+	/** 403: a signed URL whose signature does not verify, or that expired (themis). */
+	INVALID_SIGNATURE: 'INVALID_SIGNATURE',
+	/** 400: a passkey ceremony that did not verify (themis). */
+	PASSKEY_VERIFICATION_FAILED: 'PASSKEY_VERIFICATION_FAILED',
+	/** 400: an OAuth sign-in that could not complete (themis). */
+	OAUTH_CALLBACK_FAILED: 'OAUTH_CALLBACK_FAILED',
+	/** 428: an idempotent command called without an Idempotency-Key (moirai). */
+	IDEMPOTENCY_KEY_REQUIRED: 'IDEMPOTENCY_KEY_REQUIRED',
+	/** 422: an Idempotency-Key used before for another request (moirai). */
+	IDEMPOTENCY_KEY_REUSED: 'IDEMPOTENCY_KEY_REUSED',
+	/** 410: the flow does not exist or expired (ariadne). */
+	FLOW_EXPIRED: 'FLOW_EXPIRED',
+	/** 410: the flow is finished (ariadne). */
+	FLOW_COMPLETED: 'FLOW_COMPLETED',
+	/** 409: a step the flow does not accept now; carries `nextSteps`, `backSteps`, `answer` (ariadne). */
+	FLOW_UNEXPECTED_STEP: 'FLOW_UNEXPECTED_STEP',
+	/** 409: another request is running the same step (ariadne). */
+	FLOW_STEP_IN_PROGRESS: 'FLOW_STEP_IN_PROGRESS'
+} as const;
+
+/**
+ * A problem code of the framework.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type ElysiumProblemCode = keyof typeof ELYSIUM_PROBLEM_CODES;
+
+/**
+ * A problem code: one of {@link ProblemCatalogue} or of the framework, or any string while the
+ * catalogue is empty.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type ProblemCode = [keyof ProblemCatalogue] extends [never]
+	? string
+	: (keyof ProblemCatalogue & string) | ElysiumProblemCode;
+
+/**
+ * The `type` of a problem code: its kebab-case slug, under the base when one is set.
+ * `INSUFFICIENT_FUNDS` gives `insufficient-funds`, or `https://api.example.com/problems/insufficient-funds`.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param code The problem code.
+ * @param base The `typeBase` of the application.
+ */
+export const problemType = (code: string, base?: string): string => {
+	const slug = code.toLowerCase().replaceAll('_', '-');
+	return base ? `${base.replace(/\/+$/, '')}/${slug}` : slug;
+};
+
+/**
+ * The options of a {@link DomainError}.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type DomainErrorOptions = {
+	/** The invalid values, served as `errors`. */
+	errors?: readonly ProblemValidationError[];
+	/** Seconds until the client may retry, served as `retryAfter` and the Retry-After header. */
+	retryAfterSeconds?: number;
+	/** Extra members of the problem; the standard members win over them. */
+	extensions?: Readonly<Record<string, unknown>>;
+	/** A title of its own. Defaults to the reason phrase of the status. */
+	title?: string;
+	/** The error that caused this one, kept for logs. */
+	cause?: unknown;
+};
+
+/**
+ * An error the application expects and reports to the client as problem details, and an Elysia
+ * `HTTPError`. Each error is a class of its own, made with `DomainError.for(code, status)`, so a
+ * signature names what can go wrong (`Promise<Account | AccountClosed>`).
+ *
+ * Handlers, commands, queries and flow steps return it (errors as values) or throw it; both send
+ * the same problem, roll back the unit of work, and commit nothing. A returned error joins the
+ * route's response type under its literal status, so typed clients see it. `message` is the
+ * detail shown to the client.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @template C The problem code.
+ * @template S The HTTP status.
+ * @example
+ * ```ts
+ * export class InsufficientFunds extends DomainError.for('INSUFFICIENT_FUNDS', 409) {
+ *   constructor(missing: number) {
+ *     super(`${missing} more are needed.`, { extensions: { missing } });
+ *   }
+ * }
+ *
+ * public async pay(amount: number): Promise<Receipt | InsufficientFunds> {
+ *   if (balance < amount) return new InsufficientFunds(amount - balance);
+ *   ...
+ * }
+ * ```
+ */
+export abstract class DomainError<
+	C extends string = string,
+	S extends number = number
+> extends HTTPError {
+	/** The base of `type`, set from `problems.typeBase` of the application. */
+	public static override typeBase?: string;
+
+	public override readonly code: C;
+	public override readonly status: S;
+	/** The detail shown to the client; undefined when none was given. */
+	public override readonly detail: string | undefined;
 	public readonly title: string;
-	public readonly detail?: string;
-	public readonly extensions: Record<string, unknown>;
+	public readonly errors: readonly ProblemValidationError[] | undefined;
+	public readonly retryAfterSeconds: number | undefined;
+	public readonly extensions: Readonly<Record<string, unknown>>;
+	public override readonly headers: Record<string, string> | undefined;
 
-	constructor(props: DomainErrorProps) {
-		const title = props.title ?? statusTitle(props.status);
-		super(props.detail ?? title);
+	/** Protected: an error is created through its own class, made with `DomainError.for()`. */
+	protected constructor(code: C, status: S, detail?: string, options: DomainErrorOptions = {}) {
+		super(detail ?? code, options.cause instanceof Error ? options.cause : undefined);
 		this.name = new.target.name;
-		this.status = props.status;
-		this.type = props.type ?? 'about:blank';
-		this.title = title;
-		this.detail = props.detail;
-		this.extensions = props.extensions ?? {};
+		this.code = code;
+		this.status = status;
+		this.detail = detail;
+		this.title = options.title ?? statusTitle(status);
+		this.errors = options.errors;
+		this.retryAfterSeconds = options.retryAfterSeconds;
+		this.extensions = options.extensions ?? {};
+		this.headers =
+			options.retryAfterSeconds === undefined
+				? undefined
+				: { 'retry-after': String(options.retryAfterSeconds) };
 	}
 
-	/** A 400 Bad Request. */
-	public static badRequest(detail?: string, extensions?: Record<string, unknown>): DomainError {
-		return new DomainError({ status: 400, detail, extensions });
+	/** The problem type: the slug of the code, under `typeBase`. */
+	public override get type(): string {
+		return problemType(this.code, DomainError.typeBase);
 	}
 
-	/** A 401 Unauthorized. */
-	public static unauthorized(detail?: string, extensions?: Record<string, unknown>): DomainError {
-		return new DomainError({ status: 401, detail, extensions });
+	/**
+	 * The base class of one error, with its code and status kept as literal types.
+	 * @param code The problem code, from the {@link ProblemCatalogue} once it has keys.
+	 * @param status The HTTP status.
+	 */
+	public static for<const C extends ProblemCode, const S extends number>(code: C, status: S) {
+		return class extends DomainError<C, S> {
+			constructor(detail?: string, options?: DomainErrorOptions) {
+				super(code, status, detail, options);
+			}
+		};
 	}
 
-	/** A 403 Forbidden. */
-	public static forbidden(detail?: string, extensions?: Record<string, unknown>): DomainError {
-		return new DomainError({ status: 403, detail, extensions });
-	}
-
-	/** A 404 Not Found. */
-	public static notFound(detail?: string, extensions?: Record<string, unknown>): DomainError {
-		return new DomainError({ status: 404, detail, extensions });
-	}
-
-	/** A 409 Conflict. */
-	public static conflict(detail?: string, extensions?: Record<string, unknown>): DomainError {
-		return new DomainError({ status: 409, detail, extensions });
-	}
-
-	/** A 422 Unprocessable Content. */
-	public static unprocessable(detail?: string, extensions?: Record<string, unknown>): DomainError {
-		return new DomainError({ status: 422, detail, extensions });
+	/** The members besides type, code, status and detail: the extensions first, so that the standard ones win. */
+	public override extension(): Record<string, unknown> {
+		return {
+			...this.extensions,
+			title: this.title,
+			...(this.retryAfterSeconds === undefined ? {} : { retryAfter: this.retryAfterSeconds }),
+			...(this.errors ? { errors: [...this.errors] } : {})
+		};
 	}
 }
+
+/**
+ * Checks whether a value is a {@link DomainError}, such as the result of a command.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export const isDomainError = (value: unknown): value is DomainError => value instanceof DomainError;
+
+/**
+ * A request that cannot be read: a 400 problem.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class BadRequestError extends DomainError.for('BAD_REQUEST', 400) {}
+
+/**
+ * Request values that do not match their schema: a 422 problem with one entry per mistake.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class ValidationFailedError extends DomainError.for('VALIDATION_FAILED', 422) {
+	constructor(errors: readonly ProblemValidationError[], detail = 'The request is invalid.') {
+		super(detail, { errors });
+	}
+}
+
+/**
+ * A request without valid credentials: a 401 problem.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class UnauthenticatedError extends DomainError.for('UNAUTHENTICATED', 401) {
+	constructor(detail = 'Authentication is required.') {
+		super(detail);
+	}
+}
+
+/**
+ * A caller that may not do this: a 403 problem.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class ForbiddenError extends DomainError.for('FORBIDDEN', 403) {}
+
+/**
+ * A resource that does not exist: a 404 problem.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class NotFoundError extends DomainError.for('NOT_FOUND', 404) {}
+
+/**
+ * A request that conflicts with the current state: a 409 problem.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class ConflictError extends DomainError.for('CONFLICT', 409) {}
 
 /**
  * Checks whether a value is a problem details object: a `status` number and a `title` string.
@@ -230,80 +407,111 @@ export const validationErrors = (part: string, errors: unknown[]): ProblemValida
  * The context {@link toProblem} needs about the request and the application.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export type ProblemContext = ProblemOptions & {
+export type ProblemContext = Omit<ProblemOptions, 'requestId'> & {
 	/** The request path, used as `instance`. */
 	path?: string;
+	/** The id of the request, served as `requestId`. */
+	requestId?: string;
 	/** Whether to include the detail and the stack of server errors. */
 	development: boolean;
 };
 
-const prefixType = (type: string, base: string | undefined): string =>
-	!base || type === 'about:blank' || /^[a-z][a-z0-9+.-]*:/i.test(type)
-		? type
-		: base.replace(/\/?$/, '/') + type.replace(/^\//, '');
+const REQUEST_ID = /^[\w.:-]{1,128}$/;
+const requestIds = new WeakMap<Request, string>();
 
 /**
- * Turns any error thrown while handling a request into problem details.
- *
- * - A {@link DomainError} keeps its status, type, title, detail and extensions.
- * - Elysia's request validation errors give `validationStatus` (422) with an `errors` list.
- * - Elysia's not found, parse and invalid cookie signature errors give 404, 400 and 400.
- * - Anything else is a 500 whose detail and stack are only shown in development.
+ * The id of a request: the one `make` gives, a valid `x-request-id` header, or a random UUID.
+ * The same request always gets the same id.
  * @author Axel Nana <axel.nana@workbud.com>
- * @param error The thrown value.
- * @param context The request path and the application's problem options.
+ * @param request The request.
+ * @param make The `requestId` option of the application.
+ */
+export const requestIdOf = (request: Request, make?: (request: Request) => string): string => {
+	let id = requestIds.get(request);
+	if (id === undefined) {
+		const header = request.headers.get('x-request-id');
+		id = make?.(request) ?? (header && REQUEST_ID.test(header) ? header : crypto.randomUUID());
+		requestIds.set(request, id);
+	}
+	return id;
+};
+
+/**
+ * Turns any error thrown or returned while handling a request into problem details. Every problem
+ * carries `code`, and the `requestId` and `instance` of the request when they are known.
+ *
+ * - A {@link DomainError} keeps its code, status, title, detail and members.
+ * - Elysia's request validation errors give `VALIDATION_FAILED` at `validationStatus` (422), with
+ *   an `errors` list.
+ * - Elysia's not found, parse and invalid cookie signature errors give `NOT_FOUND` (404) and
+ *   `BAD_REQUEST` (400).
+ * - Anything else is an `INTERNAL_ERROR` (500) whose detail and stack are only shown in
+ *   development.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param error The thrown or returned value.
+ * @param context The request and the application's problem options.
  */
 export const toProblem = (error: unknown, context: ProblemContext): ProblemDetails => {
-	const instance = context.path ? { instance: context.path } : {};
+	const request = {
+		...(context.requestId !== undefined ? { requestId: context.requestId } : {}),
+		...(context.path !== undefined ? { instance: context.path } : {})
+	};
+	const make = (
+		code: string,
+		status: number,
+		members: Record<string, unknown> = {}
+	): ProblemDetails => {
+		// The standard members come first and win over the extensions of the same name.
+		const {
+			type: _t,
+			title,
+			status: _s,
+			code: _c,
+			detail,
+			instance: _i,
+			requestId: _r,
+			...rest
+		} = members;
+		return {
+			type: problemType(code, context.typeBase),
+			title: typeof title === 'string' ? title : statusTitle(status),
+			status,
+			code,
+			...(typeof detail === 'string' ? { detail } : {}),
+			...rest,
+			...request
+		};
+	};
 
 	if (error instanceof DomainError) {
-		return {
-			...error.extensions,
-			type: prefixType(error.type, context.typeBase),
-			title: error.title,
-			status: error.status,
-			...(error.detail !== undefined ? { detail: error.detail } : {}),
-			...instance
-		};
+		const showDetail = error.detail !== undefined && (error.status < 500 || context.development);
+		return make(error.code, error.status, {
+			...error.extension(),
+			...(showDetail ? { detail: error.detail } : {})
+		});
 	}
 
 	const elysia = error as { code?: unknown; status?: unknown; type?: string; all?: unknown[] };
 	const code = typeof elysia?.code === 'string' ? elysia.code : undefined;
 
 	if (code === 'validation' && elysia.status !== 500) {
-		const status = context.validationStatus ?? 422;
-		return {
-			type: 'about:blank',
-			title: statusTitle(status),
-			status,
+		return make(ELYSIUM_PROBLEM_CODES.VALIDATION_FAILED, context.validationStatus ?? 422, {
 			detail: `The request ${elysia.type ?? 'input'} is invalid.`,
-			...instance,
 			errors: validationErrors(elysia.type ?? 'body', elysia.all ?? [])
-		};
+		});
 	}
 
-	const clientErrors: Record<string, number> = {
-		'not-found': 404,
-		parse: 400,
-		'invalid-cookie-signature': 400
-	};
-	if (code && code in clientErrors) {
-		const status = clientErrors[code]!;
-		return { type: 'about:blank', title: statusTitle(status), status, ...instance };
+	if (code === 'not-found') return make(ELYSIUM_PROBLEM_CODES.NOT_FOUND, 404);
+	if (code === 'parse' || code === 'invalid-cookie-signature') {
+		return make(ELYSIUM_PROBLEM_CODES.BAD_REQUEST, 400);
 	}
 
-	const status = 500;
-	const problem: ProblemDetails = {
-		type: 'about:blank',
-		title: statusTitle(status),
-		status,
-		...instance
-	};
+	const members: Record<string, unknown> = {};
 	if (context.development && error instanceof Error) {
-		problem.detail = error.message;
-		if (error.stack) problem.stack = error.stack.split('\n').map((line) => line.trim());
+		members.detail = error.message;
+		if (error.stack) members.stack = error.stack.split('\n').map((line) => line.trim());
 	}
-	return problem;
+	return make(ELYSIUM_PROBLEM_CODES.INTERNAL_ERROR, 500, members);
 };
 
 /**
@@ -330,8 +538,11 @@ export const ProblemDetailsSchema = t.Object(
 		type: t.String(),
 		title: t.String(),
 		status: t.Integer(),
+		code: t.String(),
 		detail: t.Optional(t.String()),
 		instance: t.Optional(t.String()),
+		requestId: t.Optional(t.String()),
+		retryAfter: t.Optional(t.Integer()),
 		errors: t.Optional(
 			t.Array(
 				t.Object({

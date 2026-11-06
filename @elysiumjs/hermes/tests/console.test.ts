@@ -17,9 +17,9 @@ import type { OutputLevel } from '@elysiumjs/core';
 import {
 	Application,
 	createTestingHttpApp,
-	DomainError,
 	Http,
 	Module,
+	NotFoundError,
 	Runtime
 } from '@elysiumjs/core';
 import { runtime as bunRuntime } from '@elysiumjs/runtime-bun';
@@ -133,7 +133,7 @@ class LogController {
 
 	@Http.get({ path: '/missing' })
 	public missing() {
-		throw DomainError.notFound('nope');
+		throw new NotFoundError('nope');
 	}
 
 	@Http.get({ path: '/boom' })

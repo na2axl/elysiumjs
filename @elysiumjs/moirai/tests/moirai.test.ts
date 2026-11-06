@@ -14,7 +14,14 @@
 
 import type { MoiraiOptions } from '../src';
 
-import { DomainError, Service, t } from '@elysiumjs/core';
+import {
+	ConflictError,
+	DomainError,
+	isDomainError,
+	NotFoundError,
+	Service,
+	t
+} from '@elysiumjs/core';
 import { Job, JobRegistry } from '@elysiumjs/heracles';
 import { UnitOfWork, withUnitOfWork } from '@elysiumjs/mnemosyne';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
@@ -121,7 +128,7 @@ class TopUp {
 	public async handle(input: { amount: number; note?: string }) {
 		runs++;
 		log.push(`top-up ${input.amount}`);
-		if (input.note === 'refuse') return new DomainError({ status: 409, detail: 'no' });
+		if (input.note === 'refuse') return new ConflictError('no');
 		await Outbox.enqueue({ kind: 'mail.send', payload: { to: 'ada', amount: input.amount } });
 		return { balance: input.amount * 10 };
 	}
@@ -142,12 +149,12 @@ describe('commands', () => {
 	});
 
 	it('validates the input and answers a 400 problem listing the mistakes', async () => {
-		const error = await Commands.execute(TopUp, { amount: 0 }, { idempotencyKey: 'k' }).catch(
-			(e) => e
-		);
+		const error = await Commands.execute(TopUp, { amount: 0 }, { idempotencyKey: 'k' });
 		expect(error).toBeInstanceOf(InvalidInputError);
+		if (!(error instanceof InvalidInputError)) return;
 		expect(error.status).toBe(400);
-		expect(error.extensions.errors[0].pointer).toBe('/amount');
+		expect(error.code).toBe('VALIDATION_FAILED');
+		expect(error.errors?.[0]?.pointer).toBe('/amount');
 	});
 
 	it('refuses a call that authorize declines with a 403 problem', async () => {
@@ -161,7 +168,7 @@ describe('commands', () => {
 			}
 		}
 		expect(await Commands.execute(Delete, { id: 'mine' })).toEqual({ deleted: true });
-		expect(Commands.execute(Delete, { id: 'yours' })).rejects.toBeInstanceOf(CommandForbiddenError);
+		expect(await Commands.execute(Delete, { id: 'yours' })).toBeInstanceOf(CommandForbiddenError);
 	});
 
 	it('runs in a unit of work, and joins the open one', async () => {
@@ -216,13 +223,14 @@ describe('commands', () => {
 	});
 
 	it('rolls back and stores nothing when the handler returns a DomainError', async () => {
-		const error = await Commands.execute(
+		const outcome = await Commands.execute(
 			TopUp,
 			{ amount: 1, note: 'refuse' },
 			{ idempotencyKey: 'tap-2' }
-		).catch((e) => e);
-		expect(error).toBeInstanceOf(DomainError);
-		expect(error.status).toBe(409);
+		);
+		// The refusal is a value: no throw, and its type is part of the outcome.
+		expect(outcome).toBeInstanceOf(DomainError);
+		expect(isDomainError(outcome) && outcome.status).toBe(409);
 		expect(log).toEqual(['BEGIN', 'top-up 1', 'ROLLBACK']);
 		expect(await idempotency.get('tap-2')).toBeUndefined();
 		expect(outbox.rows).toEqual([]);
@@ -277,9 +285,32 @@ describe('commands', () => {
 		).toBe(true);
 
 		attempts = 0;
-		expect(Commands.execute(Flaky, { mode: 'broken' })).rejects.toThrow('broken');
-		await Bun.sleep(0);
+		await expect(Commands.execute(Flaky, { mode: 'broken' })).rejects.toThrow('broken');
 		expect(attempts).toBe(1);
+	});
+
+	it('retries a returned DomainError its retry policy calls transient, and returns the last one', async () => {
+		class ConcurrencyConflict extends DomainError.for('CONCURRENCY_CONFLICT', 409) {}
+		let calls = 0;
+		@Moirai.command({
+			input: t.Object({ wins: t.Integer() }),
+			retry: { attempts: 4, isTransient: (error) => error instanceof ConcurrencyConflict }
+		})
+		class Bump {
+			public handle(input: { wins: number }, context: { attempt: number }) {
+				calls++;
+				if (context.attempt < input.wins) return new ConcurrencyConflict('changed');
+				return { attempt: context.attempt };
+			}
+		}
+
+		expect(await Commands.execute(Bump, { wins: 4 })).toEqual({ attempt: 4 });
+		expect(calls).toBe(4);
+		calls = 0;
+		const outcome = await Commands.execute(Bump, { wins: 9 });
+		expect(outcome).toBeInstanceOf(ConcurrencyConflict);
+		expect(calls).toBe(4);
+		expect(log.filter((entry) => entry === 'ROLLBACK').length).toBeGreaterThanOrEqual(4);
 	});
 
 	it('serializes the calls that share a serializeBy key', async () => {
@@ -310,16 +341,18 @@ describe('commands', () => {
 
 	it('explains a missing store', async () => {
 		Service.remove(MOIRAI_IDEMPOTENCY_STORE);
-		expect(Commands.execute(TopUp, { amount: 1 }, { idempotencyKey: 'x' })).rejects.toBeInstanceOf(
-			MissingStoreError
-		);
+		await expect(
+			Commands.execute(TopUp, { amount: 1 }, { idempotencyKey: 'x' })
+		).rejects.toBeInstanceOf(MissingStoreError);
 	});
 
-	it('refuses a class that is not a command', () => {
+	it('refuses a class that is not a command', async () => {
 		class Plain {
 			public handle() {}
 		}
-		expect(Commands.execute(Plain, {})).rejects.toThrow('is not marked with @Moirai.command()');
+		await expect(Commands.execute(Plain, {})).rejects.toThrow(
+			'is not marked with @Moirai.command()'
+		);
 	});
 });
 
@@ -327,7 +360,7 @@ describe('queries', () => {
 	@Moirai.query({ input: t.Object({ id: t.String({ minLength: 2 }) }) })
 	class FindUser {
 		public handle(input: { id: string }) {
-			if (input.id === 'gone') return new DomainError({ status: 404 });
+			if (input.id === 'gone') return new NotFoundError();
 			return { id: input.id };
 		}
 	}
@@ -335,9 +368,9 @@ describe('queries', () => {
 	it('validates and runs a query without a transaction', async () => {
 		expect(await Queries.ask(FindUser, { id: 'ada' })).toEqual({ id: 'ada' });
 		expect(log).toEqual([]);
-		expect(Queries.ask(FindUser, { id: 'a' })).rejects.toBeInstanceOf(InvalidInputError);
-		const error = await Queries.ask(FindUser, { id: 'gone' }).catch((e) => e);
-		expect(error.status).toBe(404);
+		expect(await Queries.ask(FindUser, { id: 'a' })).toBeInstanceOf(InvalidInputError);
+		const missing = await Queries.ask(FindUser, { id: 'gone' });
+		expect(missing).toBeInstanceOf(NotFoundError);
 	});
 });
 

@@ -126,12 +126,10 @@ export type AppRateLimitOptions = Partial<RateLimitOptions>;
  * Raised when a client goes over a rate limit. Rendered as a 429 problem, with `Retry-After`.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class TooManyRequestsError extends DomainError {
+export class TooManyRequestsError extends DomainError.for('RATE_LIMITED', 429) {
 	constructor(public readonly retryAfter: number) {
-		super({
-			status: 429,
-			detail: `Too many requests. Try again in ${retryAfter} seconds.`,
-			extensions: { retryAfter }
+		super(`Too many requests. Try again in ${retryAfter} seconds.`, {
+			retryAfterSeconds: retryAfter
 		});
 	}
 }

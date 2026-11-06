@@ -31,9 +31,9 @@ export class InvalidFlowError extends ElysiumError {
  * The flow does not exist, or it expired: a 410 problem.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class FlowExpiredError extends DomainError {
+export class FlowExpiredError extends DomainError.for('FLOW_EXPIRED', 410) {
 	constructor() {
-		super({ status: 410, type: 'flow-expired', detail: 'This flow has expired. Start it again.' });
+		super('This flow has expired. Start it again.');
 	}
 }
 
@@ -41,9 +41,9 @@ export class FlowExpiredError extends DomainError {
  * The flow is finished: a 410 problem.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class FlowCompletedError extends DomainError {
+export class FlowCompletedError extends DomainError.for('FLOW_COMPLETED', 410) {
 	constructor() {
-		super({ status: 410, type: 'flow-completed', detail: 'This flow is already finished.' });
+		super('This flow is already finished.');
 	}
 }
 
@@ -52,12 +52,9 @@ export class FlowCompletedError extends DomainError {
  * and the last answer.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class FlowUnexpectedStepError extends DomainError {
+export class FlowUnexpectedStepError extends DomainError.for('FLOW_UNEXPECTED_STEP', 409) {
 	constructor(step: string, position: { next: string[]; back: string[] }, answer: unknown) {
-		super({
-			status: 409,
-			type: 'flow-unexpected-step',
-			detail: `The step "${step}" is not allowed now.`,
+		super(`The step "${step}" is not allowed now.`, {
 			extensions: { nextSteps: position.next, backSteps: position.back, answer }
 		});
 	}
@@ -67,13 +64,9 @@ export class FlowUnexpectedStepError extends DomainError {
  * Another request is running the same step: a 409 problem. Retry shortly.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class FlowStepInProgressError extends DomainError {
+export class FlowStepInProgressError extends DomainError.for('FLOW_STEP_IN_PROGRESS', 409) {
 	constructor() {
-		super({
-			status: 409,
-			type: 'flow-step-in-progress',
-			detail: 'This step is already being processed. Retry shortly.'
-		});
+		super('This step is already being processed. Retry shortly.');
 	}
 }
 
@@ -81,9 +74,9 @@ export class FlowStepInProgressError extends DomainError {
  * The caller does not own the flow: a 403 problem.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class FlowForbiddenError extends DomainError {
+export class FlowForbiddenError extends DomainError.for('FORBIDDEN', 403) {
 	constructor() {
-		super({ status: 403, detail: 'This flow belongs to someone else.' });
+		super('This flow belongs to someone else.');
 	}
 }
 
@@ -91,9 +84,9 @@ export class FlowForbiddenError extends DomainError {
  * A user flow called without a signed-in user: a 401 problem.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class FlowUserRequiredError extends DomainError {
+export class FlowUserRequiredError extends DomainError.for('UNAUTHENTICATED', 401) {
 	constructor() {
-		super({ status: 401, detail: 'Sign in to use this flow.' });
+		super('Sign in to use this flow.');
 	}
 }
 
@@ -102,9 +95,9 @@ export class FlowUserRequiredError extends DomainError {
  * per missing header.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class InvalidFlowRequestError extends DomainError {
+export class InvalidFlowRequestError extends DomainError.for('VALIDATION_FAILED', 422) {
 	constructor(errors: ProblemValidationError[]) {
-		super({ status: 422, detail: 'The flow request is invalid.', extensions: { errors } });
+		super('The flow request is invalid.', { errors });
 	}
 }
 

@@ -92,9 +92,9 @@ export const DEFAULT_BODY_LIMIT = 1024 * 1024;
  * Raised when a request body is larger than the body limit. Rendered as a 413 problem.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class PayloadTooLargeError extends DomainError {
+export class PayloadTooLargeError extends DomainError.for('PAYLOAD_TOO_LARGE', 413) {
 	constructor(public readonly limit: number) {
-		super({ status: 413, detail: `The request body is larger than ${limit} bytes.` });
+		super(`The request body is larger than ${limit} bytes.`);
 	}
 }
 

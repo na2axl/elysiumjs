@@ -21,69 +21,101 @@ import { Http } from '../src/http';
 import { Middleware } from '../src/middleware';
 import { Module } from '../src/module';
 import {
+	ConflictError,
 	DomainError,
+	isDomainError,
 	isProblemDetails,
 	PROBLEM_CONTENT_TYPE,
+	problemType,
 	statusTitle,
 	toProblem,
-	validationErrors
+	validationErrors,
+	ValidationFailedError
 } from '../src/problem';
 import { createTestingHttpApp } from '../src/testing';
 
-class InsufficientFundsError extends DomainError {
+class InsufficientFundsError extends DomainError.for('INSUFFICIENT_FUNDS', 409) {
 	constructor(balance: number) {
-		super({
-			status: 409,
-			type: 'insufficient-funds',
+		super(`The balance is ${balance}.`, {
 			title: 'Insufficient funds',
-			detail: `The balance is ${balance}.`,
 			extensions: { balance }
 		});
 	}
 }
 
 describe('toProblem', () => {
-	const context = { path: '/x', development: false };
+	const context = { path: '/x', requestId: 'req-1', development: false };
 
-	it('keeps the fields of a DomainError and prefixes a relative type', () => {
+	it('keeps the members of a DomainError, with its code under the type base', () => {
 		const problem = toProblem(new InsufficientFundsError(3), {
 			...context,
-			typeBase: 'https://api.test/problems'
+			typeBase: 'https://api.test/problems/'
 		});
 		expect(problem).toEqual({
 			type: 'https://api.test/problems/insufficient-funds',
 			title: 'Insufficient funds',
 			status: 409,
+			code: 'INSUFFICIENT_FUNDS',
 			detail: 'The balance is 3.',
-			instance: '/x',
-			balance: 3
+			balance: 3,
+			requestId: 'req-1',
+			instance: '/x'
 		});
+		expect(toProblem(new InsufficientFundsError(3), context).type).toBe('insufficient-funds');
 	});
 
-	it('keeps absolute types and about:blank as they are', () => {
-		const absolute = new DomainError({ status: 400, type: 'urn:problem:x' });
-		expect(toProblem(absolute, { ...context, typeBase: 'https://a/' }).type).toBe('urn:problem:x');
-		expect(toProblem(DomainError.notFound(), { ...context, typeBase: 'https://a/' }).type).toBe(
-			'about:blank'
+	it('serves errors and retryAfter, and sets Retry-After', () => {
+		const error = new ValidationFailedError([{ pointer: '/body/a', message: 'is required' }]);
+		expect(toProblem(error, context)).toMatchObject({
+			status: 422,
+			code: 'VALIDATION_FAILED',
+			errors: [{ pointer: '/body/a', message: 'is required' }]
+		});
+		class Slow extends DomainError.for('RATE_LIMITED', 429) {}
+		const slow = new Slow('later', { retryAfterSeconds: 30 });
+		expect(slow.headers).toEqual({ 'retry-after': '30' });
+		expect(toProblem(slow, context)).toMatchObject({ retryAfter: 30, detail: 'later' });
+	});
+
+	it('keeps the code and status of each error class as literal types', () => {
+		const error = new InsufficientFundsError(1);
+		const code: 'INSUFFICIENT_FUNDS' = error.code;
+		const status: 409 = error.status;
+		expect([code, status]).toEqual(['INSUFFICIENT_FUNDS', 409]);
+		expect(error).toBeInstanceOf(DomainError);
+		expect(isDomainError(error)).toBe(true);
+		expect(error.message).toBe('The balance is 1.');
+		expect(problemType('FLOW_UNEXPECTED_STEP', 'https://a/b/')).toBe(
+			'https://a/b/flow-unexpected-step'
 		);
 	});
 
 	it('does not let extensions replace the standard members', () => {
-		const error = new DomainError({ status: 409, extensions: { status: 200, title: 'x' } });
-		expect(toProblem(error, context)).toMatchObject({ status: 409, title: 'Conflict' });
+		const error = new ConflictError('no', { extensions: { status: 200, code: 'X', type: 'y' } });
+		expect(toProblem(error, context)).toMatchObject({
+			status: 409,
+			title: 'Conflict',
+			code: 'CONFLICT',
+			type: 'conflict'
+		});
 	});
 
 	it('hides the detail of server errors outside development, and shows it in development', () => {
 		const error = new Error('secret table name');
 		expect(toProblem(error, context)).toEqual({
-			type: 'about:blank',
+			type: 'internal-error',
 			title: 'Internal Server Error',
 			status: 500,
+			code: 'INTERNAL_ERROR',
+			requestId: 'req-1',
 			instance: '/x'
 		});
 		const dev = toProblem(error, { ...context, development: true });
 		expect(dev.detail).toBe('secret table name');
 		expect(Array.isArray(dev.stack)).toBe(true);
+
+		class Unavailable extends DomainError.for('UNAVAILABLE', 503) {}
+		expect(toProblem(new Unavailable('db host down'), context).detail).toBeUndefined();
 	});
 
 	it('maps validator errors to JSON pointers, one per missing property', () => {
@@ -112,7 +144,7 @@ describe('toProblem', () => {
 	});
 
 	it('recognises problem details objects', () => {
-		expect(isProblemDetails({ type: 'about:blank', title: 'Gone', status: 410 })).toBe(true);
+		expect(isProblemDetails({ type: 'gone', title: 'Gone', status: 410 })).toBe(true);
 		expect(isProblemDetails({ status: 410 })).toBe(false);
 		expect(isProblemDetails(null)).toBe(false);
 	});
@@ -165,12 +197,17 @@ describe('problem details over HTTP', () => {
 		@Middleware.register(Witness)
 		@Http.get({ path: '/witnessed' })
 		public witnessed() {
-			throw DomainError.conflict('no');
+			throw new ConflictError('no');
 		}
 
 		@Http.get({ path: '/domain' })
 		public domain() {
 			throw new InsufficientFundsError(5);
+		}
+
+		@Http.get({ path: '/returned' })
+		public returned(): { paid: true } | InsufficientFundsError {
+			return new InsufficientFundsError(2);
 		}
 
 		@Http.get({ path: '/status' })
@@ -220,7 +257,7 @@ describe('problem details over HTTP', () => {
 
 	it('renders a DomainError as problem details, without reporting it', async () => {
 		const http = await start({ typeBase: 'https://api.test/problems/' });
-		const response = await http.get('/p/domain');
+		const response = await http.get('/p/domain').header('x-request-id', 'req-9');
 
 		expect(response.status).toBe(409);
 		expect(response.headers.get('content-type')).toBe(PROBLEM_CONTENT_TYPE);
@@ -228,10 +265,23 @@ describe('problem details over HTTP', () => {
 			type: 'https://api.test/problems/insufficient-funds',
 			title: 'Insufficient funds',
 			status: 409,
+			code: 'INSUFFICIENT_FUNDS',
 			detail: 'The balance is 5.',
-			instance: '/p/domain',
-			balance: 5
+			balance: 5,
+			requestId: 'req-9',
+			instance: '/p/domain'
 		});
+		expect(reported).toEqual([]);
+	});
+
+	it('sends a returned DomainError like a thrown one, with a request id of its own', async () => {
+		const http = await start();
+		const response = await http.get('/p/returned').header('x-request-id', 'not a valid id!');
+
+		expect(response.status).toBe(409);
+		const body = await response.json();
+		expect(body).toMatchObject({ code: 'INSUFFICIENT_FUNDS', detail: 'The balance is 2.' });
+		expect(body.requestId).toMatch(/^[0-9a-f-]{36}$/);
 		expect(reported).toEqual([]);
 	});
 
@@ -258,10 +308,11 @@ describe('problem details over HTTP', () => {
 		const response = await http.get('/p/boom');
 
 		expect(response.status).toBe(500);
-		expect(await response.json()).toEqual({
-			type: 'about:blank',
+		expect(await response.json()).toMatchObject({
+			type: 'internal-error',
 			title: 'Internal Server Error',
 			status: 500,
+			code: 'INTERNAL_ERROR',
 			instance: '/p/boom'
 		});
 		expect(reported.filter((r) => r instanceof Error)).toHaveLength(1);
@@ -272,10 +323,11 @@ describe('problem details over HTTP', () => {
 		const response = await http.post('/p/signup').json({ email: 'nope' });
 
 		expect(response.status).toBe(422);
-		expect(await response.json()).toEqual({
-			type: 'about:blank',
+		expect(await response.json()).toMatchObject({
+			type: 'validation-failed',
 			title: 'Unprocessable Entity',
 			status: 422,
+			code: 'VALIDATION_FAILED',
 			detail: 'The request body is invalid.',
 			instance: '/p/signup',
 			errors: [

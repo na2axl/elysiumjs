@@ -14,7 +14,7 @@ A flow is a controller. Each step is a `POST` route of it, so the `@Http.*()` pa
 
 ```ts
 import { Flow } from '@elysiumjs/ariadne';
-import { DomainError, Http, t } from '@elysiumjs/core';
+import { BadRequestError, Http, t } from '@elysiumjs/core';
 
 type SignUp = { email?: string; attempts: number };
 
@@ -49,7 +49,7 @@ export class SignUpFlow {
 	) {
 		if (!(await this.codes.check(state.email!, code))) {
 			const attempts = state.attempts + 1;
-			return Flow.refuse({ ...state, attempts }, DomainError.badRequest('Wrong code.'), {
+			return Flow.refuse({ ...state, attempts }, new BadRequestError('Wrong code.'), {
 				end: attempts >= 3
 			});
 		}

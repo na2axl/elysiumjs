@@ -126,7 +126,7 @@ describe('Query.parse', () => {
 		);
 
 		expect(problem.status).toBe(400);
-		expect(problem.extensions.errors).toEqual([
+		expect(problem.errors).toEqual([
 			{ pointer: '/query/filter[secret]', message: 'cannot filter by "secret"', code: 'filter' },
 			{
 				pointer: '/query/filter[status][gt]',

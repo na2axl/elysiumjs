@@ -15,7 +15,7 @@
 import type { TestingHttpApp } from '@elysiumjs/core';
 import type { FlowContext, FlowStore } from '../src';
 
-import { Application, DomainError, Http, Module, t } from '@elysiumjs/core';
+import { Application, BadRequestError, ConflictError, Http, Module, t } from '@elysiumjs/core';
 import { Auth, Jwt, jwtGuard, ThemisModule } from '@elysiumjs/themis';
 import { afterEach, describe, expect, it } from 'bun:test';
 
@@ -59,14 +59,13 @@ class SignUpFlow {
 	@Flow.step()
 	public code(@Flow.state() state: SignUp, @Http.body(CodeBody) { code }: typeof CodeBody.static) {
 		if (code === 'boom') throw new Error('provider down');
-		if (code === 'later') throw DomainError.conflict('Try again later.');
+		if (code === 'later') throw new ConflictError('Try again later.');
+		if (code === 'busy') return new ConflictError('Busy, try again.');
 		if (code !== '123456') {
 			const attempts = state.attempts + 1;
-			return Flow.refuse(
-				{ ...state, attempts },
-				DomainError.badRequest(`Wrong code (${attempts}).`),
-				{ end: attempts >= 3 }
-			);
+			return Flow.refuse({ ...state, attempts }, new BadRequestError(`Wrong code (${attempts}).`), {
+				end: attempts >= 3
+			});
 		}
 		return { welcome: state.email, attempts: state.attempts, rewound: state.rewound ?? 0 };
 	}
@@ -126,7 +125,7 @@ class PinFlow {
 	) {
 		if (pin === '1234') return { attempts: state.attempts };
 		const attempts = state.attempts + 1;
-		return Flow.refuse({ attempts }, DomainError.badRequest(`Wrong pin (${attempts}).`), {
+		return Flow.refuse({ attempts }, new BadRequestError(`Wrong pin (${attempts}).`), {
 			end: attempts >= 3
 		});
 	}
@@ -322,6 +321,10 @@ describe('flows over HTTP', () => {
 		const { step } = await guest();
 		await step('email', 's1', { email: 'ada@example.com' });
 		expect((await step('code', 's2', { code: 'later' })).status).toBe(409);
+		// A returned error refuses the step like a thrown one: nothing is committed.
+		const busy = await step('code', 's2', { code: 'busy' });
+		expect(busy.status).toBe(409);
+		expect((await busy.json()).code).toBe('CONFLICT');
 		expect((await step('code', 's2', { code: 'boom' })).status).toBe(500);
 		const done = await step('code', 's2', { code: '123456' });
 		expect(done.status).toBe(200);
