@@ -42,6 +42,12 @@ export type ServeHandle = {
  * The runtime is process-wide: the last application constructed wins.
  * @author Axel Nana <axel.nana@workbud.com>
  */
+/**
+ * The level of a line written to the console.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type OutputLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+
 export interface Runtime {
 	/** A short name for the runtime, used in error messages. */
 	readonly name: string;
@@ -87,8 +93,10 @@ export interface Runtime {
 	 * the console instead.
 	 * @param stream The stream to write to.
 	 * @param text The text to write, as is.
+	 * @param level The level of the text, for runtimes whose console keeps one per line, such as
+	 * Cloudflare Workers.
 	 */
-	write(stream: 'stdout' | 'stderr', text: string): void;
+	write(stream: 'stdout' | 'stderr', text: string, level?: OutputLevel): void;
 
 	/**
 	 * The interactive terminal, or `undefined` on runtimes without one.

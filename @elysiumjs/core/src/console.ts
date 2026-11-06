@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { OutputLevel } from './runtime';
+
 import { isEmpty, omit } from 'radash';
 
 import { Runtime, RuntimeNotSupportedError } from './runtime';
@@ -63,6 +65,59 @@ const formatMap: Record<ConsoleFormat, string> = {
 	[ConsoleFormat.INVERSE]: '\x1b[7m'
 };
 
+const RESET = '\x1b[0m';
+
+/**
+ * The kinds of messages the level shortcuts of {@link InteractsWithConsole} write.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type ConsoleTag = 'debug' | 'info' | 'success' | 'warning' | 'error';
+
+/**
+ * The tag written before a message: its label and the styles of the label.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type ConsoleTagStyle = { label: string; styles: ConsoleFormat[] };
+
+const DEFAULT_TAGS: Record<ConsoleTag, ConsoleTagStyle> = {
+	debug: { label: '[D]', styles: [ConsoleFormat.GRAY] },
+	info: { label: '[I]', styles: [ConsoleFormat.BLUE] },
+	success: { label: '[S]', styles: [ConsoleFormat.GREEN] },
+	warning: { label: '[W]', styles: [ConsoleFormat.YELLOW] },
+	error: { label: '[E]', styles: [ConsoleFormat.RED] }
+};
+
+/** The level and the stream of each tag. */
+const TAG_OUTPUT: Record<ConsoleTag, { level: OutputLevel; out: 'stdout' | 'stderr' }> = {
+	debug: { level: 'debug', out: 'stdout' },
+	info: { level: 'info', out: 'stdout' },
+	success: { level: 'info', out: 'stdout' },
+	warning: { level: 'warn', out: 'stdout' },
+	error: { level: 'error', out: 'stderr' }
+};
+
+/** The console method of each level, for hosts that write through the console. */
+const CONSOLE_METHODS: Record<OutputLevel, 'debug' | 'info' | 'warn' | 'error'> = {
+	trace: 'debug',
+	debug: 'debug',
+	info: 'info',
+	warn: 'warn',
+	error: 'error',
+	fatal: 'error'
+};
+
+const styled = (text: string, styles: ConsoleFormat[]): string =>
+	styles.length === 0 ? text : `${styles.map((style) => formatMap[style]).join('')}${text}${RESET}`;
+
+let tags = DEFAULT_TAGS;
+let renderedTags: Record<ConsoleTag, string> | undefined;
+
+/** The formatted tags, built once until they change. */
+const rendered = (): Record<ConsoleTag, string> =>
+	(renderedTags ??= Object.fromEntries(
+		Object.entries(tags).map(([tag, { label, styles }]) => [tag, styled(label, styles)])
+	) as Record<ConsoleTag, string>);
+
 /**
  * A utility class for console IO with various formatting options.
  * @author Axel Nana <axel.nana@workbud.com>
@@ -71,23 +126,53 @@ export class InteractsWithConsole {
 	protected static readonly SPACE_WIDTH = 60;
 
 	/**
+	 * Changes the tags the level shortcuts write before their messages, for every console. A tag
+	 * is a label, or a label and its styles; the tags left out keep their defaults (`[D]`, `[I]`,
+	 * `[S]`, `[W]` and `[E]`, in gray, blue, green, yellow and red).
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @example
+	 * ```ts
+	 * InteractsWithConsole.useTags({ info: '[INFO]', error: { label: '[ERR]', styles: [ConsoleFormat.RED, ConsoleFormat.BOLD] } });
+	 * ```
+	 */
+	public static useTags(custom: Partial<Record<ConsoleTag, string | ConsoleTagStyle>>): void {
+		const next = { ...DEFAULT_TAGS };
+		for (const [tag, value] of Object.entries(custom) as [ConsoleTag, string | ConsoleTagStyle][]) {
+			next[tag] = typeof value === 'string' ? { ...DEFAULT_TAGS[tag], label: value } : value;
+		}
+		tags = next;
+		renderedTags = undefined;
+	}
+
+	/** Restores the default tags. */
+	public static resetTags(): void {
+		tags = DEFAULT_TAGS;
+		renderedTags = undefined;
+	}
+
+	/**
 	 * Write a message to the console.
 	 * @param message The message to write.
 	 * @param newLine Whether to add a newline at the end (default: `true`).
 	 * @param out The stream to write to (default: `'stdout'`). The runtime decides how it is
 	 * written: hosts without streams, such as Cloudflare Workers, write to the console instead,
 	 * and so does the framework when no runtime is set yet.
+	 * @param level The level of the message. A host that writes through the console uses the
+	 * console method of the level, so that its logs keep the level.
 	 */
 	public write(
 		message: string,
 		newLine: boolean = true,
-		out: 'stdout' | 'stderr' = 'stdout'
+		out: 'stdout' | 'stderr' = 'stdout',
+		level?: OutputLevel
 	): void {
-		const text = message + (newLine ? '\n' : '');
 		const runtime = Runtime.find();
-		if (runtime) runtime.write(out, text);
-		else if (out === 'stderr') globalThis.console.error(message);
-		else globalThis.console.log(message);
+		if (runtime) {
+			runtime.write(out, newLine ? `${message}\n` : message, level);
+			return;
+		}
+		const method = level ? CONSOLE_METHODS[level] : out === 'stderr' ? 'error' : 'log';
+		globalThis.console[method](message);
 	}
 
 	/**
@@ -97,47 +182,51 @@ export class InteractsWithConsole {
 		this.write('\n', false);
 	}
 
+	/** Writes a message after the tag of its kind, at the level and on the stream of that kind. */
+	protected tagged(tag: ConsoleTag, message: string): void {
+		const { level, out } = TAG_OUTPUT[tag];
+		this.write(`${rendered()[tag]} ${message}`, true, out, level);
+	}
+
 	/**
-	 * Write an info message to the console (blue text).
+	 * Write an info message to the console, after the `info` tag.
 	 * @param message The message to write.
 	 */
 	public info(message: string): void {
-		this.write(`${this.format('ℹ', ConsoleFormat.BLUE)} ${message}`);
+		this.tagged('info', message);
 	}
 
 	/**
-	 * Write a success message to the console (green text).
+	 * Write a success message to the console, after the `success` tag.
 	 * @param message The message to write.
 	 */
 	public success(message: string): void {
-		this.write(`${this.format('✔', ConsoleFormat.GREEN)} ${message}`);
+		this.tagged('success', message);
 	}
 
 	/**
-	 * Write a warning message to the console (yellow text).
+	 * Write a warning message to the console, after the `warning` tag.
 	 * @param message The message to write.
 	 */
 	public warning(message: string): void {
-		this.write(`${this.format('⚠', ConsoleFormat.YELLOW)} ${message}`);
+		this.tagged('warning', message);
 	}
 
 	/**
-	 * Write an error message to the console (red text).
+	 * Write an error message to the standard error stream, after the `error` tag.
 	 * @param message The message to write.
 	 */
 	public error(message: string): void {
-		this.write(`${this.format('✖', ConsoleFormat.RED)} ${message}`, true, 'stderr');
+		this.tagged('error', message);
 	}
 
 	/**
-	 * Write a debug message to the console (gray text).
-	 * Only shown if the DEBUG environment variable is set.
+	 * Write a debug message to the console, after the `debug` tag. Only written when the `DEBUG`
+	 * environment variable is set.
 	 * @param message The message to write.
 	 */
 	public debug(message: string): void {
-		if (Runtime.find()?.env().DEBUG) {
-			this.write(`🔍 ${message}`);
-		}
+		if (Runtime.find()?.env().DEBUG) this.tagged('debug', message);
 	}
 
 	/**
@@ -162,11 +251,16 @@ export class InteractsWithConsole {
 		}
 
 		// Display the error name and message in red
-		this.write(this.format(`${errorName}: ${errorMessage}`, ConsoleFormat.RED));
+		this.write(
+			this.format(`${errorName}: ${errorMessage}`, ConsoleFormat.RED),
+			true,
+			'stderr',
+			'error'
+		);
 
 		if (error.stack) {
 			// Display the stack trace in gray, each line prefixed by a tab for readability
-			this.write(this.format('Stack Trace:', ConsoleFormat.BOLD));
+			this.write(this.format('Stack Trace:', ConsoleFormat.BOLD), true, 'stderr', 'error');
 			this.write(
 				this.format(
 					errorStack
@@ -174,7 +268,10 @@ export class InteractsWithConsole {
 						.map((line) => `\t${line}`)
 						.join('\n'),
 					ConsoleFormat.GRAY
-				)
+				),
+				true,
+				'stderr',
+				'error'
 			);
 		}
 
@@ -182,11 +279,15 @@ export class InteractsWithConsole {
 		const customProps = omit(error, ['name', 'message', 'stack']);
 
 		if (!isEmpty(customProps)) {
-			this.write(this.format('Additional Information:', ConsoleFormat.BOLD));
-			Object.keys(customProps).forEach((prop) => {
-				const value = error[prop];
-				this.write(`\t${prop}: ${JSON.stringify(value)}`);
-			});
+			this.write(
+				this.format('Additional Information:', ConsoleFormat.BOLD),
+				true,
+				'stderr',
+				'error'
+			);
+			for (const prop of Object.keys(customProps)) {
+				this.write(`\t${prop}: ${JSON.stringify(error[prop])}`, true, 'stderr', 'error');
+			}
 		}
 
 		this.newLine();
@@ -208,7 +309,7 @@ export class InteractsWithConsole {
 	 */
 	public section(header: string): void {
 		this.newLine();
-		this.write(`\x1b[1m${header}\x1b[0m`);
+		this.write(this.bold(header));
 	}
 
 	/**
@@ -308,8 +409,7 @@ export class InteractsWithConsole {
 	 * @returns The formatted text.
 	 */
 	public format(text: string, ...styles: ConsoleFormat[]): string {
-		const styleCodes = styles.map((style) => formatMap[style]).join('');
-		return `${styleCodes}${text}\x1b[0m`;
+		return styled(text, styles);
 	}
 
 	/**

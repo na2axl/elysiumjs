@@ -15,6 +15,8 @@
 import type { LoggerInterface } from '@elysiumjs/core';
 import type { HermesConfig, LogLevel } from '../types';
 
+import { InteractsWithConsole } from '@elysiumjs/core';
+
 import { DEFAULT_CONFIG } from '../types';
 
 const LEVELS: Record<LogLevel, number> = {
@@ -24,15 +26,6 @@ const LEVELS: Record<LogLevel, number> = {
 	warn: 40,
 	error: 50,
 	fatal: 60
-};
-
-const METHODS: Record<LogLevel, 'debug' | 'info' | 'warn' | 'error'> = {
-	trace: 'debug',
-	debug: 'debug',
-	info: 'info',
-	warn: 'warn',
-	error: 'error',
-	fatal: 'error'
 };
 
 /** Turns errors into plain objects, so that they survive `JSON.stringify`. */
@@ -49,12 +42,14 @@ const serializable = (value: unknown): unknown => {
 };
 
 /**
- * A logger that writes one JSON object per line through `console`, with the same fields as the
- * pino logger (`level`, `time`, `name`, `msg` and the context). It needs nothing but `console`,
- * so it runs on Bun, Node.js and Cloudflare Workers, where Workers Logs index the fields.
+ * A logger that writes one JSON object per line, with the same fields as the pino logger
+ * (`level`, `time`, `name`, `msg` and the context), through the console of the runtime: the
+ * standard streams on Bun and Node.js (warnings and errors on stderr), and the console method of
+ * each level on Cloudflare Workers, where Workers Logs index the fields and keep the level.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export class JsonConsoleLogger implements LoggerInterface {
+	readonly #console = new InteractsWithConsole();
 	readonly #threshold: number;
 	readonly #bindings: Record<string, unknown>;
 
@@ -111,6 +106,6 @@ export class JsonConsoleLogger implements LoggerInterface {
 		} catch {
 			line = JSON.stringify({ level: entry.level, time: entry.time, msg, unserializable: true });
 		}
-		console[METHODS[level]](line);
+		this.#console.write(line, true, LEVELS[level] >= LEVELS.warn ? 'stderr' : 'stdout', level);
 	}
 }

@@ -12,22 +12,72 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Application, createTestingHttpApp, DomainError, Http, Module } from '@elysiumjs/core';
-import { afterEach, describe, expect, it, spyOn } from 'bun:test';
+import type { OutputLevel } from '@elysiumjs/core';
+
+import {
+	Application,
+	createTestingHttpApp,
+	DomainError,
+	Http,
+	Module,
+	Runtime
+} from '@elysiumjs/core';
+import { runtime as bunRuntime } from '@elysiumjs/runtime-bun';
+import { afterEach, describe, expect, it } from 'bun:test';
 
 import { HermesModule, JsonConsoleLogger, RequestLogInterceptor } from '../src';
 
+type Method = 'debug' | 'info' | 'warn' | 'error';
+
+const METHOD: Record<OutputLevel, Method> = {
+	trace: 'debug',
+	debug: 'debug',
+	info: 'info',
+	warn: 'warn',
+	error: 'error',
+	fatal: 'error'
+};
+
+let written: { stream: string; method: Method; line: string }[] = [];
+
+/** The lines written at the levels of a console method, through a runtime that keeps them. */
+const captured = (method: Method) => {
+	Runtime.use({
+		...bunRuntime,
+		write: (stream, text, level) => {
+			written.push({ stream, method: level ? METHOD[level] : 'info', line: text.trimEnd() });
+		}
+	});
+	return {
+		mock: {
+			get calls() {
+				return written.filter((entry) => entry.method === method).map((entry) => [entry.line]);
+			}
+		}
+	};
+};
+
+const restore = () => {
+	written = [];
+	Runtime.use(bunRuntime);
+};
+
+/** The JSON lines among what was written (the app also writes the traces of server errors). */
 const lines = (spy: { mock: { calls: unknown[][] } }) =>
-	spy.mock.calls.map(([line]) => JSON.parse(String(line)) as Record<string, unknown>);
+	spy.mock.calls
+		.map(([line]) => String(line))
+		.filter((line) => line.startsWith('{'))
+		.map((line) => JSON.parse(line) as Record<string, unknown>);
 
 describe('JsonConsoleLogger', () => {
 	it('writes JSON lines with level, time, bindings and context', () => {
-		const info = spyOn(console, 'info').mockImplementation(() => {});
+		const info = captured('info');
 		try {
 			new JsonConsoleLogger({ name: 'api', level: 'info' }).child({ module: 'auth' }).info('hi', {
 				userId: 'u1'
 			});
 			const [line] = lines(info);
+			expect(written[0]?.stream).toBe('stdout');
 			expect(line).toMatchObject({
 				level: 30,
 				name: 'api',
@@ -37,27 +87,28 @@ describe('JsonConsoleLogger', () => {
 			});
 			expect(typeof line!.time).toBe('number');
 		} finally {
-			info.mockRestore();
+			restore();
 		}
 	});
 
 	it('drops lines under its level and serializes errors', () => {
-		const debug = spyOn(console, 'debug').mockImplementation(() => {});
-		const error = spyOn(console, 'error').mockImplementation(() => {});
+		const debug = captured('debug');
+		const error = captured('error');
 		try {
 			const logger = new JsonConsoleLogger({ level: 'info' });
 			logger.debug('hidden');
 			logger.error('failed', { error: new Error('boom') });
-			expect(debug).not.toHaveBeenCalled();
+			expect(debug.mock.calls).toHaveLength(0);
 			const [line] = lines(error);
+			expect(written.find((entry) => entry.method === 'error')?.stream).toBe('stderr');
 			expect(line).toMatchObject({
 				level: 50,
 				msg: 'failed',
 				error: { type: 'Error', message: 'boom' }
 			});
 		} finally {
-			debug.mockRestore();
-			error.mockRestore();
+			restore();
+			restore();
 		}
 	});
 
@@ -110,9 +161,9 @@ describe('RequestLogInterceptor', () => {
 	});
 
 	it('logs one line per request, at a level that follows the status', async () => {
-		const info = spyOn(console, 'info').mockImplementation(() => {});
-		const warn = spyOn(console, 'warn').mockImplementation(() => {});
-		const error = spyOn(console, 'error').mockImplementation(() => {});
+		const info = captured('info');
+		const warn = captured('warn');
+		const error = captured('error');
 		try {
 			testing = await Application.testing({ app: LogApp });
 			await testing.http.get('/logs/ok/1').header('x-request-id', 'req-1');
@@ -135,9 +186,9 @@ describe('RequestLogInterceptor', () => {
 				error: { message: 'boom' }
 			});
 		} finally {
-			info.mockRestore();
-			warn.mockRestore();
-			error.mockRestore();
+			restore();
+			restore();
+			restore();
 		}
 	});
 });

@@ -21,7 +21,12 @@ export {
 	Command,
 	CommandArgumentType
 } from './command';
-export { ConsoleFormat, InteractsWithConsole } from './console';
+export {
+	ConsoleFormat,
+	type ConsoleTag,
+	type ConsoleTagStyle,
+	InteractsWithConsole
+} from './console';
 export { Env } from './env';
 export { type EventData, type EventHandler, Event } from './event';
 export { type LoggerInterface, ConsoleLogger, getLogger, LOGGER_SERVICE } from './logger';
@@ -78,6 +83,7 @@ export {
 	UnexpectedStatusError
 } from './http-client';
 export {
+	type OutputLevel,
 	type ServeHandle,
 	type ShutdownSignal,
 	Runtime,

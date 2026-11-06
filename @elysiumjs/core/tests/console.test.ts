@@ -85,25 +85,25 @@ describe('InteractsWithConsole', () => {
 		it('should write info message', () => {
 			const console = new InteractsWithConsole();
 			console.info('Info message');
-			expect(stdoutOutput).toMatch(/ℹ\S* Info message/);
+			expect(stdoutOutput).toMatch(/\[I\]\S* Info message/);
 		});
 
 		it('should write success message', () => {
 			const console = new InteractsWithConsole();
 			console.success('Success message');
-			expect(stdoutOutput).toMatch(/✔\S* Success message/);
+			expect(stdoutOutput).toMatch(/\[S\]\S* Success message/);
 		});
 
 		it('should write warning message', () => {
 			const console = new InteractsWithConsole();
 			console.warning('Warning message');
-			expect(stdoutOutput).toMatch(/⚠\S* Warning message/);
+			expect(stdoutOutput).toMatch(/\[W\]\S* Warning message/);
 		});
 
 		it('should write error message to stderr', () => {
 			const console = new InteractsWithConsole();
 			console.error('Error message');
-			expect(stderrOutput).toMatch(/✖\S* Error message/);
+			expect(stderrOutput).toMatch(/\[E\]\S* Error message/);
 		});
 
 		it('should write debug message when DEBUG is set', () => {
@@ -112,7 +112,7 @@ describe('InteractsWithConsole', () => {
 
 			const console = new InteractsWithConsole();
 			console.debug('Debug message');
-			expect(stdoutOutput).toContain('🔍 Debug message');
+			expect(stdoutOutput).toMatch(/\[D\]\S* Debug message/);
 
 			process.env.DEBUG = originalDebug;
 		});
@@ -214,8 +214,8 @@ describe('InteractsWithConsole', () => {
 			console.trace(error);
 
 			// Check that the output contains error details
-			expect(stdoutOutput).toContain('TestError: Test error');
-			expect(stdoutOutput).toContain('Stack Trace:');
+			expect(stderrOutput).toContain('TestError: Test error');
+			expect(stderrOutput).toContain('Stack Trace:');
 		});
 
 		it('should trace an error with custom properties', () => {
@@ -226,10 +226,10 @@ describe('InteractsWithConsole', () => {
 			console.trace(error);
 
 			// Check that the output contains custom properties
-			expect(stdoutOutput).toContain('Test error');
-			expect(stdoutOutput).toContain('Stack Trace:');
-			expect(stdoutOutput).toContain('customProp');
-			expect(stdoutOutput).toContain('Custom value');
+			expect(stderrOutput).toContain('Test error');
+			expect(stderrOutput).toContain('Stack Trace:');
+			expect(stderrOutput).toContain('customProp');
+			expect(stderrOutput).toContain('Custom value');
 		});
 
 		it('should handle errors without stack traces', () => {
@@ -239,8 +239,8 @@ describe('InteractsWithConsole', () => {
 			console.trace(error as Error);
 
 			// Check that the output contains error details
-			expect(stdoutOutput).toContain('TestError: Test error');
-			expect(stdoutOutput).not.toContain('Stack Trace:');
+			expect(stderrOutput).toContain('TestError: Test error');
+			expect(stderrOutput).not.toContain('Stack Trace:');
 		});
 	});
 
@@ -542,6 +542,67 @@ describe('InteractsWithConsole through the runtime', () => {
 		expect(write.mock.calls[0]?.[0]).toBe('stdout');
 		expect(write.mock.calls[1]?.[0]).toBe('stderr');
 		expect(write.mock.calls[1]?.[1]).toContain('boom');
+	});
+
+	it('passes the level of each shortcut to Runtime.write', () => {
+		const write = mock((_stream: 'stdout' | 'stderr', _text: string, _level?: string) => {});
+		Runtime.use({ ...testRuntime, write, env: () => ({ DEBUG: '1' }) });
+		const console = new InteractsWithConsole();
+		console.debug('d');
+		console.info('i');
+		console.success('s');
+		console.warning('w');
+		console.error('e');
+		console.write('plain');
+		expect(write.mock.calls.map(([stream, , level]) => [stream, level])).toEqual([
+			['stdout', 'debug'],
+			['stdout', 'info'],
+			['stdout', 'info'],
+			['stdout', 'warn'],
+			['stderr', 'error'],
+			['stdout', undefined]
+		]);
+	});
+
+	it('writes the custom tags, with their styles', () => {
+		const write = mock((_stream: 'stdout' | 'stderr', _text: string) => {});
+		Runtime.use({ ...testRuntime, write });
+		const console = new InteractsWithConsole();
+		try {
+			InteractsWithConsole.useTags({
+				info: '[INFO]',
+				error: { label: '[ERR]', styles: [ConsoleFormat.BOLD] }
+			});
+			console.info('i');
+			console.error('e');
+			console.warning('w');
+			InteractsWithConsole.resetTags();
+			console.info('i');
+		} finally {
+			InteractsWithConsole.resetTags();
+		}
+		expect(write.mock.calls.map(([, text]) => text)).toEqual([
+			'\x1b[94m[INFO]\x1b[0m i\n',
+			'\x1b[1m[ERR]\x1b[0m e\n',
+			'\x1b[93m[W]\x1b[0m w\n',
+			'\x1b[94m[I]\x1b[0m i\n'
+		]);
+	});
+
+	it('writes through the console method of the level when no runtime is set', () => {
+		Runtime.reset();
+		const warn = spyOn(globalThis.console, 'warn').mockImplementation(() => {});
+		const log = spyOn(globalThis.console, 'log').mockImplementation(() => {});
+		try {
+			const console = new InteractsWithConsole();
+			console.warning('careful');
+			console.write('plain');
+			expect(String(warn.mock.calls[0]?.[0])).toContain('careful');
+			expect(log.mock.calls[0]?.[0]).toBe('plain');
+		} finally {
+			warn.mockRestore();
+			log.mockRestore();
+		}
 	});
 
 	it('interactive prompts throw RuntimeNotSupportedError without a terminal', async () => {

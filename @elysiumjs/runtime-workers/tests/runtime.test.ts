@@ -71,4 +71,23 @@ describe('argv, write and terminal', () => {
 			error.mockRestore();
 		}
 	});
+
+	it('writes through the console method of the level, which Workers Logs keeps', () => {
+		const methods = ['debug', 'info', 'warn', 'error'] as const;
+		const spies = methods.map((method) => spyOn(console, method).mockImplementation(() => {}));
+		try {
+			runtime.write('stdout', 'a\n', 'trace');
+			runtime.write('stdout', 'b\n', 'info');
+			runtime.write('stdout', 'c\n', 'warn');
+			runtime.write('stderr', 'd\n', 'fatal');
+			expect(spies.map((spy) => spy.mock.calls.map(([line]) => line))).toEqual([
+				['a'],
+				['b'],
+				['c'],
+				['d']
+			]);
+		} finally {
+			for (const spy of spies) spy.mockRestore();
+		}
+	});
 });
