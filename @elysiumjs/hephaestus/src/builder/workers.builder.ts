@@ -12,7 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { join } from 'node:path';
+import type { BunPlugin } from 'bun';
+
+import { readFileSync } from 'node:fs';
+import { builtinModules } from 'node:module';
+import { dirname, join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 
 /**
@@ -46,6 +50,38 @@ export interface WorkersBuildResult {
 /** Statements workerd refuses at runtime. */
 const CODEGEN = /\bnew Function\b|\beval\(/;
 
+/** A bare package name, such as `pino` or `@scope/name`, without a subpath. */
+const BARE_PACKAGE = /^(?:@[^/]+\/)?[^./:][^/:]*$/;
+
+/** The Node.js modules, by their bare names (`fs`, `readline`, ...). */
+const NODE_MODULES = new Set(builtinModules.filter((name) => !name.startsWith('_')));
+
+/**
+ * Resolves packages to their `browser` entry (the string form of the `browser` field), such as
+ * pino's console build: Bun skips that field for modules the AOT plugin loads, which would pull
+ * the Node.js build into the Worker. Also leaves Node.js modules imported by their bare names to
+ * workerd, which provides them with the `nodejs_compat` flag. A CommonJS `require()` of one
+ * throws when it runs, so packages load such modules only where they run on Workers.
+ */
+const browserEntries: BunPlugin = {
+	name: 'elysium-browser-entries',
+	setup(build) {
+		build.onResolve({ filter: BARE_PACKAGE }, (args) => {
+			// Node.js modules come from workerd (`nodejs_compat`), under their `node:` name.
+			if (NODE_MODULES.has(args.path)) return { path: `node:${args.path}`, external: true };
+			if (!args.importer) return undefined;
+			try {
+				const manifest = Bun.resolveSync(`${args.path}/package.json`, dirname(args.importer));
+				const { browser } = JSON.parse(readFileSync(manifest, 'utf8')) as { browser?: unknown };
+				if (typeof browser === 'string') return { path: join(dirname(manifest), browser) };
+			} catch {
+				// No readable manifest (or none exported): let Bun resolve the package.
+			}
+			return undefined;
+		});
+	}
+};
+
 /**
  * Bundles an Elysium app for Cloudflare Workers, with its routes compiled ahead of time by
  * `elysia/plugin/aot`, since workerd forbids generating code at runtime.
@@ -72,7 +108,7 @@ export class WorkersBuilder {
 			external: ['node:*', 'cloudflare:*'],
 			minify: options.minify ?? true,
 			sourcemap: (options.sourcemap ?? true) ? 'linked' : 'none',
-			plugins: [aot(options.entry, { target: 'workerd' })]
+			plugins: [browserEntries, aot(options.entry, { target: 'workerd' })]
 		});
 		if (!result.success) {
 			throw new AggregateError(result.logs, `The Worker bundle of ${options.entry} failed.`);

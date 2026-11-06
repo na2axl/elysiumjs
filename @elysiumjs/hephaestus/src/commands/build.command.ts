@@ -12,14 +12,43 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { WorkersBuildOptions, WorkersBuildResult } from '../builder/workers.builder';
 import type { PlatformTarget } from '../types';
 
 import { Command, CommandArgumentType } from '@elysiumjs/core';
 
 import { BinaryBuilder } from '../builder/binary.builder';
 import { NodeBuilder } from '../builder/node.builder';
-import { WorkersBuilder } from '../builder/workers.builder';
 import { loadConfig } from '../config/loader';
+
+/**
+ * Runs the Workers builder in a process of its own. The AOT plugin imports the entry to capture
+ * its routes, which boots the app; the services container is global to the process, and this
+ * one already runs the CLI app.
+ */
+const buildWorkerInChildProcess = async (
+	options: WorkersBuildOptions
+): Promise<WorkersBuildResult> => {
+	const script = `
+		const { WorkersBuilder } = await import(${JSON.stringify(import.meta.resolve('@elysiumjs/hephaestus'))});
+		const result = await new WorkersBuilder().build(${JSON.stringify(options)});
+		process.stdout.write('\\n' + JSON.stringify(result));
+		process.exit(0);
+	`;
+	const child = Bun.spawn([process.execPath, '-e', script], {
+		cwd: process.cwd(),
+		stdout: 'pipe',
+		stderr: 'pipe'
+	});
+	const [stdout, stderr, code] = await Promise.all([
+		new Response(child.stdout).text(),
+		new Response(child.stderr).text(),
+		child.exited
+	]);
+	if (code !== 0)
+		throw new Error(stderr.trim() || stdout.trim() || `The Worker build exited with code ${code}.`);
+	return JSON.parse(stdout.trim().split('\n').at(-1)!) as WorkersBuildResult;
+};
 
 /**
  * Command used to build the project into a standalone binary (`--target binary`, the default), a
@@ -122,7 +151,7 @@ export class HephaestusBuildCommand extends Command {
 		try {
 			const config = await loadConfig(process.cwd(), { optional: true });
 			const spinner = this.spinner('Building the Worker');
-			const result = await new WorkersBuilder().build({
+			const result = await buildWorkerInChildProcess({
 				entry: this.entry ?? config.workers.entry,
 				outdir: config.output.dir,
 				outfile: config.workers.outfile,
