@@ -23,10 +23,13 @@ export type Scenario = {
 	/** Builds a fresh application class instance. No runtime is set on it. */
 	app: () => Promise<Application>;
 	requests: {
-		request: () => Request;
+		/** Builds the request. It receives the JSON bodies of the earlier responses, in order. */
+		request: (previous: unknown[]) => Request;
 		expect: {
 			status: number;
 			json?: unknown;
+			/** Top-level properties the JSON body has, besides others that may vary. */
+			includes?: Record<string, unknown>;
 			text?: string;
 			headers?: Record<string, string>;
 		};

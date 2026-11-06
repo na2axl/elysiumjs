@@ -98,6 +98,9 @@ class IoApp extends Application {}
 // service container, and build apps of their own.
 let worker: ReturnType<typeof createWorker> | undefined;
 
+/** The flow store Durable Object, which `tests/workerd/flow-store.test.ts` drives through `FLOWS`. */
+export { FlowStoreObject } from '@elysiumjs/ariadne-workers';
+
 export default {
 	async fetch(request: Request, env: Record<string, unknown>, ctx: WorkersExecutionContext) {
 		if (new URL(request.url).pathname === '/io/source') return source();

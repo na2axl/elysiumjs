@@ -33,7 +33,9 @@ export { type LoggerInterface, ConsoleLogger, getLogger, LOGGER_SERVICE } from '
 export {
 	type Context,
 	type HttpControllerDescription,
+	type HttpControllerProps,
 	type HttpRouteDescription,
+	type RequestHandlerDecoratorProps,
 	type Route,
 	DATABASE_TRANSACTION_SERVICE,
 	HttpControllerScope,

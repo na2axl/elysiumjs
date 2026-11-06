@@ -33,13 +33,13 @@ const readEvents = async (response: Response): Promise<string> => {
 	return text.split('\n\n').slice(0, EVENT_COUNT).join('\n\n') + '\n\n';
 };
 
-/** Asserts the status, headers and body of one response. */
+/** Asserts the status, headers and body of one response, and returns its JSON body, if any. */
 const checkResponse = async (
 	response: Response,
 	expect: Scenario['requests'][number]['expect'],
 	label: string,
 	assert: AssertAdapter
-): Promise<void> => {
+): Promise<unknown> => {
 	assert.equal(response.status, expect.status, `${label}: status`);
 	for (const [name, value] of Object.entries(expect.headers ?? {})) {
 		const actual = response.headers.get(name) ?? '';
@@ -49,12 +49,15 @@ const checkResponse = async (
 	if (streamed) {
 		const text = await readEvents(response);
 		if (expect.text !== undefined) assert.equal(text, expect.text, `${label}: text`);
-	} else if (expect.json !== undefined) {
-		assert.equal(
-			JSON.stringify(await response.json()),
-			JSON.stringify(expect.json),
-			`${label}: json`
-		);
+	} else if (expect.json !== undefined || expect.includes !== undefined) {
+		const json = (await response.json()) as Record<string, unknown>;
+		if (expect.json !== undefined) {
+			assert.equal(JSON.stringify(json), JSON.stringify(expect.json), `${label}: json`);
+		}
+		for (const [key, value] of Object.entries(expect.includes ?? {})) {
+			assert.equal(JSON.stringify(json[key]), JSON.stringify(value), `${label}: json ${key}`);
+		}
+		return json;
 	} else if (expect.text !== undefined) {
 		assert.equal(await response.text(), expect.text, `${label}: text`);
 	} else {
@@ -74,8 +77,10 @@ export const checkRequests = async (
 	handle: (request: Request) => Promise<Response>,
 	assert: AssertAdapter
 ): Promise<void> => {
+	const previous: unknown[] = [];
 	for (const [index, { request, expect }] of s.requests.entries()) {
-		await checkResponse(await handle(request()), expect, `${s.name} #${index + 1}`, assert);
+		const response = await handle(request(previous));
+		previous.push(await checkResponse(response, expect, `${s.name} #${index + 1}`, assert));
 	}
 };
 

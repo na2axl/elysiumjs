@@ -70,7 +70,13 @@ export const ROOTS = [
 	'@elysiumjs/heracles',
 	'@elysiumjs/plugin-sentry',
 	'@elysiumjs/mnemosyne-drizzle',
-	'@elysiumjs/heracles-workers'
+	'@elysiumjs/heracles-workers',
+	'@elysiumjs/moirai',
+	'@elysiumjs/moirai-drizzle',
+	'@elysiumjs/themis',
+	'@elysiumjs/ariadne',
+	'@elysiumjs/ariadne-redis',
+	'@elysiumjs/ariadne-workers'
 ];
 
 /** Files exempt from the gate, per root. Globs are relative to the root. */
