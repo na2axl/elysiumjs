@@ -82,7 +82,23 @@ class OpenController {
 	}
 }
 
-@Module.register({ controllers: [LimitedController, OpenController] })
+let allowed = 1;
+const deciding: RateLimitStore = {
+	async hit() {
+		return { limited: allowed-- <= 0 };
+	}
+};
+
+@Http.controller({ path: '/decided' })
+class DecidedController {
+	@Http.get({ path: '/' })
+	@RateLimit({ window: 10_000, max: 1, store: deciding })
+	public index() {
+		return { ok: true };
+	}
+}
+
+@Module.register({ controllers: [LimitedController, OpenController, DecidedController] })
 class LimitedModule extends Module {}
 
 @Application.register({ modules: [LimitedModule], openapi: false })
@@ -124,6 +140,22 @@ describe('rate limits', () => {
 		const problem = await over.json();
 		expect(problem.status).toBe(429);
 		expect(problem.retryAfter).toBeGreaterThan(0);
+	});
+
+	it('answers 429 with a whole window to wait when the store only decides', async () => {
+		testing = await createTestingHttpApp({ app: LimitedApp });
+		const { http } = testing;
+
+		const first = await http.get('/decided');
+		expect(first.status).toBe(200);
+		expect(first.headers.get('ratelimit-limit')).toBe('1');
+		expect(first.headers.get('ratelimit-policy')).toBe('1;w=10');
+		expect(first.headers.get('ratelimit-reset')).toBeNull();
+
+		const over = await http.get('/decided');
+		expect(over.status).toBe(429);
+		expect(over.headers.get('retry-after')).toBe('10');
+		expect(over.headers.get('ratelimit-remaining')).toBe('0');
 	});
 
 	it('lets a route override or turn off the limit of its controller', async () => {

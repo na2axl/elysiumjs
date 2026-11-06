@@ -61,28 +61,9 @@ export interface WorkersKVNamespace {
 	}>;
 }
 
-/** The stub of a Durable Object, as its namespace returns it. */
-export interface WorkersDurableObjectStub {
-	fetch(input: string | Request, init?: RequestInit): Promise<Response>;
-}
-
-/** A Durable Object namespace binding. */
-export interface WorkersDurableObjectNamespace {
-	idFromName(name: string): unknown;
-	get(id: any): WorkersDurableObjectStub;
-}
-
-/** The storage of a Durable Object. */
-export interface WorkersDurableObjectStorage {
-	get<T = unknown>(key: string): Promise<T | undefined>;
-	put<T>(key: string, value: T): Promise<void>;
-	deleteAll(): Promise<void>;
-	setAlarm(scheduledTime: number): Promise<void>;
-}
-
-/** The `state` argument of a Durable Object constructor. */
-export interface WorkersDurableObjectState {
-	readonly storage: WorkersDurableObjectStorage;
+/** A rate limiting binding. */
+export interface WorkersRateLimitBinding {
+	limit(options: { key: string }): Promise<{ success: boolean }>;
 }
 
 /** The handlers a Worker module exports. */

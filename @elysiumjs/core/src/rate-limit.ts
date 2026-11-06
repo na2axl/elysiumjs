@@ -16,22 +16,28 @@ import { Metadata } from './metadata';
 import { DomainError } from './problem';
 
 /**
- * The count of a key in its current window.
+ * What a store answers for a hit: the count of the key in its current window, or, for stores that
+ * only decide (such as the Cloudflare rate limiting binding), whether the hit is over the limit.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export type RateLimitHit = {
-	/** The number of hits in the window, this one included. */
-	count: number;
-	/** When the window ends, in milliseconds since the epoch. */
-	resetAt: number;
-};
+export type RateLimitHit =
+	| {
+			/** The number of hits in the window, this one included. */
+			count: number;
+			/** When the window ends, in milliseconds since the epoch. */
+			resetAt: number;
+	  }
+	| {
+			/** Whether the hit is over the limit. */
+			limited: boolean;
+	  };
 
 /**
  * Where rate limits keep their counts. Counts use fixed windows: the first hit of a key opens a
  * window of `windowMs`, and the count starts again once it has ended. Implement it to keep the
  * counts anywhere; `MemoryRateLimitStore` keeps them in the process, `RedisRateLimitStore`
- * (`@elysiumjs/redis`) in Redis, and `DurableObjectRateLimitStore` (`@elysiumjs/runtime-workers`)
- * in a Durable Object.
+ * (`@elysiumjs/redis`) in Redis, and `WorkersRateLimitStore` (`@elysiumjs/runtime-workers`) uses
+ * a Cloudflare rate limiting binding.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export interface RateLimitStore {
@@ -49,10 +55,10 @@ export interface RateLimitStore {
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export class MemoryRateLimitStore implements RateLimitStore {
-	readonly #windows = new Map<string, RateLimitHit>();
+	readonly #windows = new Map<string, { count: number; resetAt: number }>();
 	#nextSweep = 0;
 
-	public async hit(key: string, windowMs: number): Promise<RateLimitHit> {
+	public async hit(key: string, windowMs: number): Promise<{ count: number; resetAt: number }> {
 		const now = Date.now();
 		this.#sweep(now);
 		const current = this.#windows.get(key);
@@ -187,16 +193,27 @@ export const enforceRateLimit = async (
 	const name = limit.name ?? 'default';
 	const key = limit.key ? await limit.key(context) : `${context.ip ?? 'unknown'}:${context.route}`;
 	const store = limit.store ?? appStore ?? defaultStore;
-	const { count, resetAt } = await store.hit(`rl:${name}:${key}`, limit.window);
+	const hit = await store.hit(`rl:${name}:${key}`, limit.window);
 
-	const reset = Math.max(0, Math.ceil((resetAt - Date.now()) / 1000));
 	const headers = context.set.headers;
 	headers['ratelimit-limit'] = String(limit.max);
-	headers['ratelimit-remaining'] = String(Math.max(0, limit.max - count));
-	headers['ratelimit-reset'] = String(reset);
 	headers['ratelimit-policy'] = `${limit.max};w=${Math.ceil(limit.window / 1000)}`;
 
-	if (count > limit.max) {
+	if ('limited' in hit) {
+		// The store only decides: the window may have started at any time, so a client waits for a
+		// whole one at most.
+		if (!hit.limited) return;
+		const retryAfter = Math.ceil(limit.window / 1000);
+		headers['ratelimit-remaining'] = '0';
+		headers['retry-after'] = String(retryAfter);
+		throw new TooManyRequestsError(retryAfter);
+	}
+
+	const reset = Math.max(0, Math.ceil((hit.resetAt - Date.now()) / 1000));
+	headers['ratelimit-remaining'] = String(Math.max(0, limit.max - hit.count));
+	headers['ratelimit-reset'] = String(reset);
+
+	if (hit.count > limit.max) {
 		headers['retry-after'] = String(reset);
 		throw new TooManyRequestsError(reset);
 	}

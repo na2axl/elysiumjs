@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-import type { RateLimitHit, RateLimitStore } from '@elysiumjs/core';
+import type { RateLimitStore } from '@elysiumjs/core';
 import type { RedisConnection } from './connection';
 
 import { Redis } from './redis';
@@ -38,7 +38,7 @@ export class RedisRateLimitStore implements RateLimitStore {
 		this.#prefix = options.prefix ?? '';
 	}
 
-	public async hit(key: string, windowMs: number): Promise<RateLimitHit> {
+	public async hit(key: string, windowMs: number): Promise<{ count: number; resetAt: number }> {
 		const redis =
 			typeof this.#connection === 'string'
 				? Redis.getConnection(this.#connection)
