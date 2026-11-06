@@ -16,6 +16,7 @@ import { diDisposal, diScopes } from './di-scopes';
 import { errors } from './errors';
 import { lifecycle } from './lifecycle';
 import { middleware } from './middleware';
+import { problems } from './problems';
 import { routing } from './routing';
 import { sse } from './sse';
 import { validation } from './validation';
@@ -34,6 +35,7 @@ export const scenarios = [
 	diDisposal,
 	middleware,
 	errors,
+	problems,
 	lifecycle,
 	sse
 ];

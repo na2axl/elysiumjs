@@ -19,6 +19,7 @@ import type { CommandClass } from './command';
 import type { ElysiaApp, Route } from './http';
 import type { ConfiguredModule, ModuleClass } from './module';
 import type { ModuleGraph, ModuleNode } from './module-graph';
+import type { ProblemOptions } from './problem';
 import type { Runtime as RuntimePort } from './runtime';
 import type { TestingApp, TestingAppOptions, TestingHttpApp, TestingOptions } from './testing';
 import type { ElysiaPlugin } from './utils';
@@ -42,10 +43,11 @@ import { Metadata } from './metadata';
 import { applyMiddlewares, middlewareStops } from './middleware';
 import { ModuleContext } from './module-context';
 import { buildModuleGraph } from './module-graph';
+import { problemResponse, toProblem } from './problem';
 import { Runtime } from './runtime';
 import { Service } from './service';
 import { createTestingApp, createTestingHttpApp } from './testing';
-import { deepMerge, Symbols } from './utils';
+import { currentEnvironment, deepMerge, Symbols } from './utils';
 
 /**
  * An application plugin, consisting of a function that returns an Elysia instance.
@@ -101,6 +103,12 @@ export type AppProps = {
 	 * The list of plugins to load.
 	 */
 	plugins?: ElysiumPlugin[];
+
+	/**
+	 * How errors are rendered as RFC 9457 problem details: the base of relative problem types, and
+	 * the status of validation errors.
+	 */
+	problems?: ProblemOptions;
 };
 
 /** The options of the root Elysia app. */
@@ -639,37 +647,51 @@ export abstract class Application extends InteractsWithConsole {
 			});
 	}
 
-	/** Turns an error raised while handling a request into the response sent to the client. */
+	/**
+	 * Turns an error raised while handling a request into the response sent to the client: a
+	 * thrown status as is, anything else as problem details. Only server errors are reported
+	 * (`onError`, the `elysium:error` event and the trace); client errors are part of normal
+	 * operation.
+	 */
 	private async handleServerError(e: ServerError) {
-		if (middlewareStops.has(e.error)) return;
-		if (!(await this.onError(e))) return;
+		const error = e.error;
+
+		// A middleware that stopped the request already chose its response.
+		if (middlewareStops.has(error)) return;
+
+		// A thrown status is already a response.
+		if (error instanceof ElysiaStatus) {
+			if (Number(error.status) >= 500 && !(await this.reportError(e))) return;
+			return error;
+		}
+
+		const { problems } = this.props();
+		const problem = toProblem(error, {
+			...problems,
+			path: e.request ? new URL(e.request.url).pathname : undefined,
+			development: currentEnvironment() === 'development'
+		});
+
+		if (problem.status >= 500 && !(await this.reportError(e))) return;
+
+		return problemResponse(problem);
+	}
+
+	/**
+	 * Reports a server error: calls `onError`, emits `elysium:error` and traces it.
+	 * @returns `false` when `onError` handled the error itself.
+	 */
+	private async reportError(e: ServerError): Promise<boolean> {
+		if (!(await this.onError(e))) return false;
 
 		Event.emit('elysium:error', e);
 		this.trace({
 			name: 'HttpError',
 			message: 'Unexpected error while handling HTTP request',
-			stack: e.error.stack,
+			stack: e.error?.stack,
 			...e.error
 		});
-
-		// A thrown status is already a response.
-		if (e.error instanceof ElysiaStatus) return e.error;
-
-		// Elysia names its errors in kebab case ('not-found'); the response keeps the upper snake case
-		// names ('NOT_FOUND'), with UNKNOWN for errors Elysia did not raise.
-		const code = e.code ? e.code.toUpperCase().replaceAll('-', '_') : 'UNKNOWN';
-
-		let data = {};
-		switch (code) {
-			case 'VALIDATION':
-				data = { scope: e.error.type, code: e.error.message };
-				break;
-			case 'INTERNAL_SERVER_ERROR':
-				data = { message: e.error.message };
-				break;
-		}
-
-		return { type: code, data };
+		return true;
 	}
 
 	/**

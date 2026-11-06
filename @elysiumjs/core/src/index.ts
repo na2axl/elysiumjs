@@ -120,3 +120,18 @@ export interface AppHttpContext {
 export interface AppEnv {
 	[key: string]: string;
 }
+export {
+	type DomainErrorProps,
+	type ProblemContext,
+	type ProblemDetails,
+	type ProblemOptions,
+	type ProblemValidationError,
+	DomainError,
+	isProblemDetails,
+	PROBLEM_CONTENT_TYPE,
+	ProblemDetailsSchema,
+	problemResponse,
+	statusTitle,
+	toProblem,
+	validationErrors
+} from './problem';
