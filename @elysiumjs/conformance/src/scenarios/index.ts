@@ -25,7 +25,7 @@ import { security } from './security';
 import { sse } from './sse';
 import { validation } from './validation';
 
-export { runScenario } from './run';
+export { checkRequests, runScenario } from './run';
 export type { AssertAdapter, Scenario, ScenarioDriver } from './types';
 
 /**

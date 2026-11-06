@@ -17,6 +17,9 @@
 # production
 **/build
 
+# conformance AOT Workers (scripts/build-aot.ts)
+@elysiumjs/conformance/.aot
+
 # misc
 **/.DS_Store
 **/*.pem

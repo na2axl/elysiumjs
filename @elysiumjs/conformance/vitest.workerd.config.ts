@@ -22,9 +22,9 @@ import { defineConfig } from 'vitest/config';
 // compiles the legacy decorators and emits `design:paramtypes` for constructor injection.
 // `tests/workerd/setup.ts` explains the two shims the lane needs.
 //
-// KNOWN GAP: the scenarios run Elysia's just-in-time compiled handlers (code generated from
-// strings, through the integration's `unsafeEval`), not the ahead-of-time compiled handlers a
-// deployed Worker runs. See the top of `tests/workerd/setup.ts`.
+// The scenarios run Elysia's just-in-time compiled handlers here (code generated from strings,
+// through the integration's `unsafeEval`); `vitest.workerd-aot.config.ts` runs them compiled
+// ahead of time, as a deployed Worker runs.
 export default defineConfig({
 	plugins: [
 		swc.vite({
