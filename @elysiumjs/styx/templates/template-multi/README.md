@@ -1,25 +1,20 @@
 # {PROJECT_NAME}
 
-A full-stack web application built with Elysium.
+A web application built with Elysium.
 
 ## Getting Started
 
-To install dependencies:
+Install the dependencies, then start the app in development:
 
 ```bash
-bun install
-```
-
-To run:
-
-```bash
-bun styx serve
+{INSTALL}
+{RUN} dev
 ```
 
 You can now access the application at http://localhost:3000.
 
-If you want to display all available `styx` commands, run:
+To list the `styx` commands, run:
 
 ```bash
-bun styx
+styx
 ```

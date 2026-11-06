@@ -31,6 +31,9 @@ const defaults = (overrides: Partial<CreateOptions> = {}): CreateOptions => ({
 	path: '.',
 	template: 'single',
 	runtime: 'bun',
+	database: true,
+	cache: true,
+	packageManager: 'bun',
 	modules: [],
 	plugins: [],
 	features: [],
@@ -145,10 +148,74 @@ describe('createProject', () => {
 		expect(existsSync(join(dir, 'my-app', 'keep.txt'))).toBe(false);
 	});
 
-	it('refuses unknown or unavailable choices', async () => {
-		await expect(createProject(defaults({ path: dir, runtime: 'workers' }), exec)).rejects.toThrow(
-			'not available yet'
+	it('writes a Node.js project built with styx build --target node', async () => {
+		const path = await createProject(
+			defaults({ path: dir, runtime: 'node', packageManager: 'npm', install: true }),
+			exec
 		);
+		const pkg = await Bun.file(join(path, 'package.json')).json();
+		expect(pkg.scripts.build).toBe('styx build --target node --entry ./index.ts');
+		expect(pkg.scripts.start).toContain('node --enable-source-maps dist/server.js serve');
+		expect(Object.keys(pkg.dependencies)).toEqual(
+			expect.arrayContaining(['@elysiumjs/runtime-node', 'postgres', 'ioredis'])
+		);
+		expect(pkg.devDependencies['@types/node']).toBeDefined();
+		expect(pkg.devDependencies['@types/bun']).toBeUndefined();
+
+		const app = await Bun.file(join(path, 'src', 'app.ts')).text();
+		expect(app).toContain("from '@elysiumjs/runtime-node'");
+		expect(app).toContain('postgresJs({ connection: process.env.DATABASE_URL! })');
+		expect(app).toContain('ioredis((url, options)');
+
+		const tsconfig = await Bun.file(join(path, 'tsconfig.json')).text();
+		expect(tsconfig).toContain('"types": ["node"]');
+		expect(await Bun.file(join(path, 'README.md')).text()).toContain('npm run dev');
+		expect(commands).toEqual([['npm', 'install']]);
+	});
+
+	it('writes a Cloudflare Workers project with its Worker entry and wrangler config', async () => {
+		const path = await createProject(
+			defaults({ path: dir, runtime: 'workers', packageManager: 'pnpm' }),
+			exec
+		);
+		expect(existsSync(join(path, 'index.ts'))).toBe(false);
+		expect(await Bun.file(join(path, 'src', 'worker.ts')).text()).toContain(
+			'export const app = worker.app;'
+		);
+		const wrangler = await Bun.file(join(path, 'wrangler.jsonc')).json();
+		expect(wrangler).toMatchObject({
+			name: 'my-app',
+			main: 'dist/worker.js',
+			compatibility_flags: ['nodejs_compat'],
+			hyperdrive: [{ binding: 'HYPERDRIVE' }]
+		});
+
+		const pkg = await Bun.file(join(path, 'package.json')).json();
+		expect(pkg.scripts.deploy).toBe('styx build --target workers && wrangler deploy');
+		expect(pkg.devDependencies.wrangler).toBeDefined();
+
+		const app = await Bun.file(join(path, 'src', 'app.ts')).text();
+		expect(app).toContain("transport: 'console'");
+		expect(app).toContain("hyperdrive({\n\t\t\t\t\t\tbinding: 'HYPERDRIVE'");
+		expect(app).toContain('upstash({ token: process.env.UPSTASH_REDIS_REST_TOKEN! })');
+	});
+
+	it('leaves the database and the cache out when not asked for', async () => {
+		const path = await createProject(defaults({ path: dir, database: false, cache: false }), exec);
+		const pkg = await Bun.file(join(path, 'package.json')).json();
+		expect(pkg.dependencies['@elysiumjs/mnemosyne-drizzle']).toBeUndefined();
+		expect(pkg.dependencies['@elysiumjs/redis']).toBeUndefined();
+		expect(pkg.devDependencies['drizzle-kit']).toBeUndefined();
+
+		const app = await Bun.file(join(path, 'src', 'app.ts')).text();
+		expect(app).not.toContain('DrizzleModule');
+		expect(app).not.toContain('RedisModule');
+	});
+
+	it('refuses unknown choices', async () => {
+		await expect(
+			createProject(defaults({ path: dir, packageManager: 'yarn' as 'npm' }), exec)
+		).rejects.toThrow('Unknown package manager');
 		await expect(
 			createProject(defaults({ path: dir, template: 'nope' as 'single' }), exec)
 		).rejects.toThrow('Unknown template');

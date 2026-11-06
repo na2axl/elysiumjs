@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import type { PromptObject } from 'prompts';
-import type { EnabledModule, RuntimeChoice } from './code';
+import type { EnabledModule } from './code';
 
 import { existsSync } from 'node:fs';
 import { mkdir, readdir, rm } from 'node:fs/promises';
@@ -24,8 +24,26 @@ import prompts from 'prompts';
 import { assign, objectify, pascal, snake } from 'radash';
 
 import { listAssets, readAsset } from '../assets';
-import { getAppCode, getModuleCode, RUNTIMES, versionFor } from './code';
+import {
+	appPackages,
+	getAppCode,
+	getModuleCode,
+	getScripts,
+	getWorkerCode,
+	getWranglerConfig,
+	RUNTIMES,
+	versionFor
+} from './code';
 import { resolveProjectPath, validateModuleName, validateProjectName } from './names';
+
+/** The package managers `styx create` can install with. */
+export const PACKAGE_MANAGERS = ['bun', 'npm', 'pnpm'] as const;
+
+/** A package manager `styx create` can install with. */
+export type PackageManager = (typeof PACKAGE_MANAGERS)[number];
+
+/** How a package manager runs a script: `bun run`, `npm run`, `pnpm run`. */
+const runWith = (manager: PackageManager) => `${manager} run`;
 
 /** The answers that describe the project to create. */
 export type CreateOptions = {
@@ -33,6 +51,12 @@ export type CreateOptions = {
 	path: string;
 	template: 'single' | 'multi';
 	runtime: keyof typeof RUNTIMES;
+	/** Whether to set up a PostgreSQL connection. */
+	database: boolean;
+	/** Whether to set up a Redis connection. */
+	cache: boolean;
+	/** The package manager that installs the dependencies and runs the scripts. */
+	packageManager: PackageManager;
 	modules: string[];
 	plugins: string[];
 	features: string[];
@@ -86,10 +110,11 @@ export const createProject = async (
 	const modules =
 		options.template === 'single' ? ['main'] : options.modules.map(validateModuleName);
 
-	const runtime: RuntimeChoice = RUNTIMES[options.runtime];
-	if (!runtime) throw new Error(`Unknown runtime ${options.runtime}.`);
-	if (runtime.unavailable)
-		throw new Error(`${runtime.title} is not available yet: ${runtime.unavailable}`);
+	if (!RUNTIMES[options.runtime]) throw new Error(`Unknown runtime ${options.runtime}.`);
+	if (!PACKAGE_MANAGERS.includes(options.packageManager)) {
+		throw new Error(`Unknown package manager ${options.packageManager}.`);
+	}
+	const parts = { database: options.database, cache: options.cache };
 	if ((await listAssets(`templates/template-${options.template}`)).length === 0) {
 		throw new Error(`Unknown template ${options.template}.`);
 	}
@@ -103,6 +128,7 @@ export const createProject = async (
 
 	progress('Copying template files...');
 	await copyAssets(`templates/template-${options.template}`, projectPath, options.name);
+	await writeRuntimeFiles(projectPath, options);
 
 	await Bun.write(
 		join(projectPath, '.elysiumrc'),
@@ -135,6 +161,7 @@ export const createProject = async (
 
 	const packageFile = join(projectPath, 'package.json');
 	let packageJson = assign(await Bun.file(packageFile).json(), {
+		scripts: getScripts(options.runtime),
 		imports:
 			options.template === 'multi'
 				? objectify(
@@ -145,8 +172,9 @@ export const createProject = async (
 				: { '#root/*': './src/*.ts' }
 	});
 
-	const devPackages: string[] = [];
-	const packages: string[] = [runtime.package];
+	const base = appPackages(options.runtime, parts);
+	const devPackages: string[] = [...base.dev];
+	const packages: string[] = [...base.prod];
 	const enabledModules: EnabledModule[] = [];
 
 	for (const [kind, names] of [
@@ -183,16 +211,17 @@ export const createProject = async (
 					options.template === 'multi' ? `#${m}/${snake(m)}.module` : `#root/${snake(m)}.module`
 			),
 			enabledModules,
-			runtime
+			options.runtime,
+			parts
 		)
 	);
 
 	if (options.install) {
 		progress('Installing dependencies...');
-		await exec(projectPath, ['bun', 'install']);
+		await exec(projectPath, [options.packageManager, 'install']);
 		if (options.features.includes('prettier')) {
 			progress('Formatting code using Prettier...');
-			await exec(projectPath, ['bun', 'run', 'format']);
+			await exec(projectPath, [options.packageManager, 'run', 'format']);
 		}
 	}
 
@@ -202,6 +231,36 @@ export const createProject = async (
 	}
 
 	return projectPath;
+};
+
+/**
+ * Writes what differs between runtimes: the tsconfig types, the README commands, and for
+ * Cloudflare Workers the Worker entry and the wrangler config in place of `index.ts`.
+ */
+const writeRuntimeFiles = async (projectPath: string, options: CreateOptions): Promise<void> => {
+	const tsconfigFile = join(projectPath, 'tsconfig.json');
+	const tsconfig = await Bun.file(tsconfigFile).text();
+	const types = JSON.stringify(RUNTIMES[options.runtime].types);
+	await Bun.write(tsconfigFile, tsconfig.replace(/"types":\s*\[[^\]]*\]/, `"types": ${types}`));
+
+	const readmeFile = join(projectPath, 'README.md');
+	const readme = await Bun.file(readmeFile).text();
+	await Bun.write(
+		readmeFile,
+		readme
+			.replaceAll('{INSTALL}', `${options.packageManager} install`)
+			.replaceAll('{RUN}', runWith(options.packageManager))
+	);
+
+	if (options.runtime === 'workers') {
+		await rm(join(projectPath, 'index.ts'), { force: true });
+		await mkdir(join(projectPath, 'src'), { recursive: true });
+		await Bun.write(join(projectPath, 'src', 'worker.ts'), getWorkerCode());
+		await Bun.write(
+			join(projectPath, 'wrangler.jsonc'),
+			getWranglerConfig(options.name, { database: options.database, cache: options.cache })
+		);
+	}
 };
 
 /** Runs a command in a folder, failing with its output when it fails. */
@@ -236,6 +295,25 @@ export class CreateCommand extends Command {
 		type: CommandArgumentType.STRING
 	})
 	private runtime?: string;
+
+	@Command.arg({
+		description: 'Set up a PostgreSQL connection',
+		type: CommandArgumentType.BOOLEAN
+	})
+	private database?: boolean;
+
+	@Command.arg({
+		description: 'Set up a Redis connection',
+		type: CommandArgumentType.BOOLEAN
+	})
+	private cache?: boolean;
+
+	@Command.arg({
+		name: 'package-manager',
+		description: 'The package manager: bun, npm or pnpm',
+		type: CommandArgumentType.STRING
+	})
+	private packageManager?: string;
 
 	@Command.arg({
 		description: 'The modules of a multi template, comma separated',
@@ -298,8 +376,9 @@ export class CreateCommand extends Command {
 		try {
 			const projectPath = await createProject(options, execIn, (step) => s.update(step));
 			s.complete(`Project ${options.name} created successfully`);
+			const dev = `${runWith(options.packageManager)} dev`;
 			this.info(
-				`Open it with ${this.format(`cd ${relative(process.cwd(), projectPath)}`, ConsoleFormat.BLUE, ConsoleFormat.BOLD)}, then run ${this.format('styx serve', ConsoleFormat.BLUE, ConsoleFormat.BOLD)}`
+				`Open it with ${this.format(`cd ${relative(process.cwd(), projectPath)}`, ConsoleFormat.BLUE, ConsoleFormat.BOLD)}, then run ${this.format(dev, ConsoleFormat.BLUE, ConsoleFormat.BOLD)}`
 			);
 		} catch (error) {
 			s.fail(error instanceof Error ? error.message : String(error));
@@ -315,6 +394,9 @@ export class CreateCommand extends Command {
 			path: this.path,
 			template: this.template,
 			runtime: this.runtime,
+			database: this.database,
+			cache: this.cache,
+			packageManager: this.packageManager,
 			modules: list(this.modules),
 			plugins: list(this.plugins),
 			features: list(this.features),
@@ -356,11 +438,28 @@ export class CreateCommand extends Command {
 				choices: Object.entries(RUNTIMES).map(([value, runtime]) => ({
 					title: runtime.title,
 					value,
-					description: runtime.unavailable
-						? `${runtime.description}. Not available yet: ${runtime.unavailable}`
-						: runtime.description,
-					disabled: runtime.unavailable !== undefined
+					description: runtime.description
 				}))
+			},
+			{
+				type: given.database === undefined ? 'confirm' : null,
+				name: 'database',
+				message: 'Set up a PostgreSQL database?',
+				initial: true
+			},
+			{
+				type: given.cache === undefined ? 'confirm' : null,
+				name: 'cache',
+				message: 'Set up a Redis cache?',
+				initial: false
+			},
+			{
+				type: given.packageManager ? null : 'select',
+				name: 'packageManager',
+				message: 'Which package manager will install the dependencies?',
+				choices: PACKAGE_MANAGERS.map((manager) => ({ title: manager, value: manager })),
+				initial: (_: unknown, values: { runtime?: string }) =>
+					(given.runtime ?? values.runtime ?? 'bun') === 'bun' ? 0 : 1
 			},
 			{
 				type: (_, values) =>
@@ -408,6 +507,7 @@ export class CreateCommand extends Command {
 				})
 			: {};
 
+		const runtime = (given.runtime ?? answers.runtime ?? 'bun') as CreateOptions['runtime'];
 		const name = given.name ?? answers.name;
 		if (!name) throw new Error('Give the project a name: styx create my-app');
 		validateProjectName(name);
@@ -416,7 +516,12 @@ export class CreateCommand extends Command {
 			name,
 			path: given.path ?? '.',
 			template: (given.template ?? answers.template ?? 'single') as CreateOptions['template'],
-			runtime: (given.runtime ?? answers.runtime ?? 'bun') as CreateOptions['runtime'],
+			runtime,
+			database: given.database ?? answers.database ?? true,
+			cache: given.cache ?? answers.cache ?? false,
+			packageManager: (given.packageManager ??
+				answers.packageManager ??
+				(runtime === 'bun' ? 'bun' : 'npm')) as PackageManager,
 			modules: given.modules ?? answers.modules ?? ['main'],
 			plugins: given.plugins ?? answers.plugins ?? [],
 			features: given.features ?? answers.features ?? [],

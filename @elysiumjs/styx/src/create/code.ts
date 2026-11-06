@@ -19,7 +19,15 @@ import { elysiumVersions } from './versions' with { type: 'macro' };
 /** The ranges of the third-party tools features add, as in the root package.json of the monorepo. */
 const TOOL_VERSIONS: Record<string, string> = {
 	prettier: '^3.9.10',
-	'@ianvs/prettier-plugin-sort-imports': '^4.7.1'
+	'@ianvs/prettier-plugin-sort-imports': '^4.7.1',
+	typescript: '^7.0.2',
+	'drizzle-kit': '^1.0.0-rc.5',
+	postgres: '^3.4.7',
+	ioredis: '^5.8.2',
+	'@types/bun': '^1.3.1',
+	'@types/node': '^24.10.0',
+	'@cloudflare/workers-types': '^4.20251101.0',
+	wrangler: '^4.158.0'
 };
 
 /** The versions of the `@elysiumjs/*` packages Styx was released with. */
@@ -65,8 +73,11 @@ export type RuntimeChoice = {
 	/** The local name the app imports `runtime` as. */
 	alias: string;
 
-	/** Why the runtime cannot be picked yet, when it cannot. */
-	unavailable?: string;
+	/** The `types` of the generated tsconfig. */
+	types: string[];
+
+	/** The development packages the runtime needs. */
+	devPackages: string[];
 };
 
 /**
@@ -77,24 +88,61 @@ export const RUNTIMES: Record<'bun' | 'node' | 'workers', RuntimeChoice> = {
 		title: 'Bun',
 		description: 'Run with Bun (https://bun.sh)',
 		package: '@elysiumjs/runtime-bun',
-		alias: 'bunRuntime'
+		alias: 'bunRuntime',
+		types: ['bun'],
+		devPackages: ['@types/bun']
 	},
 	node: {
 		title: 'Node.js',
-		description: 'Run with Node.js (https://nodejs.org)',
+		description: 'Run with Node.js (https://nodejs.org), built with styx build --target node',
 		package: '@elysiumjs/runtime-node',
 		alias: 'nodeRuntime',
-		unavailable:
-			'The Postgres, Redis and CLI packages the templates use still need Bun, and Node.js cannot run decorators without a build step.'
+		types: ['node'],
+		devPackages: ['@types/node']
 	},
 	workers: {
 		title: 'Cloudflare Workers',
 		description: 'Deploy to Cloudflare Workers (https://workers.cloudflare.com)',
 		package: '@elysiumjs/runtime-workers',
 		alias: 'workersRuntime',
-		unavailable:
-			'The templates use Postgres and Redis clients that need Bun. A Worker can be set up by hand with createWorker() from @elysiumjs/runtime-workers and built with styx build --target workers.'
+		types: ['@cloudflare/workers-types', 'node'],
+		devPackages: ['@cloudflare/workers-types', '@types/node', 'wrangler']
 	}
+};
+
+/**
+ * The parts of the generated app that can be left out.
+ */
+export type AppParts = {
+	/** A PostgreSQL connection through `@elysiumjs/mnemosyne-drizzle`. */
+	database: boolean;
+
+	/** A Redis connection through `@elysiumjs/redis`. */
+	cache: boolean;
+};
+
+/**
+ * The packages the app of a runtime needs for its parts.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param runtime The runtime key.
+ * @param parts The parts of the app.
+ */
+export const appPackages = (
+	runtime: keyof typeof RUNTIMES,
+	parts: AppParts
+): { prod: string[]; dev: string[] } => {
+	const prod = ['@elysiumjs/core', '@elysiumjs/hermes', RUNTIMES[runtime].package];
+	const dev = ['@elysiumjs/styx', 'typescript', ...RUNTIMES[runtime].devPackages];
+	if (parts.database) {
+		prod.push('@elysiumjs/mnemosyne-drizzle');
+		dev.push('drizzle-kit');
+		if (runtime !== 'bun') prod.push('postgres');
+	}
+	if (parts.cache) {
+		prod.push('@elysiumjs/redis');
+		if (runtime === 'node') prod.push('ioredis');
+	}
+	return { prod, dev };
 };
 
 /**
@@ -111,19 +159,91 @@ export type EnabledModule = {
 	expression: string;
 };
 
+/** The imports and the module entries of the database and the cache, per runtime. */
+const partCode = (runtime: keyof typeof RUNTIMES, parts: AppParts) => {
+	const imports: string[] = [];
+	const modules: string[] = [];
+	if (parts.cache) {
+		if (runtime === 'bun') {
+			imports.push("import { RedisModule } from '@elysiumjs/redis';");
+			modules.push(`RedisModule.with(() => ({
+			default: 'cache',
+			connections: { cache: { url: process.env.REDIS_URL! } }
+		}))`);
+		} else if (runtime === 'node') {
+			imports.push("import { ioredis, RedisModule } from '@elysiumjs/redis';");
+			imports.push("import IORedis from 'ioredis';");
+			modules.push(`RedisModule.with(() => ({
+			default: 'cache',
+			client: ioredis((url, options) => new IORedis(url, { ...options, lazyConnect: true })),
+			connections: { cache: { url: process.env.REDIS_URL! } }
+		}))`);
+		} else {
+			imports.push("import { RedisModule, upstash } from '@elysiumjs/redis';");
+			modules.push(`RedisModule.with(() => ({
+			default: 'cache',
+			client: upstash({ token: process.env.UPSTASH_REDIS_REST_TOKEN! }),
+			connections: { cache: { url: process.env.UPSTASH_REDIS_REST_URL! } }
+		}))`);
+		}
+	}
+	if (parts.database) {
+		imports.push("import { DrizzleModule } from '@elysiumjs/mnemosyne-drizzle';");
+		if (runtime === 'bun') {
+			modules.push(`DrizzleModule.with(() => ({
+			default: 'main',
+			connections: { main: { connection: process.env.DATABASE_URL! } }
+		}))`);
+		} else if (runtime === 'node') {
+			imports.push("import { postgresJs } from '@elysiumjs/mnemosyne-drizzle/postgres-js';");
+			modules.push(`DrizzleModule.with(() => ({
+			default: 'main',
+			connections: { main: { driver: postgresJs({ connection: process.env.DATABASE_URL! }) } }
+		}))`);
+		} else {
+			imports.push("import { hyperdrive } from '@elysiumjs/mnemosyne-drizzle/hyperdrive';");
+			imports.push("import { postgresJs } from '@elysiumjs/mnemosyne-drizzle/postgres-js';");
+			modules.push(`DrizzleModule.with(() => ({
+			default: 'main',
+			connections: {
+				main: {
+					driver: hyperdrive({
+						binding: 'HYPERDRIVE',
+						driver: (url) => postgresJs({ connection: { url, max: 5, fetch_types: false } })
+					})
+				}
+			}
+		}))`);
+		}
+	}
+	return { imports, modules };
+};
+
 export const getAppCode = (
 	projectName: string,
 	modules: Record<string, string>,
 	enabledModules: EnabledModule[] = [],
-	runtime: RuntimeChoice = RUNTIMES.bun
-) => /* js */ `import type { ServerError } from '@elysiumjs/core';
+	runtime: keyof typeof RUNTIMES = 'bun',
+	parts: AppParts = { database: true, cache: true }
+) => {
+	const choice = RUNTIMES[runtime];
+	const part = partCode(runtime, parts);
+	const hermes =
+		runtime === 'workers'
+			? "HermesModule.with({ level: 'debug', transport: 'console' })"
+			: "HermesModule.with({ level: 'debug', format: 'pretty' })";
+	const entries = [
+		hermes,
+		...part.modules,
+		...enabledModules.map((module) => module.expression),
+		...Object.keys(modules).map((module) => `${pascal(module)}Module`)
+	];
+	return /* js */ `import type { ServerError } from '@elysiumjs/core';
 
-import { Application, Service, t } from '@elysiumjs/core';
-import { HermesLogger, HermesModule } from '@elysiumjs/hermes';
-import { RedisModule } from '@elysiumjs/redis';
-import { runtime as ${runtime.alias} } from '${runtime.package}';
-import { DrizzleModule } from '@elysiumjs/mnemosyne-drizzle';
-${enabledModules.map((module) => `import { ${module.import} } from '${module.name}';`).join('\n')}
+import { Application, getLogger, t } from '@elysiumjs/core';
+import { HermesModule } from '@elysiumjs/hermes';
+import { runtime as ${choice.alias} } from '${choice.package}';
+${[...part.imports, ...enabledModules.map((module) => `import { ${module.import} } from '${module.name}';`)].join('\n')}
 
 ${Object.keys(modules)
 	.map((module) => `import { ${pascal(module)}Module } from '${modules[module]}';`)
@@ -132,24 +252,9 @@ ${Object.keys(modules)
 export const env = t.Object({});
 
 @Application.register({
-	runtime: ${runtime.alias},
+	runtime: ${choice.alias},
 	modules: [
-		HermesModule.with({ level: 'debug', format: 'pretty' }),
-		RedisModule.with({
-			default: 'cache',
-			connections: {
-				cache: { url: process.env.REDIS_URL! }
-			}
-		}),
-		DrizzleModule.with(() => ({
-			default: 'main',
-			connections: {
-				main: { connection: process.env.DATABASE_URL! }
-			}
-		})),
-		${enabledModules.map((module) => `${module.expression},\n\t\t`).join('')}${Object.keys(modules)
-			.map((module) => `${pascal(module)}Module`)
-			.join(',\n\t\t')}
+		${entries.join(',\n\t\t')}
 	],
 	server: {
 		name: '${projectName}',
@@ -170,8 +275,79 @@ export const env = t.Object({});
 })
 export class App extends Application {
 	protected onError(e: ServerError): Promise<boolean> {
-		Service.get(HermesLogger)?.error(e.error.message, e.error);
+		getLogger().error(e.error.message, { error: e.error });
 		return super.onError(e);
 	}
 }
 `;
+};
+
+/**
+ * The scripts of a project, per runtime and package manager.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param runtime The runtime key.
+ */
+export const getScripts = (runtime: keyof typeof RUNTIMES): Record<string, string> => {
+	const common = {
+		routes: 'styx routes:generate',
+		typecheck: 'styx routes:generate && tsc --noEmit'
+	};
+	if (runtime === 'node') {
+		return {
+			build: 'styx build --target node --entry ./index.ts',
+			start: 'node --enable-source-maps dist/server.js serve',
+			dev: 'styx build --target node --entry ./index.ts && node --enable-source-maps dist/server.js serve',
+			...common
+		};
+	}
+	if (runtime === 'workers') {
+		return {
+			build: 'styx build --target workers',
+			dev: 'styx build --target workers && wrangler dev',
+			deploy: 'styx build --target workers && wrangler deploy',
+			...common
+		};
+	}
+	return { dev: 'bun --watch styx serve', ...common };
+};
+
+/** The Worker entry of a Cloudflare Workers project. */
+export const getWorkerCode =
+	() => /* js */ `import { createWorker } from '@elysiumjs/runtime-workers';
+
+import { App } from '#root/app';
+
+const worker = await createWorker(new App());
+
+// The AOT plugin of styx build --target workers compiles the routes of the exported app.
+export const app = worker.app;
+
+export default worker;
+`;
+
+/**
+ * The wrangler config of a Cloudflare Workers project.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param projectName The project name.
+ * @param parts The parts of the app, for the bindings they need.
+ */
+export const getWranglerConfig = (projectName: string, parts: AppParts) => {
+	const config: Record<string, unknown> = {
+		$schema: 'node_modules/wrangler/config-schema.json',
+		name: projectName.replace(/^@[^/]+\//, ''),
+		main: 'dist/worker.js',
+		compatibility_date: '2026-10-01',
+		compatibility_flags: ['nodejs_compat'],
+		observability: { enabled: true }
+	};
+	if (parts.database) {
+		config.hyperdrive = [
+			{
+				binding: 'HYPERDRIVE',
+				id: '<your-hyperdrive-id>',
+				localConnectionString: `postgres://postgres:postgres@localhost:5432/${config.name}`
+			}
+		];
+	}
+	return JSON.stringify(config, null, '\t') + '\n';
+};
