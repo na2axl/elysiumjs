@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import type {
-	CommandLock,
+	ActionLock,
 	IdempotencyRecord,
 	IdempotencyStore,
 	InboxStore,
@@ -51,7 +51,7 @@ export const moiraiTables = (schema?: string) => {
 	return {
 		idempotencyKeys: table('idempotency_keys', {
 			key: text('key').primaryKey(),
-			command: text('command').notNull(),
+			action: text('action').notNull(),
 			requestHash: text('request_hash').notNull(),
 			response: jsonb('response'),
 			createdAt: at('created_at').notNull().defaultNow()
@@ -110,7 +110,7 @@ const isUniqueViolation = (error: unknown): boolean => {
 };
 
 /**
- * Keeps idempotency records in a Postgres table, in the command's transaction.
+ * Keeps idempotency records in a Postgres table, in the action's transaction.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export class DrizzleIdempotencyStore implements IdempotencyStore {
@@ -240,11 +240,11 @@ export class DrizzleInboxStore implements InboxStore {
 }
 
 /**
- * Serializes commands with a Postgres advisory lock taken in the command's transaction, and
+ * Serializes actions with a Postgres advisory lock taken in the action's transaction, and
  * released when it ends.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class PgAdvisoryLock implements CommandLock {
+export class PgAdvisoryLock implements ActionLock {
 	constructor(private readonly options: { connection?: string } = {}) {}
 
 	public async lock(key: string): Promise<void> {

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { actions } from './actions';
 import { auth } from './auth';
-import { commands } from './commands';
 import { config } from './config';
 import { diDisposal, diScopes } from './di-scopes';
 import { errors } from './errors';
@@ -54,7 +54,7 @@ export const scenarios = [
 	lifecycle,
 	sse,
 	sseDisposal,
-	commands,
+	actions,
 	auth,
 	flows
 ];

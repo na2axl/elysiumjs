@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { CommandLock, IdempotencyStore, InboxStore, OutboxStore } from './stores';
+import type { ActionLock, IdempotencyStore, InboxStore, OutboxStore } from './stores';
 
 import { Service } from '@elysiumjs/core';
 
@@ -22,22 +22,22 @@ import { MissingStoreError } from './errors';
 export const MOIRAI_IDEMPOTENCY_STORE = 'moirai.idempotency';
 export const MOIRAI_OUTBOX_STORE = 'moirai.outbox';
 export const MOIRAI_INBOX_STORE = 'moirai.inbox';
-export const MOIRAI_COMMAND_LOCK = 'moirai.lock';
+export const MOIRAI_ACTION_LOCK = 'moirai.lock';
 export const MOIRAI_OPTIONS = 'moirai.options';
 
 /**
- * How moirai runs commands and relays the outbox.
+ * How moirai runs actions and relays the outbox.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export type MoiraiOptions = {
-	/** The attempts of a command that fails with a transient error. Defaults to 3. */
+	/** The attempts of an action that fails with a transient error. Defaults to 3. */
 	maxAttempts: number;
 	/**
-	 * Whether an error is transient, so that the command retries in a new unit of work. Defaults to
+	 * Whether an error is transient, so that the action retries in a new unit of work. Defaults to
 	 * errors with `transient: true` and the Postgres serialization failure and deadlock codes.
 	 */
 	isTransient: (error: unknown) => boolean;
-	/** Whether the effects a command enqueues relay right after it commits. Defaults to `true`. */
+	/** Whether the effects an action enqueues relay right after it commits. Defaults to `true`. */
 	relayOnCommit: boolean;
 	/**
 	 * Runs the relay that follows a commit. Defaults to awaiting it before the response. On
@@ -100,4 +100,4 @@ const store =
 export const idempotencyStore = store<IdempotencyStore>(MOIRAI_IDEMPOTENCY_STORE, 'idempotency');
 export const outboxStore = store<OutboxStore>(MOIRAI_OUTBOX_STORE, 'outbox');
 export const inboxStore = store<InboxStore>(MOIRAI_INBOX_STORE, 'inbox');
-export const commandLock = store<CommandLock>(MOIRAI_COMMAND_LOCK, 'lock');
+export const actionLock = store<ActionLock>(MOIRAI_ACTION_LOCK, 'lock');

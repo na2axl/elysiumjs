@@ -24,7 +24,7 @@ import {
 } from '@elysiumjs/core';
 import { withUnitOfWork } from '@elysiumjs/mnemosyne';
 import {
-	Commands,
+	Action,
 	MemoryIdempotencyStore,
 	MemoryOutboxStore,
 	Moirai,
@@ -37,18 +37,18 @@ const make = async (): Promise<Application> => {
 
 	@Service.register({ name: 'conformance.mailer' })
 	class Mailer {
-		@Moirai.effect('conformance.wallet.credited')
+		@Outbox.handle('conformance.wallet.credited')
 		public send(payload: { balance: number }) {
 			wallet.mails.push(`credited:${payload.balance}`);
 		}
 	}
 
-	@Moirai.command({
+	@Action.register({
 		name: 'top-up',
 		input: t.Object({ amount: t.Integer({ minimum: 1 }) }),
 		idempotent: true
 	})
-	class TopUp {
+	class TopUp extends Action<{ amount: number }> {
 		public async handle(input: { amount: number }) {
 			wallet.balance += input.amount;
 			await Outbox.enqueue({
@@ -63,7 +63,7 @@ const make = async (): Promise<Application> => {
 	class WalletController {
 		@Http.post({ path: '/top-up' })
 		public topUp(@Http.context() c: { body: unknown; request: Request }) {
-			return Commands.execute(TopUp, c.body as { amount: number }, {
+			return Moirai.execute(TopUp, c.body as { amount: number }, {
 				idempotencyKey: c.request.headers.get('idempotency-key') ?? undefined
 			});
 		}
@@ -111,12 +111,12 @@ const topUp = (key: string | null, amount: number) => () =>
 	});
 
 /**
- * An idempotent command replays its response for a repeated key, refuses a missing key (428) and
+ * An idempotent action replays its response for a repeated key, refuses a missing key (428) and
  * a reused key with another input (422), and its outbox effect relays once it commits.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export const commands: Scenario = {
-	name: 'commands: idempotent replay and outbox relay after commit',
+export const actions: Scenario = {
+	name: 'actions: idempotent replay and outbox relay after commit',
 	app: make,
 	requests: [
 		{ request: topUp('k1', 10), expect: { status: 200, json: { balance: 10 } } },

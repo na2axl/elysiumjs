@@ -1,6 +1,6 @@
 # @elysiumjs/moirai-drizzle
 
-Postgres stores for [`@elysiumjs/moirai`](../moirai), through Drizzle ORM and the connections of [`@elysiumjs/mnemosyne-drizzle`](../mnemosyne-drizzle). They write in the transaction of the command, so an idempotency record and the outbox rows commit with the data.
+Postgres stores for [`@elysiumjs/moirai`](../moirai), through Drizzle ORM and the connections of [`@elysiumjs/mnemosyne-drizzle`](../mnemosyne-drizzle). They write in the transaction of the action, so an idempotency record and the outbox rows commit with the data.
 
 ## Installation
 
@@ -38,9 +38,9 @@ MoiraiModule.with({
 });
 ```
 
-- `DrizzleIdempotencyStore` keeps the response of an idempotent command per key.
+- `DrizzleIdempotencyStore` keeps the response of an idempotent action per key.
 - `DrizzleOutboxStore` claims due rows with `FOR UPDATE SKIP LOCKED`, so that several relays never take the same row.
 - `DrizzleInboxStore` records the messages a consumer has processed.
-- `PgAdvisoryLock` serializes the commands that share a `serializeBy` key with a transaction advisory lock.
+- `PgAdvisoryLock` serializes the actions that share a `serializeBy` key with a transaction advisory lock.
 
 Each store takes `connection`, the name of a mnemosyne-drizzle connection, which defaults to `default`.

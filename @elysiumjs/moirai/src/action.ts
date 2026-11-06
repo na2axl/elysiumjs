@@ -24,77 +24,82 @@ import {
 import { UnitOfWork } from '@elysiumjs/mnemosyne';
 import Value from 'typebox/value';
 
-import { commandLock, idempotencyStore, options } from './config';
+import { actionLock, idempotencyStore, options } from './config';
 import {
-	CommandForbiddenError,
+	CallForbiddenError,
 	IdempotencyKeyRequiredError,
 	IdempotencyKeyReusedError,
 	InvalidInputError
 } from './errors';
 import { requestHash } from './hash';
 
-const COMMAND = Symbol.for('elysium:moirai:command');
+const ACTION = Symbol.for('elysium:moirai:action');
 const QUERY = Symbol.for('elysium:moirai:query');
-type EffectHandler = (payload: unknown, row: unknown) => unknown;
-const EFFECTS = new Map<string, EffectHandler>();
 
 /**
- * What a command or a query handler receives besides its input.
+ * What an action or a query handler receives besides its input.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export type HandlerContext = {
-	/** The name of the command or the query. */
+	/** The name of the action or the query. */
 	name: string;
 	/** The idempotency key of the call, if any. */
 	idempotencyKey?: string;
-	/** The attempt, from 1, when the command retries after a transient error. */
+	/** The attempt, from 1, when the action retries after a transient error. */
 	attempt: number;
 };
 
 /**
- * A command or a query: a class whose `handle()` gets the validated input. Returning or throwing a
- * `DomainError` refuses the call.
+ * What `handle()` gives: the result, or a DomainError that refuses the call.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export interface Handler<TInput = any, TResult = any> {
-	handle(
-		input: TInput,
-		context: HandlerContext
-	): Promise<TResult | DomainError> | TResult | DomainError;
-}
+export type HandlerResult<TResult> = Promise<TResult | DomainError> | TResult | DomainError;
 
-export type HandlerClass<TInput = any, TResult = any> = new (
+/**
+ * An action class.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type ActionClass<TInput = any, TResult = any> = new (
 	...args: any[]
-) => Handler<TInput, TResult>;
+) => Action<TInput, TResult>;
 
+/**
+ * A query class.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type QueryClass<TInput = any, TResult = any> = new (
+	...args: any[]
+) => Query<TInput, TResult>;
+
+type HandlerClass = ActionClass | QueryClass;
 type InputOf<C extends HandlerClass> = Parameters<InstanceType<C>['handle']>[0];
 type OutcomeOf<C extends HandlerClass> = Awaited<ReturnType<InstanceType<C>['handle']>>;
 type ResultOf<C extends HandlerClass> = Exclude<OutcomeOf<C>, DomainError>;
 
 /**
- * What `Commands.execute()` gives: the result, or the DomainError that refused the call, from the
+ * What `Moirai.execute()` gives: the result, or the DomainError that refused the call, from the
  * handler or from moirai itself.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export type CommandOutcome<C extends HandlerClass> =
+export type ActionOutcome<C extends ActionClass> =
 	| OutcomeOf<C>
 	| InvalidInputError
-	| CommandForbiddenError
+	| CallForbiddenError
 	| IdempotencyKeyRequiredError
 	| IdempotencyKeyReusedError;
 
 /**
- * What `Queries.ask()` gives: the result, or the DomainError that refused the call.
+ * What `Moirai.ask()` gives: the result, or the DomainError that refused the call.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export type QueryOutcome<C extends HandlerClass> =
-	OutcomeOf<C> | InvalidInputError | CommandForbiddenError;
+export type QueryOutcome<C extends QueryClass> =
+	OutcomeOf<C> | InvalidInputError | CallForbiddenError;
 
 /**
- * How a command retries a transient failure.
+ * How an action retries a transient failure.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export type CommandRetry = {
+export type ActionRetry = {
 	/** The attempts, the first included. Defaults to `maxAttempts` of the module. */
 	attempts?: number;
 	/**
@@ -105,11 +110,11 @@ export type CommandRetry = {
 };
 
 /**
- * The options of a command.
+ * The options of an action.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export type CommandOptions<S extends TSchema = TSchema> = {
-	/** The name of the command, in idempotency records and problems. Defaults to the class name. */
+export type ActionOptions<S extends TSchema = TSchema> = {
+	/** The name of the action, in idempotency records and problems. Defaults to the class name. */
 	name?: string;
 	/** The schema of the input. */
 	input: S;
@@ -119,12 +124,12 @@ export type CommandOptions<S extends TSchema = TSchema> = {
 	 */
 	idempotent?: boolean;
 	/**
-	 * Who owns the idempotency keys of the command, so that the keys of two owners never meet,
+	 * Who owns the idempotency keys of the action, so that the keys of two owners never meet,
 	 * such as a tenant and a user. Defaults to the id of the current user (`currentUserId()`),
-	 * else `anonymous`. `Commands.execute()` may pass its own.
+	 * else `anonymous`. `Moirai.execute()` may pass its own.
 	 */
 	scope?: (input: Static<S>) => string;
-	/** Whether the command runs in a unit of work, or joins the open one. Defaults to `true`. */
+	/** Whether the action runs in a unit of work, or joins the open one. Defaults to `true`. */
 	transactional?: boolean;
 	/** The database connection of the unit of work. Defaults to `default`. */
 	connection?: string;
@@ -135,11 +140,11 @@ export type CommandOptions<S extends TSchema = TSchema> = {
 	serializeBy?: (input: Static<S>) => string;
 	/**
 	 * Whether a transient failure retries in a new unit of work. Defaults to `true`, with the
-	 * `maxAttempts` and `isTransient` of the module. An object sets them for this command, such as
+	 * `maxAttempts` and `isTransient` of the module. An object sets them for this action, such as
 	 * an `isTransient` that also retries a returned `ConcurrencyConflict` error. A transient
 	 * DomainError that outlasts the attempts is returned like any refusal.
 	 */
-	retry?: boolean | CommandRetry;
+	retry?: boolean | ActionRetry;
 	/** Decides whether the call may run, such as with the abilities of the current user. */
 	authorize?: (input: Static<S>) => boolean | Promise<boolean>;
 };
@@ -157,75 +162,64 @@ export type QueryOptions<S extends TSchema = TSchema> = {
 	authorize?: (input: Static<S>) => boolean | Promise<boolean>;
 };
 
-export namespace Moirai {
+/**
+ * An action: a write, validated, run in a unit of work, retried on transient failures, and
+ * idempotent when asked. Mark the class with `@Action.register()` and run it with
+ * {@link Moirai.execute}.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @example
+ * ```ts
+ * @Action.register({ input: t.Object({ amount: t.Integer({ minimum: 1 }) }), idempotent: true })
+ * class TopUp extends Action<{ amount: number }> {
+ * 	constructor(@Service.inject() private readonly wallets: WalletRepository) {
+ * 		super();
+ * 	}
+ *
+ * 	public async handle(input: { amount: number }) {
+ * 		const wallet = await this.wallets.credit(input.amount);
+ * 		await Outbox.enqueue({ kind: 'wallet.credited', payload: { id: wallet.id } });
+ * 		return { balance: wallet.balance };
+ * 	}
+ * }
+ * ```
+ */
+export abstract class Action<TInput = any, TResult = any> {
 	/**
-	 * Marks a class as a command: a write, validated, run in a unit of work, retried on transient
-	 * failures, and idempotent when asked. Run it with {@link Commands.execute}.
-	 * @author Axel Nana <axel.nana@workbud.com>
-	 * @param props The options of the command.
-	 * @example
-	 * ```ts
-	 * @Moirai.command({ input: t.Object({ amount: t.Integer({ minimum: 1 }) }), idempotent: true })
-	 * class TopUpCommand {
-	 * 	constructor(@Service.inject() private readonly wallets: WalletRepository) {}
-	 *
-	 * 	public async handle(input: { amount: number }) {
-	 * 		const wallet = await this.wallets.credit(input.amount);
-	 * 		await Outbox.enqueue({ kind: 'wallet.credited', payload: { id: wallet.id } });
-	 * 		return { balance: wallet.balance };
-	 * 	}
-	 * }
-	 * ```
+	 * Marks a class as an action.
+	 * @param props The options of the action.
 	 */
-	export const command =
-		<S extends TSchema>(props: CommandOptions<S>) =>
-		(target: HandlerClass): void => {
-			Metadata.define(COMMAND, { ...props, name: props.name ?? target.name }, target);
+	public static register<S extends TSchema>(props: ActionOptions<S>) {
+		return (target: ActionClass): void => {
+			Metadata.define(ACTION, { ...props, name: props.name ?? target.name }, target);
 		};
+	}
 
 	/**
-	 * Marks a class as a query: a read, validated and run without a transaction. Run it with
-	 * {@link Queries.ask}.
-	 * @author Axel Nana <axel.nana@workbud.com>
-	 * @param props The options of the query.
+	 * Runs the action with its validated input. Returning or throwing a DomainError refuses the
+	 * call and rolls its unit of work back.
 	 */
-	export const query =
-		<S extends TSchema>(props: QueryOptions<S>) =>
-		(target: HandlerClass): void => {
-			Metadata.define(QUERY, { ...props, name: props.name ?? target.name }, target);
-		};
-
-	/**
-	 * Marks a service method as the handler of the outbox rows of a kind. The method gets the
-	 * payload and the row; throwing retries the row later.
-	 * @author Axel Nana <axel.nana@workbud.com>
-	 * @param kind The kind of effect.
-	 */
-	export const effect =
-		(kind: string): MethodDecorator =>
-		(target, method) => {
-			EFFECTS.set(kind, (payload, row) => {
-				const instance = instanceOf(target.constructor as HandlerClass) as unknown as Record<
-					string | symbol,
-					EffectHandler
-				>;
-				return instance[method]!(payload, row);
-			});
-		};
+	public abstract handle(input: TInput, context: HandlerContext): HandlerResult<TResult>;
 }
 
-/** The handler of a kind of effect, if any. */
-export const effectHandler = (kind: string): EffectHandler | undefined => EFFECTS.get(kind);
-
 /**
- * Registers the handler of a kind of effect with a function, for packages that ship effects.
+ * A query: a read, validated and run without a transaction. Mark the class with
+ * `@Query.register()` and run it with {@link Moirai.ask}.
  * @author Axel Nana <axel.nana@workbud.com>
- * @param kind The kind of effect.
- * @param handler Gets the payload and the row; throwing retries the row later.
  */
-export const registerEffect = (kind: string, handler: EffectHandler): void => {
-	EFFECTS.set(kind, handler);
-};
+export abstract class Query<TInput = any, TResult = any> {
+	/**
+	 * Marks a class as a query.
+	 * @param props The options of the query.
+	 */
+	public static register<S extends TSchema>(props: QueryOptions<S>) {
+		return (target: QueryClass): void => {
+			Metadata.define(QUERY, { ...props, name: props.name ?? target.name }, target);
+		};
+	}
+
+	/** Runs the query with its validated input. Returning or throwing a DomainError refuses it. */
+	public abstract handle(input: TInput, context: HandlerContext): HandlerResult<TResult>;
+}
 
 /** The instance of a handler: the registered service, or a new one with its dependencies. */
 const instanceOf = <T>(target: new (...args: any[]) => T): T =>
@@ -263,43 +257,43 @@ const settle = async <T>(call: () => Promise<T>): Promise<T | DomainError> => {
 	}
 };
 
-export namespace Commands {
+export namespace Moirai {
 	/**
-	 * Runs a command: validates the input, checks `authorize`, then runs the handler in a unit of
+	 * Runs an action: validates the input, checks `authorize`, then runs the handler in a unit of
 	 * work (or joins the open one), retrying transient failures, and replaying the stored response
-	 * of an idempotent command called again with the same key.
+	 * of an idempotent action called again with the same key.
 	 *
 	 * A refusal is a value: the DomainError the handler returns or throws, or one of moirai's own
 	 * (an invalid input, a refused `authorize`, a missing or reused idempotency key). The unit of
 	 * work rolls back, nothing is stored for idempotency, and the error is returned, so a handler
 	 * that returns it sends it as the problem of its route.
 	 * @author Axel Nana <axel.nana@workbud.com>
-	 * @param command The command class.
+	 * @param action The action class.
 	 * @param input The raw input.
 	 * @param call The idempotency key of the call.
 	 */
-	export const execute = <C extends HandlerClass>(
-		command: C,
+	export const execute = <C extends ActionClass>(
+		action: C,
 		input: InputOf<C>,
 		call: { idempotencyKey?: string; scope?: string } = {}
-	): Promise<CommandOutcome<C>> =>
-		settle(() => run(command, input, call)) as Promise<CommandOutcome<C>>;
+	): Promise<ActionOutcome<C>> =>
+		settle(() => run(action, input, call)) as Promise<ActionOutcome<C>>;
 
-	const run = async <C extends HandlerClass>(
-		command: C,
+	const run = async <C extends ActionClass>(
+		action: C,
 		input: InputOf<C>,
 		call: { idempotencyKey?: string; scope?: string }
 	): Promise<ResultOf<C>> => {
-		const props = Metadata.get(COMMAND, command) as (CommandOptions & { name: string }) | undefined;
-		if (!props) throw new TypeError(`${command.name} is not marked with @Moirai.command().`);
+		const props = Metadata.get(ACTION, action) as (ActionOptions & { name: string }) | undefined;
+		if (!props) throw new TypeError(`${action.name} is not marked with @Action.register().`);
 		const { name, idempotent = false, transactional = true, retry = true } = props;
 		const config = options();
 
 		const value = validate(props.input, input, name);
-		if (props.authorize && !(await props.authorize(value))) throw new CommandForbiddenError(name);
+		if (props.authorize && !(await props.authorize(value))) throw new CallForbiddenError(name);
 		const key = call.idempotencyKey;
 		if (idempotent && !key) throw new IdempotencyKeyRequiredError(name);
-		// A key belongs to its owner and its command: another owner presenting it runs on its own.
+		// A key belongs to its owner and its action: another owner presenting it runs on its own.
 		const storedKey = idempotent
 			? [call.scope ?? props.scope?.(value) ?? currentUserId() ?? 'anonymous', name, key!]
 					.map(encodeURIComponent)
@@ -308,10 +302,10 @@ export namespace Commands {
 
 		const body = async (attempt: number): Promise<ResultOf<C>> => {
 			const release = props.serializeBy
-				? await commandLock().lock(props.serializeBy(value))
+				? await actionLock().lock(props.serializeBy(value))
 				: undefined;
 			try {
-				const handler = instanceOf(command);
+				const handler = instanceOf(action);
 				const context: HandlerContext = { name, idempotencyKey: key, attempt };
 				if (!idempotent) return unwrap(await handler.handle(value, context)) as ResultOf<C>;
 
@@ -319,14 +313,14 @@ export namespace Commands {
 				const hash = await requestHash(value);
 				const seen = await store.get(storedKey!);
 				if (seen) {
-					if (seen.command === name && seen.requestHash === hash)
+					if (seen.action === name && seen.requestHash === hash)
 						return seen.response as ResultOf<C>;
 					throw new IdempotencyKeyReusedError(key!);
 				}
 				const response = unwrap(await handler.handle(value, context)) as ResultOf<C>;
 				await store.put({
 					key: storedKey!,
-					command: name,
+					action: name,
 					requestHash: hash,
 					// Kept as JSON, which is what a replay answers.
 					response: response === undefined ? null : JSON.parse(JSON.stringify(response)),
@@ -339,7 +333,7 @@ export namespace Commands {
 		};
 
 		const transaction = transactional && Service.exists(DATABASE_TRANSACTION_SERVICE);
-		// A command that joins an open unit of work leaves the retries to whoever opened it.
+		// An action that joins an open unit of work leaves the retries to whoever opened it.
 		if (transaction && UnitOfWork.active()) return body(1);
 
 		for (let attempt = 1; ; attempt++) {
@@ -356,9 +350,7 @@ export namespace Commands {
 			}
 		}
 	};
-}
 
-export namespace Queries {
 	/**
 	 * Runs a query: validates the input, checks `authorize`, and runs the handler. A refusal is a
 	 * value: the DomainError the handler returns or throws, an invalid input, or a refused
@@ -367,16 +359,16 @@ export namespace Queries {
 	 * @param query The query class.
 	 * @param input The raw input.
 	 */
-	export const ask = <C extends HandlerClass>(
+	export const ask = <C extends QueryClass>(
 		query: C,
 		input: InputOf<C>
 	): Promise<QueryOutcome<C>> =>
 		settle(async () => {
 			const props = Metadata.get(QUERY, query) as (QueryOptions & { name: string }) | undefined;
-			if (!props) throw new TypeError(`${query.name} is not marked with @Moirai.query().`);
+			if (!props) throw new TypeError(`${query.name} is not marked with @Query.register().`);
 			const value = validate(props.input, input, props.name);
 			if (props.authorize && !(await props.authorize(value)))
-				throw new CommandForbiddenError(props.name);
+				throw new CallForbiddenError(props.name);
 			return instanceOf(query).handle(value, { name: props.name, attempt: 1 });
 		}) as Promise<QueryOutcome<C>>;
 }

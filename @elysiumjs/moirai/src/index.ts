@@ -13,23 +13,22 @@
 // limitations under the License.
 
 export {
-	type CommandOptions,
-	type CommandOutcome,
-	type CommandRetry,
-	Commands,
-	effectHandler,
-	type Handler,
-	type HandlerClass,
+	type ActionClass,
+	type ActionOptions,
+	type ActionOutcome,
+	type ActionRetry,
 	type HandlerContext,
-	Moirai,
-	Queries,
+	type HandlerResult,
+	type QueryClass,
 	type QueryOptions,
 	type QueryOutcome,
-	registerEffect
-} from './command';
+	Action,
+	Moirai,
+	Query
+} from './action';
 export {
 	isTransientError,
-	MOIRAI_COMMAND_LOCK,
+	MOIRAI_ACTION_LOCK,
 	MOIRAI_IDEMPOTENCY_STORE,
 	MOIRAI_INBOX_STORE,
 	MOIRAI_OPTIONS,
@@ -37,7 +36,7 @@ export {
 	type MoiraiOptions
 } from './config';
 export {
-	CommandForbiddenError,
+	CallForbiddenError,
 	IdempotencyConflictError,
 	IdempotencyKeyRequiredError,
 	IdempotencyKeyReusedError,
@@ -48,13 +47,21 @@ export {
 export { requestHash } from './hash';
 export { uuidv7 } from './ids';
 export { MoiraiModule, type MoiraiModuleConfig } from './moirai.module';
-export { backoffMs, Inbox, Outbox, type RelayOptions, type RelaySummary } from './outbox';
 export {
-	type CommandLock,
+	type RelayOptions,
+	type RelaySummary,
+	backoffMs,
+	effectHandler,
+	Inbox,
+	Outbox,
+	registerEffect
+} from './outbox';
+export {
+	type ActionLock,
 	type IdempotencyRecord,
 	type IdempotencyStore,
 	type InboxStore,
-	MemoryCommandLock,
+	MemoryActionLock,
 	MemoryIdempotencyStore,
 	MemoryInboxStore,
 	MemoryOutboxStore,

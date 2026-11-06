@@ -28,7 +28,7 @@ const canonical = (value: unknown): unknown => {
 };
 
 /**
- * The fingerprint of a command input: the hex SHA-256 of its canonical JSON, so that the same input
+ * The fingerprint of an action input: the hex SHA-256 of its canonical JSON, so that the same input
  * gives the same hash whatever the order of its keys.
  * @author Axel Nana <axel.nana@workbud.com>
  * @param input The validated input.

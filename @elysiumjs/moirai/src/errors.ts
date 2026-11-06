@@ -17,18 +17,18 @@ import type { ProblemValidationError } from '@elysiumjs/core';
 import { DomainError, ElysiumError } from '@elysiumjs/core';
 
 /**
- * Raised when an idempotent command is called without an idempotency key. Rendered as a 428
+ * Raised when an idempotent action is called without an idempotency key. Rendered as a 428
  * problem.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export class IdempotencyKeyRequiredError extends DomainError.for('IDEMPOTENCY_KEY_REQUIRED', 428) {
-	constructor(public readonly command: string) {
-		super(`The ${command} command needs an Idempotency-Key.`, { extensions: { command } });
+	constructor(public readonly action: string) {
+		super(`The ${action} action needs an Idempotency-Key.`, { extensions: { action } });
 	}
 }
 
 /**
- * Raised when an idempotency key comes back with another command or another input. Rendered as a
+ * Raised when an idempotency key comes back with another action or another input. Rendered as a
  * 422 problem.
  * @author Axel Nana <axel.nana@workbud.com>
  */
@@ -41,12 +41,12 @@ export class IdempotencyKeyReusedError extends DomainError.for('IDEMPOTENCY_KEY_
 }
 
 /**
- * Raised by an {@link IdempotencyStore} when another call stored the same key first. The command
+ * Raised by an {@link IdempotencyStore} when another call stored the same key first. The action
  * retries, and replays the response of the call that won.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export class IdempotencyConflictError extends ElysiumError {
-	/** Conflicts are transient: the command retries them. */
+	/** Conflicts are transient: the action retries them. */
 	public readonly transient = true;
 
 	constructor(public readonly key: string) {
@@ -55,7 +55,7 @@ export class IdempotencyConflictError extends ElysiumError {
 }
 
 /**
- * Raised when the input of a command or a query does not match its schema. Rendered as a 400
+ * Raised when the input of an action or a query does not match its schema. Rendered as a 400
  * problem, with one entry per mistake in `errors`.
  * @author Axel Nana <axel.nana@workbud.com>
  */
@@ -69,12 +69,12 @@ export class InvalidInputError extends DomainError.for('VALIDATION_FAILED', 400)
 }
 
 /**
- * Raised when the `authorize` hook of a command refuses the call. Rendered as a 403 problem.
+ * Raised when the `authorize` hook of an action refuses the call. Rendered as a 403 problem.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class CommandForbiddenError extends DomainError.for('FORBIDDEN', 403) {
-	constructor(public readonly command: string) {
-		super(`You may not run the ${command} command.`);
+export class CallForbiddenError extends DomainError.for('FORBIDDEN', 403) {
+	constructor(public readonly action: string) {
+		super(`You may not run the ${action} action.`);
 	}
 }
 
@@ -91,13 +91,13 @@ export class MissingStoreError extends ElysiumError {
 }
 
 /**
- * Raised when an outbox row has a kind no `@Moirai.effect()` handles.
+ * Raised when an outbox row has a kind no `@Outbox.handle()` handles.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export class UnknownEffectError extends ElysiumError {
 	constructor(public readonly kind: string) {
 		super(
-			`No @Moirai.effect('${kind}') handles the outbox rows of kind "${kind}". Effects register when ` +
+			`No @Outbox.handle('${kind}') handles the outbox rows of kind "${kind}". Effects register when ` +
 				'their module is imported, so the process that relays must import it' +
 				(kind === 'heracles.job' ? " (here '@elysiumjs/moirai/heracles')." : '.')
 		);

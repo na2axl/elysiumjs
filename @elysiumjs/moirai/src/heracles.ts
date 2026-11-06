@@ -19,8 +19,7 @@ import { DATABASE_TRANSACTION_SERVICE, ElysiumError, Service } from '@elysiumjs/
 import { Heracles, JobRegistry } from '@elysiumjs/heracles';
 import { UnitOfWork } from '@elysiumjs/mnemosyne';
 
-import { registerEffect } from './command';
-import { Inbox } from './outbox';
+import { Inbox, registerEffect } from './outbox';
 
 /** The kind of the effects that dispatch a Heracles job. */
 export const HERACLES_JOB_EFFECT = 'heracles.job';
@@ -35,7 +34,7 @@ registerEffect(HERACLES_JOB_EFFECT, async (payload) => {
 });
 
 /**
- * An outbox effect that dispatches a Heracles job once the command commits, with the retries of
+ * An outbox effect that dispatches a Heracles job once the action commits, with the retries of
  * the outbox until the job is queued.
  * @author Axel Nana <axel.nana@workbud.com>
  * @param jobClass The job class, registered in a module's `jobs`.

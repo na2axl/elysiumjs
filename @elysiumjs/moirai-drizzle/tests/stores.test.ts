@@ -55,12 +55,12 @@ describe('moirai stores', () => {
 		const store = new DrizzleIdempotencyStore({ table: tables.idempotencyKeys });
 		answer = (query) =>
 			query.startsWith('select')
-				? [{ key: 'k', command: 'pay', request_hash: 'h', response: null, created_at: new Date(0) }]
+				? [{ key: 'k', action: 'pay', request_hash: 'h', response: null, created_at: new Date(0) }]
 				: [];
 
 		expect(await store.get('k')).toMatchObject({
 			key: 'k',
-			command: 'pay',
+			action: 'pay',
 			requestHash: 'h',
 			response: null
 		});
@@ -70,7 +70,7 @@ describe('moirai stores', () => {
 
 		await store.put({
 			key: 'k2',
-			command: 'pay',
+			action: 'pay',
 			requestHash: 'h',
 			response: { ok: true },
 			createdAt: new Date(0)
@@ -83,7 +83,7 @@ describe('moirai stores', () => {
 		await expect(
 			store.put({
 				key: 'k',
-				command: 'pay',
+				action: 'pay',
 				requestHash: 'h',
 				response: null,
 				createdAt: new Date(0)
@@ -100,7 +100,7 @@ describe('moirai stores', () => {
 		await expect(
 			store.put({
 				key: 'k',
-				command: 'pay',
+				action: 'pay',
 				requestHash: 'h',
 				response: null,
 				createdAt: new Date(0)

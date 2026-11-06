@@ -17,10 +17,25 @@ import type { OutboxEffect, OutboxRow } from './stores';
 import { DATABASE_TRANSACTION_SERVICE, getLogger, Service } from '@elysiumjs/core';
 import { UnitOfWork } from '@elysiumjs/mnemosyne';
 
-import { effectHandler } from './command';
 import { inboxStore, options, outboxStore } from './config';
 import { UnknownEffectError } from './errors';
 import { uuidv7 } from './ids';
+
+type EffectHandler = (payload: unknown, row: OutboxRow) => unknown;
+const EFFECTS = new Map<string, EffectHandler>();
+
+/** The handler of a kind of effect, if any. */
+export const effectHandler = (kind: string): EffectHandler | undefined => EFFECTS.get(kind);
+
+/**
+ * Registers the handler of a kind of effect with a function, for packages that ship effects.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param kind The kind of effect.
+ * @param handler Gets the payload and the row; throwing retries the row later.
+ */
+export const registerEffect = (kind: string, handler: EffectHandler): void => {
+	EFFECTS.set(kind, handler);
+};
 
 const BASE_DELAY_MS = 5_000;
 const MAX_DELAY_MS = 3_600_000;
@@ -46,7 +61,7 @@ export type RelaySummary = { dispatched: number; retried: number; dead: number }
 export type RelayOptions = {
 	/** Relay only the rows of these kinds. */
 	kinds?: readonly string[];
-	/** Relay only these rows, such as the ones a command just committed. */
+	/** Relay only these rows, such as the ones an action just committed. */
 	ids?: readonly string[];
 	/** The rows claimed at once. Defaults to the `relayBatch` option. */
 	batch?: number;
@@ -60,6 +75,23 @@ const inUnitOfWork = <T>(work: () => Promise<T>): Promise<T> =>
 	Service.exists(DATABASE_TRANSACTION_SERVICE) ? UnitOfWork.run(work) : work();
 
 export namespace Outbox {
+	/**
+	 * Marks a service method as the handler of the outbox rows of a kind. The method gets the
+	 * payload and the row; throwing retries the row later.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param kind The kind of effect.
+	 */
+	export const handle =
+		(kind: string): MethodDecorator =>
+		(target, method) => {
+			EFFECTS.set(kind, (payload, row) => {
+				const owner = target.constructor as new (...args: any[]) => unknown;
+				const instance = ((Service.exists(owner) ? Service.get(owner) : null) ??
+					Service.make(owner)) as Record<string | symbol, EffectHandler>;
+				return instance[method]!(payload, row);
+			});
+		};
+
 	/**
 	 * Writes effects to the outbox, in the open unit of work: they happen if and only if it
 	 * commits. Once it has, the effects relay (see the `relayOnCommit` option).
@@ -100,7 +132,7 @@ export namespace Outbox {
 	};
 
 	/**
-	 * Runs the due rows of the outbox through their `@Moirai.effect()` handlers. A row that fails
+	 * Runs the due rows of the outbox through their `@Outbox.handle()` handlers. A row that fails
 	 * is retried later with an exponential backoff, and is dead after `maxRelayAttempts`. Delivery
 	 * is at least once, so handlers must tolerate a repeat.
 	 *

@@ -15,22 +15,22 @@
 import { IdempotencyConflictError } from './errors';
 
 /**
- * What an idempotency store keeps of a command call: its response, replayed when the key comes
+ * What an idempotency store keeps of an action call: its response, replayed when the key comes
  * back with the same request.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export interface IdempotencyRecord {
 	key: string;
-	command: string;
+	action: string;
 	/** The fingerprint of the input (see `requestHash`). */
 	requestHash: string;
-	/** The JSON-safe response of the command. */
+	/** The JSON-safe response of the action. */
 	response: unknown;
 	createdAt: Date;
 }
 
 /**
- * Where idempotent commands keep their responses. `put` runs in the command's unit of work, and
+ * Where idempotent actions keep their responses. `put` runs in the action's unit of work, and
  * throws {@link IdempotencyConflictError} when another call stored the key first.
  * @author Axel Nana <axel.nana@workbud.com>
  */
@@ -40,21 +40,21 @@ export interface IdempotencyStore {
 }
 
 /**
- * Serializes the commands that share a key (`serializeBy`): `lock` waits for the other holders,
+ * Serializes the actions that share a key (`serializeBy`): `lock` waits for the other holders,
  * and the lock lasts until the unit of work ends, or until the returned release runs.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export interface CommandLock {
+export interface ActionLock {
 	lock(key: string): Promise<(() => void) | void>;
 }
 
 /**
- * A side effect a command asks for. It is written to the outbox in the command's unit of work,
- * so it happens if and only if the command commits.
+ * A side effect an action asks for. It is written to the outbox in the action's unit of work,
+ * so it happens if and only if the action commits.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export interface OutboxEffect {
-	/** The kind, which picks the `@Moirai.effect()` handler. */
+	/** The kind, which picks the `@Outbox.handle()` handler. */
 	kind: string;
 	/** The JSON-safe payload given to the handler. */
 	payload: unknown;
@@ -148,10 +148,10 @@ export class MemoryIdempotencyStore implements IdempotencyStore {
 }
 
 /**
- * Serializes commands in the process, one holder per key at a time.
+ * Serializes actions in the process, one holder per key at a time.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class MemoryCommandLock implements CommandLock {
+export class MemoryActionLock implements ActionLock {
 	readonly #tails = new Map<string, Promise<void>>();
 
 	public async lock(key: string): Promise<() => void> {
