@@ -14,6 +14,7 @@
 
 import type { Elysia } from 'elysia';
 import type { Class } from 'type-fest';
+import type { TSchema } from 'typebox';
 import type { CommandClass } from './command';
 import type { FilterClass } from './filter';
 import type { Route } from './http';
@@ -68,6 +69,12 @@ export type ModuleProps<TConfig = unknown> = {
 
 	/** Environments (`NODE_ENV` values) in which the module is active. */
 	env?: string[];
+
+	/**
+	 * The environment variables the module needs, as a TypeBox object. Merged with the schemas of
+	 * the app and the other active modules, and validated at boot.
+	 */
+	envSchema?: TSchema;
 
 	/**
 	 * Exception filters for the routes of this module's controllers. They run after the filters

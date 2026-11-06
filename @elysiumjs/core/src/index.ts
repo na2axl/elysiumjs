@@ -144,3 +144,11 @@ export {
 	TimingInterceptor,
 	TransformInterceptor
 } from './interceptor';
+export {
+	type EnvironmentIssue,
+	ConflictingEnvironmentSchemaError,
+	InvalidEnvironmentError,
+	mergeEnvironmentSchemas,
+	Secret,
+	validateEnvironment
+} from './config';

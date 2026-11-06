@@ -277,57 +277,6 @@ describe('Application class', () => {
 			expect(initEnvSpy).toHaveBeenCalledWith(Bun.env);
 		});
 
-		it('should validate and handle invalid environment configuration when debug is enabled', () => {
-			const traceSpy = spyOn(Application.prototype, 'trace');
-			const schema = t.Object({ TEST_VAR: t.String() });
-			const errorFirstMock = {
-				keyword: 'type',
-				schemaPath: '#/properties/TEST_VAR',
-				instancePath: '/TEST_VAR',
-				params: { type: 'string' },
-				message: 'must be string'
-			} as TLocalizedValidationError;
-			const valueCheckSpy = spyOn(Value, 'Check').mockReturnValueOnce(false);
-			const valueErrorsSpy = spyOn(Value, 'Errors').mockReturnValueOnce([errorFirstMock]);
-			spyOn(Value, 'Convert').mockReturnValueOnce({});
-			const valueCleanSpy = spyOn(Value, 'Clean').mockReturnValueOnce({});
-			const initEnvSpy = spyOn(Env, 'initEnv');
-
-			@Application.register({ debug: true, env: schema })
-			class TestApp extends Application {}
-
-			new TestApp();
-
-			expect(valueCheckSpy).toHaveBeenCalled();
-			expect(valueErrorsSpy).toHaveBeenCalled();
-			expect(traceSpy).toHaveBeenCalledWith(errorFirstMock, 'Invalid environment configuration');
-			expect(valueCleanSpy).toHaveBeenCalled();
-			expect(initEnvSpy).toHaveBeenCalledWith({});
-		});
-
-		it('should properly initialize environment with Value.Clean result when env is provided', () => {
-			const valueCloneSpy = spyOn(Value, 'Clone').mockReturnValueOnce({ TEST_VAR: 'test_value' });
-			const valueConvertSpy = spyOn(Value, 'Convert').mockReturnValueOnce({
-				TEST_VAR: 'test_value'
-			});
-			spyOn(Value, 'Check').mockReturnValueOnce(true);
-			const valueCleanSpy = spyOn(Value, 'Clean').mockReturnValueOnce({
-				TEST_VAR: 'cleaned_value'
-			});
-			const initEnvSpy = spyOn(Env, 'initEnv');
-
-			const envSchema = t.Object({ TEST_VAR: t.String() });
-
-			@Application.register({ env: envSchema })
-			class TestApp extends Application {}
-
-			new TestApp();
-
-			expect(valueCloneSpy).toHaveBeenCalledWith(Bun.env);
-			expect(valueConvertSpy).toHaveBeenCalledWith(envSchema, { TEST_VAR: 'test_value' });
-			expect(valueCleanSpy).toHaveBeenCalled();
-			expect(initEnvSpy).toHaveBeenCalledWith({ TEST_VAR: 'cleaned_value' });
-		});
 	});
 
 	describe('static methods', () => {

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { config } from './config';
 import { diDisposal, diScopes } from './di-scopes';
 import { errors } from './errors';
 import { filters } from './filters';
@@ -40,6 +41,7 @@ export const scenarios = [
 	problems,
 	filters,
 	interceptors,
+	config,
 	lifecycle,
 	sse
 ];
