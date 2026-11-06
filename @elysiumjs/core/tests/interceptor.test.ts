@@ -115,7 +115,10 @@ class InterceptedController {
 
 	@Http.get({
 		path: '/transform',
-		interceptors: [TimingInterceptor, TransformInterceptor.with((data) => ({ data }))]
+		interceptors: [
+			TimingInterceptor,
+			TransformInterceptor.with<number[], { data: number[] }>((data) => ({ data }))
+		]
 	})
 	public transform() {
 		return [1, 2];
@@ -190,6 +193,12 @@ describe('interceptors', () => {
 
 		expect(await response.json()).toEqual({ filtered: true });
 		expect(log).toEqual([...before, 'handler', 'filter']);
+	});
+
+	it('types the result it receives and the one it returns', () => {
+		TransformInterceptor.with<number[], number>((data) => data.length);
+		// @ts-expect-error The transform must return TOut.
+		TransformInterceptor.with<number[], number>((data) => data.join(','));
 	});
 
 	it('times the handler and transforms its result', async () => {

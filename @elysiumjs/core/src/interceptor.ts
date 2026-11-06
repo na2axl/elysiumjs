@@ -134,18 +134,23 @@ export class TimingInterceptor implements Interceptor {
 export abstract class TransformInterceptor {
 	/**
 	 * Creates an interceptor class that passes each handler result through `transform`.
+	 * @template TIn The result of the handlers the interceptor wraps. It is not checked at runtime:
+	 * the interceptor trusts the handlers it is set on to return it.
+	 * @template TOut The result the interceptor returns instead.
 	 * @param transform Receives the result and the request context; returns the new result.
 	 * @example
 	 * ```ts
-	 * @Http.controller({ path: '/posts', interceptors: [TransformInterceptor.with((data) => ({ data }))] })
+	 * const Envelope = TransformInterceptor.with<Post[], { data: Post[] }>((data) => ({ data }));
+	 *
+	 * @Http.controller({ path: '/posts', interceptors: [Envelope] })
 	 * ```
 	 */
-	public static with(
-		transform: (result: unknown, ctx: InterceptorContext) => unknown | Promise<unknown>
+	public static with<TIn = unknown, TOut = unknown>(
+		transform: (result: TIn, ctx: InterceptorContext) => TOut | Promise<TOut>
 	): InterceptorClass {
 		return class Transform implements Interceptor {
 			public async intercept(ctx: InterceptorContext, next: () => Promise<unknown>) {
-				return transform(await next(), ctx);
+				return transform((await next()) as TIn, ctx);
 			}
 		};
 	}
