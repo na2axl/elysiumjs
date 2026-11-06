@@ -126,6 +126,27 @@ describe('Container', () => {
 		expect(a).not.toBe(c);
 	});
 
+	it('lists the modules that declare a service in their own scope', () => {
+		class Shared {}
+		Container.register(A, Shared, undefined);
+		Container.register(C, Shared, undefined);
+		Container.register(null, { name: 'global.only', factory: () => 1 }, undefined);
+		Container.register(B, { name: 'named', factory: () => 1 }, undefined);
+		expect(Service.ownersOf(Shared)).toEqual([A, C]);
+		expect(Service.ownersOf('named')).toEqual([B]);
+		expect(Service.ownersOf('global.only')).toEqual([]);
+	});
+
+	it('looks up only the global scope outside of any module', () => {
+		Container.register(A, { name: 'store', factory: () => 'a' }, undefined);
+		Container.register(null, { name: 'store', factory: () => 'global' }, undefined);
+		run(A, () => {
+			expect(Service.get('store')).toBe('a');
+			expect(ModuleContext.outside(() => Service.get('store'))).toBe('global');
+			expect(ModuleContext.current()).toBe(A);
+		});
+	});
+
 	it('rejects duplicate global names, naming both owners', () => {
 		const def = { name: 'G', factory: () => ({}), global: true };
 		Container.register(A, def, undefined);

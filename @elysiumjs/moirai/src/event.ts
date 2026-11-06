@@ -16,7 +16,7 @@ import type { OutboxRow } from './stores';
 
 import { Service } from '@elysiumjs/core';
 
-import { inStoreSet } from './config';
+import { inOwnerModule } from './config';
 import { DuplicateEventConsumerError, UnknownEventConsumerError } from './errors';
 import { uuidv7 } from './ids';
 import { Inbox, Outbox, registerEffect } from './outbox';
@@ -76,12 +76,6 @@ export type EventHandlerOptions = {
 	 * module; `false` gives one attempt. A handler that fails them all is dead (`onDead`).
 	 */
 	retry?: false | { attempts?: number };
-	/**
-	 * The store set of the handler, from the `stores` of `MoiraiModule`: the inbox that records the
-	 * events it handled, and the outbox of the effects and events it writes. Defaults to the set of
-	 * the outbox the delivery came from, which is the publisher's.
-	 */
-	stores?: string;
 };
 
 /** The kind of the outbox rows that deliver an event to one handler. */
@@ -97,7 +91,7 @@ type Delivery = {
 type Registered = {
 	event: string;
 	attempts?: number;
-	stores?: string;
+	owner: object;
 	run: (payload: unknown, meta: EventMeta) => unknown;
 };
 
@@ -109,7 +103,8 @@ registerEffect(
 		const delivery = payload as Delivery;
 		const handler = CONSUMERS.get(delivery.consumer);
 		if (!handler) throw new UnknownEventConsumerError(delivery.consumer, delivery.event);
-		await inStoreSet(handler.stores, () =>
+		// The handler runs in its module: the inbox and outbox of that module record its work.
+		await inOwnerModule(handler.owner, () =>
 			Inbox.once({ messageId: delivery.id, consumer: delivery.consumer }, async () => {
 				await handler.run(delivery.payload, {
 					id: delivery.id,
@@ -143,7 +138,7 @@ export namespace Event {
 	 * methods run on the registered service, or on a new instance with its dependencies.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param event The name of the event.
-	 * @param options The name of the handler, its attempts and its store set.
+	 * @param options The name of the handler and its attempts.
 	 * @throws {DuplicateEventConsumerError} When another handler has the same `consumer`.
 	 * @example
 	 * ```ts
@@ -164,24 +159,23 @@ export namespace Event {
 			const owner = (isStatic ? target : target.constructor) as new (...args: any[]) => unknown;
 			const consumer = options.consumer ?? `${owner.name}.${String(method)}`;
 			if (CONSUMERS.has(consumer)) throw new DuplicateEventConsumerError(consumer);
-			const { retry, stores } = options;
+			const { retry } = options;
 			CONSUMERS.set(consumer, {
 				event,
-				stores,
+				owner,
 				attempts: retry === false ? 1 : retry?.attempts,
 				run: (payload, meta) => {
-					const self = (
-						isStatic
-							? owner
-							: ((Service.exists(owner) ? Service.get(owner) : null) ?? Service.make(owner))
-					) as Record<string | symbol, (payload: unknown, meta: EventMeta) => unknown>;
+					const self = (isStatic ? owner : (Service.get(owner) ?? Service.make(owner))) as Record<
+						string | symbol,
+						(payload: unknown, meta: EventMeta) => unknown
+					>;
 					return self[method]!(payload, meta);
 				}
 			});
 		};
 
 	/**
-	 * Publishes an event in the open unit of work, through the outbox of the current store set: each
+	 * Publishes an event in the open unit of work, through the outbox of the current module: each
 	 * handler of the event gets it once the unit
 	 * commits, and never when it rolls back.
 	 * @author Axel Nana <axel.nana@workbud.com>

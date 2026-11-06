@@ -578,6 +578,12 @@ export namespace Container {
 			: new ServiceNotFoundError(name);
 	}
 
+	/** The modules that declare a service with that token in their own scope, in registration order. */
+	export const ownersOf = (service: ServiceToken): ModuleNode[] => {
+		const token = tokenOf(service);
+		return [...moduleScopes].filter(([, scope]) => scope.has(token)).map(([node]) => node);
+	};
+
 	/** Whether the global scope has a service with that token. */
 	export const hasGlobal = (service: ServiceToken): boolean => globalScope.has(tokenOf(service));
 

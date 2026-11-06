@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { ModuleNode } from '@elysiumjs/core';
 import type { OutboxEffect, OutboxRow } from './stores';
 
-import { DATABASE_TRANSACTION_SERVICE, getLogger, Service } from '@elysiumjs/core';
+import { DATABASE_TRANSACTION_SERVICE, getLogger, ModuleContext, Service } from '@elysiumjs/core';
 import { UnitOfWork } from '@elysiumjs/mnemosyne';
 
-import { currentStoreSet, inboxStore, inStoreSet, options, outboxStore } from './config';
-import { UnknownEffectError } from './errors';
+import { inboxStore, MOIRAI_OUTBOX_STORE, options, outboxStore } from './config';
+import { MissingStoreError, UnknownEffectError } from './errors';
 import { uuidv7 } from './ids';
 
 type EffectHandler = (payload: unknown, row: OutboxRow) => unknown;
@@ -73,8 +74,23 @@ export type RelayOptions = {
 	ids?: readonly string[];
 	/** The rows claimed at once. Defaults to the `relayBatch` option. */
 	batch?: number;
-	/** The store set whose outbox relays. Defaults to the current set. */
-	stores?: string;
+	/**
+	 * The module whose outbox relays: the one it lists with `Moirai.stores()`. Defaults to the
+	 * outbox of the current module, else the one of `MoiraiModule`.
+	 */
+	module?: abstract new (...args: any[]) => unknown;
+};
+
+/** Runs work in a module, or in the current context. */
+const inModule = <T>(node: ModuleNode | undefined, work: () => T): T =>
+	node && node !== ModuleContext.current() ? ModuleContext.run(node, work) : work();
+
+/** The module of `relayOptions.module` that declares an outbox. */
+const outboxModule = (module: RelayOptions['module']): ModuleNode | undefined => {
+	if (!module) return undefined;
+	const node = Service.ownersOf(MOIRAI_OUTBOX_STORE).find((owner) => owner.moduleClass === module);
+	if (!node) throw new MissingStoreError('outbox', module.name);
+	return node;
 };
 
 const asError = (error: unknown): Error =>
@@ -96,15 +112,17 @@ export namespace Outbox {
 		(target, method) => {
 			EFFECTS.set(kind, (payload, row) => {
 				const owner = target.constructor as new (...args: any[]) => unknown;
-				const instance = ((Service.exists(owner) ? Service.get(owner) : null) ??
-					Service.make(owner)) as Record<string | symbol, EffectHandler>;
+				const instance = (Service.get(owner) ?? Service.make(owner)) as Record<
+					string | symbol,
+					EffectHandler
+				>;
 				return instance[method]!(payload, row);
 			});
 		};
 
 	/**
-	 * Writes effects to the outbox of the current store set, in the open unit of work: they happen
-	 * if and only if it commits. Once it has, the effects relay (see the `relayOnCommit` option).
+	 * Writes effects to the outbox of the current module, in the open unit of work: they happen if
+	 * and only if it commits. Once it has, the effects relay (see the `relayOnCommit` option).
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param effects The effects.
 	 * @returns The ids of the rows, in order.
@@ -123,15 +141,15 @@ export namespace Outbox {
 			dispatchedAt: null,
 			deadAt: null
 		}));
-		const stores = currentStoreSet();
-		await outboxStore(stores).insert(rows);
+		await outboxStore().insert(rows);
 
-		const config = options(stores);
+		const config = options();
+		const module = ModuleContext.current();
 		if (config.relayOnCommit) {
 			const ids = rows.filter((row) => row.availableAt <= now).map((row) => row.id);
 			if (ids.length > 0) {
 				await UnitOfWork.afterCommit(() => {
-					const work = relay({ ids, stores }).catch((error) =>
+					const work = inModule(module, () => relay({ ids })).catch((error) =>
 						getLogger().error('The outbox relay after a commit failed', { error })
 					);
 					if (config.defer) config.defer(work);
@@ -143,8 +161,8 @@ export namespace Outbox {
 	};
 
 	/**
-	 * Runs the due rows of the outbox of a store set through their `@Outbox.handle()` handlers,
-	 * with that set current. A row that fails
+	 * Runs the due rows of an outbox through their `@Outbox.handle()` handlers, in the module of
+	 * that outbox. A row that fails
 	 * is retried later with an exponential backoff, and is dead after `maxRelayAttempts`. Delivery
 	 * is at least once, so handlers must tolerate a repeat.
 	 *
@@ -155,7 +173,7 @@ export namespace Outbox {
 	 * @param relayOptions The rows to relay.
 	 */
 	export const relay = (relayOptions: RelayOptions = {}): Promise<RelaySummary> =>
-		inStoreSet(relayOptions.stores, () => relayRows(relayOptions));
+		inModule(outboxModule(relayOptions.module), () => relayRows(relayOptions));
 
 	const relayRows = async (relayOptions: RelayOptions): Promise<RelaySummary> => {
 		const config = options();
@@ -206,28 +224,40 @@ export namespace Outbox {
 
 	/**
 	 * Relays every due row, batch after batch, such as from a cron trigger. Stops when a batch
-	 * dispatches nothing.
+	 * dispatches nothing. With `module`, it relays the outbox of that module; without it, the
+	 * outbox of `MoiraiModule` and the one of each module that lists its own with
+	 * `Moirai.stores()`.
 	 * @author Axel Nana <axel.nana@workbud.com>
-	 * @param relayOptions The kinds to relay, the batch size and the store set.
+	 * @param relayOptions The kinds to relay, the batch size and the module.
 	 */
 	export const sweep = async (
 		relayOptions: Omit<RelayOptions, 'ids'> = {}
 	): Promise<RelaySummary> => {
 		const total: RelaySummary = { dispatched: 0, retried: 0, dead: 0 };
-		for (;;) {
-			const summary = await relay(relayOptions);
-			total.dispatched += summary.dispatched;
-			total.retried += summary.retried;
-			total.dead += summary.dead;
-			if (summary.dispatched + summary.retried + summary.dead === 0) return total;
+		const drain = async () => {
+			for (;;) {
+				const summary = await relayRows(relayOptions);
+				total.dispatched += summary.dispatched;
+				total.retried += summary.retried;
+				total.dead += summary.dead;
+				if (summary.dispatched + summary.retried + summary.dead === 0) return;
+			}
+		};
+		if (relayOptions.module) {
+			await inModule(outboxModule(relayOptions.module), drain);
+			return total;
 		}
+		if (Service.exists(MOIRAI_OUTBOX_STORE)) await ModuleContext.outside(drain);
+		for (const owner of Service.ownersOf(MOIRAI_OUTBOX_STORE))
+			await ModuleContext.run(owner, drain);
+		return total;
 	};
 }
 
 export namespace Inbox {
 	/**
 	 * Runs work unless this consumer already processed the message, as recorded in the inbox of the
-	 * current store set. Call it in the consumer's unit of work, so that a failure rolls the record back and the redelivery runs the work again.
+	 * current module. Call it in the consumer's unit of work, so that a failure rolls the record back and the redelivery runs the work again.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param message The id of the message and the name of the consumer.
 	 * @param work The work.

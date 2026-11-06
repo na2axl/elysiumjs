@@ -14,9 +14,7 @@
 
 import type { ActionLock, IdempotencyStore, InboxStore, OutboxStore } from './stores';
 
-import { AsyncLocalStorage } from 'node:async_hooks';
-
-import { Service } from '@elysiumjs/core';
+import { ModuleContext, Service } from '@elysiumjs/core';
 
 import { MissingStoreError } from './errors';
 
@@ -27,18 +25,8 @@ export const MOIRAI_INBOX_STORE = 'moirai.inbox';
 export const MOIRAI_ACTION_LOCK = 'moirai.lock';
 export const MOIRAI_OPTIONS = 'moirai.options';
 
-/** The name of the store set `MoiraiModule` sets outside its `stores` map. */
-export const DEFAULT_STORE_SET = 'default';
-
-/**
- * The service name of a store or of the options of a store set: the base name for the default
- * set, `<base>:<set>` for a named one, such as `moirai.outbox:billing`.
- * @author Axel Nana <axel.nana@workbud.com>
- * @param base The service name in the default set, such as {@link MOIRAI_OUTBOX_STORE}.
- * @param set The name of the store set.
- */
-export const storeServiceName = (base: string, set: string): string =>
-	set === DEFAULT_STORE_SET ? base : `${base}:${set}`;
+/** The service name of the options a module overrides with `Moirai.stores()`. */
+export const MOIRAI_MODULE_OPTIONS = 'moirai.module-options';
 
 /**
  * How moirai runs actions and relays the outbox.
@@ -99,36 +87,24 @@ export const DEFAULT_OPTIONS: MoiraiOptions = {
 	relayLease: 300
 };
 
-const currentSet = new AsyncLocalStorage<string>();
-
-/** The store set current in this async context: the one of the running action, relay or handler. */
-export const currentStoreSet = (): string => currentSet.getStore() ?? DEFAULT_STORE_SET;
-
-/** Runs work with a store set current, or in the current one when `set` is undefined. */
-export const inStoreSet = <T>(set: string | undefined, work: () => T): T =>
-	set === undefined || set === currentSet.getStore() ? work() : currentSet.run(set, work);
-
-const lookup = <T>(name: string): T | null => (Service.exists(name) ? Service.get<T>(name) : null);
+const lookup = <T>(name: string): T | null => Service.get<T>(name);
 
 /**
- * The options of a store set: the defaults, then the options of the default set, then the ones the
- * named set overrides.
+ * The options of the current module: the defaults, then the options of `MoiraiModule`, then the
+ * ones the module overrides with `Moirai.stores()`.
  */
-export const options = (set: string = currentStoreSet()): MoiraiOptions => {
+export const options = (): MoiraiOptions => {
 	const base = lookup<MoiraiOptions>(MOIRAI_OPTIONS) ?? DEFAULT_OPTIONS;
-	if (set === DEFAULT_STORE_SET) return base;
-	const own = lookup<Partial<MoiraiOptions>>(storeServiceName(MOIRAI_OPTIONS, set));
+	const own = lookup<Partial<MoiraiOptions>>(MOIRAI_MODULE_OPTIONS);
 	return own ? { ...base, ...own } : base;
 };
 
 const store =
-	<T>(base: string, kind: string) =>
-	(set: string = currentStoreSet()): T => {
-		// A named set that does not set a store shares the one of the default set.
-		const found =
-			lookup<T>(storeServiceName(base, set)) ??
-			(set === DEFAULT_STORE_SET ? null : lookup<T>(base));
-		if (!found) throw new MissingStoreError(kind, set);
+	<T>(name: string, kind: string) =>
+	(): T => {
+		// The stores of the current module, else the ones its imports export, else the global ones.
+		const found = lookup<T>(name);
+		if (!found) throw new MissingStoreError(kind, ModuleContext.current()?.id);
 		return found;
 	};
 
@@ -136,3 +112,13 @@ export const idempotencyStore = store<IdempotencyStore>(MOIRAI_IDEMPOTENCY_STORE
 export const outboxStore = store<OutboxStore>(MOIRAI_OUTBOX_STORE, 'outbox');
 export const inboxStore = store<InboxStore>(MOIRAI_INBOX_STORE, 'inbox');
 export const actionLock = store<ActionLock>(MOIRAI_ACTION_LOCK, 'lock');
+
+/**
+ * Runs work in the context of the module that declares a service, such as the module of an
+ * action or of an event handler, so that it uses that module's stores. Without such a module, the
+ * work runs in the current context.
+ */
+export const inOwnerModule = <T>(service: object, work: () => T): T => {
+	const owner = Service.ownersOf(service as never)[0];
+	return owner && owner !== ModuleContext.current() ? ModuleContext.run(owner, work) : work();
+};

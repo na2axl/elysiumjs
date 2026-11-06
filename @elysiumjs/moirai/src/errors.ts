@@ -79,32 +79,20 @@ export class CallForbiddenError extends DomainError.for('FORBIDDEN', 403) {
 }
 
 /**
- * Raised when moirai needs a store that `MoiraiModule.with()` did not set.
+ * Raised when moirai needs a store that neither the current module (`Moirai.stores()`) nor
+ * `MoiraiModule.with()` set.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export class MissingStoreError extends ElysiumError {
 	constructor(
 		public readonly store: string,
-		public readonly set: string = 'default'
+		public readonly module?: string
 	) {
 		super(
-			set === 'default'
-				? `Moirai has no ${store} store. Set one with MoiraiModule.with({ ${store}: ... }) in the application.`
-				: `Moirai has no ${store} store in the "${set}" store set. Set one with ` +
-						`MoiraiModule.with({ stores: { ${set}: { ${store}: ... } } }) in the application.`
-		);
-	}
-}
-
-/**
- * Raised when `MoiraiModule.with()` names a store set `default`, the name of the stores it sets
- * outside `stores`.
- * @author Axel Nana <axel.nana@workbud.com>
- */
-export class ReservedStoreSetError extends ElysiumError {
-	constructor() {
-		super(
-			'The "default" store set is the one MoiraiModule.with() sets outside `stores`. Give the named set another name.'
+			`Moirai has no ${store} store` +
+				(module ? ` in module ${module}` : '') +
+				`. Set one with MoiraiModule.with({ ${store}: ... }) in the application, or with ` +
+				`Moirai.stores({ ${store}: ... }) in the services of the module.`
 		);
 	}
 }

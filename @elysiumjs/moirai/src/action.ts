@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { ServiceDefinition } from '@elysiumjs/core';
 import type { Static, TSchema } from 'typebox';
+import type { MoiraiStores } from './moirai.module';
 
 import {
 	currentUserId,
@@ -24,7 +26,7 @@ import {
 import { UnitOfWork } from '@elysiumjs/mnemosyne';
 import Value from 'typebox/value';
 
-import { actionLock, idempotencyStore, inStoreSet, options } from './config';
+import { actionLock, idempotencyStore, inOwnerModule, options } from './config';
 import {
 	CallForbiddenError,
 	IdempotencyKeyRequiredError,
@@ -32,6 +34,7 @@ import {
 	InvalidInputError
 } from './errors';
 import { requestHash } from './hash';
+import { moduleStores } from './moirai.module';
 
 const ACTION = Symbol.for('elysium:moirai:action');
 const QUERY = Symbol.for('elysium:moirai:query');
@@ -134,12 +137,6 @@ export type ActionOptions<S extends TSchema = TSchema> = {
 	/** The database connection of the unit of work. Defaults to `default`. */
 	connection?: string;
 	/**
-	 * The store set of the action, from the `stores` of `MoiraiModule`: its idempotency store, its
-	 * lock, its options, and the outbox that the effects and events of the call go to. Defaults to
-	 * the current set: the one of the action that runs it, else the default set.
-	 */
-	stores?: string;
-	/**
 	 * Serializes the calls that give the same key, so that a double tap waits for the first call
 	 * and replays it instead of racing it. Needs a `lock` store.
 	 */
@@ -229,7 +226,7 @@ export abstract class Query<TInput = any, TResult = any> {
 
 /** The instance of a handler: the registered service, or a new one with its dependencies. */
 const instanceOf = <T>(target: new (...args: any[]) => T): T =>
-	(Service.exists(target) ? Service.get(target) : null) ?? Service.make(target);
+	Service.get(target) ?? Service.make(target);
 
 /** The input, with its defaults, or an {@link InvalidInputError} listing the mistakes. */
 const validate = <S extends TSchema>(schema: S, raw: unknown, name: string): Static<S> => {
@@ -286,18 +283,34 @@ export namespace Moirai {
 		settle(() => {
 			const props = Metadata.get(ACTION, action) as (ActionOptions & { name: string }) | undefined;
 			if (!props) throw new TypeError(`${action.name} is not marked with @Action.register().`);
-			return inStoreSet(props.stores, () => run(action, props, input, call));
+			// The action runs in its module, so that it uses the stores of that module.
+			return inOwnerModule(action, () => run(action, props, input, call));
 		}) as Promise<ActionOutcome<C>>;
 
 	/**
-	 * Runs work with a store set current, so that `Outbox.enqueue()`, `Event.publish()`,
-	 * `Inbox.once()` and the actions it runs without a `stores` option use that set, such as in a
-	 * webhook handler that writes to the outbox of its domain.
+	 * The stores and options of a module, as private services to list in its `services`. The
+	 * actions and event handlers of the module, and the code that runs in it, use them instead of
+	 * the ones of `MoiraiModule`; a store left out is the one of `MoiraiModule`, and an option left
+	 * out is the one of `MoiraiModule`. Like any service, they are visible to the modules that
+	 * import the module when it exports them.
 	 * @author Axel Nana <axel.nana@workbud.com>
-	 * @param stores The name of the store set.
-	 * @param work The work.
+	 * @param stores The stores, each an instance or a function that builds it once, and options.
+	 * @example
+	 * ```ts
+	 * @Module.register({
+	 * 	controllers: [WalletController],
+	 * 	services: [
+	 * 		WalletRepository,
+	 * 		...Moirai.stores({
+	 * 			outbox: () => new DrizzleOutboxStore({ table: billing.outbox }),
+	 * 			inbox: () => new DrizzleInboxStore({ table: billing.inbox })
+	 * 		})
+	 * 	]
+	 * })
+	 * class BillingModule extends Module {}
+	 * ```
 	 */
-	export const using = <T>(stores: string, work: () => T): T => inStoreSet(stores, work);
+	export const stores = (stores: MoiraiStores): ServiceDefinition[] => moduleStores(stores);
 
 	const run = async <C extends ActionClass>(
 		action: C,

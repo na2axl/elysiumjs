@@ -15,11 +15,15 @@
 import type { Job, JobClass, JobDispatchOptions } from '@elysiumjs/heracles';
 import type { OutboxEffect } from './stores';
 
-import { DATABASE_TRANSACTION_SERVICE, ElysiumError, Service } from '@elysiumjs/core';
+import {
+	DATABASE_TRANSACTION_SERVICE,
+	ElysiumError,
+	ModuleContext,
+	Service
+} from '@elysiumjs/core';
 import { Heracles, JobRegistry } from '@elysiumjs/heracles';
 import { UnitOfWork } from '@elysiumjs/mnemosyne';
 
-import { inStoreSet } from './config';
 import { Inbox, registerEffect } from './outbox';
 
 /** The kind of the effects that dispatch a Heracles job. */
@@ -72,8 +76,8 @@ export class InvalidOnceJobError extends ElysiumError {
  * Made for the jobs of a `Scheduler`, whose dispatch id names the scheduler, the case and the
  * tick. Without a database module, the record and the work run without a transaction.
  * @author Axel Nana <axel.nana@workbud.com>
- * @param options The inbox consumer, which defaults to the job name, and the store set of the inbox,
- * which defaults to the current set.
+ * The record goes to the inbox of the module that registers the job.
+ * @param options The inbox consumer. Defaults to the job name.
  * @example
  * ```ts
  * @Job.register({ queue: 'billing' })
@@ -82,22 +86,22 @@ export class InvalidOnceJobError extends ElysiumError {
  * ```
  */
 export const Once =
-	(options: { consumer?: string; stores?: string } = {}) =>
+	(options: { consumer?: string } = {}) =>
 	(target: Function): void => {
 		const proto = target.prototype as { execute?: (...args: unknown[]) => unknown };
 		const execute = proto.execute;
 		if (typeof execute !== 'function') throw new InvalidOnceJobError(target.name);
 		proto.execute = async function (this: Job, ...args: unknown[]) {
-			const consumer =
-				options.consumer ??
-				JobRegistry.all().find((entry) => entry.jobClass === this.constructor)?.name ??
-				target.name;
+			const entry = JobRegistry.all().find((item) => item.jobClass === this.constructor);
+			const consumer = options.consumer ?? entry?.name ?? target.name;
 			const work = () =>
 				Inbox.once({ messageId: this.dispatchId, consumer }, async () => {
 					await execute.apply(this, args);
 				});
-			await inStoreSet(options.stores, () =>
-				Service.exists(DATABASE_TRANSACTION_SERVICE) ? UnitOfWork.run(work) : work()
-			);
+			const run = () =>
+				Service.exists(DATABASE_TRANSACTION_SERVICE) ? UnitOfWork.run(work) : work();
+			await (entry && entry.module !== ModuleContext.current()
+				? ModuleContext.run(entry.module, run)
+				: run());
 		};
 	};

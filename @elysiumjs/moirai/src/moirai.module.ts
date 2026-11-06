@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { ServiceDefinition } from '@elysiumjs/core';
 import type { MoiraiOptions } from './config';
 import type { ActionLock, IdempotencyStore, InboxStore, OutboxStore } from './stores';
 
@@ -19,24 +20,21 @@ import { Module } from '@elysiumjs/core';
 
 import {
 	DEFAULT_OPTIONS,
-	DEFAULT_STORE_SET,
 	MOIRAI_ACTION_LOCK,
 	MOIRAI_IDEMPOTENCY_STORE,
 	MOIRAI_INBOX_STORE,
+	MOIRAI_MODULE_OPTIONS,
 	MOIRAI_OPTIONS,
-	MOIRAI_OUTBOX_STORE,
-	storeServiceName
+	MOIRAI_OUTBOX_STORE
 } from './config';
-import { ReservedStoreSetError } from './errors';
 
 type StoreOption<T> = T | (() => T);
 
 /**
- * A store set: the stores, built once, and the options that differ from the ones of the default
- * set. A named set that leaves a store out shares the one of the default set.
+ * Stores, each an instance or a function that builds it once, and options.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export type MoiraiStoreSet = Partial<MoiraiOptions> & {
+export type MoiraiStores = Partial<MoiraiOptions> & {
 	idempotency?: StoreOption<IdempotencyStore>;
 	outbox?: StoreOption<OutboxStore>;
 	inbox?: StoreOption<InboxStore>;
@@ -44,23 +42,16 @@ export type MoiraiStoreSet = Partial<MoiraiOptions> & {
 };
 
 /**
- * The configuration of {@link MoiraiModule}: the default store set and the options, and the named
- * store sets in `stores`.
+ * The configuration of {@link MoiraiModule}: the stores of the application and the options.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export type MoiraiModuleConfig = MoiraiStoreSet & {
-	/**
-	 * Named store sets, such as one per domain with its own outbox and inbox tables. Actions, event
-	 * handlers and relays pick one with their `stores` option.
-	 */
-	stores?: Record<string, MoiraiStoreSet>;
-};
+export type MoiraiModuleConfig = MoiraiStores;
 
 const build = <T>(option: StoreOption<T>): T =>
 	typeof option === 'function' ? (option as () => T)() : option;
 
-/** The services of one store set: its options, then the stores it sets. */
-const servicesOf = (set: string, config: MoiraiStoreSet) => {
+/** The service definitions of stores and options, global or private to the declaring module. */
+const definitions = (config: MoiraiStores, global: boolean): ServiceDefinition[] => {
 	const { idempotency, outbox, inbox, lock, ...rest } = config;
 	const stores: [string, StoreOption<unknown> | undefined][] = [
 		[MOIRAI_IDEMPOTENCY_STORE, idempotency],
@@ -68,52 +59,38 @@ const servicesOf = (set: string, config: MoiraiStoreSet) => {
 		[MOIRAI_INBOX_STORE, inbox],
 		[MOIRAI_ACTION_LOCK, lock]
 	];
+	const options: ServiceDefinition[] = global
+		? [{ name: MOIRAI_OPTIONS, global, factory: () => ({ ...DEFAULT_OPTIONS, ...rest }) }]
+		: Object.keys(rest).length > 0
+			? [{ name: MOIRAI_MODULE_OPTIONS, global, factory: () => ({ ...rest }) }]
+			: [];
 	return [
-		{
-			name: storeServiceName(MOIRAI_OPTIONS, set),
-			global: true,
-			// A named set keeps only its overrides: the options of the default set fill the rest.
-			factory: () => (set === DEFAULT_STORE_SET ? { ...DEFAULT_OPTIONS, ...rest } : { ...rest })
-		},
+		...options,
 		...stores
 			.filter(([, option]) => option !== undefined)
-			.map(([name, option]) => ({
-				name: storeServiceName(name, set),
-				global: true,
-				factory: () => build(option!)
-			}))
+			.map(([name, option]) => ({ name, global, factory: () => build(option!) }))
 	];
 };
 
-/** @internal The services of the configuration: the default set, then each named set. */
-export const moiraiServices = (config: MoiraiModuleConfig) => {
-	const { stores = {}, ...defaults } = config;
-	if (Object.hasOwn(stores, DEFAULT_STORE_SET)) throw new ReservedStoreSetError();
-	return [
-		...servicesOf(DEFAULT_STORE_SET, defaults),
-		...Object.entries(stores).flatMap(([set, options]) => servicesOf(set, options))
-	];
-};
+/** @internal The services of `Moirai.stores()`: private to the module that lists them. */
+export const moduleStores = (config: MoiraiStores): ServiceDefinition[] =>
+	definitions(config, false);
 
 /**
- * Provides the moirai stores and options as global services. Set the stores the app uses: the
- * memory ones (`MemoryIdempotencyStore`, ...) for tests, the Postgres ones of
- * `@elysiumjs/moirai-drizzle` in production. Named store sets in `stores` give each part of the
- * app its own stores, such as the outbox and inbox tables of each domain.
+ * Provides the moirai stores and options of the application as global services. Set the stores
+ * the app uses: the memory ones (`MemoryIdempotencyStore`, ...) for tests, the Postgres ones of
+ * `@elysiumjs/moirai-drizzle` in production. A module that needs stores of its own, such as the
+ * outbox and inbox tables of a domain, lists them with `Moirai.stores()` in its services.
  * @author Axel Nana <axel.nana@workbud.com>
  * @example
  * ```ts
  * MoiraiModule.with({
  * 	idempotency: () => new DrizzleIdempotencyStore({ table: tables.idempotencyKeys }),
- * 	lock: () => new PgAdvisoryLock(),
- * 	stores: {
- * 		billing: {
- * 			outbox: () => new DrizzleOutboxStore({ table: billing.outbox }),
- * 			inbox: () => new DrizzleInboxStore({ table: billing.inbox })
- * 		}
- * 	}
+ * 	outbox: () => new DrizzleOutboxStore({ table: tables.outbox }),
+ * 	inbox: () => new DrizzleInboxStore({ table: tables.inbox }),
+ * 	lock: () => new PgAdvisoryLock()
  * });
  * ```
  */
-@Module.register<MoiraiModuleConfig>({ services: (config) => moiraiServices(config) })
+@Module.register<MoiraiModuleConfig>({ services: (config) => definitions(config, true) })
 export class MoiraiModule extends Module.configurable<MoiraiModuleConfig>() {}

@@ -36,6 +36,15 @@ export namespace ModuleContext {
 	}
 
 	/**
+	 * Runs `fn` outside of any module, so that service lookups only see the global scope.
+	 * @param fn The function to run.
+	 * @returns The value returned by `fn`.
+	 */
+	export function outside<T>(fn: () => T): T {
+		return storage.exit(fn);
+	}
+
+	/**
 	 * Gets the module current in this async context, if any.
 	 */
 	export function current(): ModuleNode | undefined {

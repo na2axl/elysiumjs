@@ -143,42 +143,30 @@ MoiraiModule.with({
 
 The memory stores (`MemoryIdempotencyStore`, `MemoryOutboxStore`, `MemoryInboxStore` and `MemoryActionLock`) are meant for tests and single-process apps. The memory outbox and inbox drop what a unit of work that rolls back wrote, like a database table.
 
-### Store sets
+### Module stores
 
-Named store sets give each part of an app its own stores, such as the outbox and inbox tables of each domain. The stores outside `stores` are the `default` set, and a named set that leaves a store out shares the one of the default set. A named set takes the options of the default set, and may override them.
+A module can have stores of its own, such as the outbox and inbox tables of a domain. `Moirai.stores()` lists them as private services of the module; what a module leaves out comes from `MoiraiModule`, stores and options alike.
 
 ```ts
 const billing = moiraiTables('billing');
-const ledger = moiraiTables('ledger');
 
-MoiraiModule.with({
-	idempotency: () => new DrizzleIdempotencyStore({ table: tables.idempotencyKeys }),
-	lock: () => new PgAdvisoryLock(),
-	stores: {
-		billing: {
+@Module.register({
+	controllers: [InvoiceController],
+	services: [
+		Charge,
+		Receipts,
+		...Moirai.stores({
 			outbox: () => new DrizzleOutboxStore({ table: billing.outbox }),
-			inbox: () => new DrizzleInboxStore({ table: billing.inbox })
-		},
-		ledger: {
-			outbox: () => new DrizzleOutboxStore({ table: ledger.outbox }),
-			inbox: () => new DrizzleInboxStore({ table: ledger.inbox }),
+			inbox: () => new DrizzleInboxStore({ table: billing.inbox }),
 			relayBatch: 20
-		}
-	}
-});
-
-@Action.register({ input: ChargeInput, stores: 'billing' })
-class Charge extends Action { ... }
-
-class Ledger {
-	@Event.on('invoice.issued', { consumer: 'ledger.record', stores: 'ledger' })
-	public record(payload: { invoiceId: string }) { ... }
-}
+		})
+	]
+})
+class BillingModule extends Module {}
 ```
 
-- An action with `stores` runs with its set current: its idempotency store, its lock and its options come from the set, and `Outbox.enqueue()`, `Event.publish()` and the actions it runs without `stores` use the set too.
-- An event is delivered through the outbox of its publisher's set. A handler with `stores` records the events it handled in the inbox of its set, and writes its own effects and events to the outbox of its set; without `stores`, it runs in the set of the delivery.
-- `Outbox.relay({ stores })` and `Outbox.sweep({ stores })` relay the outbox of one set, such as one cron trigger per domain. The relay that follows a commit relays the set the rows went to.
-- `@Once({ stores })` records the dispatch ids of a job in the inbox of a set.
-- `Moirai.using(stores, work)` runs other code with a set current, such as a webhook handler that writes to the outbox of its domain.
-
+- An action runs in the module that registers it, whoever calls it: its idempotency store, its lock, its options, and the outbox of its effects and events are the ones of that module.
+- An event goes through the outbox of the module that publishes it. An `@Event.on` handler runs in the module that registers its class: the events it handled are recorded in the inbox of that module, and its own effects and events go to the outbox of that module. A handler whose class no module registers runs in the module of the outbox the event came from.
+- A `@Once()` job records its dispatch ids in the inbox of the module that registers the job.
+- The relay that follows a commit relays the outbox the rows went to. `Outbox.relay({ module })` and `Outbox.sweep({ module })` relay the outbox of one module; `Outbox.sweep()` relays the outbox of `MoiraiModule` and the one of every module that has its own, so one cron trigger covers them all.
+- Like any service, module stores are visible to the modules that import the module when it exports them.

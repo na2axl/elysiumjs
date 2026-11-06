@@ -12,12 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { TestingApp } from '@elysiumjs/core';
 import type { MoiraiOptions } from '../src';
 
 import {
+	Application,
 	ConflictError,
 	DomainError,
 	isDomainError,
+	Module,
 	NotFoundError,
 	Service,
 	t
@@ -27,7 +30,6 @@ import { UnitOfWork, withUnitOfWork } from '@elysiumjs/mnemosyne';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { HERACLES_JOB_EFFECT, InvalidOnceJobError, job, Once } from '../src/heracles';
-import { moiraiServices } from '../src/moirai.module';
 import {
 	Action,
 	backoffMs,
@@ -51,13 +53,13 @@ import {
 	MOIRAI_EVENT_EFFECT,
 	MOIRAI_IDEMPOTENCY_STORE,
 	MOIRAI_INBOX_STORE,
+	MOIRAI_MODULE_OPTIONS,
 	MOIRAI_OPTIONS,
 	MOIRAI_OUTBOX_STORE,
+	MoiraiModule,
 	Outbox,
 	Query,
 	requestHash,
-	ReservedStoreSetError,
-	storeServiceName,
 	uuidv7
 } from './exports';
 
@@ -612,59 +614,109 @@ describe('heracles jobs', () => {
 	});
 });
 
-describe('store sets', () => {
-	const billing = { outbox: new MemoryOutboxStore(), inbox: new MemoryInboxStore() };
-	const names = [
-		storeServiceName(MOIRAI_OUTBOX_STORE, 'billing'),
-		storeServiceName(MOIRAI_INBOX_STORE, 'billing'),
-		storeServiceName(MOIRAI_OPTIONS, 'billing')
-	];
+describe('module stores', () => {
 	const handled: string[] = [];
+	let app: TestingApp | undefined;
+	let root: {
+		outbox: MemoryOutboxStore;
+		inbox: MemoryInboxStore;
+		idempotency: MemoryIdempotencyStore;
+	};
+	let billing: { outbox: MemoryOutboxStore; inbox: MemoryInboxStore };
+	let ledger: { outbox: MemoryOutboxStore; inbox: MemoryInboxStore };
+	let billingOptions: Partial<MoiraiOptions> = {};
 
-	@Action.register({ input: t.Object({ order: t.String() }), stores: 'billing' })
+	@Action.register({ input: t.Object({ order: t.String() }) })
 	class Charge extends Action {
 		public async handle(input: { order: string }) {
 			await Outbox.enqueue({ kind: 'mail.send', payload: { to: input.order } });
 			await Event.publish('invoice.issued', { order: input.order });
-			// An action it runs without a stores option joins its set.
-			await Moirai.execute(Rename, { name: input.order });
 			return { charged: input.order };
 		}
 	}
 
+	@Action.register({ input: t.Object({ n: t.Integer() }), idempotent: true })
+	class Pay extends Action {
+		public handle(input: { n: number }) {
+			return { paid: input.n };
+		}
+	}
+
 	class Ledger {
-		@Event.on('invoice.issued', { consumer: 'ledger.record', stores: 'ledger' })
-		public static record(payload: { order: string }) {
+		@Event.on('invoice.issued', { consumer: 'ledger.record' })
+		public record(payload: { order: string }) {
 			handled.push(`ledger:${payload.order}`);
 		}
+	}
 
-		@Event.on('invoice.issued', { consumer: 'billing.notify' })
+	class Notifier {
+		@Event.on('invoice.issued', { consumer: 'notify' })
 		public static notify(payload: { order: string }) {
 			handled.push(`notify:${payload.order}`);
 		}
 	}
 
-	const ledgerInbox = new MemoryInboxStore();
+	@Module.register({
+		services: (_config) => [
+			Charge,
+			Pay,
+			...Moirai.stores({
+				outbox: () => billing.outbox,
+				inbox: () => billing.inbox,
+				...billingOptions
+			})
+		]
+	})
+	class BillingModule extends Module {}
 
-	beforeEach(() => {
-		billing.outbox = new MemoryOutboxStore();
-		billing.inbox = new MemoryInboxStore();
-		Service.instance(names[0]!, billing.outbox);
-		Service.instance(names[1]!, billing.inbox);
-		Service.instance(storeServiceName(MOIRAI_INBOX_STORE, 'ledger'), ledgerInbox);
+	@Module.register({
+		services: [Ledger, ...Moirai.stores({ outbox: () => ledger.outbox, inbox: () => ledger.inbox })]
+	})
+	class LedgerModule extends Module {}
+
+	@Module.register({})
+	class EmptyModule extends Module {}
+
+	const boot = async () => {
+		app = await Application.testing({
+			modules: [
+				MoiraiModule.with({
+					outbox: () => root.outbox,
+					inbox: () => root.inbox,
+					idempotency: () => root.idempotency
+				}),
+				BillingModule,
+				LedgerModule,
+				EmptyModule
+			],
+			overrides: { 'db.transaction': withUnitOfWork((callback) => callback()) },
+			boot: 'eager'
+		});
+	};
+
+	beforeEach(async () => {
+		root = {
+			outbox: new MemoryOutboxStore(),
+			inbox: new MemoryInboxStore(),
+			idempotency: new MemoryIdempotencyStore()
+		};
+		billing = { outbox: new MemoryOutboxStore(), inbox: new MemoryInboxStore() };
+		ledger = { outbox: new MemoryOutboxStore(), inbox: new MemoryInboxStore() };
+		billingOptions = {};
 		handled.length = 0;
 		sent.length = 0;
-		expect(Ledger).toBeDefined();
+		expect(Notifier).toBeDefined();
 	});
 
-	afterEach(() => {
-		for (const name of [...names, storeServiceName(MOIRAI_INBOX_STORE, 'ledger')])
-			Service.remove(name);
+	afterEach(async () => {
+		await app?.shutdown();
+		app = undefined;
 	});
 
-	it('writes the effects and events of an action to the outbox of its set', async () => {
+	it('runs an action with the stores of its module', async () => {
+		await boot();
 		expect(await Moirai.execute(Charge, { order: 'o1' })).toEqual({ charged: 'o1' });
-		expect(outbox.rows).toEqual([]);
+		expect(root.outbox.rows).toEqual([]);
 		expect(billing.outbox.rows.map((row) => row.kind).sort()).toEqual([
 			'mail.send',
 			MOIRAI_EVENT_EFFECT,
@@ -675,84 +727,55 @@ describe('store sets', () => {
 		expect(handled.sort()).toEqual(['ledger:o1', 'notify:o1']);
 	});
 
-	it('records each handled event in the inbox of the handler set', async () => {
+	it('records each handled event in the inbox of the handler module', async () => {
+		await boot();
 		await Moirai.execute(Charge, { order: 'o2' });
-		// The ledger handler has its own set; the other one runs in the set of the delivery.
-		const deliveries = billing.outbox.rows.filter((row) => row.kind === MOIRAI_EVENT_EFFECT);
-		const id = (deliveries[0]!.payload as { id: string }).id;
-		expect(await ledgerInbox.record(id, 'ledger.record')).toBe(false);
-		expect(await billing.inbox.record(id, 'billing.notify')).toBe(false);
-		expect(await billing.inbox.record(id, 'ledger.record')).toBe(true);
+		const delivery = billing.outbox.rows.find((row) => row.kind === MOIRAI_EVENT_EFFECT)!;
+		const id = (delivery.payload as { id: string }).id;
+		expect(await ledger.inbox.record(id, 'ledger.record')).toBe(false);
+		// A handler outside any module runs in the module of the outbox it came from.
+		expect(await billing.inbox.record(id, 'notify')).toBe(false);
+		expect(await root.inbox.record(id, 'notify')).toBe(true);
 	});
 
-	it('shares the stores of the default set that a named set leaves out', async () => {
-		@Action.register({ input: t.Object({ n: t.Integer() }), idempotent: true, stores: 'billing' })
-		class Pay extends Action {
-			public handle(input: { n: number }) {
-				return { paid: input.n };
-			}
-		}
+	it('uses the stores of MoiraiModule that a module leaves out', async () => {
+		await boot();
 		expect(await Moirai.execute(Pay, { n: 1 }, { idempotencyKey: 'p' })).toEqual({ paid: 1 });
-		expect(await idempotency.get('anonymous:Pay:p')).toBeDefined();
+		expect(await root.idempotency.get('anonymous:Pay:p')).toBeDefined();
 	});
 
-	it('relays the outbox of the set it is given, and of the current one', async () => {
-		setOptions({ relayOnCommit: false });
+	it('takes the options a module overrides, and sweeps one outbox or all of them', async () => {
+		billingOptions = { relayOnCommit: false };
+		await boot();
 		await Moirai.execute(Charge, { order: 'o3' });
 		expect(sent).toEqual([]);
 		expect(await Outbox.relay()).toEqual({ dispatched: 0, retried: 0, dead: 0 });
-		expect(await Outbox.sweep({ stores: 'billing' })).toEqual({
+		expect(await Outbox.sweep({ module: LedgerModule })).toEqual({
+			dispatched: 0,
+			retried: 0,
+			dead: 0
+		});
+		expect(await Outbox.sweep()).toEqual({ dispatched: 3, retried: 0, dead: 0 });
+		expect(sent).toEqual([{ to: 'o3' }]);
+
+		await Moirai.execute(Charge, { order: 'o4' });
+		expect(await Outbox.sweep({ module: BillingModule })).toEqual({
 			dispatched: 3,
 			retried: 0,
 			dead: 0
 		});
-		expect(sent).toEqual([{ to: 'o3' }]);
-
-		await Moirai.using('billing', () =>
-			UnitOfWork.run(() => Outbox.enqueue({ kind: 'mail.send', payload: { to: 'later' } }))
-		);
-		expect(await Moirai.using('billing', () => Outbox.relay())).toEqual({
-			dispatched: 1,
-			retried: 0,
-			dead: 0
-		});
+		expect(() => Outbox.relay({ module: EmptyModule })).toThrow(MissingStoreError);
 	});
 
-	it('gives a named set the options of the default set, with its own overrides', async () => {
-		Service.instance(names[2]!, { relayOnCommit: false });
-		await Moirai.execute(Charge, { order: 'o4' });
-		expect(sent).toEqual([]);
-		expect(await Moirai.execute(Rename, { name: 'x' })).toEqual({ name: 'x' });
-	});
-
-	it('names the set of a missing store', async () => {
-		@Action.register({ input: t.Object({}), stores: 'nowhere' })
-		class Lost extends Action {
-			public async handle() {
-				await Outbox.enqueue({ kind: 'mail.send', payload: {} });
-			}
-		}
-		Service.remove(MOIRAI_OUTBOX_STORE);
-		const error = await Moirai.execute(Lost, {}).catch((e) => e);
-		expect(error).toBeInstanceOf(MissingStoreError);
-		expect(error.message).toContain('"nowhere" store set');
-	});
-
-	it('registers the services of each set, and refuses a named set called default', () => {
-		const services = moiraiServices({
-			relayBatch: 10,
-			outbox: () => new MemoryOutboxStore(),
-			stores: { billing: { relayBatch: 5, inbox: () => new MemoryInboxStore() } }
-		});
-		expect(services.map((service) => service.name)).toEqual([
-			MOIRAI_OPTIONS,
-			MOIRAI_OUTBOX_STORE,
-			'moirai.options:billing',
-			'moirai.inbox:billing'
+	it('lists private services for the module', () => {
+		const inbox = new MemoryInboxStore();
+		const withOptions = Moirai.stores({ relayBatch: 5, inbox });
+		expect(withOptions.map((def) => (def as { name: string }).name)).toEqual([
+			MOIRAI_MODULE_OPTIONS,
+			MOIRAI_INBOX_STORE
 		]);
-		expect(services[0]!.factory()).toMatchObject({ relayBatch: 10, maxRelayAttempts: 8 });
-		expect(services[2]!.factory()).toEqual({ relayBatch: 5 });
-		expect(() => moiraiServices({ stores: { default: {} } })).toThrow(ReservedStoreSetError);
+		expect(withOptions.every((def) => (def as { global: boolean }).global === false)).toBe(true);
+		expect(Moirai.stores({ inbox })).toHaveLength(1);
 	});
 });
 

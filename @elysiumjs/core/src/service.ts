@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import type { Class } from 'type-fest';
+import type { ModuleNode } from './module-graph';
 import type { ServiceToken } from './token';
 
 import { isString } from 'radash';
@@ -301,6 +302,17 @@ export namespace Service {
 	export const exists = (service: ServiceToken): boolean => {
 		return Container.hasGlobal(nameOf(service));
 	};
+
+	/**
+	 * The modules that declare a service in their own scope, rather than as a global service, in
+	 * registration order. Run code in one of them with `ModuleContext.run()` to resolve the service
+	 * as that module sees it.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param service The service class or name.
+	 * @returns The modules, empty when no module declares it.
+	 */
+	export const ownersOf = (service: ServiceToken): readonly ModuleNode[] =>
+		Container.ownersOf(nameOf(service));
 
 	/**
 	 * Checks if a service has already been built, without building it.
