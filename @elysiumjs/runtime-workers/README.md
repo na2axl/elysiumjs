@@ -40,6 +40,8 @@ export default worker;
 
 Modules boot on the first invocation, whatever its kind, so building runs no `onInit` work.
 
+workerd binds every I/O object (a stream, a request or response body, a socket) to the request that created it. A singleton's `onInit` runs during the first invocation, so it may do I/O and keep what it read, but it must not keep the I/O object itself: a later invocation that uses it fails with "Cannot perform I/O on behalf of a different request". Open such objects per invocation, in request-scoped services.
+
 ### Bindings
 
 Each invocation runs with its own env and execution context. Read them with `Workers.env()`, `Workers.context()` and `Workers.binding(name)`, or inject them: `WorkersModule` provides the env (`workers.env`), the context (`workers.context`) and each binding it lists as global request-scoped services.
