@@ -46,6 +46,40 @@ jobs:
           bun run test:scripts
           bun run check:portability
 
+  # The conformance scenarios, on each runtime: Bun, Node.js (Vitest) and workerd (Vitest in the
+  # Workers runtime). The Node.js and workerd lanes run the built packages.
+  conformance:
+    name: Conformance (${{ matrix.lane }})
+    needs: quality
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: [bun, node, workerd]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.3"
+
+      - uses: actions/setup-node@v4
+        if: matrix.lane != 'bun'
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build
+        if: matrix.lane != 'bun'
+        run: bun run build
+
+      - name: Run the conformance suite
+        run: bun run --cwd @elysiumjs/conformance ${{ matrix.lane == 'bun' && 'test' || format('test:{0}', matrix.lane) }}
+
   # Late stage: build + test, needs services
   test:
     name: Build & Test
