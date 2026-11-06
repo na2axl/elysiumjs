@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { ServiceDefinition } from '@elysiumjs/core';
 import type { Static, TSchema } from 'typebox';
+import type { MoiraiStores } from './moirai.module';
 
 import {
 	currentUserId,
@@ -24,7 +26,7 @@ import {
 import { UnitOfWork } from '@elysiumjs/mnemosyne';
 import Value from 'typebox/value';
 
-import { actionLock, idempotencyStore, options } from './config';
+import { actionLock, idempotencyStore, inOwnerModule, options } from './config';
 import {
 	CallForbiddenError,
 	IdempotencyKeyRequiredError,
@@ -32,6 +34,7 @@ import {
 	InvalidInputError
 } from './errors';
 import { requestHash } from './hash';
+import { moduleStores } from './moirai.module';
 
 const ACTION = Symbol.for('elysium:moirai:action');
 const QUERY = Symbol.for('elysium:moirai:query');
@@ -223,7 +226,7 @@ export abstract class Query<TInput = any, TResult = any> {
 
 /** The instance of a handler: the registered service, or a new one with its dependencies. */
 const instanceOf = <T>(target: new (...args: any[]) => T): T =>
-	(Service.exists(target) ? Service.get(target) : null) ?? Service.make(target);
+	Service.get(target) ?? Service.make(target);
 
 /** The input, with its defaults, or an {@link InvalidInputError} listing the mistakes. */
 const validate = <S extends TSchema>(schema: S, raw: unknown, name: string): Static<S> => {
@@ -277,15 +280,44 @@ export namespace Moirai {
 		input: InputOf<C>,
 		call: { idempotencyKey?: string; scope?: string } = {}
 	): Promise<ActionOutcome<C>> =>
-		settle(() => run(action, input, call)) as Promise<ActionOutcome<C>>;
+		settle(() => {
+			const props = Metadata.get(ACTION, action) as (ActionOptions & { name: string }) | undefined;
+			if (!props) throw new TypeError(`${action.name} is not marked with @Action.register().`);
+			// The action runs in its module, so that it uses the stores of that module.
+			return inOwnerModule(action, () => run(action, props, input, call));
+		}) as Promise<ActionOutcome<C>>;
+
+	/**
+	 * The stores and options of a module, as private services to list in its `services`. The
+	 * actions and event handlers of the module, and the code that runs in it, use them instead of
+	 * the ones of `MoiraiModule`; a store left out is the one of `MoiraiModule`, and an option left
+	 * out is the one of `MoiraiModule`. Like any service, they are visible to the modules that
+	 * import the module when it exports them.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param stores The stores, each an instance or a function that builds it once, and options.
+	 * @example
+	 * ```ts
+	 * @Module.register({
+	 * 	controllers: [WalletController],
+	 * 	services: [
+	 * 		WalletRepository,
+	 * 		...Moirai.stores({
+	 * 			outbox: () => new DrizzleOutboxStore({ table: billing.outbox }),
+	 * 			inbox: () => new DrizzleInboxStore({ table: billing.inbox })
+	 * 		})
+	 * 	]
+	 * })
+	 * class BillingModule extends Module {}
+	 * ```
+	 */
+	export const stores = (stores: MoiraiStores): ServiceDefinition[] => moduleStores(stores);
 
 	const run = async <C extends ActionClass>(
 		action: C,
+		props: ActionOptions & { name: string },
 		input: InputOf<C>,
 		call: { idempotencyKey?: string; scope?: string }
 	): Promise<ResultOf<C>> => {
-		const props = Metadata.get(ACTION, action) as (ActionOptions & { name: string }) | undefined;
-		if (!props) throw new TypeError(`${action.name} is not marked with @Action.register().`);
 		const { name, idempotent = false, transactional = true, retry = true } = props;
 		const config = options();
 

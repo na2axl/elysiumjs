@@ -91,11 +91,11 @@ export class FlowUserRequiredError extends DomainError.for('UNAUTHENTICATED', 40
 }
 
 /**
- * A flow request without its `x-flow-key` or `x-flow-step` header: a 422 problem with one entry
- * per missing header.
+ * A flow request without its `x-flow-key` or `x-flow-step` header: a 400 `BAD_REQUEST` problem
+ * with one entry per missing header.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class InvalidFlowRequestError extends DomainError.for('VALIDATION_FAILED', 422) {
+export class InvalidFlowRequestError extends DomainError.for('BAD_REQUEST', 400) {
 	constructor(errors: ProblemValidationError[]) {
 		super('The flow request is invalid.', { errors });
 	}

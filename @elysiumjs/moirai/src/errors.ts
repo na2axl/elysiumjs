@@ -17,11 +17,11 @@ import type { ProblemValidationError } from '@elysiumjs/core';
 import { DomainError, ElysiumError } from '@elysiumjs/core';
 
 /**
- * Raised when an idempotent action is called without an idempotency key. Rendered as a 428
+ * Raised when an idempotent action is called without an idempotency key. Rendered as a 400
  * problem.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class IdempotencyKeyRequiredError extends DomainError.for('IDEMPOTENCY_KEY_REQUIRED', 428) {
+export class IdempotencyKeyRequiredError extends DomainError.for('IDEMPOTENCY_KEY_REQUIRED', 400) {
 	constructor(public readonly action: string) {
 		super(`The ${action} action needs an Idempotency-Key.`, { extensions: { action } });
 	}
@@ -55,11 +55,11 @@ export class IdempotencyConflictError extends ElysiumError {
 }
 
 /**
- * Raised when the input of an action or a query does not match its schema. Rendered as a 400
+ * Raised when the input of an action or a query does not match its schema. Rendered as a 422
  * problem, with one entry per mistake in `errors`.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class InvalidInputError extends DomainError.for('VALIDATION_FAILED', 400) {
+export class InvalidInputError extends DomainError.for('VALIDATION_FAILED', 422) {
 	constructor(
 		public readonly target: string,
 		errors: readonly ProblemValidationError[]
@@ -79,13 +79,20 @@ export class CallForbiddenError extends DomainError.for('FORBIDDEN', 403) {
 }
 
 /**
- * Raised when moirai needs a store that `MoiraiModule.with()` did not set.
+ * Raised when moirai needs a store that neither the current module (`Moirai.stores()`) nor
+ * `MoiraiModule.with()` set.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export class MissingStoreError extends ElysiumError {
-	constructor(store: string) {
+	constructor(
+		public readonly store: string,
+		public readonly module?: string
+	) {
 		super(
-			`Moirai has no ${store} store. Set one with MoiraiModule.with({ ${store}: ... }) in the application.`
+			`Moirai has no ${store} store` +
+				(module ? ` in module ${module}` : '') +
+				`. Set one with MoiraiModule.with({ ${store}: ... }) in the application, or with ` +
+				`Moirai.stores({ ${store}: ... }) in the services of the module.`
 		);
 	}
 }

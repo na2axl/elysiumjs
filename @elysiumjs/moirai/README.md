@@ -46,11 +46,11 @@ return Moirai.ask(WalletBalance, { walletId });
 ```
 
 - A refusal is a value. `Moirai.execute()` and `Moirai.ask()` return the DomainError that refused the call, and their return type lists it next to the result. A controller that returns it sends it as the problem of its route, and typed clients see it under its status. Check one with `isDomainError(outcome)`.
-- An input that does not match the schema is refused with a 400 `VALIDATION_FAILED` problem, with one entry per mistake.
+- An input that does not match the schema is refused with a 422 `VALIDATION_FAILED` problem, with one entry per mistake.
 - When `authorize(input)` returns `false`, the call is refused with a 403 `FORBIDDEN` problem.
 - An action runs in a unit of work, or joins the one already open. A transient failure retries in a new unit of work, up to 3 attempts. Transient failures are errors with `transient: true`, and Postgres serialization failures and deadlocks. `retry: { attempts, isTransient }` sets them per action, such as to retry a returned optimistic-concurrency error; `retry: false` never retries. A transient DomainError that outlasts the attempts is returned.
 - A handler refuses a call by returning a `DomainError`, or throwing one. The unit of work then rolls back, nothing is stored for idempotency, and the error is returned to the caller. An action that joined an open unit of work hands it up: the unit rolls back when its opener returns it too.
-- An idempotent action needs a key, or it is refused with a 428 `IDEMPOTENCY_KEY_REQUIRED` problem. A repeat with the same key and input replays the stored response, as JSON; with another input, it is refused with a 422 `IDEMPOTENCY_KEY_REUSED` problem.
+- An idempotent action needs a key, or it is refused with a 400 `IDEMPOTENCY_KEY_REQUIRED` problem. A repeat with the same key and input replays the stored response, as JSON; with another input, it is refused with a 422 `IDEMPOTENCY_KEY_REUSED` problem.
 - A key belongs to its owner: the current user by default (`currentUserId()` of core, else `anonymous`), or what `scope(input)` of the action or `Moirai.execute(..., { scope })` returns, such as a tenant and a user. Another owner presenting the same key runs the action on its own.
 - `serializeBy` makes calls that share a key run one after the other, so a double tap waits for the first call and replays its response.
 
@@ -142,3 +142,31 @@ MoiraiModule.with({
 ```
 
 The memory stores (`MemoryIdempotencyStore`, `MemoryOutboxStore`, `MemoryInboxStore` and `MemoryActionLock`) are meant for tests and single-process apps. The memory outbox and inbox drop what a unit of work that rolls back wrote, like a database table.
+
+### Module stores
+
+A module can have stores of its own, such as the outbox and inbox tables of a domain. `Moirai.stores()` lists them as private services of the module; what a module leaves out comes from `MoiraiModule`, stores and options alike.
+
+```ts
+const billing = moiraiTables('billing');
+
+@Module.register({
+	controllers: [InvoiceController],
+	services: [
+		Charge,
+		Receipts,
+		...Moirai.stores({
+			outbox: () => new DrizzleOutboxStore({ table: billing.outbox }),
+			inbox: () => new DrizzleInboxStore({ table: billing.inbox }),
+			relayBatch: 20
+		})
+	]
+})
+class BillingModule extends Module {}
+```
+
+- An action runs in the module that registers it, whoever calls it: its idempotency store, its lock, its options, and the outbox of its effects and events are the ones of that module.
+- An event goes through the outbox of the module that publishes it. An `@Event.on` handler runs in the module that registers its class: the events it handled are recorded in the inbox of that module, and its own effects and events go to the outbox of that module. A handler whose class no module registers runs in the module of the outbox the event came from.
+- A `@Once()` job records its dispatch ids in the inbox of the module that registers the job.
+- The relay that follows a commit relays the outbox the rows went to. `Outbox.relay({ module })` and `Outbox.sweep({ module })` relay the outbox of one module; `Outbox.sweep()` relays the outbox of `MoiraiModule` and the one of every module that has its own, so one cron trigger covers them all.
+- Like any service, module stores are visible to the modules that import the module when it exports them.

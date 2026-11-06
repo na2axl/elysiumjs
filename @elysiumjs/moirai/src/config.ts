@@ -14,7 +14,7 @@
 
 import type { ActionLock, IdempotencyStore, InboxStore, OutboxStore } from './stores';
 
-import { Service } from '@elysiumjs/core';
+import { ModuleContext, Service } from '@elysiumjs/core';
 
 import { MissingStoreError } from './errors';
 
@@ -24,6 +24,9 @@ export const MOIRAI_OUTBOX_STORE = 'moirai.outbox';
 export const MOIRAI_INBOX_STORE = 'moirai.inbox';
 export const MOIRAI_ACTION_LOCK = 'moirai.lock';
 export const MOIRAI_OPTIONS = 'moirai.options';
+
+/** The service name of the options a module overrides with `Moirai.stores()`. */
+export const MOIRAI_MODULE_OPTIONS = 'moirai.module-options';
 
 /**
  * How moirai runs actions and relays the outbox.
@@ -84,16 +87,24 @@ export const DEFAULT_OPTIONS: MoiraiOptions = {
 	relayLease: 300
 };
 
-/** The moirai options, or the defaults when MoiraiModule is not loaded. */
-export const options = (): MoiraiOptions =>
-	(Service.exists(MOIRAI_OPTIONS) ? Service.get<MoiraiOptions>(MOIRAI_OPTIONS) : null) ??
-	DEFAULT_OPTIONS;
+const lookup = <T>(name: string): T | null => Service.get<T>(name);
+
+/**
+ * The options of the current module: the defaults, then the options of `MoiraiModule`, then the
+ * ones the module overrides with `Moirai.stores()`.
+ */
+export const options = (): MoiraiOptions => {
+	const base = lookup<MoiraiOptions>(MOIRAI_OPTIONS) ?? DEFAULT_OPTIONS;
+	const own = lookup<Partial<MoiraiOptions>>(MOIRAI_MODULE_OPTIONS);
+	return own ? { ...base, ...own } : base;
+};
 
 const store =
-	<T>(token: string, name: string) =>
+	<T>(name: string, kind: string) =>
 	(): T => {
-		const found = Service.exists(token) ? Service.get<T>(token) : null;
-		if (!found) throw new MissingStoreError(name);
+		// The stores of the current module, else the ones its imports export, else the global ones.
+		const found = lookup<T>(name);
+		if (!found) throw new MissingStoreError(kind, ModuleContext.current()?.id);
 		return found;
 	};
 
@@ -101,3 +112,13 @@ export const idempotencyStore = store<IdempotencyStore>(MOIRAI_IDEMPOTENCY_STORE
 export const outboxStore = store<OutboxStore>(MOIRAI_OUTBOX_STORE, 'outbox');
 export const inboxStore = store<InboxStore>(MOIRAI_INBOX_STORE, 'inbox');
 export const actionLock = store<ActionLock>(MOIRAI_ACTION_LOCK, 'lock');
+
+/**
+ * Runs work in the context of the module that declares a service, such as the module of an
+ * action or of an event handler, so that it uses that module's stores. Without such a module, the
+ * work runs in the current context.
+ */
+export const inOwnerModule = <T>(service: object, work: () => T): T => {
+	const owner = Service.ownersOf(service as never)[0];
+	return owner && owner !== ModuleContext.current() ? ModuleContext.run(owner, work) : work();
+};

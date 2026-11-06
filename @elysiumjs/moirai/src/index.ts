@@ -31,6 +31,7 @@ export {
 	MOIRAI_ACTION_LOCK,
 	MOIRAI_IDEMPOTENCY_STORE,
 	MOIRAI_INBOX_STORE,
+	MOIRAI_MODULE_OPTIONS,
 	MOIRAI_OPTIONS,
 	MOIRAI_OUTBOX_STORE,
 	type MoiraiOptions
@@ -57,7 +58,7 @@ export {
 } from './event';
 export { requestHash } from './hash';
 export { uuidv7 } from './ids';
-export { MoiraiModule, type MoiraiModuleConfig } from './moirai.module';
+export { MoiraiModule, type MoiraiModuleConfig, type MoiraiStores } from './moirai.module';
 export {
 	type RelayOptions,
 	type RelaySummary,

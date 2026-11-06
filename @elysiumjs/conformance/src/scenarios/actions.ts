@@ -43,7 +43,9 @@ const make = async (): Promise<Application> => {
 		public send(payload: { balance: number }) {
 			wallet.mails.push(`credited:${payload.balance}`);
 		}
+	}
 
+	class AuditLog {
 		@Event.on('conformance.wallet.topped-up', { consumer: 'conformance.audit' })
 		public audit(payload: { amount: number }) {
 			wallet.mails.push(`event:${payload.amount}`);
@@ -86,6 +88,11 @@ const make = async (): Promise<Application> => {
 		controllers: [WalletController],
 		services: [
 			Mailer,
+			TopUp,
+			...Moirai.stores({
+				outbox: () => new MemoryOutboxStore(),
+				inbox: () => new MemoryInboxStore()
+			}),
 			{
 				name: DATABASE_TRANSACTION_SERVICE,
 				global: true,
@@ -96,14 +103,18 @@ const make = async (): Promise<Application> => {
 	})
 	class WalletModule extends Module {}
 
+	@Module.register({
+		services: [AuditLog, ...Moirai.stores({ inbox: () => new MemoryInboxStore() })]
+	})
+	class AuditModule extends Module {}
+
 	@Application.register({
 		modules: [
 			MoiraiModule.with({
-				idempotency: () => new MemoryIdempotencyStore(),
-				outbox: () => new MemoryOutboxStore(),
-				inbox: () => new MemoryInboxStore()
+				idempotency: () => new MemoryIdempotencyStore()
 			}),
-			WalletModule
+			WalletModule,
+			AuditModule
 		],
 		openapi: false
 	})
@@ -120,9 +131,10 @@ const topUp = (key: string | null, amount: number) => () =>
 	});
 
 /**
- * An idempotent action replays its response for a repeated key, refuses a missing key (428) and
+ * An idempotent action replays its response for a repeated key, refuses a missing key (400) and
  * a reused key with another input (422), and its outbox effect and its event relay once it
- * commits.
+ * commits. The action and the event handler use the stores of their modules, and the
+ * idempotency store of MoiraiModule.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export const actions: Scenario = {
@@ -132,7 +144,7 @@ export const actions: Scenario = {
 		{ request: topUp('k1', 10), expect: { status: 200, json: { balance: 10 } } },
 		{ request: topUp('k1', 10), expect: { status: 200, json: { balance: 10 } } },
 		{ request: topUp('k1', 99), expect: { status: 422 } },
-		{ request: topUp(null, 10), expect: { status: 428 } },
+		{ request: topUp(null, 10), expect: { status: 400 } },
 		{
 			request: () => new Request('http://localhost/wallet'),
 			expect: { status: 200, json: { balance: 10, mails: ['credited:10', 'event:10'] } }

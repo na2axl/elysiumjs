@@ -16,6 +16,7 @@ import type { OutboxRow } from './stores';
 
 import { Service } from '@elysiumjs/core';
 
+import { inOwnerModule } from './config';
 import { DuplicateEventConsumerError, UnknownEventConsumerError } from './errors';
 import { uuidv7 } from './ids';
 import { Inbox, Outbox, registerEffect } from './outbox';
@@ -90,6 +91,7 @@ type Delivery = {
 type Registered = {
 	event: string;
 	attempts?: number;
+	owner: object;
 	run: (payload: unknown, meta: EventMeta) => unknown;
 };
 
@@ -101,14 +103,17 @@ registerEffect(
 		const delivery = payload as Delivery;
 		const handler = CONSUMERS.get(delivery.consumer);
 		if (!handler) throw new UnknownEventConsumerError(delivery.consumer, delivery.event);
-		await Inbox.once({ messageId: delivery.id, consumer: delivery.consumer }, async () => {
-			await handler.run(delivery.payload, {
-				id: delivery.id,
-				event: delivery.event,
-				publishedAt: new Date(delivery.publishedAt),
-				attempt: row.attempts + 1
-			});
-		});
+		// The handler runs in its module: the inbox and outbox of that module record its work.
+		await inOwnerModule(handler.owner, () =>
+			Inbox.once({ messageId: delivery.id, consumer: delivery.consumer }, async () => {
+				await handler.run(delivery.payload, {
+					id: delivery.id,
+					event: delivery.event,
+					publishedAt: new Date(delivery.publishedAt),
+					attempt: row.attempts + 1
+				});
+			})
+		);
 	},
 	{
 		attempts: (row: OutboxRow) =>
@@ -157,20 +162,21 @@ export namespace Event {
 			const { retry } = options;
 			CONSUMERS.set(consumer, {
 				event,
+				owner,
 				attempts: retry === false ? 1 : retry?.attempts,
 				run: (payload, meta) => {
-					const self = (
-						isStatic
-							? owner
-							: ((Service.exists(owner) ? Service.get(owner) : null) ?? Service.make(owner))
-					) as Record<string | symbol, (payload: unknown, meta: EventMeta) => unknown>;
+					const self = (isStatic ? owner : (Service.get(owner) ?? Service.make(owner))) as Record<
+						string | symbol,
+						(payload: unknown, meta: EventMeta) => unknown
+					>;
 					return self[method]!(payload, meta);
 				}
 			});
 		};
 
 	/**
-	 * Publishes an event in the open unit of work: each handler of the event gets it once the unit
+	 * Publishes an event in the open unit of work, through the outbox of the current module: each
+	 * handler of the event gets it once the unit
 	 * commits, and never when it rolls back.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param event The name of the event.

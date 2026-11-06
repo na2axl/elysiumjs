@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { ServiceDefinition } from '@elysiumjs/core';
 import type { MoiraiOptions } from './config';
 import type { ActionLock, IdempotencyStore, InboxStore, OutboxStore } from './stores';
 
@@ -22,6 +23,7 @@ import {
 	MOIRAI_ACTION_LOCK,
 	MOIRAI_IDEMPOTENCY_STORE,
 	MOIRAI_INBOX_STORE,
+	MOIRAI_MODULE_OPTIONS,
 	MOIRAI_OPTIONS,
 	MOIRAI_OUTBOX_STORE
 } from './config';
@@ -29,23 +31,56 @@ import {
 type StoreOption<T> = T | (() => T);
 
 /**
- * The configuration of {@link MoiraiModule}: the stores, built once, and the options.
+ * Stores, each an instance or a function that builds it once, and options.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export type MoiraiModuleConfig = Partial<MoiraiOptions> & {
+export type MoiraiStores = Partial<MoiraiOptions> & {
 	idempotency?: StoreOption<IdempotencyStore>;
 	outbox?: StoreOption<OutboxStore>;
 	inbox?: StoreOption<InboxStore>;
 	lock?: StoreOption<ActionLock>;
 };
 
+/**
+ * The configuration of {@link MoiraiModule}: the stores of the application and the options.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type MoiraiModuleConfig = MoiraiStores;
+
 const build = <T>(option: StoreOption<T>): T =>
 	typeof option === 'function' ? (option as () => T)() : option;
 
+/** The service definitions of stores and options, global or private to the declaring module. */
+const definitions = (config: MoiraiStores, global: boolean): ServiceDefinition[] => {
+	const { idempotency, outbox, inbox, lock, ...rest } = config;
+	const stores: [string, StoreOption<unknown> | undefined][] = [
+		[MOIRAI_IDEMPOTENCY_STORE, idempotency],
+		[MOIRAI_OUTBOX_STORE, outbox],
+		[MOIRAI_INBOX_STORE, inbox],
+		[MOIRAI_ACTION_LOCK, lock]
+	];
+	const options: ServiceDefinition[] = global
+		? [{ name: MOIRAI_OPTIONS, global, factory: () => ({ ...DEFAULT_OPTIONS, ...rest }) }]
+		: Object.keys(rest).length > 0
+			? [{ name: MOIRAI_MODULE_OPTIONS, global, factory: () => ({ ...rest }) }]
+			: [];
+	return [
+		...options,
+		...stores
+			.filter(([, option]) => option !== undefined)
+			.map(([name, option]) => ({ name, global, factory: () => build(option!) }))
+	];
+};
+
+/** @internal The services of `Moirai.stores()`: private to the module that lists them. */
+export const moduleStores = (config: MoiraiStores): ServiceDefinition[] =>
+	definitions(config, false);
+
 /**
- * Provides the moirai stores and options as global services. Set the stores the app uses: the
- * memory ones (`MemoryIdempotencyStore`, ...) for tests, the Postgres ones of
- * `@elysiumjs/moirai-drizzle` in production.
+ * Provides the moirai stores and options of the application as global services. Set the stores
+ * the app uses: the memory ones (`MemoryIdempotencyStore`, ...) for tests, the Postgres ones of
+ * `@elysiumjs/moirai-drizzle` in production. A module that needs stores of its own, such as the
+ * outbox and inbox tables of a domain, lists them with `Moirai.stores()` in its services.
  * @author Axel Nana <axel.nana@workbud.com>
  * @example
  * ```ts
@@ -57,21 +92,5 @@ const build = <T>(option: StoreOption<T>): T =>
  * });
  * ```
  */
-@Module.register<MoiraiModuleConfig>({
-	services: (config) => {
-		const { idempotency, outbox, inbox, lock, ...rest } = config;
-		const stores: [string, StoreOption<unknown> | undefined][] = [
-			[MOIRAI_IDEMPOTENCY_STORE, idempotency],
-			[MOIRAI_OUTBOX_STORE, outbox],
-			[MOIRAI_INBOX_STORE, inbox],
-			[MOIRAI_ACTION_LOCK, lock]
-		];
-		return [
-			{ name: MOIRAI_OPTIONS, global: true, factory: () => ({ ...DEFAULT_OPTIONS, ...rest }) },
-			...stores
-				.filter(([, option]) => option !== undefined)
-				.map(([name, option]) => ({ name, global: true, factory: () => build(option!) }))
-		];
-	}
-})
+@Module.register<MoiraiModuleConfig>({ services: (config) => definitions(config, true) })
 export class MoiraiModule extends Module.configurable<MoiraiModuleConfig>() {}
