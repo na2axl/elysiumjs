@@ -48,18 +48,26 @@
       },
       "devDependencies": {
         "@elysiumjs/core": "workspace:*",
-        "@elysiumjs/redis": "workspace:*",
         "@elysiumjs/runtime-bun": "workspace:*",
         "@elysiumjs/themis": "workspace:*",
         "elysia": "^2.0.0-rc.1",
       },
       "peerDependencies": {
         "@elysiumjs/core": "workspace:^",
+      },
+    },
+    "@elysiumjs/ariadne-redis": {
+      "name": "@elysiumjs/ariadne-redis",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@elysiumjs/ariadne": "workspace:*",
+        "@elysiumjs/core": "workspace:*",
+        "@elysiumjs/redis": "workspace:*",
+      },
+      "peerDependencies": {
+        "@elysiumjs/ariadne": "workspace:^",
         "@elysiumjs/redis": "workspace:^",
       },
-      "optionalPeers": [
-        "@elysiumjs/redis",
-      ],
     },
     "@elysiumjs/ariadne-workers": {
       "name": "@elysiumjs/ariadne-workers",
@@ -499,6 +507,8 @@
     "@elysiumjs/argus": ["@elysiumjs/argus@workspace:@elysiumjs/argus"],
 
     "@elysiumjs/ariadne": ["@elysiumjs/ariadne@workspace:@elysiumjs/ariadne"],
+
+    "@elysiumjs/ariadne-redis": ["@elysiumjs/ariadne-redis@workspace:@elysiumjs/ariadne-redis"],
 
     "@elysiumjs/ariadne-workers": ["@elysiumjs/ariadne-workers@workspace:@elysiumjs/ariadne-workers"],
 

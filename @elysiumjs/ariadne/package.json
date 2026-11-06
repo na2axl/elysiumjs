@@ -55,18 +55,11 @@
   },
   "devDependencies": {
     "@elysiumjs/core": "workspace:*",
-    "@elysiumjs/redis": "workspace:*",
     "@elysiumjs/runtime-bun": "workspace:*",
     "elysia": "^2.0.0-rc.1",
     "@elysiumjs/themis": "workspace:*"
   },
   "peerDependencies": {
-    "@elysiumjs/core": "workspace:^",
-    "@elysiumjs/redis": "workspace:^"
-  },
-  "peerDependenciesMeta": {
-    "@elysiumjs/redis": {
-      "optional": true
-    }
+    "@elysiumjs/core": "workspace:^"
   }
 }

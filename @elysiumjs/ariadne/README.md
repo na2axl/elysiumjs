@@ -55,7 +55,8 @@ export const signUp = Flow.define({
 ## Serving flows
 
 ```ts
-import { AriadneModule, RedisFlowStore } from '@elysiumjs/ariadne';
+import { AriadneModule } from '@elysiumjs/ariadne';
+import { RedisFlowStore } from '@elysiumjs/ariadne-redis';
 import { Application } from '@elysiumjs/core';
 import { Auth } from '@elysiumjs/themis';
 
@@ -94,7 +95,7 @@ The routes answer problems:
 ## Stores
 
 - `MemoryFlowStore`, for tests and single-process apps.
-- `RedisFlowStore`, whose claims and commits are Lua scripts run with `EVAL`, which Upstash runs too.
+- `RedisFlowStore` of [`@elysiumjs/ariadne-redis`](../ariadne-redis), whose claims and commits are Lua scripts run with `EVAL`, which Upstash runs too.
 - `durableFlowStore` of [`@elysiumjs/ariadne-workers`](../ariadne-workers), a Durable Object per flow on Cloudflare Workers.
 
 A finished flow keeps its last answer replayable for up to 10 minutes. Then only its owner and end time stay, for its TTL, so that a late call learns that the flow is finished. A custom store implements `FlowStore`, and can follow `FlowRules` to answer like the others.

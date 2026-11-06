@@ -74,6 +74,7 @@ export const ROOTS = [
 	'@elysiumjs/moirai',
 	'@elysiumjs/themis',
 	'@elysiumjs/ariadne',
+	'@elysiumjs/ariadne-redis',
 	'@elysiumjs/ariadne-workers'
 ];
 

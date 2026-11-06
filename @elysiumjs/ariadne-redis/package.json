@@ -1,0 +1,62 @@
+{
+  "name": "@elysiumjs/ariadne-redis",
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "description": "A Redis flow store for @elysiumjs/ariadne, with atomic Lua scripts that Upstash runs too.",
+  "private": false,
+  "author": {
+    "name": "Axel Nana",
+    "email": "axel.nana@workbud.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/na2axl/elysiumjs.git",
+    "directory": "@elysiumjs/ariadne-redis"
+  },
+  "homepage": "https://github.com/na2axl/elysiumjs/tree/main/@elysiumjs/ariadne-redis#readme",
+  "bugs": {
+    "url": "https://github.com/na2axl/elysiumjs/issues"
+  },
+  "scripts": {
+    "format": "prettier --write \"./src/**/*.ts\"",
+    "clean": "rimraf dist",
+    "build:js": "bun build ./src/index.ts --outdir ./dist --target browser --packages external --root ./src --minify-syntax --minify-whitespace",
+    "build:ts": "tsc",
+    "build": "bun run clean && bun run build:js && bun run build:ts",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "bun run build",
+    "test": "bun test",
+    "test:coverage": "bun test --coverage"
+  },
+  "keywords": [
+    "elysium",
+    "framework",
+    "typescript",
+    "flows",
+    "redis",
+    "upstash"
+  ],
+  "type": "module",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md"
+  ],
+  "sideEffects": false,
+  "devDependencies": {
+    "@elysiumjs/ariadne": "workspace:*",
+    "@elysiumjs/core": "workspace:*",
+    "@elysiumjs/redis": "workspace:*"
+  },
+  "peerDependencies": {
+    "@elysiumjs/ariadne": "workspace:^",
+    "@elysiumjs/redis": "workspace:^"
+  }
+}

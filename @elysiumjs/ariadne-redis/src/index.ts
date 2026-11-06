@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { RedisConnection } from '@elysiumjs/redis';
 import type {
 	FlowAmend,
 	FlowClaim,
@@ -21,9 +20,10 @@ import type {
 	FlowCommitResult,
 	FlowRecord,
 	FlowStore
-} from '../store';
+} from '@elysiumjs/ariadne';
+import type { RedisConnection } from '@elysiumjs/redis';
 
-import { FLOW_TOMBSTONE_SECONDS } from '../store';
+import { FLOW_TOMBSTONE_SECONDS } from '@elysiumjs/ariadne';
 
 // Each flow is a hash (owner, step, lastStepId, completedAt, and the JSON of state and answer),
 // a lease key that expires on its own, and a marker hash that outlives a finished flow. A missing

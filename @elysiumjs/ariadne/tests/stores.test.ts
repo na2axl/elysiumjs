@@ -14,10 +14,9 @@
 
 import type { FlowStore } from '../src';
 
-import { bunRedis } from '@elysiumjs/redis';
-import { afterAll, describe, expect, it } from 'bun:test';
+import { describe, expect, it } from 'bun:test';
 
-import { MemoryFlowStore, RedisFlowStore } from '../src';
+import { MemoryFlowStore } from '../src';
 
 const claim = (stepId: string, step: string, expectStep: string | null) => ({
 	stepId,
@@ -36,7 +35,7 @@ const commit = (stepId: string, step: string, expectStep: string | null, termina
 	ttlSeconds: 60
 });
 
-/** The rules every store follows. */
+/** The rules every store follows (`@elysiumjs/ariadne-redis` runs the same ones on Redis). */
 const contract = (name: string, make: () => FlowStore) => {
 	describe(name, () => {
 		let n = 0;
@@ -157,40 +156,6 @@ const contract = (name: string, make: () => FlowStore) => {
 };
 
 contract('MemoryFlowStore', () => new MemoryFlowStore());
-
-const url = process.env.REDIS_URL;
-if (url) {
-	const connection = bunRedis(url, {});
-	afterAll(() => connection.close());
-	contract('RedisFlowStore', () => new RedisFlowStore({ connection, prefix: 'ariadne-test:' }));
-
-	it('RedisFlowStore keeps only the owner and end time once the answer expired', async () => {
-		const store = new RedisFlowStore({ connection: () => connection });
-		const key = `test:${crypto.randomUUID()}`;
-		await store.init(key, 'owner-1', 60);
-		await store.claim(key, claim('s1', 'a', null));
-		await store.commit(key, commit('s1', 'a', null, true));
-		expect(Number(await connection.send('TTL', [`flow:{${key}}`]))).toBeLessThanOrEqual(60);
-		expect(Number(await connection.send('TTL', [`flow:{${key}}:done`]))).toBeGreaterThan(60);
-		await connection.del(`flow:{${key}}`);
-		expect(await store.load(key)).toEqual({
-			owner: 'owner-1',
-			step: null,
-			state: null,
-			lastStepId: null,
-			lastAnswer: null,
-			completedAt: expect.any(String)
-		});
-		expect(await store.claim(key, claim('s1', 'a', null))).toEqual({
-			ok: false,
-			reason: 'completed'
-		});
-		expect(await store.commit(key, commit('s1', 'a', null))).toEqual({
-			ok: false,
-			reason: 'completed'
-		});
-	});
-}
 
 describe('MemoryFlowStore expiry', () => {
 	it('expires an idle flow, and keeps a finished one as a marker for its TTL', async () => {

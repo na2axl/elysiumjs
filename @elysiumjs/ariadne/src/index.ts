@@ -48,4 +48,3 @@ export {
 	type FlowStore
 } from './store';
 export { MemoryFlowStore } from './stores/memory';
-export { RedisFlowStore } from './stores/redis';
