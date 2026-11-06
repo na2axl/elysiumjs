@@ -17,7 +17,7 @@ import type { WorkersExecutionContext, WorkersMessageBatch } from '@elysiumjs/ru
 import type { DeadJob, HeraclesWorkersConfig } from '../src';
 
 import { Application, Http, Module, Service } from '@elysiumjs/core';
-import { Heracles, HeraclesModule, Job, Schedule } from '@elysiumjs/heracles';
+import { Heracles, HeraclesModule, Job, Scheduler } from '@elysiumjs/heracles';
 import { createRuntime, createWorker } from '@elysiumjs/runtime-workers';
 import { beforeEach, describe, expect, it } from 'bun:test';
 
@@ -26,7 +26,7 @@ import { CloudflareQueueTransport, HeraclesWorkersModule } from '../src';
 const ran: string[] = [];
 
 @Job.register({ name: 'greet', queue: 'jobs', maxRetries: 2, retryDelay: 30_000 })
-@Schedule('*/5 * * * *', { args: ['cron'] })
+@Scheduler.job('*/5 * * * *', { args: ['cron'] })
 class GreetJob extends Job {
 	constructor(private readonly who: string) {
 		super();

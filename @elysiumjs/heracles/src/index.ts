@@ -28,13 +28,16 @@ export { Cron, type CronSchedule, InvalidCronError } from './cron';
 export { HeraclesModule, type HeraclesModuleConfig } from './heracles.module';
 export { DuplicateJobError, JobRegistry, type JobRegistryEntry, QUEUES_SERVICE } from './registry';
 export {
-	InvalidScheduleError,
+	type FanOutCase,
 	type JobSchedule,
-	Schedule,
 	type ScheduledJob,
-	Scheduler,
-	type SchedulerOptions,
+	type SchedulerClass,
+	type SchedulerProps,
 	type ScheduleOptions,
+	type ScheduleRunnerOptions,
+	DuplicateSchedulerError,
+	ScheduleRunner,
+	Scheduler,
 	schedulesOf
 } from './schedule';
 export { Heracles } from './heracles';

@@ -69,14 +69,13 @@ export class InvalidOnceJobError extends ElysiumError {
 /**
  * Runs a Heracles job once per dispatch id: its `execute()` runs in a unit of work with an inbox
  * record of the dispatch id, so a delivery that comes again, or a tick handled twice, does nothing.
- * Made for the jobs of a fan-out `@Schedule()`, whose dispatch id names the job, the case and the
+ * Made for the jobs of a `Scheduler`, whose dispatch id names the scheduler, the case and the
  * tick. Without a database module, the record and the work run without a transaction.
  * @author Axel Nana <axel.nana@workbud.com>
  * @param options The inbox consumer. Defaults to the job name.
  * @example
  * ```ts
  * @Job.register({ queue: 'billing' })
- * @Schedule('0 6 * * *', { fanOut: 'due' })
  * @Once()
  * class BillInvoice extends Job { ... }
  * ```

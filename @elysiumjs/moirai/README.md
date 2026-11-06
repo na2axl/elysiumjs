@@ -77,7 +77,7 @@ import { job } from '@elysiumjs/moirai/heracles';
 await Outbox.enqueue(job(SendReceiptJob, [order.id]));
 ```
 
-`@Once()` runs a Heracles job once per dispatch id: its `execute()` runs in a unit of work with an inbox record of the id. It fits the jobs of a fan-out `@Schedule()`, whose dispatch id names the job, the case and the tick, so a repeated delivery or a tick handled twice does nothing.
+`@Once()` runs a Heracles job once per dispatch id: its `execute()` runs in a unit of work with an inbox record of the id. It fits the jobs of a `Scheduler`, whose dispatch id names the scheduler, the case and the tick, so a repeated delivery or a tick handled twice does nothing.
 
 Effect handlers register when their module is imported, `@elysiumjs/moirai/heracles` included. A process that relays the outbox, such as a cron sweeper, imports the modules of the effects it relays.
 

@@ -15,10 +15,10 @@
 import { Command, CommandArgumentType, Runtime } from '@elysiumjs/core';
 import { Redis } from '@elysiumjs/redis';
 
-import { Scheduler } from '../schedule';
+import { ScheduleRunner } from '../schedule';
 
 /**
- * Runs the scheduler: dispatches the jobs marked with `@Schedule()` at their times.
+ * Runs the scheduler: dispatches the scheduled jobs at their times.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 @Command.register()
@@ -42,9 +42,9 @@ export class HeraclesScheduleCommand extends Command {
 			Runtime.get().exit(1);
 		}
 
-		const scheduler = new Scheduler({ redis: this.redis ?? false });
+		const scheduler = new ScheduleRunner({ redis: this.redis ?? false });
 		const jobs = scheduler.start();
-		if (jobs.length === 0) this.warning('No job is marked with @Schedule().');
+		if (jobs.length === 0) this.warning('No job is scheduled.');
 		for (const { name, schedule } of jobs) {
 			this.info(`${this.bold(name)} runs at ${schedule.cron.expression} (UTC)`);
 		}

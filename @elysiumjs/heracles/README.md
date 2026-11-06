@@ -239,26 +239,43 @@ Jobs in Heracles go through several statuses:
 
 ### Schedules
 
-`@Schedule(cron, { args })` dispatches a job on a cron, in UTC. The `heracles:schedule` command runs the schedules on Bun and Node.js; on Cloudflare Workers, the cron triggers do (see `@elysiumjs/heracles-workers`).
+`@Scheduler.job(cron, { args })` dispatches a job on a cron, in UTC, with fixed arguments. The `heracles:schedule` command runs the schedules on Bun and Node.js; on Cloudflare Workers, the cron triggers do (see `@elysiumjs/heracles-workers`).
 
-With `fanOut`, a schedule selects the cases due at the tick and dispatches one job per case, so that each case retries and fails on its own. The named static method receives the tick (to the minute) and returns the cases; each job gets its case after `args`, and a dispatch id made of the job, the case `key` (its `id` by default) and the tick:
+```ts
+@Job.register({ queue: 'default' })
+@Scheduler.job('0 3 * * *')
+class PurgeExpiredSessions extends Job {
+	protected async execute() {}
+}
+```
+
+A scheduler class dispatches one job per case due at a tick, so that each case retries and fails on its own. It extends `Scheduler`, names its job in `@Scheduler.register()`, and its `fanOut()` receives the tick (to the minute) and returns the cases: a key and the arguments of the job, typed against its constructor. A scheduler is a service, so it can inject what it reads. Each job has a dispatch id made of the scheduler, the case key and the tick:
 
 ```ts
 @Job.register({ queue: 'billing' })
-@Schedule('0 6 * * *', { fanOut: 'due' })
 @Once() // from @elysiumjs/moirai/heracles: one run per dispatch id
 class BillInvoice extends Job {
-	public static async due(tick: Date): Promise<{ id: string }[]> {
-		return invoices.dueAt(tick);
-	}
-
-	constructor(private readonly invoice: { id: string }) {
+	constructor(private readonly invoiceId: string) {
 		super();
 	}
 
 	protected async execute() {}
 }
+
+@Scheduler.register({ cron: '0 6 * * *', job: BillInvoice })
+class DailyBilling extends Scheduler<typeof BillInvoice> {
+	constructor(@Service.inject() private readonly invoices: InvoiceRepository) {
+		super();
+	}
+
+	public async fanOut(tick: Date) {
+		const due = await this.invoices.dueAt(tick);
+		return due.map((invoice) => ({ key: invoice.id, args: [invoice.id] }));
+	}
+}
 ```
+
+A scheduler fans out one job; another job gets its own scheduler.
 
 ### Job Cancellation
 

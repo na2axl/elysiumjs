@@ -54,7 +54,7 @@ export class HeraclesWorkersHandlers {
 	}
 
 	/**
-	 * Dispatches the jobs whose `@Schedule()` expression is the cron of the trigger, at the time of
+	 * Dispatches the scheduled jobs whose expression is the cron of the trigger, at the time of
 	 * the trigger: a fan-out schedule selects its cases for that tick.
 	 */
 	@Workers.cron('*')
@@ -75,7 +75,7 @@ export class HeraclesWorkersHandlers {
 
 /**
  * Runs Heracles on Cloudflare Workers: consumes the jobs sent with `CloudflareQueueTransport`
- * from the Worker's queues (`queue` handler), and dispatches the `@Schedule()` jobs whose
+ * from the Worker's queues (`queue` handler), and dispatches the scheduled jobs whose
  * expression is the cron of a trigger (`scheduled` handler). Declare each consumer queue and each
  * cron expression in the wrangler config. Use it as is, or with `.with({ deadLetterQueue, onDead })`
  * to keep the jobs that failed their last retry.
