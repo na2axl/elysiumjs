@@ -37,3 +37,11 @@ export type Scenario = {
 
 /** The assertion adapter a lane injects, so scenarios never import a test framework. */
 export type AssertAdapter = { equal(a: unknown, b: unknown, msg: string): void };
+
+/**
+ * Builds a scenario's app and returns the function each of its requests goes through. The
+ * default builds the app and calls `elysia.handle`; the workerd lane goes through a Worker's
+ * `fetch`.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type ScenarioDriver = (app: Application) => Promise<(request: Request) => Promise<Response>>;

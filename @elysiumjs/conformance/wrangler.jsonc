@@ -1,0 +1,13 @@
+// The Worker the workerd conformance lane runs its tests in (see vitest.workerd.config.ts).
+{
+	"name": "elysium-conformance",
+	"main": "tests/workerd/worker.ts",
+	"compatibility_date": "2025-09-01",
+	"compatibility_flags": ["nodejs_compat"],
+	"kv_namespaces": [{ "binding": "CACHE", "id": "elysium-conformance-cache" }],
+	"queues": {
+		"producers": [{ "binding": "JOBS", "queue": "jobs" }],
+		"consumers": [{ "queue": "jobs", "max_batch_size": 10, "max_batch_timeout": 1 }]
+	},
+	"services": [{ "binding": "SELF", "service": "elysium-conformance" }]
+}

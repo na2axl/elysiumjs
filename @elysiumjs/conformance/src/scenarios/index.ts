@@ -21,7 +21,7 @@ import { sse } from './sse';
 import { validation } from './validation';
 
 export { runScenario } from './run';
-export type { AssertAdapter, Scenario } from './types';
+export type { AssertAdapter, Scenario, ScenarioDriver } from './types';
 
 /**
  * Every conformance scenario, run identically on each runtime lane.

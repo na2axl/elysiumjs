@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import type { Application } from '@elysiumjs/core';
-import type { AssertAdapter, Scenario } from './types';
+import type { AssertAdapter, Scenario, ScenarioDriver } from './types';
 
 import { resetContainer, Runtime } from '@elysiumjs/core';
 
@@ -62,33 +62,36 @@ const checkResponse = async (
 	}
 };
 
+/** The default driver: builds the app and hands each request to `elysia.handle`. */
+const handleDriver: ScenarioDriver = async (app) => {
+	const elysia = await app.build();
+	return (request) => elysia.handle(request);
+};
+
 /**
- * Runs a scenario against a runtime: builds a fresh app, drives its requests through
- * `elysia.handle`, runs the `after` hook, then shuts the app down and resets the container,
- * also when the app factory or a request fails.
+ * Runs a scenario against a runtime: builds a fresh app, drives its requests through the
+ * driver (`elysia.handle` by default), runs the `after` hook, then shuts the app down and resets
+ * the container, also when the app factory or a request fails.
  * @author Axel Nana <axel.nana@workbud.com>
  * @param s The scenario.
  * @param runtime The runtime to run it on.
  * @param assert The assertion adapter of the test framework.
+ * @param driver Builds the app and returns how a request reaches it, e.g. a Worker's `fetch`.
  */
 export const runScenario = async (
 	s: Scenario,
 	runtime: Runtime,
-	assert: AssertAdapter
+	assert: AssertAdapter,
+	driver: ScenarioDriver = handleDriver
 ): Promise<void> => {
 	Runtime.use(runtime);
 	let app: Application | undefined;
 	let failure: { error: unknown } | undefined;
 	try {
 		app = await s.app();
-		const elysia = await app.build();
+		const handle = await driver(app);
 		for (const [index, { request, expect }] of s.requests.entries()) {
-			await checkResponse(
-				await elysia.handle(request()),
-				expect,
-				`${s.name} #${index + 1}`,
-				assert
-			);
+			await checkResponse(await handle(request()), expect, `${s.name} #${index + 1}`, assert);
 		}
 		await s.after?.(app, assert);
 	} catch (error) {

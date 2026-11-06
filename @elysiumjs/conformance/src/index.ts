@@ -13,4 +13,4 @@
 // limitations under the License.
 
 export { runScenario, scenarios } from './scenarios';
-export type { Scenario } from './scenarios/types';
+export type { AssertAdapter, Scenario, ScenarioDriver } from './scenarios/types';

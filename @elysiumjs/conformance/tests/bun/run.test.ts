@@ -61,6 +61,30 @@ describe('runScenario', () => {
 		expect(received).toBe(expectAdapter);
 	});
 
+	it('drives the requests through the given driver', async () => {
+		const seen: string[] = [];
+		const scenario: Scenario = {
+			name: 'custom driver',
+			app: makeApp,
+			requests: [
+				{
+					request: () => new Request('http://localhost/ping'),
+					expect: { status: 200, text: 'pong' }
+				}
+			]
+		};
+
+		await runScenario(scenario, runtimeBun, expectAdapter, async (app) => {
+			const elysia = await app.build();
+			return (request) => {
+				seen.push(new URL(request.url).pathname);
+				return elysia.handle(request);
+			};
+		});
+
+		expect(seen).toEqual(['/ping']);
+	});
+
 	it('resets the container when the app factory throws', async () => {
 		const scenario: Scenario = {
 			name: 'factory throws',
