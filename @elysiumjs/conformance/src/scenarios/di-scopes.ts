@@ -23,18 +23,9 @@ import {
 	ServiceScope
 } from '@elysiumjs/core';
 
+import { waitFor } from './wait';
+
 const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 5));
-
-const WAIT_TIMEOUT_MS = 1000;
-const WAIT_STEP_MS = 1;
-
-/** Polls `done` until it holds or the timeout elapses; the caller asserts afterwards. */
-const waitFor = async (done: () => boolean): Promise<void> => {
-	const deadline = Date.now() + WAIT_TIMEOUT_MS;
-	while (!done() && Date.now() < deadline) {
-		await new Promise<void>((resolve) => setTimeout(resolve, WAIT_STEP_MS));
-	}
-};
 
 const makeScopes = async (): Promise<Application> => {
 	let factories = 0;

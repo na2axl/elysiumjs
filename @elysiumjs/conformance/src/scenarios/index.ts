@@ -22,7 +22,7 @@ import { middleware } from './middleware';
 import { problems } from './problems';
 import { routing } from './routing';
 import { security } from './security';
-import { sse } from './sse';
+import { sse, sseDisposal } from './sse';
 import { validation } from './validation';
 
 export { checkRequests, runScenario } from './run';
@@ -45,5 +45,6 @@ export const scenarios = [
 	config,
 	security,
 	lifecycle,
-	sse
+	sse,
+	sseDisposal
 ];

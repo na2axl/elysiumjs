@@ -210,7 +210,7 @@ describe('createWorker', () => {
 		await app.kernel.shutdown();
 	});
 
-	it('destroys request-scoped services through waitUntil once fetch resolves', async () => {
+	it('destroys request-scoped services through waitUntil once the body is read', async () => {
 		const destroyed: string[] = [];
 
 		@Service.register({ scope: ServiceScope.REQUEST })
@@ -240,6 +240,7 @@ describe('createWorker', () => {
 		const response = await worker.fetch(new Request('http://localhost/scratch'), {}, context);
 		expect(response.status).toBe(200);
 		expect(context.waited.length).toBeGreaterThan(0);
+		expect(await response.json()).toEqual({ ok: true });
 		await Promise.all(context.waited);
 		expect(destroyed).toEqual(['Scratch']);
 		await app.kernel.shutdown();
