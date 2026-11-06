@@ -34,6 +34,7 @@ import { runInterceptors } from './interceptor';
 import { Metadata } from './metadata';
 import { applyMiddlewares, executeMiddlewareChain, makeMiddlewares } from './middleware';
 import { ModuleContext } from './module-context';
+import { isSerializable, readFields, Resource } from './resource';
 import { Runtime } from './runtime';
 import { Service } from './service';
 import { nextTick, Symbols } from './utils';
@@ -173,6 +174,9 @@ type HttpRequestHandlerMetadata = {
 	 */
 	transactional?: boolean;
 
+	/** Whether the handler result is serialized through the response schema. */
+	serialize?: boolean;
+
 	/** The exception filters of the route. */
 	filters?: FilterClass[];
 
@@ -193,6 +197,7 @@ type HttpRequestHandlerRegistrationProps = Pick<
 	| 'operationId'
 	| 'description'
 	| 'transactional'
+	| 'serialize'
 	| 'filters'
 	| 'interceptors'
 > & {
@@ -409,6 +414,7 @@ const registerHttpRequestHandler = (props: HttpRequestHandlerRegistrationProps) 
 		operationId,
 		description,
 		transactional,
+		serialize,
 		filters,
 		interceptors
 	} = props;
@@ -432,6 +438,7 @@ const registerHttpRequestHandler = (props: HttpRequestHandlerRegistrationProps) 
 		description,
 		services,
 		transactional,
+		serialize,
 		filters,
 		interceptors
 	});
@@ -533,6 +540,13 @@ export type RequestHandlerDecoratorProps = {
 	 * for this request handler.
 	 */
 	transactional?: boolean;
+
+	/**
+	 * Whether to serialize the handler result through the `response` schema: undeclared and hidden
+	 * fields are stripped, dates become ISO strings, and `?fields=` selects fields. Defaults to
+	 * `true` when the route has a `response` schema.
+	 */
+	serialize?: boolean;
 
 	/** Exception filters for this route. They run before those of the controller. */
 	filters?: FilterClass[];
@@ -847,11 +861,30 @@ export namespace Http {
 								);
 						};
 
+						const successSchema =
+							route.response && route.serialize !== false
+								? Resource.successSchema(route.response)
+								: undefined;
+
+						/**
+						 * Serializes a handler result through the route's response schema. A sparse
+						 * fieldset leaves out required fields, so its body is sent as a response of its own,
+						 * past the validation of the full schema.
+						 */
+						const toBody = (c: Context, result: unknown): unknown => {
+							if (!successSchema || !isSerializable(result)) return result;
+							const fields = readFields(c.query as Record<string, unknown>);
+							const body = Resource.serialize(successSchema, result, { fields });
+							if (!fields) return body;
+							const status = typeof c.set.status === 'number' ? c.set.status : 200;
+							return Response.json(body, { status });
+						};
+
 						if (isValidator) {
 							return async function (c: Context) {
 								if (await ModuleContext.run(node, () => route.body!.validator!.validate(c))) {
 									const handler = initInterceptedHandler(c);
-									return await handler(...(await getParameters(c)));
+									return toBody(c, await handler(...(await getParameters(c))));
 								}
 
 								throw c.status(400, 'Invalid request body');
@@ -860,7 +893,7 @@ export namespace Http {
 
 						return async function (c: Context) {
 							const handler = initInterceptedHandler(c);
-							return await handler(...(await getParameters(c)));
+							return toBody(c, await handler(...(await getParameters(c))));
 						};
 					};
 
@@ -932,7 +965,7 @@ export namespace Http {
 								operationId: route.operationId
 							},
 							body: isValidator ? route.body?.validator?.schema : route.body?.schema,
-							response: route.response,
+							response: route.response ? Resource.projectResponse(route.response) : undefined,
 							params: isEmpty(params) ? undefined : t.Object(params)
 						},
 						handler
