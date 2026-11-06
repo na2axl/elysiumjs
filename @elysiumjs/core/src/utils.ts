@@ -60,6 +60,7 @@ export namespace Symbols {
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export function currentEnvironment(): string {
+	// portability-allow: fallback before a runtime is set
 	return Runtime.find()?.env().NODE_ENV ?? globalThis.process?.env?.NODE_ENV ?? 'development';
 }
 

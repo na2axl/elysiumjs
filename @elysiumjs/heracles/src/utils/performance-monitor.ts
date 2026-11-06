@@ -344,7 +344,7 @@ export class PerformanceMonitor extends InteractsWithConsole {
 		this.workerConcurrency.set(concurrency);
 
 		// Update memory usage
-		const memUsage = globalThis.process?.memoryUsage?.() ?? { heapUsed: 0 };
+		const memUsage = globalThis.process?.memoryUsage?.() ?? { heapUsed: 0 }; // portability-allow: optional metric, zero where the host has no process
 		this.workerMemoryUsage.set(memUsage.heapUsed / 1024 / 1024); // MB
 	}
 

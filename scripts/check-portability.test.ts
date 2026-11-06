@@ -43,7 +43,7 @@ describe('checkPortability', () => {
 			'a.ts': [
 				'Bun.sleep(1);',
 				'// Bun.sleep',
-				' * process.exit()',
+				'/** process.exit() */',
 				"import { x } from 'node:fs';",
 				"import { y } from 'node:events';"
 			].join('\n')
@@ -77,5 +77,39 @@ describe('checkPortability', () => {
 		});
 		const lines = checkPortability([root], {}).map((f) => f.line);
 		expect(lines).toEqual([1, 2, 3, 4, 5, 8, 10]);
+	});
+
+	test('catches optional chaining, bun: builtins, aliases and code after block comments', async () => {
+		const root = await fixture({
+			'c.ts': [
+				'process?.exit(1);',
+				'Bun?.sleep(1);',
+				"import { Database } from 'bun:sqlite';",
+				'/* note */ Bun.sleep(1);',
+				'const p = globalThis.process;',
+				"const q = globalThis['Bun'];",
+				'const r = process;',
+				'/*',
+				' * Bun.sleep(1) inside a block comment',
+				' */',
+				"const s = 'ok';"
+			].join('\n')
+		});
+		const lines = checkPortability([root], {}).map((f) => f.line);
+		expect([...new Set(lines)]).toEqual([1, 2, 3, 4, 5, 6, 7]);
+	});
+
+	test('exempts a line marked with portability-allow, at its end or on the line above', async () => {
+		const root = await fixture({
+			'd.ts': [
+				'const a = globalThis.process?.env; // portability-allow: fallback',
+				'// portability-allow: fallback',
+				'const b = globalThis.process?.env;',
+				'const c = globalThis.process?.env;',
+				'const d = globalThis.process?.env; // portability-allow:'
+			].join('\n')
+		});
+		const lines = checkPortability([root], {}).map((f) => f.line);
+		expect([...new Set(lines)]).toEqual([4, 5]);
 	});
 });

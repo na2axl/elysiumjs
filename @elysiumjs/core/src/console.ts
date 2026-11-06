@@ -40,6 +40,7 @@ export enum ConsoleFormat {
  * Loads `node:readline` when a prompt needs it, so that runtimes without the module
  * (Cloudflare Workers) can still load the console.
  */
+// portability-allow: only reached after Runtime.terminal() returned a terminal, never on Workers
 const loadReadline = () => import('node:readline');
 
 /**
