@@ -329,6 +329,22 @@ describe('createWorker', () => {
 		await app.kernel.shutdown();
 	});
 
+	it('leaves a message settled by its handler as the handler settled it', async () => {
+		@Service.register()
+		class Jobs {
+			@Workers.queue('jobs', { each: true })
+			public run(message: { body: number; retry(options?: { delaySeconds?: number }): void }) {
+				if (message.body === 1) message.retry({ delaySeconds: 30 });
+			}
+		}
+		const { app, worker } = await appWith([Jobs]);
+		const { value, acked, retried } = trackedBatch('jobs', 2);
+		await worker.queue(value, {}, ctx());
+		expect(acked).toEqual(['2']);
+		expect(retried).toEqual(['1']);
+		await app.kernel.shutdown();
+	});
+
 	it('retries every message when a batch handler throws', async () => {
 		@Service.register()
 		class Jobs {
