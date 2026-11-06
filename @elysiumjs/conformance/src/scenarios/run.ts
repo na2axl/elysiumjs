@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { Application } from '@elysiumjs/core';
 import type { AssertAdapter, Scenario } from './types';
 
-import { Runtime, Service } from '@elysiumjs/core';
+import { resetContainer, Runtime } from '@elysiumjs/core';
 
 const EVENT_COUNT = 2;
 
@@ -32,9 +33,39 @@ const readEvents = async (response: Response): Promise<string> => {
 	return text.split('\n\n').slice(0, EVENT_COUNT).join('\n\n') + '\n\n';
 };
 
+/** Asserts the status, headers and body of one response. */
+const checkResponse = async (
+	response: Response,
+	expect: Scenario['requests'][number]['expect'],
+	label: string,
+	assert: AssertAdapter
+): Promise<void> => {
+	assert.equal(response.status, expect.status, `${label}: status`);
+	for (const [name, value] of Object.entries(expect.headers ?? {})) {
+		const actual = response.headers.get(name) ?? '';
+		assert.equal(actual.startsWith(value), true, `${label}: header ${name} (${actual})`);
+	}
+	const streamed = (response.headers.get('content-type') ?? '').startsWith('text/event-stream');
+	if (streamed) {
+		const text = await readEvents(response);
+		if (expect.text !== undefined) assert.equal(text, expect.text, `${label}: text`);
+	} else if (expect.json !== undefined) {
+		assert.equal(
+			JSON.stringify(await response.json()),
+			JSON.stringify(expect.json),
+			`${label}: json`
+		);
+	} else if (expect.text !== undefined) {
+		assert.equal(await response.text(), expect.text, `${label}: text`);
+	} else {
+		await response.arrayBuffer();
+	}
+};
+
 /**
  * Runs a scenario against a runtime: builds a fresh app, drives its requests through
- * `elysia.handle`, runs the `after` hook, then shuts the app down.
+ * `elysia.handle`, runs the `after` hook, then shuts the app down and resets the container,
+ * also when the app factory or a request fails.
  * @author Axel Nana <axel.nana@workbud.com>
  * @param s The scenario.
  * @param runtime The runtime to run it on.
@@ -46,37 +77,25 @@ export const runScenario = async (
 	assert: AssertAdapter
 ): Promise<void> => {
 	Runtime.use(runtime);
-	const app = await s.app();
+	let app: Application | undefined;
 	try {
+		app = await s.app();
 		const elysia = await app.build();
 		for (const [index, { request, expect }] of s.requests.entries()) {
-			const label = `${s.name} #${index + 1}`;
-			const response = await elysia.handle(request());
-			assert.equal(response.status, expect.status, `${label}: status`);
-			for (const [name, value] of Object.entries(expect.headers ?? {})) {
-				const actual = response.headers.get(name) ?? '';
-				assert.equal(actual.startsWith(value), true, `${label}: header ${name} (${actual})`);
-			}
-			const streamed = (response.headers.get('content-type') ?? '').startsWith('text/event-stream');
-			if (streamed) {
-				const text = await readEvents(response);
-				if (expect.text !== undefined) assert.equal(text, expect.text, `${label}: text`);
-			} else if (expect.json !== undefined) {
-				assert.equal(
-					JSON.stringify(await response.json()),
-					JSON.stringify(expect.json),
-					`${label}: json`
-				);
-			} else if (expect.text !== undefined) {
-				assert.equal(await response.text(), expect.text, `${label}: text`);
-			} else {
-				await response.arrayBuffer();
-			}
+			await checkResponse(
+				await elysia.handle(request()),
+				expect,
+				`${s.name} #${index + 1}`,
+				assert
+			);
 		}
-		await s.after?.(app);
+		await s.after?.(app, assert);
 	} finally {
-		await app.kernel.shutdown();
-		// The container is global to the process: leave it empty for the next scenario.
-		Service.clear();
+		try {
+			await app?.kernel.shutdown();
+		} finally {
+			// The container is global to the process: leave it empty for the next scenario.
+			resetContainer();
+		}
 	}
 };

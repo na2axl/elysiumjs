@@ -31,8 +31,8 @@ export type Scenario = {
 			headers?: Record<string, string>;
 		};
 	}[];
-	/** Extra assertions run after the requests, which throw on failure (e.g. destroy logs). */
-	after?: (app: Application) => Promise<void> | void;
+	/** Extra assertions run after the requests (e.g. destroy logs), through the lane's adapter. */
+	after?: (app: Application, assert: AssertAdapter) => Promise<void> | void;
 };
 
 /** The assertion adapter a lane injects, so scenarios never import a test framework. */

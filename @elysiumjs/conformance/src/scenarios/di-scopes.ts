@@ -25,6 +25,17 @@ import {
 
 const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 5));
 
+const WAIT_TIMEOUT_MS = 1000;
+const WAIT_STEP_MS = 1;
+
+/** Polls `done` until it holds or the timeout elapses; the caller asserts afterwards. */
+const waitFor = async (done: () => boolean): Promise<void> => {
+	const deadline = Date.now() + WAIT_TIMEOUT_MS;
+	while (!done() && Date.now() < deadline) {
+		await new Promise<void>((resolve) => setTimeout(resolve, WAIT_STEP_MS));
+	}
+};
+
 const makeScopes = async (): Promise<Application> => {
 	let factories = 0;
 
@@ -158,10 +169,9 @@ export const diDisposal: Scenario = {
 		{ request: get('/dispose/ok'), expect: { status: 200, json: { ok: true } } },
 		{ request: get('/dispose/fail'), expect: { status: 500 } }
 	],
-	after: async () => {
-		await tick();
-		const actual = destroyed.join(',');
-		const expected = 'Outer,Inner,Outer,Inner';
-		if (actual !== expected) throw new Error(`destroy order: expected ${expected}, got ${actual}`);
+	after: async (_app, assert) => {
+		const expected = ['Outer', 'Inner', 'Outer', 'Inner'];
+		await waitFor(() => destroyed.length >= expected.length);
+		assert.equal(destroyed.join(','), expected.join(','), 'destroy order');
 	}
 };
