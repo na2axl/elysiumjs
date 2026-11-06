@@ -106,7 +106,8 @@ The routes answer problems:
 - 410 when the flow expired, or is finished;
 - 409 for a step the flow does not accept now (with `nextSteps`, `backSteps` and the last `answer`), and for a step submitted while another submission of the flow runs (`flow-step-in-progress`);
 - 403 when the caller does not own the flow, and 401 for a user flow without a user;
-- 422 for a body that does not match the step's schema, or a request without `x-flow-key` or `x-flow-step`.
+- 422 for a body that does not match the step's schema.
+- 400 for a request without `x-flow-key` or `x-flow-step`.
 
 ## Stores
 

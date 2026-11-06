@@ -293,12 +293,13 @@ describe('flows over HTTP', () => {
 		expect((await invalid.json()).errors[0].pointer).toBe('/body/email');
 
 		const bare = await http.post('/flows/sign-up/email').json({ email: 'ada@example.com' });
-		expect(bare.status).toBe(422);
+		expect(bare.status).toBe(400);
+		expect((await bare.clone().json()).code).toBe('BAD_REQUEST');
 		expect((await bare.json()).errors.map((e: { pointer: string }) => e.pointer)).toEqual([
 			`/headers/${FLOW_KEY_HEADER}`,
 			`/headers/${FLOW_STEP_HEADER}`
 		]);
-		expect((await http.get('/flows/sign-up')).status).toBe(422);
+		expect((await http.get('/flows/sign-up')).status).toBe(400);
 	});
 
 	it('keeps the state of a refused step, and ends the flow on the last attempt', async () => {
