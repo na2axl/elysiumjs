@@ -61,6 +61,11 @@ export interface WorkersKVNamespace {
 	}>;
 }
 
+/** A rate limiting binding. */
+export interface WorkersRateLimitBinding {
+	limit(options: { key: string }): Promise<{ success: boolean }>;
+}
+
 /** The handlers a Worker module exports. */
 export interface WorkersHandler<Env = Record<string, unknown>> {
 	fetch(request: Request, env: Env, ctx: WorkersExecutionContext): Promise<Response>;

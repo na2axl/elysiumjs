@@ -33,6 +33,7 @@ export {
 	type DrizzleModelOptions
 } from './model';
 export { DrizzleModule, type DrizzleModuleConfig } from './drizzle.module';
+export { compileAfter, compileFilter, compileQuery } from './query';
 export { DrizzleRepository } from './repository';
 export {
 	DrizzleSchemaTenancy,

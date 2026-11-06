@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { IdType, ModelClass } from '@elysiumjs/mnemosyne';
+import type { CursorPage, IdType, ModelClass, ParsedQuery } from '@elysiumjs/mnemosyne';
 import type { PgColumn, PgTable, PgTableWithColumns } from 'drizzle-orm/pg-core';
 import type { DrizzleConnection } from './database';
 
@@ -20,11 +20,13 @@ import {
 	AbstractRepository,
 	getCurrentTenant,
 	getTenancyConfig,
-	getTenancyStrategy
+	getTenancyStrategy,
+	Query
 } from '@elysiumjs/mnemosyne';
 import { eq } from 'drizzle-orm';
 
 import { Database } from './database';
+import { compileQuery } from './query';
 import { DrizzleRLSTenancy } from './tenancy';
 
 // ============================================================================
@@ -140,6 +142,35 @@ export const DrizzleRepository = <
 
 		public async deleteAll(): Promise<TSelect[]> {
 			return this.withConnection((db) => db.delete(table()).returning());
+		}
+
+		/**
+		 * Lists a page of rows matching a parsed query (see `Query.parse`): its filters, its sort and
+		 * cursor pagination. One row more than the limit is fetched to tell whether a next page
+		 * exists.
+		 * @param query The parsed query.
+		 * @returns The rows of the page and the cursor of the next one.
+		 */
+		public async list(query: ParsedQuery): Promise<CursorPage<TSelect>> {
+			const { where, orderBy } = compileQuery(table(), query);
+			const rows = await this.withConnection((db) =>
+				db
+					.select()
+					.from(table())
+					.where(where)
+					.orderBy(...orderBy)
+					.limit(query.limit + 1)
+			);
+			return Query.page(query, rows as Record<string, unknown>[]) as CursorPage<TSelect>;
+		}
+
+		/**
+		 * Counts the rows matching the filters of a parsed query, ignoring its cursor.
+		 * @param query The parsed query.
+		 */
+		public async count(query?: ParsedQuery): Promise<number> {
+			const where = query ? compileQuery(table(), { ...query, after: undefined }).where : undefined;
+			return this.withConnection((db) => db.$count(table(), where));
 		}
 
 		public async exists(id: IdType): Promise<boolean> {

@@ -20,6 +20,8 @@ import { interceptors } from './interceptors';
 import { lifecycle } from './lifecycle';
 import { middleware } from './middleware';
 import { problems } from './problems';
+import { rateLimits } from './rate-limits';
+import { resources } from './resources';
 import { routing } from './routing';
 import { security } from './security';
 import { sse, sseDisposal } from './sse';
@@ -40,6 +42,8 @@ export const scenarios = [
 	middleware,
 	errors,
 	problems,
+	resources,
+	rateLimits,
 	filters,
 	interceptors,
 	config,

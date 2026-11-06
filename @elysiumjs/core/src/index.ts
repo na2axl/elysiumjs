@@ -13,7 +13,7 @@
 // limitations under the License.
 
 export { type Elysia, t } from 'elysia';
-export { type Static, type TSchema } from 'typebox';
+export { type Static, type TObject, type TSchema } from 'typebox';
 export { type AppContext, type ElysiumPlugin, type ServerError, Application } from './app';
 export {
 	type CommandArgumentProps,
@@ -138,6 +138,17 @@ export {
 	validationErrors
 } from './problem';
 export { type ExceptionFilter, type FilterClass, type FilterContext, Catch } from './filter';
+export { type ResponseSchemas, Resource } from './resource';
+export {
+	type AppRateLimitOptions,
+	type RateLimitHit,
+	type RateLimitKeyContext,
+	type RateLimitOptions,
+	type RateLimitStore,
+	MemoryRateLimitStore,
+	RateLimit,
+	TooManyRequestsError
+} from './rate-limit';
 export {
 	type Interceptor,
 	type InterceptorClass,

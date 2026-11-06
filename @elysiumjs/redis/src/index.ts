@@ -14,3 +14,4 @@
 
 export { type RedisClientFactory, type RedisConnection, bunRedis } from './connection';
 export { type RedisConnectionProps, type RedisModuleConfig, Redis, RedisModule } from './redis';
+export { RedisRateLimitStore } from './rate-limit';

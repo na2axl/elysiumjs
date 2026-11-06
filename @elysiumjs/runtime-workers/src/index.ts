@@ -16,6 +16,7 @@ export { BindingNotFoundError, NoWorkersHandlerError, OutsideInvocationError } f
 export { type Invocation, runInvocation } from './invocation';
 export { KeyvWorkersKV, type KeyvWorkersKVOptions } from './kv-store';
 export { type WorkersModuleConfig, WorkersModule } from './module';
+export { WorkersRateLimitStore, type WorkersRateLimitStoreOptions } from './rate-limit';
 export { createRuntime, runtime, type WorkersRuntimeOptions } from './runtime';
 export * from './types';
 export { createWorker } from './worker';

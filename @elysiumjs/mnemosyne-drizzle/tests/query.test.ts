@@ -1,0 +1,106 @@
+// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+import { Service } from '@elysiumjs/core';
+import { Query } from '@elysiumjs/mnemosyne';
+import { afterEach, describe, expect, it } from 'bun:test';
+import * as d from 'drizzle-orm/pg-core';
+
+import { DrizzleModel } from '../src/model';
+import { DrizzleRepository } from '../src/repository';
+import { pgTable } from '../src/table';
+import { fakeConnection } from './fake-sql';
+
+const posts = pgTable('query_posts', {
+	id: d.integer().primaryKey(),
+	title: d.text().notNull(),
+	status: d.text().notNull(),
+	createdAt: d.timestamp('created_at', { withTimezone: true }).notNull()
+});
+
+class Post extends DrizzleModel(posts) {}
+class PostRepository extends DrizzleRepository(Post) {}
+
+const spec = Query.define(Post, {
+	filters: { status: ['eq', 'in'], title: ['contains'], createdAt: ['gte'] },
+	sort: ['createdAt', 'title'],
+	defaultSort: '-createdAt',
+	limit: { default: 2 }
+});
+
+const rows = [
+	{ id: 3, title: 'c', status: 'draft', createdAt: '2026-03-01 00:00:00+00' },
+	{ id: 2, title: 'b', status: 'draft', createdAt: '2026-02-01 00:00:00+00' },
+	{ id: 1, title: 'a', status: 'draft', createdAt: '2026-01-01 00:00:00+00' }
+];
+
+describe('DrizzleRepository.list()', () => {
+	let fake: ReturnType<typeof fakeConnection>;
+
+	afterEach(() => Service.remove('db.connection.default'));
+
+	const use = (respond: (query: string) => Record<string, unknown>[]) => {
+		fake = fakeConnection(respond);
+		Service.instance('db.connection.default', fake.connection);
+	};
+
+	it('filters, sorts with the key as tiebreaker, and fetches one row more than the limit', async () => {
+		use(() => rows);
+		const query = Query.parse(spec, {
+			'filter[status][in]': 'draft,published',
+			'filter[title][contains]': '50%_off'
+		});
+
+		const page = await new PostRepository().list(query);
+
+		expect(fake.log[0]).toEqual({
+			client: 'root',
+			query:
+				'select "id", "title", "status", "created_at" from "query_posts" where (("query_posts"."status" in ($1, $2)) and ("query_posts"."title" ilike $3)) order by "query_posts"."created_at" desc, "query_posts"."id" desc limit $4',
+			params: ['draft', 'published', '%50\\%\\_off%', 3]
+		});
+		expect(page.data.map((row) => row.id)).toEqual([3, 2]);
+		expect(page.nextCursor).not.toBeNull();
+	});
+
+	it('continues after the cursor with a keyset condition', async () => {
+		use(() => rows.slice(2));
+		const first = Query.parse(spec);
+		const cursor = Query.cursorAfter(first, { id: 2, createdAt: new Date('2026-02-01T00:00:00Z') });
+
+		const page = await new PostRepository().list(Query.parse(spec, { cursor }));
+
+		expect(fake.log[0]!.query).toBe(
+			'select "id", "title", "status", "created_at" from "query_posts" where (("query_posts"."created_at" < $1) or ((("query_posts"."created_at" = $2) and ("query_posts"."id" < $3)))) order by "query_posts"."created_at" desc, "query_posts"."id" desc limit $4'
+		);
+		expect(fake.log[0]!.params).toEqual([
+			'2026-02-01T00:00:00.000Z',
+			'2026-02-01T00:00:00.000Z',
+			2,
+			3
+		]);
+		expect(page.nextCursor).toBeNull();
+	});
+
+	it('counts the rows matching the filters', async () => {
+		use(() => [{ count: 7 }]);
+
+		expect(await new PostRepository().count(Query.parse(spec, { 'filter[status]': 'draft' }))).toBe(
+			7
+		);
+		expect(fake.log[0]!.query).toBe(
+			'select count(*) from "query_posts" where "query_posts"."status" = $1'
+		);
+	});
+});

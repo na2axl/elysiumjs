@@ -21,6 +21,7 @@ import type { InterceptorClass, InterceptorContext, InterceptorLevel } from './i
 import type { Middleware } from './middleware';
 import type { Module } from './module';
 import type { ModuleNode } from './module-graph';
+import type { AppRateLimitOptions, RateLimitOptions } from './rate-limit';
 import type { ServiceToken } from './token';
 
 import { Elysia, sse as esse, t } from 'elysia';
@@ -34,6 +35,8 @@ import { runInterceptors } from './interceptor';
 import { Metadata } from './metadata';
 import { applyMiddlewares, executeMiddlewareChain, makeMiddlewares } from './middleware';
 import { ModuleContext } from './module-context';
+import { enforceRateLimit, rateLimitOf } from './rate-limit';
+import { isSerializable, readFields, Resource } from './resource';
 import { Runtime } from './runtime';
 import { Service } from './service';
 import { nextTick, Symbols } from './utils';
@@ -173,6 +176,9 @@ type HttpRequestHandlerMetadata = {
 	 */
 	transactional?: boolean;
 
+	/** Whether the handler result is serialized through the response schema. */
+	serialize?: boolean;
+
 	/** The exception filters of the route. */
 	filters?: FilterClass[];
 
@@ -193,6 +199,7 @@ type HttpRequestHandlerRegistrationProps = Pick<
 	| 'operationId'
 	| 'description'
 	| 'transactional'
+	| 'serialize'
 	| 'filters'
 	| 'interceptors'
 > & {
@@ -409,6 +416,7 @@ const registerHttpRequestHandler = (props: HttpRequestHandlerRegistrationProps) 
 		operationId,
 		description,
 		transactional,
+		serialize,
 		filters,
 		interceptors
 	} = props;
@@ -432,6 +440,7 @@ const registerHttpRequestHandler = (props: HttpRequestHandlerRegistrationProps) 
 		description,
 		services,
 		transactional,
+		serialize,
 		filters,
 		interceptors
 	});
@@ -534,6 +543,13 @@ export type RequestHandlerDecoratorProps = {
 	 */
 	transactional?: boolean;
 
+	/**
+	 * Whether to serialize the handler result through the `response` schema: undeclared and hidden
+	 * fields are stripped, dates become ISO strings, and `?fields=` selects fields. Defaults to
+	 * `true` when the route has a `response` schema.
+	 */
+	serialize?: boolean;
+
 	/** Exception filters for this route. They run before those of the controller. */
 	filters?: FilterClass[];
 
@@ -600,6 +616,27 @@ const appInterceptorLevel = (): InterceptorLevel => {
 	}
 	return level;
 };
+
+/** The rate limit options of the running application. */
+const appRateLimit = (): AppRateLimitOptions | undefined => {
+	const app = Service.get<object>('elysium.app');
+	return app ? Metadata.get(Symbols.app, app.constructor)?.rateLimit : undefined;
+};
+
+/** The limit of the application for routes that set none, when it gives a window and a max. */
+const appDefaultRateLimit = (): RateLimitOptions | undefined => {
+	const options = appRateLimit();
+	return options?.window !== undefined && options.max !== undefined
+		? (options as RateLimitOptions)
+		: undefined;
+};
+
+/** Joins a controller path and a route path into the route's full path. */
+const joinPath = (base: string, path: string): string =>
+	`/${[base, path]
+		.map((part) => part.replace(/^\/+|\/+$/g, ''))
+		.filter(Boolean)
+		.join('/')}`;
 
 /** The module level of exception filters, shared by every controller of a module. */
 const moduleFilterLevels = new WeakMap<ModuleNode, FilterLevel>();
@@ -847,11 +884,30 @@ export namespace Http {
 								);
 						};
 
+						const successSchema =
+							route.response && route.serialize !== false
+								? Resource.successSchema(route.response)
+								: undefined;
+
+						/**
+						 * Serializes a handler result through the route's response schema. A sparse
+						 * fieldset leaves out required fields, so its body is sent as a response of its own,
+						 * past the validation of the full schema.
+						 */
+						const toBody = (c: Context, result: unknown): unknown => {
+							if (!successSchema || !isSerializable(result)) return result;
+							const fields = readFields(c.query as Record<string, unknown>);
+							const body = Resource.serialize(successSchema, result, { fields });
+							if (!fields) return body;
+							const status = typeof c.set.status === 'number' ? c.set.status : 200;
+							return Response.json(body, { status });
+						};
+
 						if (isValidator) {
 							return async function (c: Context) {
 								if (await ModuleContext.run(node, () => route.body!.validator!.validate(c))) {
 									const handler = initInterceptedHandler(c);
-									return await handler(...(await getParameters(c)));
+									return toBody(c, await handler(...(await getParameters(c))));
 								}
 
 								throw c.status(400, 'Invalid request body');
@@ -860,7 +916,7 @@ export namespace Http {
 
 						return async function (c: Context) {
 							const handler = initInterceptedHandler(c);
-							return await handler(...(await getParameters(c)));
+							return toBody(c, await handler(...(await getParameters(c))));
 						};
 					};
 
@@ -871,6 +927,12 @@ export namespace Http {
 					);
 
 					const mi = makeMiddlewares(route.middlewares, node);
+
+					const routeName = `${route.method.toUpperCase()} ${joinPath(props.path, route.path)}`;
+					/** The limit of the route, read on the first request: the app is created after it. */
+					let limit: RateLimitOptions | false | undefined;
+					const routeRateLimit = (): RateLimitOptions | false =>
+						(limit ??= rateLimitOf(target, route.name) ?? appDefaultRateLimit() ?? false);
 
 					const handler = getHandler();
 					const filterLevels = [
@@ -908,7 +970,17 @@ export namespace Http {
 									scopeKey(c)
 								);
 							},
-							beforeHandle(c: Context) {
+							async beforeHandle(c: Context) {
+								const limit = routeRateLimit();
+								if (limit) {
+									await enforceRateLimit(limit, appRateLimit()?.store, {
+										request: c.request,
+										ip: (c as unknown as { ip?: string }).ip,
+										route: routeName,
+										context: c as unknown as Record<string, unknown>,
+										set: c.set as { headers: Record<string, string | number> }
+									});
+								}
 								return Container.runInRequestScope(
 									() => executeMiddlewareChain(mi, c, 'onBeforeHandle', node),
 									scopeKey(c)
@@ -932,7 +1004,7 @@ export namespace Http {
 								operationId: route.operationId
 							},
 							body: isValidator ? route.body?.validator?.schema : route.body?.schema,
-							response: route.response,
+							response: route.response ? Resource.projectResponse(route.response) : undefined,
 							params: isEmpty(params) ? undefined : t.Object(params)
 						},
 						handler

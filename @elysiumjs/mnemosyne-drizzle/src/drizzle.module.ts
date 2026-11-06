@@ -21,7 +21,8 @@ import {
 	DATABASE_TRANSACTION_SERVICE,
 	MnemosyneModule,
 	TENANCY_CONFIG_SERVICE,
-	TENANCY_STRATEGY_SERVICE
+	TENANCY_STRATEGY_SERVICE,
+	withUnitOfWork
 } from '@elysiumjs/mnemosyne';
 
 import { MigrationGenerateCommand } from './commands/migration_generate.command';
@@ -75,10 +76,10 @@ export type DrizzleModuleConfig = {
 			{
 				name: DATABASE_TRANSACTION_SERVICE,
 				global: true,
-				factory:
-					() =>
-					<T>(callback: () => Promise<T>, connection?: string): Promise<T> =>
+				factory: () =>
+					withUnitOfWork(<T>(callback: () => Promise<T>, connection?: string): Promise<T> =>
 						Database.transaction(() => callback(), connection)
+					)
 			},
 			{ name: TENANCY_CONFIG_SERVICE, global: true, factory: () => tenancy },
 			{

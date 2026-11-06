@@ -28,6 +28,19 @@ export type {
 export * from './database';
 export * from './model';
 export * from './repository';
+export { ModelResource, type ModelResourceOptions } from './resource';
+export { type TransactionRunner, Transactional, UnitOfWork, withUnitOfWork } from './unit-of-work';
+export {
+	type CursorPage,
+	type FilterOperator,
+	type ParsedFilter,
+	type ParsedQuery,
+	type ParsedSort,
+	type QueryFieldType,
+	type QueryFilterSpec,
+	type QuerySpec,
+	Query
+} from './query';
 
 export * from './tenancy';
 export type { TenancyConfig, TenancyMode, ModelTenancyConfig } from './tenancy';
