@@ -1,5 +1,41 @@
 # create-elysium
 
+## 0.3.0
+
+### Minor Changes
+
+- [#9](https://github.com/na2axl/elysiumjs/pull/9) [`8a30cc3`](https://github.com/na2axl/elysiumjs/commit/8a30cc35a82438fe9da08fcea91ef9b46f3430f1) Thanks [@na2axl](https://github.com/na2axl)! - Styx is a global command: install it with `bun add -g @elysiumjs/styx`, then run `styx create my-app` to start a project (template, runtime, modules, plugins and features, from prompts or options). Inside a project, the global `styx` hands every command to the project's own Styx. The code generators (`make:*`, `module:*`) run without starting the app, and new projects install Styx as a dev dependency.
+
+  When a project installs `@elysiumjs/hephaestus` as a dev dependency, Styx provides its commands. Standalone `styx` executables are built with Hephaestus (`bun run build:bin`), with the stubs and templates embedded. The Hephaestus asset embedder includes dotfiles.
+
+  `create-elysium` runs `styx create`; the project templates live in `@elysiumjs/styx`.
+
+### Patch Changes
+
+- [#7](https://github.com/na2axl/elysiumjs/pull/7) [`e9c3d98`](https://github.com/na2axl/elysiumjs/commit/e9c3d98dd2714b69100215f7c8a80046da463148) Thanks [@na2axl](https://github.com/na2axl)! - Elysium runs on Elysia 2 (`elysia@^2.0.0-rc.1`), with TypeBox 1 (`typebox`), `@elysia/openapi` and `@elysia/opentelemetry`.
+
+  Breaking:
+
+  - `TSchema` and `Static` are re-exported from `typebox` instead of `@sinclair/typebox`; `Value` comes from `typebox/value` and `Value.Errors()` returns an array.
+  - `Application.onError()` receives a `ServerError` (exported from core). Elysia now names its errors in kebab case; the default error response keeps the upper snake case names (`VALIDATION`, `NOT_FOUND`, `UNKNOWN` for other errors).
+  - `AppHttpContext` is a plain interface with `decorator`, `store` and `derive` records (Elysia 2 renamed `resolve` to `derive`).
+  - Websocket controllers install Elysia's `websocket()` capability themselves.
+
+  A module or controller `onRequest` middleware that answers now stops the request: Elysia 2 ignores values returned from a transform hook, so the response is thrown as a status and sent as is, without going through `onError`.
+
+  `mnemosyne` builds date columns with `t.Codec` (TypeBox 1 dropped `Transform`). `argus` traces every route of the app it is installed on and ends each span once, keeping the error status when the request failed.
+
+- [#5](https://github.com/na2axl/elysiumjs/pull/5) [`557a3ca`](https://github.com/na2axl/elysiumjs/commit/557a3cab7af8053a8bab9944e492e5022d91aa82) Thanks [@na2axl](https://github.com/na2axl)! - Core runs outside Bun. Environment variables, timers, the HTTP server, process exit and shutdown signals now come from a `Runtime` set with the new `runtime` option of `@Application.register()` or with `Runtime.use()`. Runtimes ship as packages, each exporting `runtime`: `@elysiumjs/runtime-bun`, `@elysiumjs/runtime-node` and `@elysiumjs/runtime-workers` (which also exports `createRuntime({ env })`).
+
+  Breaking: an application needs a runtime (add `runtime` from `@elysiumjs/runtime-bun`), and `Redis` and `RedisModule` moved from core to the new `@elysiumjs/redis` package, which also accepts a `client` factory for runtimes without `Bun.RedisClient`.
+
+  Console colours are plain ANSI codes instead of `Bun.color`, `node:readline` is loaded only when a prompt runs, and core's dist is built for the `node` target so `node:` imports keep their prefix. `check:runtime` scripts in core and runtime-workers fail when their bundles touch the `Bun` global.
+
+  `create-elysium` gets a runtime step: it installs the chosen runtime package and sets it in the generated app. Bun is selectable today; Node.js and Cloudflare Workers are listed as coming later.
+
+- Updated dependencies [[`87299fd`](https://github.com/na2axl/elysiumjs/commit/87299fd9da82d1a408ced1891c0c3d42991444e5), [`bee66bd`](https://github.com/na2axl/elysiumjs/commit/bee66bdc874b8f23fea356f7d3adf7555a48ca64), [`0057b67`](https://github.com/na2axl/elysiumjs/commit/0057b67df0e3abecab8a9accff6b55a6a64c21df), [`8a30cc3`](https://github.com/na2axl/elysiumjs/commit/8a30cc35a82438fe9da08fcea91ef9b46f3430f1), [`1ea417e`](https://github.com/na2axl/elysiumjs/commit/1ea417e3583250bc2f975d795f398b7ff736115d), [`0956186`](https://github.com/na2axl/elysiumjs/commit/0956186db0ca5a83c0a6636aeb2a4c81a0033de4), [`ac96e55`](https://github.com/na2axl/elysiumjs/commit/ac96e55874b0ffe350b287c4278cd85afecb7576), [`98a16aa`](https://github.com/na2axl/elysiumjs/commit/98a16aae889d46f7a9fb5573188f4cbe3629dd3b)]:
+  - @elysiumjs/styx@0.9.0
+
 ## 0.2.2
 
 ### Patch Changes
