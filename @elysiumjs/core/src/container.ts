@@ -101,6 +101,8 @@ const globalScope = new Map<ServiceToken, ContainerEntry>();
 const moduleScopes = new Map<ModuleNode, Map<ServiceToken, ContainerEntry>>();
 const requestStorage = new AsyncLocalStorage<RequestStore>();
 const keyedRequestStores = new WeakMap<object, RequestStore>();
+/** The disposals of keyed scopes, so that a later dispose of the same key waits for them. */
+const keyedDisposals = new WeakMap<object, Promise<void>>();
 const building: ContainerEntry[] = [];
 const constructedEntries: { entry: ContainerEntry; instance: unknown }[] = [];
 
@@ -623,14 +625,19 @@ export namespace Container {
 	/**
 	 * Ends the request scope of `key`: removes its store and calls `onDestroy` on its instances,
 	 * the last created first, each in its owner's module context. Errors are logged, never thrown.
-	 * Disposing a scope twice, or one that never existed, does nothing.
+	 * Disposing a scope twice returns the first disposal, so that every caller, such as a host
+	 * that keeps the invocation alive until it ends, waits for the `onDestroy` work. Disposing a
+	 * scope that never existed does nothing.
 	 * @param key The object the scope was started with.
 	 */
-	export const disposeRequestScope = async (key: object): Promise<void> => {
+	export const disposeRequestScope = (key: object): Promise<void> => {
 		const store = keyedRequestStores.get(key);
-		if (!store) return;
+		const running = keyedDisposals.get(key);
+		if (!store) return running ?? Promise.resolve();
 		keyedRequestStores.delete(key);
-		await destroyStore(store);
+		const disposal = Promise.all([running, destroyStore(store)]).then(() => undefined);
+		keyedDisposals.set(key, disposal);
+		return disposal;
 	};
 
 	/** Whether the current code runs in a request scope. */

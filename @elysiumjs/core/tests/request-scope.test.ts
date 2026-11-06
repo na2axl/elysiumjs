@@ -202,6 +202,27 @@ describe('Request scope', () => {
 				await Container.disposeRequestScope(key);
 				expect(log).toEqual(['A', 'B']);
 			});
+
+			it('makes a second dispose of a keyed scope wait for the one in progress', async () => {
+				const destroyed: string[] = [];
+
+				@Service.register({ scope: ServiceScope.REQUEST })
+				class Slow {
+					public async onDestroy() {
+						await tick();
+						destroyed.push('Slow');
+					}
+				}
+
+				Container.register(null, Slow, undefined);
+				const key = {};
+				await Container.runInRequestScope(async () => Service.resolve(Slow), key);
+
+				void Container.disposeRequestScope(key);
+				await Container.disposeRequestScope(key);
+
+				expect(destroyed).toEqual(['Slow']);
+			});
 		});
 	});
 
