@@ -64,7 +64,13 @@ export type TestingApp = {
 	shutdown(): Promise<void>;
 };
 
-const resetContainer = () => {
+/**
+ * Empties the service container and clears its overrides, module visibility rules, module
+ * init hook and skipped-module lookup. The container is global to the process: call this
+ * between tests or scenarios that each boot their own application.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export const resetContainer = (): void => {
 	Container.reset();
 	Container.setOverrides(null);
 	Container.setVisibility(null);

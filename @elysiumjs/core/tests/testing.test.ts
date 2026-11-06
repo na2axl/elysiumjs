@@ -14,12 +14,13 @@
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
+import * as publicApi from '../src';
 import { Container } from '../src/container';
 import { ServiceNotFoundError, ServiceNotVisibleError } from '../src/errors';
 import { Event } from '../src/event';
 import { Module } from '../src/module';
 import { Service } from '../src/service';
-import { createTestingApp } from '../src/testing';
+import { createTestingApp, resetContainer } from '../src/testing';
 
 const events: string[] = [];
 
@@ -167,5 +168,29 @@ describe('@Event.on handlers and module context', () => {
 
 		expect(seen).toHaveLength(1);
 		expect(seen[0]).toBeInstanceOf(PrivateSvc);
+	});
+});
+
+describe('resetContainer', () => {
+	afterEach(() => resetContainer());
+
+	it('is part of the public API', () => {
+		expect(publicApi.resetContainer).toBe(resetContainer);
+	});
+
+	it('empties the container and clears overrides, visibility and hooks', () => {
+		Service.instance('reset.global', 1);
+		Container.setOverrides(['reset.overridden']);
+		Container.setVisibility({ visibleOwners: () => [], exportsOf: () => true });
+		Container.setModuleInitHook(() => {});
+		Container.setSkippedLookup(() => ({ module: 'Skipped', environment: 'prod' }));
+
+		resetContainer();
+
+		expect(Service.exists('reset.global')).toBe(false);
+		expect(Container.constructed()).toEqual([]);
+		// Without the override, a definition with that name is registered again.
+		Container.register(null, { name: 'reset.overridden', factory: () => 2 }, undefined);
+		expect(Service.exists('reset.overridden')).toBe(true);
 	});
 });
