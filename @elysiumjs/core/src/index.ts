@@ -52,6 +52,7 @@ export {
 	ModuleCycleError,
 	OutsideRequestScopeError,
 	ScopeMismatchError,
+	InterceptorNextCalledTwiceError,
 	ServiceNotFoundError,
 	ServiceNotReadyError,
 	ServiceNotVisibleError
@@ -135,9 +136,11 @@ export {
 	toProblem,
 	validationErrors
 } from './problem';
+export { type ExceptionFilter, type FilterClass, type FilterContext, Catch } from './filter';
 export {
-	type ExceptionFilter,
-	type FilterClass,
-	type FilterContext,
-	Catch
-} from './filter';
+	type Interceptor,
+	type InterceptorClass,
+	type InterceptorContext,
+	TimingInterceptor,
+	TransformInterceptor
+} from './interceptor';

@@ -17,7 +17,7 @@ import type { Class, MergeDeep } from 'type-fest';
 import type { Static, TSchema } from 'typebox';
 import type { AppHttpContext } from '.';
 import type { FilterClass, FilterLevel } from './filter';
-import type { InterceptorClass } from './interceptor';
+import type { InterceptorClass, InterceptorContext, InterceptorLevel } from './interceptor';
 import type { Middleware } from './middleware';
 import type { Module } from './module';
 import type { ModuleNode } from './module-graph';
@@ -30,6 +30,7 @@ import { Application } from './app';
 import { Container } from './container';
 import { Event } from './event';
 import { FILTER_LEVELS, routeFilterLevels } from './filter';
+import { runInterceptors } from './interceptor';
 import { Metadata } from './metadata';
 import { applyMiddlewares, executeMiddlewareChain, makeMiddlewares } from './middleware';
 import { ModuleContext } from './module-context';
@@ -572,6 +573,34 @@ export type HttpControllerDescription = {
 	routes: HttpRouteDescription[];
 };
 
+/** The module level of interceptors, shared by every controller of a module. */
+const moduleInterceptorLevels = new WeakMap<ModuleNode, InterceptorLevel>();
+
+const moduleInterceptorLevel = (node: ModuleNode): InterceptorLevel => {
+	let level = moduleInterceptorLevels.get(node);
+	if (!level) {
+		moduleInterceptorLevels.set(
+			node,
+			(level = { interceptors: node.props.interceptors ?? [], node })
+		);
+	}
+	return level;
+};
+
+/** The app level of interceptors, from the running application's `interceptors` option. */
+const appInterceptorLevels = new WeakMap<object, InterceptorLevel>();
+
+const appInterceptorLevel = (): InterceptorLevel => {
+	const app = Service.get<object>('elysium.app');
+	if (!app) return { interceptors: [], node: null };
+	let level = appInterceptorLevels.get(app);
+	if (!level) {
+		const interceptors = Metadata.get(Symbols.app, app.constructor)?.interceptors ?? [];
+		appInterceptorLevels.set(app, (level = { interceptors, node: null }));
+	}
+	return level;
+};
+
 /** The module level of exception filters, shared by every controller of a module. */
 const moduleFilterLevels = new WeakMap<ModuleNode, FilterLevel>();
 
@@ -630,6 +659,15 @@ export namespace Http {
 
 				const controllerFilters: FilterLevel = { filters: props.filters ?? [], node };
 				const moduleFilters = moduleFilterLevel(node);
+
+				// Read on the first request: the app is created after its controllers are decorated.
+				let outer: InterceptorLevel[] | undefined;
+				const outerInterceptors = (): InterceptorLevel[] =>
+					(outer ??= [
+						appInterceptorLevel(),
+						moduleInterceptorLevel(node),
+						{ interceptors: props.interceptors ?? [], node }
+					].filter((level) => level.interceptors.length > 0));
 
 				const getController = (() => {
 					if (props.scope === HttpControllerScope.SERVER) {
@@ -792,10 +830,27 @@ export namespace Http {
 							};
 						}
 
+						const routeInterceptors: InterceptorLevel = {
+							interceptors: route.interceptors ?? [],
+							node
+						};
+
+						/** Calls the handler through the interceptors of the app, module, controller and route. */
+						const initInterceptedHandler = (c: Context) => {
+							return (...args: unknown[]) =>
+								inRequestScope(c, () =>
+									runInterceptors(
+										[...outerInterceptors(), routeInterceptors],
+										c as unknown as InterceptorContext,
+										async () => callHandler<Promise<unknown>>(c, args)
+									)
+								);
+						};
+
 						if (isValidator) {
 							return async function (c: Context) {
 								if (await ModuleContext.run(node, () => route.body!.validator!.validate(c))) {
-									const handler = initTransactedHandler(c);
+									const handler = initInterceptedHandler(c);
 									return await handler(...(await getParameters(c)));
 								}
 
@@ -804,7 +859,7 @@ export namespace Http {
 						}
 
 						return async function (c: Context) {
-							const handler = initTransactedHandler(c);
+							const handler = initInterceptedHandler(c);
 							return await handler(...(await getParameters(c)));
 						};
 					};

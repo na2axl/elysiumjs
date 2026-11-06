@@ -15,6 +15,7 @@
 import { diDisposal, diScopes } from './di-scopes';
 import { errors } from './errors';
 import { filters } from './filters';
+import { interceptors } from './interceptors';
 import { lifecycle } from './lifecycle';
 import { middleware } from './middleware';
 import { problems } from './problems';
@@ -38,6 +39,7 @@ export const scenarios = [
 	errors,
 	problems,
 	filters,
+	interceptors,
 	lifecycle,
 	sse
 ];
