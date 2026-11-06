@@ -40,6 +40,39 @@
         "@elysiumjs/hermes",
       ],
     },
+    "@elysiumjs/ariadne": {
+      "name": "@elysiumjs/ariadne",
+      "version": "0.0.0",
+      "dependencies": {
+        "typebox": "^1.3.0",
+      },
+      "devDependencies": {
+        "@elysiumjs/core": "workspace:*",
+        "@elysiumjs/redis": "workspace:*",
+        "@elysiumjs/runtime-bun": "workspace:*",
+        "@elysiumjs/themis": "workspace:*",
+        "elysia": "^2.0.0-rc.1",
+      },
+      "peerDependencies": {
+        "@elysiumjs/core": "workspace:^",
+        "@elysiumjs/redis": "workspace:^",
+      },
+      "optionalPeers": [
+        "@elysiumjs/redis",
+      ],
+    },
+    "@elysiumjs/ariadne-workers": {
+      "name": "@elysiumjs/ariadne-workers",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@elysiumjs/ariadne": "workspace:*",
+        "@elysiumjs/core": "workspace:*",
+        "elysia": "^2.0.0-rc.1",
+      },
+      "peerDependencies": {
+        "@elysiumjs/ariadne": "workspace:^",
+      },
+    },
     "@elysiumjs/cerberus": {
       "name": "@elysiumjs/cerberus",
       "version": "0.3.2",
@@ -57,12 +90,17 @@
       "name": "@elysiumjs/conformance",
       "version": "0.0.0",
       "dependencies": {
+        "@elysiumjs/ariadne": "workspace:^",
         "@elysiumjs/core": "workspace:^",
+        "@elysiumjs/mnemosyne": "workspace:^",
+        "@elysiumjs/moirai": "workspace:^",
         "@elysiumjs/runtime-bun": "workspace:^",
+        "@elysiumjs/themis": "workspace:^",
         "elysia": "^2.0.0-rc.1",
       },
       "devDependencies": {
         "@cloudflare/vitest-plugin": "^1.6.0",
+        "@elysiumjs/ariadne-workers": "workspace:*",
         "@elysiumjs/runtime-node": "workspace:*",
         "@elysiumjs/runtime-workers": "workspace:*",
         "@swc/core": "^1.16.22",
@@ -308,9 +346,9 @@
       "name": "@elysiumjs/themis",
       "version": "0.0.0",
       "dependencies": {
-        "@simplewebauthn/server": "14.0.3",
+        "@simplewebauthn/server": "^14.0.3",
         "jose": "^6.2.15",
-        "oauth4webapi": "3.8.8",
+        "oauth4webapi": "^3.8.8",
       },
       "devDependencies": {
         "@elysiumjs/core": "workspace:*",
@@ -459,6 +497,10 @@
     "@elysia/opentelemetry": ["@elysia/opentelemetry@2.0.0-rc.0", "", { "dependencies": { "@opentelemetry/api": "^1.9.0", "@opentelemetry/instrumentation": "^0.200.0", "@opentelemetry/sdk-node": "^0.200.0" }, "peerDependencies": { "elysia": ">= 2.0.0-rc.0", "graphql": "*", "graphql-yoga": "*" }, "optionalPeers": ["graphql", "graphql-yoga"] }, "sha512-ncfF+qwi7ENf/eEYAsbyZQxH75YOunVbJQYnHGHAXzpijNVR+AGFC2Vcps3rYnRrX0EkAjPfr0Wv4G2w+p/xFQ=="],
 
     "@elysiumjs/argus": ["@elysiumjs/argus@workspace:@elysiumjs/argus"],
+
+    "@elysiumjs/ariadne": ["@elysiumjs/ariadne@workspace:@elysiumjs/ariadne"],
+
+    "@elysiumjs/ariadne-workers": ["@elysiumjs/ariadne-workers@workspace:@elysiumjs/ariadne-workers"],
 
     "@elysiumjs/cerberus": ["@elysiumjs/cerberus@workspace:@elysiumjs/cerberus"],
 
