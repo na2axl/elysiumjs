@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { EventHandler } from '@elysiumjs/core';
+import type { LifecycleHandler } from '@elysiumjs/core';
 import type { JobClass, JobOverlapBehavior } from './job';
 import type { JobStatusInfo, Transport, TransportClass, TransportEvent } from './transport';
 
-import { Event, InteractsWithConsole } from '@elysiumjs/core';
+import { InteractsWithConsole, Lifecycle } from '@elysiumjs/core';
 import { map, uid } from 'radash';
 
 import { Job, JobStatus } from './job';
@@ -260,16 +260,16 @@ export class Queue extends InteractsWithConsole {
 
 	public on<TData, TSource = any>(
 		event: TransportEvent['type'],
-		handler: EventHandler<TData, TSource> | never
+		handler: LifecycleHandler<TData, TSource> | never
 	) {
-		Event.on(`elysium:heracles:queue:${this.name}:${event}`, handler);
+		Lifecycle.on(`elysium:heracles:queue:${this.name}:${event}`, handler);
 	}
 
 	public once<TData, TSource = any>(
 		event: TransportEvent['type'],
-		handler: EventHandler<TData, TSource> | never
+		handler: LifecycleHandler<TData, TSource> | never
 	) {
-		Event.once(`elysium:heracles:queue:${this.name}:${event}`, handler);
+		Lifecycle.once(`elysium:heracles:queue:${this.name}:${event}`, handler);
 	}
 
 	private emit<TData, TSource = any>(
@@ -277,7 +277,7 @@ export class Queue extends InteractsWithConsole {
 		data: TData,
 		source: TSource | null = null
 	): void {
-		Event.emit(`elysium:heracles:queue:${this.name}:${event}`, data, source);
+		Lifecycle.emit(`elysium:heracles:queue:${this.name}:${event}`, data, source);
 	}
 
 	/**

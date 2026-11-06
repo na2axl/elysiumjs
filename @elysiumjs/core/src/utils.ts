@@ -40,7 +40,7 @@ export namespace Symbols {
 
 	export const middlewareGuards = Symbol('elysium:MiddlewareGuards');
 
-	export const eventListeners = Symbol('elysium:EventListeners');
+	export const lifecycleListeners = Symbol('elysium:LifecycleListeners');
 
 	export const serviceOptions = Symbol('elysium:ServiceOptions');
 

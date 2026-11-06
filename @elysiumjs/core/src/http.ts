@@ -29,9 +29,9 @@ import { assign, isEmpty, objectify } from 'radash';
 
 import { Application } from './app';
 import { Container } from './container';
-import { Event } from './event';
 import { FILTER_LEVELS, routeFilterLevels } from './filter';
 import { runInterceptors } from './interceptor';
+import { Lifecycle } from './lifecycle';
 import { Metadata } from './metadata';
 import { applyMiddlewares, enlist, executeMiddlewareChain, makeMiddlewares } from './middleware';
 import { ModuleContext } from './module-context';
@@ -336,7 +336,7 @@ async function* iterateInScope<T>(
 			// A running step cannot be interrupted: the generator is closed once it settles,
 			// after the scope ends. Otherwise it is closed now, inside the scope.
 			if (stepping) {
-				generator.return(undefined).catch((error) => Event.emit('elysium:error', error));
+				generator.return(undefined).catch((error) => Lifecycle.emit('elysium:error', error));
 			} else {
 				await generator.return(undefined);
 			}

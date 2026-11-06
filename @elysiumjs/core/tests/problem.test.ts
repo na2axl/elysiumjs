@@ -16,8 +16,8 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { t } from 'elysia';
 
 import { Application } from '../src/app';
-import { Event } from '../src/event';
 import { Http } from '../src/http';
+import { Lifecycle } from '../src/lifecycle';
 import { Middleware } from '../src/middleware';
 import { Module } from '../src/module';
 import {
@@ -158,7 +158,7 @@ describe('problem details over HTTP', () => {
 		await testing?.shutdown();
 		testing = undefined;
 		reported = [];
-		Event.off('elysium:error');
+		Lifecycle.off('elysium:error');
 	});
 
 	class Stop extends Middleware {
@@ -250,7 +250,7 @@ describe('problem details over HTTP', () => {
 
 	const start = async (problems?: { validationStatus?: 400 | 422; typeBase?: string }) => {
 		const listener = (e: unknown) => reported.push(['event', e]);
-		Event.on('elysium:error', listener);
+		Lifecycle.on('elysium:error', listener);
 		testing = await createTestingHttpApp({ app: makeApp(problems) });
 		return testing.http;
 	};

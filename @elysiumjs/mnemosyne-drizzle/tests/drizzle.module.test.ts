@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Application, Event, Service } from '@elysiumjs/core';
+import { Application, Lifecycle, Service } from '@elysiumjs/core';
 import { getTenancyConfig, getTenancyStrategy } from '@elysiumjs/mnemosyne';
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
@@ -48,8 +48,8 @@ describe('DrizzleModule', () => {
 	});
 
 	it('registers nothing when the package is imported', async () => {
-		const once = spyOn(Event, 'once');
-		const on = spyOn(Event, 'on');
+		const once = spyOn(Lifecycle, 'once');
+		const on = spyOn(Lifecycle, 'on');
 		await import('../src/index.ts?fresh-import');
 		expect(once).not.toHaveBeenCalled();
 		expect(on).not.toHaveBeenCalled();

@@ -26,9 +26,9 @@ import { Application } from '../src/app';
 import { Command } from '../src/command';
 import { Container } from '../src/container';
 import * as Env from '../src/env';
-import { Event, EventBus } from '../src/event';
 import { Http } from '../src/http';
 import { Kernel } from '../src/kernel';
+import { Lifecycle, LifecycleBus } from '../src/lifecycle';
 import { ConsoleLogger, LOGGER_SERVICE } from '../src/logger';
 import { Metadata } from '../src/metadata';
 import { Middleware } from '../src/middleware';
@@ -213,9 +213,9 @@ describe('Application class', () => {
 			}
 		}
 
-		Event.off('elysium:app:launched');
-		Event.off('elysium:server:before-init');
-		Event.off('elysium:server:after-init');
+		Lifecycle.off('elysium:app:launched');
+		Lifecycle.off('elysium:server:before-init');
+		Lifecycle.off('elysium:server:after-init');
 		process.exit = originalExit;
 		process.stdout.write = originalStdoutWrite;
 		process.stderr.write = originalStderrWrite;
@@ -665,7 +665,7 @@ describe('Application class', () => {
 		it('should emit app:launched once for a lazy command, before it runs', async () => {
 			const { TestCommand, PrivateService } = makeCommand('launch:lazy');
 			const launched = mock(() => events.push('launched'));
-			Event.on('elysium:app:launched', launched);
+			Lifecycle.on('elysium:app:launched', launched);
 
 			@Module.register({ services: [PrivateService], commands: [TestCommand] })
 			class LaunchModule extends Module {}
@@ -679,7 +679,7 @@ describe('Application class', () => {
 		it('should emit app:launched once for a boot command, after the eager boot', async () => {
 			const { TestCommand, PrivateService } = makeCommand('launch:boot', { boot: true });
 			const launched = mock(() => events.push('launched'));
-			Event.on('elysium:app:launched', launched);
+			Lifecycle.on('elysium:app:launched', launched);
 
 			@Module.register({ services: [PrivateService], commands: [TestCommand] })
 			class BootModule extends Module {
@@ -696,7 +696,7 @@ describe('Application class', () => {
 
 		it('should not emit app:launched for list', async () => {
 			const launched = mock();
-			Event.on('elysium:app:launched', launched);
+			Lifecycle.on('elysium:app:launched', launched);
 
 			await appWith().run(['list']);
 
@@ -1060,7 +1060,7 @@ describe('Application class', () => {
 
 				@Service.register()
 				class Listener {
-					@Event.on({ event: 'retry:evt' })
+					@Lifecycle.on({ event: 'retry:evt' })
 					public handle(e: unknown) {
 						received.push(e);
 					}
@@ -1082,7 +1082,7 @@ describe('Application class', () => {
 				await expect(instance.boot()).rejects.toThrow('module failed');
 				await instance.boot();
 
-				expect(EventBus.instance.listenerCount('retry:evt')).toBe(1);
+				expect(LifecycleBus.instance.listenerCount('retry:evt')).toBe(1);
 				await instance.kernel.shutdown();
 			});
 
@@ -1105,7 +1105,7 @@ describe('Application class', () => {
 			@Application.register({ server: { port: 0 }, modules: [], openapi: false })
 			class TestApp extends Application {}
 
-			Event.on('elysium:server:after-init', async (e) => {
+			Lifecycle.on('elysium:server:after-init', async (e) => {
 				spyOn(e.source.elysia, 'listen');
 			});
 
@@ -1369,7 +1369,7 @@ describe('Application class', () => {
 			class TestApp extends Application {}
 
 			let listenSpy: Mock<(...args: any[]) => any> | undefined;
-			Event.on('elysium:server:before-init', (e) => {
+			Lifecycle.on('elysium:server:before-init', (e) => {
 				listenSpy = spyOn(e.source.elysia, 'listen');
 			});
 
@@ -1394,7 +1394,7 @@ describe('Application class', () => {
 			class TestApp extends Application {}
 
 			let listenSpy: Mock<(...args: any[]) => any> | undefined;
-			Event.on('elysium:server:before-init', (e) => {
+			Lifecycle.on('elysium:server:before-init', (e) => {
 				listenSpy = spyOn(e.source.elysia, 'listen');
 			});
 
@@ -1454,7 +1454,7 @@ describe('Application class', () => {
 
 			// @ts-expect-error The onStart method is protected
 			const onStartSpy = spyOn(TestApp.prototype, 'onStart');
-			const emitSpy = spyOn(Event, 'emit');
+			const emitSpy = spyOn(Lifecycle, 'emit');
 
 			const instance = new TestApp();
 			await serve(instance);
@@ -1480,7 +1480,7 @@ describe('Application class', () => {
 
 			// @ts-expect-error The onStop method is protected
 			const onStopSpy = spyOn(TestApp.prototype, 'onStop');
-			const emitSpy = spyOn(Event, 'emit');
+			const emitSpy = spyOn(Lifecycle, 'emit');
 
 			const instance = new TestApp();
 			await serve(instance);
@@ -1513,7 +1513,7 @@ describe('Application class', () => {
 
 			// @ts-expect-error The onError method is protected
 			const onErrorSpy = spyOn(TestApp.prototype, 'onError');
-			const emitSpy = spyOn(Event, 'emit');
+			const emitSpy = spyOn(Lifecycle, 'emit');
 
 			const instance = new TestApp();
 			await serve(instance);

@@ -25,8 +25,8 @@ import { Symbols } from './utils';
  * @internal
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class EventBus extends EventEmitter {
-	static readonly instance = new EventBus();
+export class LifecycleBus extends EventEmitter {
+	static readonly instance = new LifecycleBus();
 
 	private constructor() {
 		super();
@@ -47,7 +47,7 @@ export class EventBus extends EventEmitter {
  * Stores the event data with the source.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export type EventData<TData, TSource = null> = {
+export type LifecycleEvent<TData, TSource = null> = {
 	/**
 	 * The emitted data.
 	 */
@@ -60,11 +60,11 @@ export type EventData<TData, TSource = null> = {
 };
 
 /**
- * Event handler function.
+ * Lifecycle handler function.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export type EventHandler<TData, TSource = any> = (
-	event: EventData<TData, TSource>
+export type LifecycleHandler<TData, TSource = any> = (
+	event: LifecycleEvent<TData, TSource>
 ) => void | Promise<void>;
 
 /**
@@ -93,10 +93,10 @@ export type ListenProps = {
 };
 
 /**
- * A listener recorded on a class by `@Event.on` / `@Event.once`.
+ * A listener recorded on a class by `@Lifecycle.on` / `@Lifecycle.once`.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export type EventListenerMeta = {
+export type LifecycleListenerMeta = {
 	readonly event: string;
 	readonly method: string | symbol;
 	readonly mode: 'on' | 'once';
@@ -105,12 +105,12 @@ export type EventListenerMeta = {
 };
 
 /**
- * Gets the listeners recorded on a class by the `@Event.on` / `@Event.once` decorators.
+ * Gets the listeners recorded on a class by the `@Lifecycle.on` / `@Lifecycle.once` decorators.
  * @author Axel Nana <axel.nana@workbud.com>
  * @param cls The class to inspect.
  */
-export function getEventListeners(cls: object): readonly EventListenerMeta[] {
-	return Metadata.getOwn(Symbols.eventListeners, cls) ?? [];
+export function getLifecycleListeners(cls: object): readonly LifecycleListenerMeta[] {
+	return Metadata.getOwn(Symbols.lifecycleListeners, cls) ?? [];
 }
 
 const recordListener = (
@@ -122,16 +122,16 @@ const recordListener = (
 	const isStatic = typeof target === 'function';
 	const owner = isStatic ? target : target.constructor;
 	Metadata.define(
-		Symbols.eventListeners,
+		Symbols.lifecycleListeners,
 		[
-			...getEventListeners(owner),
+			...getLifecycleListeners(owner),
 			{ event: props.event, method, mode, prepend: props.prepend ?? false, static: isStatic }
 		],
 		owner
 	);
 };
 
-export namespace Event {
+export namespace Lifecycle {
 	/**
 	 * Emits an event with the provided data and source.
 	 * @author Axel Nana <axel.nana@workbud.com>
@@ -144,7 +144,7 @@ export namespace Event {
 		data: TData,
 		source: TSource | null = null
 	): void => {
-		EventBus.instance.emitEvent(event, data, source);
+		LifecycleBus.instance.emitEvent(event, data, source);
 	};
 
 	/**
@@ -169,15 +169,15 @@ export namespace Event {
 	 */
 	export function on<TData, TSource = any>(
 		event: string,
-		handler: EventHandler<TData, TSource>
+		handler: LifecycleHandler<TData, TSource>
 	): void;
 
 	export function on<TData, TSource = any>(
 		event: string | Omit<ListenProps, 'mode'>,
-		handler?: EventHandler<TData, TSource> | never
+		handler?: LifecycleHandler<TData, TSource> | never
 	): MethodDecorator | void {
 		if (isString(event)) {
-			EventBus.instance.on(event, handler!);
+			LifecycleBus.instance.on(event, handler!);
 		} else {
 			return function (target, propertyKey) {
 				recordListener(target, propertyKey, 'on', event);
@@ -187,7 +187,7 @@ export namespace Event {
 
 	/**
 	 * Marks a method as an event listener that listens for the event only once.
-	 * Like {@link Event.on}, the decorator is metadata-only and the kernel wires it per module.
+	 * Like {@link Lifecycle.on}, the decorator is metadata-only and the kernel wires it per module.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param options The decorator options.
 	 */
@@ -201,15 +201,15 @@ export namespace Event {
 	 */
 	export function once<TData, TSource = any>(
 		event: string,
-		handler: EventHandler<TData, TSource>
+		handler: LifecycleHandler<TData, TSource>
 	): void;
 
 	export function once<TData, TSource = any>(
 		event: string | Omit<ListenProps, 'mode'>,
-		handler?: EventHandler<TData, TSource> | never
+		handler?: LifecycleHandler<TData, TSource> | never
 	): MethodDecorator | void {
 		if (isString(event)) {
-			EventBus.instance.once(event, handler!);
+			LifecycleBus.instance.once(event, handler!);
 		} else {
 			return function (target, propertyKey) {
 				recordListener(target, propertyKey, 'once', event);
@@ -223,7 +223,7 @@ export namespace Event {
 	 * @param event The event name.
 	 */
 	export const off = (event: string): void => {
-		EventBus.instance.removeAllListeners(event);
+		LifecycleBus.instance.removeAllListeners(event);
 	};
 
 	/**
@@ -231,7 +231,7 @@ export namespace Event {
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 */
 	export const clear = () => {
-		EventBus.instance.removeAllListeners();
+		LifecycleBus.instance.removeAllListeners();
 	};
 
 	/**

@@ -236,7 +236,7 @@ export class InvalidControllerError extends ElysiumError {
  *
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class EventListenerNotSupportedError extends ElysiumError {
+export class LifecycleListenerNotSupportedError extends ElysiumError {
 	constructor(
 		public readonly className: string,
 		public readonly method: string,

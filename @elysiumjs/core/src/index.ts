@@ -28,7 +28,7 @@ export {
 	InteractsWithConsole
 } from './console';
 export { Env } from './env';
-export { type EventData, type EventHandler, Event } from './event';
+export { type LifecycleEvent, type LifecycleHandler, Lifecycle } from './lifecycle';
 export { type LoggerInterface, ConsoleLogger, getLogger, LOGGER_SERVICE } from './logger';
 export {
 	type Context,
@@ -54,7 +54,7 @@ export {
 	DuplicateModuleNameError,
 	ElysiumError,
 	EnvironmentSkippedModuleError,
-	EventListenerNotSupportedError,
+	LifecycleListenerNotSupportedError,
 	InvalidModuleError,
 	InvalidModuleConfigError,
 	MissingModuleConfigError,

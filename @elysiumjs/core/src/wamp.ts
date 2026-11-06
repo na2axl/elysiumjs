@@ -22,7 +22,7 @@ import Wampy from 'wampy';
 import { needsDefaultAlias, runAll } from './connections';
 import { Container } from './container';
 import { ServiceNotFoundError } from './errors';
-import { Event } from './event';
+import { Lifecycle } from './lifecycle';
 import { getLogger } from './logger';
 import { Metadata } from './metadata';
 import { Module } from './module';
@@ -302,7 +302,7 @@ export namespace Wamp {
 				const message = `An error occurred in WAMP connection ${name} (${config.url})`;
 				// Typed as an Error by wampy, but not guaranteed to be one at runtime.
 				const reason: unknown = error;
-				Event.emit(
+				Lifecycle.emit(
 					'elysium:error',
 					reason == null
 						? new Error(message)
@@ -350,7 +350,7 @@ export namespace Wamp {
 						maxRetries,
 						error
 					});
-					Event.emit(
+					Lifecycle.emit(
 						'elysium:error',
 						new Error(`Failed to establish WAMP connection ${name} after ${attempts} attempts`)
 					);
@@ -363,7 +363,7 @@ export namespace Wamp {
 			try {
 				await config.onOpen?.();
 			} catch (error) {
-				Event.emit('elysium:error', error);
+				Lifecycle.emit('elysium:error', error);
 			}
 		};
 
@@ -410,7 +410,7 @@ export namespace Wamp {
 							},
 							(error) => {
 								getLogger().error('Failed to register WAMP RPC', { connection, topic, error });
-								Event.emit(
+								Lifecycle.emit(
 									'elysium:error',
 									new Error(`Failed to register WAMP RPC ${topic} on connection ${connection}`, {
 										cause: error
@@ -435,7 +435,7 @@ export namespace Wamp {
 									topic,
 									error
 								});
-								Event.emit(
+								Lifecycle.emit(
 									'elysium:error',
 									new Error(
 										`Failed to subscribe to WAMP topic ${topic} on connection ${connection}`,

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { EventData, EventHandler } from '../src/event';
+import type { LifecycleEvent, LifecycleHandler } from '../src/lifecycle';
 
 import { EventEmitter } from 'node:events';
 
@@ -25,9 +25,9 @@ const prependListenerSpy = spyOn(EventEmitter.prototype, 'prependListener');
 const prependOnceListenerSpy = spyOn(EventEmitter.prototype, 'prependOnceListener');
 const removeAllListenersSpy = spyOn(EventEmitter.prototype, 'removeAllListeners');
 
-const { Event, getEventListeners } = await import('../src/event');
+const { Lifecycle, getLifecycleListeners } = await import('../src/lifecycle');
 
-describe('Event namespace', () => {
+describe('Lifecycle namespace', () => {
 	beforeEach(() => {
 		// Reset all mocks before each test
 		jest.clearAllMocks();
@@ -35,7 +35,7 @@ describe('Event namespace', () => {
 
 	afterEach(() => {
 		// Clean up after each test
-		Event.clear();
+		Lifecycle.clear();
 	});
 
 	describe('emit', () => {
@@ -43,7 +43,7 @@ describe('Event namespace', () => {
 			// Call the emit function
 			const testData = { test: 'data' };
 			const testSource = { source: 'test' };
-			Event.emit('test-event', testData, testSource);
+			Lifecycle.emit('test-event', testData, testSource);
 
 			// Check if emitEvent was called with the correct parameters
 			expect(emitSpy).toHaveBeenCalledWith('test-event', { data: testData, source: testSource });
@@ -52,7 +52,7 @@ describe('Event namespace', () => {
 		it('should emit an event with data and null source if not provided', () => {
 			// Call the emit function without a source
 			const testData = { test: 'data' };
-			Event.emit('test-event', testData);
+			Lifecycle.emit('test-event', testData);
 
 			// Check if emitEvent was called with the correct parameters
 			expect(emitSpy).toHaveBeenCalledWith('test-event', { data: testData, source: null });
@@ -62,12 +62,12 @@ describe('Event namespace', () => {
 	describe('on (function)', () => {
 		it('should register an event listener', () => {
 			// Create a test handler
-			const handler: EventHandler<any> = () => {};
+			const handler: LifecycleHandler<any> = () => {};
 
 			// Call the on function
-			Event.on('test-event', handler);
+			Lifecycle.on('test-event', handler);
 
-			// Check if EventBus.on was called with the correct parameters
+			// Check if LifecycleBus.on was called with the correct parameters
 			expect(onSpy).toHaveBeenCalledWith('test-event', handler);
 		});
 
@@ -76,11 +76,11 @@ describe('Event namespace', () => {
 			const handler = mock();
 
 			// Register the handler
-			Event.on('test-event', handler);
+			Lifecycle.on('test-event', handler);
 
 			// Emit an event
 			const testData = { test: 'data' };
-			Event.emit('test-event', testData);
+			Lifecycle.emit('test-event', testData);
 
 			// Check if the handler was called with the correct data
 			expect(handler).toHaveBeenCalledWith({ data: testData, source: null });
@@ -90,12 +90,12 @@ describe('Event namespace', () => {
 	describe('once (function)', () => {
 		it('should register a one-time event listener', () => {
 			// Create a test handler
-			const handler: EventHandler<any> = () => {};
+			const handler: LifecycleHandler<any> = () => {};
 
 			// Call the once function
-			Event.once('test-event', handler);
+			Lifecycle.once('test-event', handler);
 
-			// Check if EventBus.once was called with the correct parameters
+			// Check if LifecycleBus.once was called with the correct parameters
 			expect(onceSpy).toHaveBeenCalledWith('test-event', handler);
 		});
 
@@ -104,13 +104,13 @@ describe('Event namespace', () => {
 			const handler = mock();
 
 			// Register the handler with once
-			Event.once('test-event', handler);
+			Lifecycle.once('test-event', handler);
 
 			// Emit the event twice
 			const testData1 = { test: 'data1' };
 			const testData2 = { test: 'data2' };
-			Event.emit('test-event', testData1);
-			Event.emit('test-event', testData2);
+			Lifecycle.emit('test-event', testData1);
+			Lifecycle.emit('test-event', testData2);
 
 			// Check if the handler was called only once with the first data
 			expect(handler).toHaveBeenCalledTimes(1);
@@ -121,7 +121,7 @@ describe('Event namespace', () => {
 	describe('off', () => {
 		it('should remove all listeners for an event', () => {
 			// Call the off function
-			Event.off('test-event');
+			Lifecycle.off('test-event');
 
 			// Check if removeAllListeners was called with the correct parameters
 			expect(removeAllListenersSpy).toHaveBeenCalledWith('test-event');
@@ -131,16 +131,16 @@ describe('Event namespace', () => {
 	describe('on (decorator)', () => {
 		it('only records the listener as class metadata', () => {
 			class TestClass {
-				@Event.on({ event: 'test-event', prepend: true })
-				handleEvent(_eventData: EventData<any>) {}
+				@Lifecycle.on({ event: 'test-event', prepend: true })
+				handleEvent(_eventData: LifecycleEvent<any>) {}
 
-				@Event.on({ event: 'test-static' })
-				static handleStatic(_eventData: EventData<any>) {}
+				@Lifecycle.on({ event: 'test-static' })
+				static handleStatic(_eventData: LifecycleEvent<any>) {}
 			}
 
 			expect(onSpy).not.toHaveBeenCalledWith('test-event', expect.any(Function));
 			expect(prependListenerSpy).not.toHaveBeenCalled();
-			expect(getEventListeners(TestClass)).toEqual([
+			expect(getLifecycleListeners(TestClass)).toEqual([
 				{ event: 'test-event', method: 'handleEvent', mode: 'on', prepend: true, static: false },
 				{ event: 'test-static', method: 'handleStatic', mode: 'on', prepend: false, static: true }
 			]);
@@ -150,21 +150,21 @@ describe('Event namespace', () => {
 	describe('listen (decorator)', () => {
 		it('records the listener with the given mode', () => {
 			class TestClass {
-				@Event.listen({ event: 'test-on', mode: 'on' })
-				handleOn(_eventData: EventData<any>) {}
+				@Lifecycle.listen({ event: 'test-on', mode: 'on' })
+				handleOn(_eventData: LifecycleEvent<any>) {}
 
-				@Event.listen({ event: 'test-once', mode: 'once' })
-				handleOnce(_eventData: EventData<any>) {}
+				@Lifecycle.listen({ event: 'test-once', mode: 'once' })
+				handleOnce(_eventData: LifecycleEvent<any>) {}
 			}
 
-			expect(getEventListeners(TestClass)).toEqual([
+			expect(getLifecycleListeners(TestClass)).toEqual([
 				{ event: 'test-on', method: 'handleOn', mode: 'on', prepend: false, static: false },
 				{ event: 'test-once', method: 'handleOnce', mode: 'once', prepend: false, static: false }
 			]);
 		});
 
 		it('throws on an unknown mode', () => {
-			expect(() => Event.listen({ event: 'test-event', mode: 'twice' as any })).toThrow(
+			expect(() => Lifecycle.listen({ event: 'test-event', mode: 'twice' as any })).toThrow(
 				"Unknown mode provided to @listen. Use either 'on' or 'once'."
 			);
 		});
@@ -173,12 +173,12 @@ describe('Event namespace', () => {
 	describe('once (decorator)', () => {
 		it('only records the listener as class metadata', () => {
 			class TestClass {
-				@Event.once({ event: 'test-event' })
-				handleEvent(_eventData: EventData<any>) {}
+				@Lifecycle.once({ event: 'test-event' })
+				handleEvent(_eventData: LifecycleEvent<any>) {}
 			}
 
 			expect(onceSpy).not.toHaveBeenCalledWith('test-event', expect.any(Function));
-			expect(getEventListeners(TestClass)).toEqual([
+			expect(getLifecycleListeners(TestClass)).toEqual([
 				{ event: 'test-event', method: 'handleEvent', mode: 'once', prepend: false, static: false }
 			]);
 		});

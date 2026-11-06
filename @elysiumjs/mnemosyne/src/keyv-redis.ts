@@ -18,7 +18,7 @@ import type { KeyvEntry, StoredData } from 'keyv';
 
 import { EventEmitter } from 'node:events';
 
-import { Event, Service } from '@elysiumjs/core';
+import { Lifecycle, Service } from '@elysiumjs/core';
 import { Redis } from '@elysiumjs/redis';
 
 /**
@@ -78,7 +78,7 @@ export class KeyvRedis extends EventEmitter implements KeyvStoreAdapter {
 		this.#noNamespaceAffectsAll = props.noNamespaceAffectsAll ?? false;
 
 		this.on('error', (error) => {
-			Event.emit('elysium:error', error);
+			Lifecycle.emit('elysium:error', error);
 		});
 	}
 

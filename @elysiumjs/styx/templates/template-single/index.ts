@@ -1,10 +1,9 @@
-import type { EventData } from '@elysiumjs/core';
+import type { LifecycleEvent } from '@elysiumjs/core';
 
-import { Event } from '@elysiumjs/core';
-
+import { Lifecycle } from '@elysiumjs/core';
 import { App } from '#root/app';
 
-Event.on('elysium:error', (e: EventData<Error>) => {
+Lifecycle.on('elysium:error', (e: LifecycleEvent<Error>) => {
 	console.error(JSON.stringify(e));
 });
 

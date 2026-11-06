@@ -1,6 +1,6 @@
-import type { EventData } from '@elysiumjs/core';
+import type { LifecycleEvent } from '@elysiumjs/core';
 
-import { Event, Service, ServiceScope } from '@elysiumjs/core';
+import { Lifecycle, Service, ServiceScope } from '@elysiumjs/core';
 import { HermesLogger } from '@elysiumjs/hermes';
 
 import { UserRepository } from '#hero/repositories/user.repository';
@@ -22,8 +22,8 @@ export class UserService {
 		return this.userRepository.find(id);
 	}
 
-	@Event.on({ event: 'user:say' })
-	private static sayFromEvent(e: EventData<string>) {
+	@Lifecycle.on({ event: 'user:say' })
+	private static sayFromEvent(e: LifecycleEvent<string>) {
 		const logger = Service.get(HermesLogger)!;
 		logger.info(`from source: ${e.source} with event: ${e.data}`);
 		throw new Error('Custom error');

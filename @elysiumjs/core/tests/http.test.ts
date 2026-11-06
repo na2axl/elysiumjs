@@ -21,8 +21,8 @@ import * as Elysia from 'elysia';
 import * as pkg from '../src';
 import { Application } from '../src/app';
 import { Container } from '../src/container';
-import { Event } from '../src/event';
 import { Http, HttpControllerScope } from '../src/http';
+import { Lifecycle } from '../src/lifecycle';
 import { Metadata } from '../src/metadata';
 import * as M from '../src/middleware';
 import { ModuleContext } from '../src/module-context';
@@ -830,7 +830,7 @@ describe('Http namespace', () => {
 		it('reports errors of a generator closed after a disconnect during a step', async () => {
 			Service.instance('db.transaction', transactionService());
 			const errors: unknown[] = [];
-			Event.on('elysium:error', (event: { data: unknown }) => {
+			Lifecycle.on('elysium:error', (event: { data: unknown }) => {
 				errors.push(event.data);
 			});
 			const gate = Promise.withResolvers<void>();
@@ -872,7 +872,7 @@ describe('Http namespace', () => {
 				expect(errors).toHaveLength(1);
 				expect((errors[0] as Error).message).toBe('cleanup failed');
 			} finally {
-				Event.off('elysium:error');
+				Lifecycle.off('elysium:error');
 			}
 		});
 
