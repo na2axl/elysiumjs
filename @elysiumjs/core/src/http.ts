@@ -21,6 +21,7 @@ import type { InterceptorClass, InterceptorContext, InterceptorLevel } from './i
 import type { Middleware } from './middleware';
 import type { Module } from './module';
 import type { ModuleNode } from './module-graph';
+import type { AppRateLimitOptions, RateLimitOptions } from './rate-limit';
 import type { ServiceToken } from './token';
 
 import { Elysia, sse as esse, t } from 'elysia';
@@ -34,6 +35,7 @@ import { runInterceptors } from './interceptor';
 import { Metadata } from './metadata';
 import { applyMiddlewares, executeMiddlewareChain, makeMiddlewares } from './middleware';
 import { ModuleContext } from './module-context';
+import { enforceRateLimit } from './rate-limit';
 import { isSerializable, readFields, Resource } from './resource';
 import { Runtime } from './runtime';
 import { Service } from './service';
@@ -177,6 +179,9 @@ type HttpRequestHandlerMetadata = {
 	/** Whether the handler result is serialized through the response schema. */
 	serialize?: boolean;
 
+	/** The rate limit of the route, or `false` for none. */
+	rateLimit?: RateLimitOptions | false;
+
 	/** The exception filters of the route. */
 	filters?: FilterClass[];
 
@@ -198,6 +203,7 @@ type HttpRequestHandlerRegistrationProps = Pick<
 	| 'description'
 	| 'transactional'
 	| 'serialize'
+	| 'rateLimit'
 	| 'filters'
 	| 'interceptors'
 > & {
@@ -415,6 +421,7 @@ const registerHttpRequestHandler = (props: HttpRequestHandlerRegistrationProps) 
 		description,
 		transactional,
 		serialize,
+		rateLimit,
 		filters,
 		interceptors
 	} = props;
@@ -439,6 +446,7 @@ const registerHttpRequestHandler = (props: HttpRequestHandlerRegistrationProps) 
 		services,
 		transactional,
 		serialize,
+		rateLimit,
 		filters,
 		interceptors
 	});
@@ -489,6 +497,12 @@ export type HttpControllerProps = {
 	 * for all the request handlers in this controller.
 	 */
 	transactional?: boolean;
+
+	/**
+	 * The rate limit of every route of the controller that sets none, or `false` for none. Each
+	 * route counts on its own.
+	 */
+	rateLimit?: RateLimitOptions | false;
 
 	/**
 	 * Exception filters for every route of the controller. They run after the filters of the route,
@@ -547,6 +561,12 @@ export type RequestHandlerDecoratorProps = {
 	 * `true` when the route has a `response` schema.
 	 */
 	serialize?: boolean;
+
+	/**
+	 * The rate limit of this route, or `false` for none. Overrides the limit of the controller and
+	 * of the app.
+	 */
+	rateLimit?: RateLimitOptions | false;
 
 	/** Exception filters for this route. They run before those of the controller. */
 	filters?: FilterClass[];
@@ -614,6 +634,27 @@ const appInterceptorLevel = (): InterceptorLevel => {
 	}
 	return level;
 };
+
+/** The rate limit options of the running application. */
+const appRateLimit = (): AppRateLimitOptions | undefined => {
+	const app = Service.get<object>('elysium.app');
+	return app ? Metadata.get(Symbols.app, app.constructor)?.rateLimit : undefined;
+};
+
+/** The limit of the application for routes that set none, when it gives a window and a max. */
+const appDefaultRateLimit = (): RateLimitOptions | undefined => {
+	const options = appRateLimit();
+	return options?.window !== undefined && options.max !== undefined
+		? (options as RateLimitOptions)
+		: undefined;
+};
+
+/** Joins a controller path and a route path into the route's full path. */
+const joinPath = (base: string, path: string): string =>
+	`/${[base, path]
+		.map((part) => part.replace(/^\/+|\/+$/g, ''))
+		.filter(Boolean)
+		.join('/')}`;
 
 /** The module level of exception filters, shared by every controller of a module. */
 const moduleFilterLevels = new WeakMap<ModuleNode, FilterLevel>();
@@ -905,6 +946,12 @@ export namespace Http {
 
 					const mi = makeMiddlewares(route.middlewares, node);
 
+					const routeName = `${route.method.toUpperCase()} ${joinPath(props.path, route.path)}`;
+					/** The limit of the route, read on the first request: the app is created after it. */
+					let limit: RateLimitOptions | false | undefined;
+					const rateLimitOf = (): RateLimitOptions | false =>
+						(limit ??= route.rateLimit ?? props.rateLimit ?? appDefaultRateLimit() ?? false);
+
 					const handler = getHandler();
 					const filterLevels = [
 						{ filters: route.filters ?? [], node },
@@ -941,7 +988,17 @@ export namespace Http {
 									scopeKey(c)
 								);
 							},
-							beforeHandle(c: Context) {
+							async beforeHandle(c: Context) {
+								const limit = rateLimitOf();
+								if (limit) {
+									await enforceRateLimit(limit, appRateLimit()?.store, {
+										request: c.request,
+										ip: (c as unknown as { ip?: string }).ip,
+										route: routeName,
+										context: c as unknown as Record<string, unknown>,
+										set: c.set as { headers: Record<string, string | number> }
+									});
+								}
 								return Container.runInRequestScope(
 									() => executeMiddlewareChain(mi, c, 'onBeforeHandle', node),
 									scopeKey(c)

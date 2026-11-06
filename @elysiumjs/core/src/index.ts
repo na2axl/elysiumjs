@@ -140,6 +140,15 @@ export {
 export { type ExceptionFilter, type FilterClass, type FilterContext, Catch } from './filter';
 export { type ResponseSchemas, Resource } from './resource';
 export {
+	type AppRateLimitOptions,
+	type RateLimitHit,
+	type RateLimitKeyContext,
+	type RateLimitOptions,
+	type RateLimitStore,
+	MemoryRateLimitStore,
+	TooManyRequestsError
+} from './rate-limit';
+export {
 	type Interceptor,
 	type InterceptorClass,
 	type InterceptorContext,

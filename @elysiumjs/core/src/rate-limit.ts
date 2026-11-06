@@ -1,0 +1,165 @@
+// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+import { DomainError } from './problem';
+
+/**
+ * The count of a key in its current window.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type RateLimitHit = {
+	/** The number of hits in the window, this one included. */
+	count: number;
+	/** When the window ends, in milliseconds since the epoch. */
+	resetAt: number;
+};
+
+/**
+ * Where rate limits keep their counts. Counts use fixed windows: the first hit of a key opens a
+ * window of `windowMs`, and the count starts again once it has ended. Implement it to keep the
+ * counts anywhere; `MemoryRateLimitStore` keeps them in the process, `RedisRateLimitStore`
+ * (`@elysiumjs/redis`) in Redis, and `DurableObjectRateLimitStore` (`@elysiumjs/runtime-workers`)
+ * in a Durable Object.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export interface RateLimitStore {
+	/**
+	 * Counts a hit of a key.
+	 * @param key The key, such as the client address and the route.
+	 * @param windowMs The length of the window, in milliseconds.
+	 */
+	hit(key: string, windowMs: number): Promise<RateLimitHit>;
+}
+
+/**
+ * Keeps rate limit counts in the memory of the process. Counts are not shared between
+ * processes or Worker isolates: use another store when the app runs on several.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class MemoryRateLimitStore implements RateLimitStore {
+	readonly #windows = new Map<string, RateLimitHit>();
+	#nextSweep = 0;
+
+	public async hit(key: string, windowMs: number): Promise<RateLimitHit> {
+		const now = Date.now();
+		this.#sweep(now);
+		const current = this.#windows.get(key);
+		if (current && current.resetAt > now) {
+			current.count++;
+			return { ...current };
+		}
+		const opened = { count: 1, resetAt: now + windowMs };
+		this.#windows.set(key, opened);
+		return { ...opened };
+	}
+
+	/** Drops ended windows, at most once a second, so that idle keys do not pile up. */
+	#sweep(now: number): void {
+		if (now < this.#nextSweep) return;
+		this.#nextSweep = now + 1000;
+		for (const [key, window] of this.#windows) {
+			if (window.resetAt <= now) this.#windows.delete(key);
+		}
+	}
+}
+
+/**
+ * What a rate limit key is built from.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type RateLimitKeyContext = {
+	request: Request;
+	/** The client address (`ctx.ip`), when the runtime knows it. */
+	ip?: string;
+	/** The route, such as `GET /posts/:id`. */
+	route: string;
+	/** The whole request context, for keys built from the current user or tenant. */
+	context: Record<string, unknown>;
+};
+
+/**
+ * A rate limit of a route, a controller or the app.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type RateLimitOptions = {
+	/** The length of a window, in milliseconds. */
+	window: number;
+	/** The hits a key may make in a window. */
+	max: number;
+	/**
+	 * Builds the key the limit counts. Defaults to the client address and the route, so that each
+	 * client has its own count on each route.
+	 */
+	key?: (context: RateLimitKeyContext) => string | Promise<string>;
+	/** Where the counts are kept. Defaults to the app's store, or one in memory. */
+	store?: RateLimitStore;
+	/** A name for the limit, in the `RateLimit-Policy` header and the keys. */
+	name?: string;
+};
+
+/**
+ * The rate limit options of an application: the store of every limit, and a limit for every
+ * route that sets none.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type AppRateLimitOptions = Partial<RateLimitOptions>;
+
+/**
+ * Raised when a client goes over a rate limit. Rendered as a 429 problem, with `Retry-After`.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class TooManyRequestsError extends DomainError {
+	constructor(public readonly retryAfter: number) {
+		super({
+			status: 429,
+			detail: `Too many requests. Try again in ${retryAfter} seconds.`,
+			extensions: { retryAfter }
+		});
+	}
+}
+
+/** The store used when neither the limit nor the app sets one. */
+const defaultStore = new MemoryRateLimitStore();
+
+/**
+ * Counts a hit against a limit, sets the `RateLimit-*` headers, and throws once the limit is
+ * exceeded.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param limit The limit.
+ * @param appStore The store of the application, used when the limit sets none.
+ * @param context The request: its context, client address and route.
+ * @throws {TooManyRequestsError} When the key went over the limit in the current window.
+ */
+export const enforceRateLimit = async (
+	limit: RateLimitOptions,
+	appStore: RateLimitStore | undefined,
+	context: RateLimitKeyContext & { set: { headers: Record<string, string | number> } }
+): Promise<void> => {
+	const name = limit.name ?? 'default';
+	const key = limit.key ? await limit.key(context) : `${context.ip ?? 'unknown'}:${context.route}`;
+	const store = limit.store ?? appStore ?? defaultStore;
+	const { count, resetAt } = await store.hit(`rl:${name}:${key}`, limit.window);
+
+	const reset = Math.max(0, Math.ceil((resetAt - Date.now()) / 1000));
+	const headers = context.set.headers;
+	headers['ratelimit-limit'] = String(limit.max);
+	headers['ratelimit-remaining'] = String(Math.max(0, limit.max - count));
+	headers['ratelimit-reset'] = String(reset);
+	headers['ratelimit-policy'] = `${limit.max};w=${Math.ceil(limit.window / 1000)}`;
+
+	if (count > limit.max) {
+		headers['retry-after'] = String(reset);
+		throw new TooManyRequestsError(reset);
+	}
+};

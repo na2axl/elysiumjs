@@ -22,6 +22,7 @@ import type { InterceptorClass } from './interceptor';
 import type { ConfiguredModule, ModuleClass } from './module';
 import type { ModuleGraph, ModuleNode } from './module-graph';
 import type { ProblemOptions } from './problem';
+import type { AppRateLimitOptions } from './rate-limit';
 import type { Runtime as RuntimePort, ServeHandle } from './runtime';
 import type { HttpOptions } from './security';
 import type { TestingApp, TestingAppOptions, TestingHttpApp, TestingOptions } from './testing';
@@ -129,6 +130,12 @@ export type AppProps = {
 	 * trusted proxies that give `ctx.ip`.
 	 */
 	http?: HttpOptions;
+
+	/**
+	 * Rate limiting: the store of every limit (in memory by default), and a limit for every route
+	 * whose controller and route set none, when `window` and `max` are given.
+	 */
+	rateLimit?: AppRateLimitOptions;
 };
 
 /** The options of the root Elysia app. */
@@ -221,13 +228,15 @@ export abstract class Application extends InteractsWithConsole {
 			];
 			// The runtime, the env schema (TypeBox keeps its kind under symbol keys) and the filter and
 			// interceptor classes are kept as given, never deep-copied.
-			const pick = <K extends 'runtime' | 'env' | 'filters' | 'interceptors'>(key: K) =>
-				props[key] ?? ownMetadata?.[key] ?? parentMetadata?.[key];
+			const pick = <K extends 'runtime' | 'env' | 'filters' | 'interceptors' | 'rateLimit'>(
+				key: K
+			) => props[key] ?? ownMetadata?.[key] ?? parentMetadata?.[key];
 			const runtime = pick('runtime');
 			const kept = {
 				env: pick('env'),
 				filters: pick('filters'),
-				interceptors: pick('interceptors')
+				interceptors: pick('interceptors'),
+				rateLimit: pick('rateLimit')
 			};
 			const withoutModules = ({
 				modules: _modules,
@@ -235,6 +244,7 @@ export abstract class Application extends InteractsWithConsole {
 				env: _env,
 				filters: _filters,
 				interceptors: _interceptors,
+				rateLimit: _rateLimit,
 				...rest
 			}: AppProps): AppProps => rest;
 
