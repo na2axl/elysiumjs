@@ -15,7 +15,7 @@
 import type { Application } from '@elysiumjs/core';
 import type { AssertAdapter, Scenario, ScenarioDriver } from './types';
 
-import { resetContainer, Runtime } from '@elysiumjs/core';
+import { createHttpClient, resetContainer, Runtime } from '@elysiumjs/core';
 
 const EVENT_COUNT = 2;
 
@@ -62,10 +62,11 @@ const checkResponse = async (
 	}
 };
 
-/** The default driver: builds the app and hands each request to `elysia.handle`. */
+/** The default driver: builds the app and sends each request through the HTTP test client. */
 const handleDriver: ScenarioDriver = async (app) => {
 	const elysia = await app.build();
-	return (request) => elysia.handle(request);
+	const client = createHttpClient((request) => elysia.handle(request));
+	return (request) => client.send(request);
 };
 
 /**

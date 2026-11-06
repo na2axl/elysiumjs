@@ -20,7 +20,7 @@ import type { ElysiaApp, Route } from './http';
 import type { ConfiguredModule, ModuleClass } from './module';
 import type { ModuleGraph, ModuleNode } from './module-graph';
 import type { Runtime as RuntimePort } from './runtime';
-import type { TestingApp, TestingOptions } from './testing';
+import type { TestingApp, TestingAppOptions, TestingHttpApp, TestingOptions } from './testing';
 import type { ElysiaPlugin } from './utils';
 
 import { AsyncLocalStorage } from 'node:async_hooks';
@@ -44,7 +44,7 @@ import { ModuleContext } from './module-context';
 import { buildModuleGraph } from './module-graph';
 import { Runtime } from './runtime';
 import { Service } from './service';
-import { createTestingApp } from './testing';
+import { createTestingApp, createTestingHttpApp } from './testing';
 import { deepMerge, Symbols } from './utils';
 
 /**
@@ -245,12 +245,18 @@ export abstract class Application extends InteractsWithConsole {
 	}
 
 	/**
-	 * Boots a module graph without a CLI or an HTTP server, for tests.
-	 * @param options The modules to boot, service overrides, environment and boot mode.
+	 * Sets up code under test. Given `app`, builds that application and returns an HTTP client that
+	 * drives it in memory (`http.get('/x').send()`). Given `modules`, boots a module graph without a
+	 * CLI or an HTTP server.
+	 * @param options The application or the modules, service overrides, environment and boot mode.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 */
-	public static testing(options: TestingOptions): Promise<TestingApp> {
-		return createTestingApp(options);
+	public static testing(options: TestingAppOptions): Promise<TestingHttpApp>;
+	public static testing(options: TestingOptions): Promise<TestingApp>;
+	public static testing(
+		options: TestingOptions | TestingAppOptions
+	): Promise<TestingApp | TestingHttpApp> {
+		return 'app' in options ? createTestingHttpApp(options) : createTestingApp(options);
 	}
 
 	/**

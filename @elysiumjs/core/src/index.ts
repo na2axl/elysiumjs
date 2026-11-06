@@ -61,7 +61,21 @@ export { Kernel, KERNEL_SERVICE } from './kernel';
 export { type ConfiguredModule, type ModuleClass, type ModuleProps, Module } from './module';
 export { ModuleContext } from './module-context';
 export { type ModuleGraph, type ModuleNode } from './module-graph';
-export { type TestingApp, type TestingOptions, resetContainer } from './testing';
+export {
+	type TestingApp,
+	type TestingAppOptions,
+	type TestingHttpApp,
+	type TestingOptions,
+	resetContainer
+} from './testing';
+export {
+	type HttpTestClient,
+	type RequestHandler,
+	type TestResponse,
+	createHttpClient,
+	TestRequest,
+	UnexpectedStatusError
+} from './http-client';
 export {
 	type ShutdownSignal,
 	Runtime,

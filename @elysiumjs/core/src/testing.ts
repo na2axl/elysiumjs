@@ -14,11 +14,13 @@
 
 import type { Class } from 'type-fest';
 import type { Application } from './app';
+import type { HttpTestClient } from './http-client';
 import type { ConfiguredModule, ModuleClass } from './module';
 import type { ServiceToken } from './token';
 
 import { Container } from './container';
 import { ElysiumError } from './errors';
+import { createHttpClient } from './http-client';
 import { Kernel } from './kernel';
 import { ModuleContext } from './module-context';
 import { buildModuleGraph } from './module-graph';
@@ -79,6 +81,77 @@ export const resetContainer = (): void => {
 };
 
 /**
+ * Options of {@link Application.testing} for a whole application, driven over HTTP.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type TestingAppOptions = {
+	/** The application class to build. It must not be started. */
+	app: new () => Application;
+
+	/**
+	 * Services registered as globals before the application boots; they win over module services
+	 * with the same token. Give named services by name, or any service by class with a `Map`.
+	 */
+	overrides?: Record<string, unknown> | Map<ServiceToken, unknown>;
+};
+
+/**
+ * A built application under test, with an HTTP client that drives it in memory.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type TestingHttpApp = TestingApp & {
+	/** The application instance. */
+	app: Application;
+
+	/** Sends requests to the application through `app.handle(Request)`, without a server. */
+	http: HttpTestClient;
+};
+
+const applyOverrides = (overrides: Record<string, unknown> | Map<ServiceToken, unknown>) => {
+	const entries = overrides instanceof Map ? [...overrides] : Object.entries(overrides);
+	Container.setOverrides(entries.map(([token]) => token));
+	for (const [token, value] of entries) Service.instance(token, value);
+};
+
+/**
+ * Builds an application, as a host that owns the server would (`app.build()`), and returns an
+ * HTTP client for it. Modules boot on the first request.
+ * @param options See {@link TestingAppOptions}.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export async function createTestingHttpApp(options: TestingAppOptions): Promise<TestingHttpApp> {
+	const { app: App, overrides = {} } = options;
+
+	resetContainer();
+	try {
+		const app = new App();
+		applyOverrides(overrides);
+		const elysia = await app.build();
+		const graph = app.kernel.graph;
+		return {
+			app,
+			kernel: app.kernel,
+			http: createHttpClient((request) => elysia.handle(request)),
+			get: async <T>(name: string | Class<T>, from?: ModuleClass) => {
+				await app.boot();
+				const resolve = () => Service.resolve<T>(name);
+				if (!from) return resolve();
+				const node = graph.node(from);
+				if (!node) throw new ElysiumError(`Module ${from.name} is not part of the app graph.`);
+				return ModuleContext.run(node, resolve);
+			},
+			shutdown: async () => {
+				await app.kernel.shutdown();
+				resetContainer();
+			}
+		};
+	} catch (error) {
+		resetContainer();
+		throw error;
+	}
+}
+
+/**
  * Boots a module graph without a CLI or an HTTP server.
  * @param options See {@link TestingOptions}.
  * @author Axel Nana <axel.nana@workbud.com>
@@ -91,9 +164,7 @@ export async function createTestingApp(options: TestingOptions): Promise<Testing
 		const graph = buildModuleGraph(modules, environment);
 		const kernel = new Kernel(graph);
 
-		const entries = overrides instanceof Map ? [...overrides] : Object.entries(overrides);
-		Container.setOverrides(entries.map(([token]) => token));
-		for (const [token, value] of entries) Service.instance(token, value);
+		applyOverrides(overrides);
 
 		await kernel.register();
 		if (boot === 'eager') await kernel.bootEager();
