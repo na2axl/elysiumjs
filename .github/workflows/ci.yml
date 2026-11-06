@@ -80,13 +80,13 @@ jobs:
 
       - name: Compile the scenarios ahead of time
         if: matrix.lane == 'workerd-aot'
-        working-directory: "@elysiumjs/conformance"
+        working-directory: conformance
         run: bun scripts/build-aot.ts
 
       # Vitest is called directly in the Node.js and workerd lanes: their `test:*` scripts rebuild
       # through `pretest:*`, which the step above already did.
       - name: Run the conformance suite
-        working-directory: "@elysiumjs/conformance"
+        working-directory: conformance
         run: ${{ matrix.lane == 'bun' && 'bun run test' || format('bunx vitest run -c vitest.{0}.config.ts', matrix.lane) }}
 
   # Late stage: build + test, needs services

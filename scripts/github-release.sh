@@ -10,6 +10,9 @@ trap 'rm -f "${notes:?}"' EXIT
 for dir in @elysiumjs/* create-elysium; do
 	name="$(bun -p "require('./$dir/package.json').name")"
 	version="$(bun -p "require('./$dir/package.json').version")"
+	if [ "$(bun -p "require('./$dir/package.json').private === true")" = true ]; then
+		continue
+	fi
 	tag="$name@$version"
 
 	if [ "$(npm view "$tag" version 2>/dev/null)" != "$version" ]; then

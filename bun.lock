@@ -94,28 +94,6 @@
         "@elysiumjs/core": "workspace:^",
       },
     },
-    "@elysiumjs/conformance": {
-      "name": "@elysiumjs/conformance",
-      "version": "0.0.0",
-      "dependencies": {
-        "@elysiumjs/ariadne": "workspace:^",
-        "@elysiumjs/core": "workspace:^",
-        "@elysiumjs/mnemosyne": "workspace:^",
-        "@elysiumjs/moirai": "workspace:^",
-        "@elysiumjs/runtime-bun": "workspace:^",
-        "@elysiumjs/themis": "workspace:^",
-        "elysia": "^2.0.0-rc.1",
-      },
-      "devDependencies": {
-        "@cloudflare/vitest-plugin": "^1.6.0",
-        "@elysiumjs/ariadne-workers": "workspace:*",
-        "@elysiumjs/runtime-node": "workspace:*",
-        "@elysiumjs/runtime-workers": "workspace:*",
-        "@swc/core": "^1.16.22",
-        "unplugin-swc": "^2.0.0",
-        "vitest": "^5.0.5",
-      },
-    },
     "@elysiumjs/core": {
       "name": "@elysiumjs/core",
       "version": "0.11.0",
@@ -405,6 +383,28 @@
         "@elysiumjs/themis": "workspace:^",
       },
     },
+    "conformance": {
+      "name": "@elysiumjs/conformance",
+      "version": "0.0.0",
+      "dependencies": {
+        "@elysiumjs/ariadne": "workspace:^",
+        "@elysiumjs/core": "workspace:^",
+        "@elysiumjs/mnemosyne": "workspace:^",
+        "@elysiumjs/moirai": "workspace:^",
+        "@elysiumjs/runtime-bun": "workspace:^",
+        "@elysiumjs/themis": "workspace:^",
+        "elysia": "^2.0.0-rc.1",
+      },
+      "devDependencies": {
+        "@cloudflare/vitest-plugin": "^1.6.0",
+        "@elysiumjs/ariadne-workers": "workspace:*",
+        "@elysiumjs/runtime-node": "workspace:*",
+        "@elysiumjs/runtime-workers": "workspace:*",
+        "@swc/core": "^1.16.22",
+        "unplugin-swc": "^2.0.0",
+        "vitest": "^5.0.5",
+      },
+    },
     "create-elysium": {
       "name": "create-elysium",
       "version": "0.3.0",
@@ -547,7 +547,7 @@
 
     "@elysiumjs/cerberus": ["@elysiumjs/cerberus@workspace:@elysiumjs/cerberus"],
 
-    "@elysiumjs/conformance": ["@elysiumjs/conformance@workspace:@elysiumjs/conformance"],
+    "@elysiumjs/conformance": ["@elysiumjs/conformance@workspace:conformance"],
 
     "@elysiumjs/core": ["@elysiumjs/core@workspace:@elysiumjs/core"],
 
