@@ -1,0 +1,176 @@
+# @elysiumjs/themis
+
+Authentication for [Elysium.js](../core) apps: passwords, tokens, sessions, guards, CSRF, TOTP, OAuth/OpenID Connect and passkeys. It runs on Bun, Node.js and Cloudflare Workers.
+
+## Installation
+
+```bash
+bun add @elysiumjs/themis
+```
+
+## Setup
+
+```ts
+import { Application, Middleware } from '@elysiumjs/core';
+import {
+	apiKeyGuard,
+	CsrfMiddleware,
+	jwtGuard,
+	RedisSessionStore,
+	sessionGuard,
+	SessionMiddleware,
+	ThemisModule
+} from '@elysiumjs/themis';
+
+@Application.register({
+	modules: [
+		ThemisModule.with({
+			secret: env.APP_SECRET,
+			session: { store: new RedisSessionStore(), ttl: 60 * 60 * 24 * 7 },
+			guards: {
+				session: sessionGuard({ user: (id) => users.find(id) }),
+				jwt: jwtGuard({ secret: env.JWT_SECRET, user: (claims) => users.find(claims.sub) }),
+				apiKey: apiKeyGuard({ find: (hash) => keys.ownerOf(hash) })
+			}
+		}),
+		AppModule
+	]
+})
+@Middleware.register(SessionMiddleware, CsrfMiddleware)
+class App extends Application {}
+```
+
+`secret` signs the session cookie, encrypts cookie sessions and binds CSRF tokens. Keep it in an environment secret, with at least 32 random characters.
+
+## Auth
+
+```ts
+import { Http } from '@elysiumjs/core';
+import { Auth } from '@elysiumjs/themis';
+
+@Http.controller({ path: '/me' })
+@Auth()
+class MeController {
+	@Http.get()
+	public me() {
+		return Auth.user();
+	}
+
+	@Http.get({ path: '/tokens' })
+	@Auth({ guards: ['jwt'] })
+	public tokens() {
+		/* ... */
+	}
+}
+```
+
+- `@Auth()` tries the configured guards in order, and `@Auth({ guards })` only the named ones. A custom guard implements `Guard`.
+- A request no guard accepts answers a 401 problem. `@Auth({ optional: true })` lets it through, and `Auth.check()` tells whether a user is signed in.
+- The user is available through `Auth.user()` and `ctx.currentUser`, so cerberus can read it with `getSubject: (ctx) => ctx.currentUser`.
+- `Auth.login(id)` signs a user in on the session (and regenerates it), and `Auth.logout()` signs them out.
+
+## Sessions
+
+```ts
+import { Session } from '@elysiumjs/themis';
+
+const session = Session.current();
+session.set('cart', items);
+session.flash('notice', 'Saved');
+session.regenerate();
+```
+
+- The stores are `MemorySessionStore`, `RedisSessionStore` and `KvSessionStore` (a Workers KV binding). `store: 'cookie'` keeps the whole session in an AES-GCM encrypted cookie.
+- The session cookie is signed, `HttpOnly`, `SameSite=Lax` and `Secure` by default.
+- The session is saved after the handler runs.
+
+## CSRF
+
+`CsrfMiddleware` protects cookie sessions with a double-submit token. Unsafe methods need the `x-csrf-token` header or the `_csrf` field to match `Csrf.token()`, or they answer a 403 problem.
+
+## Passwords
+
+```ts
+import { Password } from '@elysiumjs/themis';
+
+const hash = await Password.hash(input);
+if ((await Password.verify(input, hash)) && Password.needsRehash(hash)) {
+	await users.updateHash(id, await Password.hash(input));
+}
+```
+
+The hasher is argon2id (`BunPasswordHasher`) on Bun and PBKDF2-SHA256 (`Pbkdf2PasswordHasher`) elsewhere. `ScryptPasswordHasher`, from `@elysiumjs/themis/scrypt`, uses `node:crypto`. Pick one with `Password.use(hasher)`. Hashes describe their format, so `verify` reads all three.
+
+## Tokens
+
+```ts
+import { ApiKeys, Jwt, SignedUrl } from '@elysiumjs/themis';
+
+const token = await Jwt.sign({ role: 'admin' }, { secret, subject: user.id, expiresIn: 3600 });
+const claims = await Jwt.verify(token, { secret });
+
+const { key, hash } = await ApiKeys.generate({ prefix: 'sk' }); // store the hash, show the key once
+await ApiKeys.verify(key, hash);
+
+const link = await SignedUrl.sign('https://app.example.com/download/1', { secret, expiresIn: 600 });
+await SignedUrl.verify(link, { secret });
+```
+
+`Jwt` signs with a secret (HS256) or with an asymmetric key and its algorithm. An invalid or expired token is a 401 problem, and an invalid or expired link a 403 problem.
+
+## Two-factor codes
+
+```ts
+import { BackupCodes, Totp } from '@elysiumjs/themis';
+
+const secret = Totp.generateSecret();
+const qr = Totp.uri({ secret, issuer: 'Acme', account: user.email });
+const counter = await Totp.verify(code, secret, { window: 1 }); // null when wrong
+
+const { codes, hashes } = await BackupCodes.generate(10);
+const { valid, remaining } = await BackupCodes.consume(typed, hashes);
+```
+
+Store the counter `Totp.verify` returns and refuse a code whose counter is not greater, so that a code works once.
+
+## OAuth and OpenID Connect
+
+```ts
+import { OAuthClient } from '@elysiumjs/themis';
+
+const google = new OAuthClient({
+	issuer: 'https://accounts.google.com',
+	clientId: env.GOOGLE_CLIENT_ID,
+	clientSecret: env.GOOGLE_CLIENT_SECRET,
+	redirectUri: 'https://api.example.com/auth/google/callback'
+});
+
+// GET /auth/google
+const url = await google.authorize();
+
+// GET /auth/google/callback
+const { tokens, claims, userInfo } = await google.callback(request.url);
+```
+
+The client uses the authorization code flow with PKCE. The state, the verifier and the OpenID Connect nonce are kept in the session. A provider without discovery takes `authorizationServer` with its endpoints. A callback with a wrong state or a failed exchange answers a 400 problem.
+
+## Passkeys
+
+```ts
+import { Passkeys } from '@elysiumjs/themis';
+
+const passkeys = new Passkeys({
+	rpName: 'Acme',
+	rpID: 'example.com',
+	origin: 'https://example.com',
+	repository: new PasskeyTable()
+});
+
+const options = await passkeys.registrationOptions({ id: user.id, name: user.email });
+const record = await passkeys.verifyRegistration(response);
+
+const challenge = await passkeys.authenticationOptions();
+const used = await passkeys.verifyAuthentication(assertion); // used.userId signs the user in
+```
+
+The challenge is kept in the session. The app stores credentials by implementing `PasskeyRepository`. A response that does not verify answers a 400 problem.

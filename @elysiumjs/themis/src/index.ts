@@ -52,5 +52,19 @@ export {
 	SessionMiddleware,
 	type SessionStore
 } from './session';
+export {
+	OAuthCallbackError,
+	OAuthClient,
+	type OAuthClientOptions,
+	type OAuthResult
+} from './oauth';
+export {
+	type PasskeyRecord,
+	type PasskeyRepository,
+	Passkeys,
+	type PasskeysOptions,
+	PasskeyVerificationError
+} from './passkeys';
 export { InvalidSignatureError, SignedUrl } from './signed-url';
 export { ThemisModule } from './themis.module';
+export { BackupCodes, Totp, type TotpOptions } from './totp';
