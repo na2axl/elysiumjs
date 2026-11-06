@@ -36,7 +36,7 @@ const effects: string[] = [];
 const EmailBody = t.Object({ email: t.String({ format: 'email' }) });
 const CodeBody = t.Object({ code: t.String() });
 
-@Flow.controller({ name: 'sign-up', ttl: 900, owner: 'guest' })
+@Flow.controller('sign-up', { ttl: 900, owner: 'guest' })
 class SignUpFlow {
 	@Flow.initial()
 	public initial(): SignUp {
@@ -71,7 +71,7 @@ class SignUpFlow {
 	}
 }
 
-@Flow.controller({ name: 'profile', path: '/me/profile-flow', ttl: 60, owner: 'user' })
+@Flow.controller('profile', { path: '/me/profile-flow', ttl: 60, owner: 'user' })
 @Auth({ guards: ['jwt'] })
 class ProfileFlow {
 	@Flow.initial()
@@ -79,7 +79,7 @@ class ProfileFlow {
 		return { owner: ctx.owner };
 	}
 
-	@Flow.step({ name: 'name' })
+	@Flow.step('name')
 	public setName(
 		@Http.body(t.Object({ name: t.String() })) { name }: { name: string },
 		@Flow.state() state: { owner: string },
@@ -91,7 +91,7 @@ class ProfileFlow {
 
 type Plan = { plan?: string };
 
-@Flow.controller({ name: 'plan', ttl: 60, owner: 'guest', start: ['choose'] })
+@Flow.controller('plan', { ttl: 60, owner: 'guest', start: ['choose'] })
 class PlanFlow {
 	/** A free plan ends the flow, a paid one goes on to payment. */
 	@Flow.step<Plan>({ next: (state) => (state.plan === 'free' ? [] : ['pay']) })
@@ -111,7 +111,7 @@ const users: Record<string, { id: string }> = { u1: { id: 'u1' }, u2: { id: 'u2'
 type Pin = { attempts: number };
 
 /** A first step that refuses: its attempts must add up from the first try. */
-@Flow.controller({ name: 'pin', ttl: 60, owner: 'guest' })
+@Flow.controller('pin', { ttl: 60, owner: 'guest' })
 class PinFlow {
 	@Flow.initial()
 	public initial(): Pin {
@@ -132,7 +132,7 @@ class PinFlow {
 }
 
 /** A user flow behind a guard whose user is the JWT claims. */
-@Flow.controller({ name: 'claims', ttl: 60, owner: 'user' })
+@Flow.controller('claims', { ttl: 60, owner: 'user' })
 @Auth({ guards: ['claims'] })
 class ClaimsFlow {
 	@Flow.step()
@@ -176,7 +176,10 @@ describe('Flow.controller', () => {
 	});
 
 	it('refuses a flow without steps, with a bad name, a bad ttl or unknown steps', () => {
-		const declare = (options: Parameters<typeof Flow.controller>[0], withStep = true) => {
+		const declare = (
+			{ name, ...options }: { name: string } & Parameters<typeof Flow.controller>[1],
+			withStep = true
+		) => {
 			class Target {
 				public a() {}
 			}
@@ -187,7 +190,7 @@ describe('Flow.controller', () => {
 					Object.getOwnPropertyDescriptor(Target.prototype, 'a')!
 				);
 			}
-			Flow.controller(options)(Target);
+			Flow.controller(name, options)(Target);
 		};
 		const base = { name: 'a', ttl: 1, owner: 'guest' as const };
 		expect(() => declare(base, false)).toThrow(InvalidFlowError);

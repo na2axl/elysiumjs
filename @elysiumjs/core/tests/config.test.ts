@@ -147,7 +147,7 @@ describe('environment at boot', () => {
 
 	const withEnv = (env: Record<string, string>) => Runtime.use({ ...testRuntime, env: () => env });
 
-	@Http.controller({ path: '/env' })
+	@Http.controller('/env')
 	class EnvController {
 		@Http.get()
 		public show() {

@@ -59,7 +59,7 @@ export abstract class CacheInterceptor {
 	 * @param options The TTL, the cache and the key.
 	 * @example
 	 * ```ts
-	 * @Http.get({ path: '/trending', interceptors: [CacheInterceptor.with({ ttl: 30_000 })] })
+	 * @Http.get('/trending', { interceptors: [CacheInterceptor.with({ ttl: 30_000 })] })
 	 * ```
 	 */
 	public static with(options: CacheInterceptorOptions): InterceptorClass {

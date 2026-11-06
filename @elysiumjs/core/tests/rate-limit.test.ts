@@ -43,27 +43,27 @@ const recording: RateLimitStore = {
 	}
 };
 
-@Http.controller({ path: '/limited' })
+@Http.controller('/limited')
 @RateLimit({ window: 60_000, max: 2 })
 class LimitedController {
-	@Http.get({ path: '/a' })
+	@Http.get('/a')
 	public a() {
 		return { ok: true };
 	}
 
-	@Http.get({ path: '/b' })
+	@Http.get('/b')
 	@RateLimit({ window: 60_000, max: 1, name: 'strict' })
 	public b() {
 		return { ok: true };
 	}
 
-	@Http.get({ path: '/free' })
+	@Http.get('/free')
 	@RateLimit(false)
 	public free() {
 		return { ok: true };
 	}
 
-	@Http.get({ path: '/user' })
+	@Http.get('/user')
 	@RateLimit({
 		window: 60_000,
 		max: 1,
@@ -74,9 +74,9 @@ class LimitedController {
 	}
 }
 
-@Http.controller({ path: '/open' })
+@Http.controller('/open')
 class OpenController {
-	@Http.get({ path: '/' })
+	@Http.get('/')
 	public index() {
 		return { ok: true };
 	}
@@ -89,9 +89,9 @@ const deciding: RateLimitStore = {
 	}
 };
 
-@Http.controller({ path: '/decided' })
+@Http.controller('/decided')
 class DecidedController {
-	@Http.get({ path: '/' })
+	@Http.get('/')
 	@RateLimit({ window: 10_000, max: 1, store: deciding })
 	public index() {
 		return { ok: true };

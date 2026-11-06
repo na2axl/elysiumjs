@@ -21,7 +21,7 @@ import { waitFor } from './wait';
 const make = async (): Promise<Application> => {
 	let counter = 0;
 
-	@Http.controller({ path: '/stream' })
+	@Http.controller('/stream')
 	class StreamController {
 		@Http.sse()
 		public events() {
@@ -70,7 +70,7 @@ const makeDisposal = async (): Promise<Application> => {
 		}
 	}
 
-	@Http.controller({ path: '/stream' })
+	@Http.controller('/stream')
 	class StreamController {
 		@Http.sse()
 		public events(@Service.inject(StreamSession) session: StreamSession) {

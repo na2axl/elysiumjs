@@ -33,9 +33,9 @@ Create a controller class:
 ```typescript
 import { Http } from '@elysiumjs/core';
 
-@Http.controller({ path: '/users' })
+@Http.controller('/users')
 export class UserController {
-	@Http.get({ path: '/:id' })
+	@Http.get('/:id')
 	public getUser(id: string) {
 		return { id };
 	}

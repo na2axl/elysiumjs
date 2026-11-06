@@ -24,11 +24,11 @@ class Greeter {
 	}
 }
 
-@Http.controller({ path: '/greet' })
+@Http.controller('/greet')
 class GreetController {
 	constructor(@Service.inject() private readonly greeter: Greeter) {}
 
-	@Http.get({ path: '/:name' })
+	@Http.get('/:name')
 	public show(@Http.context() c: { params: { name: string } }) {
 		return { message: this.greeter.greet(c.params.name), runtime: typeof Bun };
 	}

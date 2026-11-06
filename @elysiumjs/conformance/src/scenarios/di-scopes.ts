@@ -50,7 +50,7 @@ const makeScopes = async (): Promise<Application> => {
 		}
 	}
 
-	@Http.controller({ path: '/di', scope: HttpControllerScope.REQUEST })
+	@Http.controller('/di', { scope: HttpControllerScope.REQUEST })
 	class DiController {
 		constructor(@Service.inject(Session) public session: Session) {}
 
@@ -127,14 +127,14 @@ const makeDisposal = async (): Promise<Application> => {
 		}
 	}
 
-	@Http.controller({ path: '/dispose' })
+	@Http.controller('/dispose')
 	class DisposeController {
-		@Http.get({ path: '/ok' })
+		@Http.get('/ok')
 		public ok(@Service.inject(Outer) outer: Outer) {
 			return { ok: !!outer };
 		}
 
-		@Http.get({ path: '/fail' })
+		@Http.get('/fail')
 		public fail(@Service.inject(Outer) _outer: Outer) {
 			throw new Error('handler failed');
 		}

@@ -45,7 +45,7 @@ export type ModelResourceOptions<TKey extends string = string> = {
  * ```ts
  * const UserResource = ModelResource(User, { hidden: ['passwordHash'] });
  *
- * @Http.get({ path: '/:id', response: UserResource })
+ * @Http.get('/:id', { response: UserResource })
  * public show(@Http.param('id') id: string) {
  *   return this.users.find(id);
  * }

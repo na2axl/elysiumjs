@@ -68,23 +68,23 @@ class JobConsumer {
 	}
 }
 
-@Http.controller({ path: '/jobs', scope: HttpControllerScope.REQUEST })
+@Http.controller('/jobs', { scope: HttpControllerScope.REQUEST })
 class JobController {
 	public constructor(@Service.inject(JobQueue) private readonly jobs: JobQueue) {}
 
-	@Http.post({ path: '/:id' })
+	@Http.post('/:id')
 	public async create(@Http.param('id', t.String({ minLength: 2 })) id: string) {
 		await this.jobs.send({ id });
 		return { queued: id };
 	}
 
-	@Http.get({ path: '/:id' })
+	@Http.get('/:id')
 	public async show(@Http.param('id', t.String()) id: string) {
 		return { id, status: (await Cache.store('kv').get<string>(`job:${id}`)) ?? 'pending' };
 	}
 }
 
-@Http.controller({ path: '/cron' })
+@Http.controller('/cron')
 class CronController {
 	@Http.get()
 	public async last() {

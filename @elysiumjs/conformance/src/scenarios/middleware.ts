@@ -25,7 +25,7 @@ const make = async (): Promise<Application> => {
 		}
 	}
 
-	@Http.controller({ path: '/secret' })
+	@Http.controller('/secret')
 	class SecretController {
 		@Http.get()
 		public show() {

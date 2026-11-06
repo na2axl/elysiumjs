@@ -14,9 +14,9 @@
 
 import { Http, t } from '@elysiumjs/core';
 
-@Http.controller({ path: '/posts' })
+@Http.controller('/posts')
 export class PostController {
-	@Http.get({ path: '/:id' })
+	@Http.get('/:id')
 	public show(@Http.param('id', t.String()) id: string): { id: string } {
 		return { id };
 	}

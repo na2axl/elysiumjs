@@ -47,7 +47,7 @@ const make = async (): Promise<Application> => {
 		}
 	}
 
-	@Http.controller({ path: '/pay' })
+	@Http.controller('/pay')
 	class PayController {
 		@Http.post()
 		public pay() {

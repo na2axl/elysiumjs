@@ -21,7 +21,7 @@ type SignUp = { email?: string; attempts: number };
 const EmailBody = t.Object({ email: t.String({ format: 'email' }) });
 const CodeBody = t.Object({ code: t.String() });
 
-@Flow.controller({ name: 'sign-up', ttl: 900, owner: 'guest' })
+@Flow.controller('sign-up', { ttl: 900, owner: 'guest' })
 export class SignUpFlow {
 	constructor(
 		private readonly codes: CodeService,

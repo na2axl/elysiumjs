@@ -27,7 +27,7 @@ class Greeter {
 	}
 }
 
-@Http.controller({ path: '/echo' })
+@Http.controller('/echo')
 class EchoController {
 	@Http.get()
 	public show(@Http.context() c: any) {
@@ -40,7 +40,7 @@ class EchoController {
 		return { body: c.body, type: c.request.headers.get('content-type') };
 	}
 
-	@Http.get({ path: '/greet/:name' })
+	@Http.get('/greet/:name')
 	public greet(@Http.param('name') name: string, @Service.inject(Greeter) greeter: Greeter) {
 		return greeter.greet(name);
 	}

@@ -24,7 +24,7 @@ import { testRuntime } from './test-runtime';
 
 let handled = 0;
 
-@Http.controller({ path: '/s' })
+@Http.controller('/s')
 class SecureController {
 	@Http.get()
 	public show(@Http.context() c: any) {

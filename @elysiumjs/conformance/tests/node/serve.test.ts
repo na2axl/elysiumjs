@@ -226,9 +226,9 @@ describe('serveNode', () => {
 	});
 
 	it('serves an Elysium application end to end on Node', async () => {
-		@Http.controller({ path: '/greet' })
+		@Http.controller('/greet')
 		class GreetController {
-			@Http.get({ path: '/:name' })
+			@Http.get('/:name')
 			public greet(@Http.param('name') name: string) {
 				return { hello: name };
 			}

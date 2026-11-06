@@ -27,7 +27,7 @@ const expectAdapter: AssertAdapter = {
 };
 
 const makeApp = async (): Promise<Application> => {
-	@Http.controller({ path: '/ping' })
+	@Http.controller('/ping')
 	class PingController {
 		@Http.get()
 		public ping() {

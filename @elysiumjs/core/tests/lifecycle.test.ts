@@ -131,10 +131,10 @@ describe('Lifecycle namespace', () => {
 	describe('on (decorator)', () => {
 		it('only records the listener as class metadata', () => {
 			class TestClass {
-				@Lifecycle.on({ event: 'test-event', prepend: true })
+				@Lifecycle.on('test-event', { prepend: true })
 				handleEvent(_eventData: LifecycleEvent<any>) {}
 
-				@Lifecycle.on({ event: 'test-static' })
+				@Lifecycle.on('test-static')
 				static handleStatic(_eventData: LifecycleEvent<any>) {}
 			}
 
@@ -173,7 +173,7 @@ describe('Lifecycle namespace', () => {
 	describe('once (decorator)', () => {
 		it('only records the listener as class metadata', () => {
 			class TestClass {
-				@Lifecycle.once({ event: 'test-event' })
+				@Lifecycle.once('test-event')
 				handleEvent(_eventData: LifecycleEvent<any>) {}
 			}
 

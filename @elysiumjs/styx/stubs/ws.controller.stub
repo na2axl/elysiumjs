@@ -2,7 +2,7 @@ import type { WS, WSError } from '@elysiumjs/core';
 
 import { Websocket } from '@elysiumjs/core';
 
-@Websocket.controller({ path: '{path}' })
+@Websocket.controller('{path}')
 export class {name} {
 	@Websocket.onOpen()
 	private onOpen() {

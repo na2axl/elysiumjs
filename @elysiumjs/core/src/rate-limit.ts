@@ -149,10 +149,10 @@ const RATE_LIMIT = Symbol.for('elysium:RateLimit');
  * @param limit The limit, or `false` for none.
  * @example
  * ```ts
- * @Http.controller({ path: '/auth' })
+ * @Http.controller('/auth')
  * @RateLimit({ window: 60_000, max: 10 })
  * class AuthController {
- * 	@Http.post({ path: '/otp' })
+ * 	@Http.post('/otp')
  * 	@RateLimit({ window: 60_000, max: 3, name: 'otp' })
  * 	public sendOtp() {}
  * }

@@ -42,9 +42,7 @@ describe('Http namespace', () => {
 
 		it('should set metadata on the target class', () => {
 			// Create a test class
-			@Http.controller({
-				path: '/test'
-			})
+			@Http.controller('/test')
 			class TestController {}
 
 			// Check if metadata was set correctly
@@ -55,9 +53,7 @@ describe('Http namespace', () => {
 
 		it('should create an Elysia app with the correct prefix', async () => {
 			// Create a test class
-			@Http.controller({
-				path: '/test'
-			})
+			@Http.controller('/test')
 			class TestController {}
 
 			// Get the plugin function
@@ -72,8 +68,7 @@ describe('Http namespace', () => {
 			const makeSpy = spyOn(Container, 'makeSingleton');
 
 			// Create a test class
-			@Http.controller({
-				path: '/test',
+			@Http.controller('/test', {
 				scope: HttpControllerScope.SERVER
 			})
 			class TestController {}
@@ -102,12 +97,11 @@ describe('Http namespace', () => {
 			const makeSpy = spyOn(Service, 'make');
 
 			// Create a test class
-			@Http.controller({
-				path: '/test',
+			@Http.controller('/test', {
 				scope: HttpControllerScope.REQUEST
 			})
 			class TestController {
-				@Http.get({ path: '/' })
+				@Http.get('/')
 				get() {
 					return 'test';
 				}
@@ -147,9 +141,7 @@ describe('Http namespace', () => {
 			class TestMiddleware2 extends M.Middleware {}
 
 			// Create a test class with middlewares
-			@Http.controller({
-				path: '/test'
-			})
+			@Http.controller('/test')
 			class TestController {}
 
 			// Set middlewares metadata
@@ -180,11 +172,9 @@ describe('Http namespace', () => {
 
 		it('should register a GET route', async () => {
 			// Create a test class
-			@Http.controller({
-				path: '/test'
-			})
+			@Http.controller('/test')
 			class TestController {
-				@Http.get({ path: '/users' })
+				@Http.get('/users')
 				getUsers() {
 					return ['user1', 'user2'];
 				}
@@ -202,11 +192,9 @@ describe('Http namespace', () => {
 
 		it('should register a POST route', async () => {
 			// Create a test class
-			@Http.controller({
-				path: '/test'
-			})
+			@Http.controller('/test')
 			class TestController {
-				@Http.post({ path: '/users' })
+				@Http.post('/users')
 				createUser() {
 					return { id: 1, name: 'User' };
 				}
@@ -224,11 +212,9 @@ describe('Http namespace', () => {
 
 		it('should register a PUT route', async () => {
 			// Create a test class
-			@Http.controller({
-				path: '/test'
-			})
+			@Http.controller('/test')
 			class TestController {
-				@Http.put({ path: '/users/:id' })
+				@Http.put('/users/:id')
 				updateUser() {
 					return { id: 1, name: 'Updated User' };
 				}
@@ -246,11 +232,9 @@ describe('Http namespace', () => {
 
 		it('should register a DELETE route', async () => {
 			// Create a test class
-			@Http.controller({
-				path: '/test'
-			})
+			@Http.controller('/test')
 			class TestController {
-				@Http.del({ path: '/users/:id' })
+				@Http.del('/users/:id')
 				deleteUser() {
 					return { success: true };
 				}
@@ -268,11 +252,9 @@ describe('Http namespace', () => {
 
 		it('should register a PATCH route', async () => {
 			// Create a test class
-			@Http.controller({
-				path: '/test'
-			})
+			@Http.controller('/test')
 			class TestController {
-				@Http.patch({ path: '/users/:id' })
+				@Http.patch('/users/:id')
 				patchUser() {
 					return { id: 1, name: 'Patched User' };
 				}
@@ -290,11 +272,9 @@ describe('Http namespace', () => {
 
 		it('should register a HEAD route', async () => {
 			// Create a test class
-			@Http.controller({
-				path: '/test'
-			})
+			@Http.controller('/test')
 			class TestController {
-				@Http.head({ path: '/users/:id' })
+				@Http.head('/users/:id')
 				headUser() {
 					return { id: 1 };
 				}
@@ -312,11 +292,9 @@ describe('Http namespace', () => {
 
 		it('should register a OPTIONS route', async () => {
 			// Create a test class
-			@Http.controller({
-				path: '/test'
-			})
+			@Http.controller('/test')
 			class TestController {
-				@Http.options({ path: '/users/:id' })
+				@Http.options('/users/:id')
 				optionsUser() {
 					return { id: 1 };
 				}
@@ -334,11 +312,9 @@ describe('Http namespace', () => {
 
 		it('should register a TRACE route', async () => {
 			// Create a test class
-			@Http.controller({
-				path: '/test'
-			})
+			@Http.controller('/test')
 			class TestController {
-				@Http.trace({ path: '/users/:id' })
+				@Http.trace('/users/:id')
 				traceUser() {
 					return { id: 1 };
 				}
@@ -356,11 +332,9 @@ describe('Http namespace', () => {
 
 		it('should register a custom route', async () => {
 			// Create a test class
-			@Http.controller({
-				path: '/test'
-			})
+			@Http.controller('/test')
 			class TestController {
-				@Http.custom({ method: 'OPTIONS', path: '/users' })
+				@Http.custom('OPTIONS', '/users')
 				optionsUser() {
 					return { allowed: ['GET', 'POST'] };
 				}
@@ -378,11 +352,9 @@ describe('Http namespace', () => {
 
 		it('should register an SSE route', async () => {
 			// Create a test class
-			@Http.controller({
-				path: '/test'
-			})
+			@Http.controller('/test')
 			class TestController {
-				@Http.sse({ path: '/events' })
+				@Http.sse('/events')
 				async getEvents() {
 					return ['event1', 'event2'];
 				}
@@ -406,11 +378,9 @@ describe('Http namespace', () => {
 
 		it('should register a body parameter', async () => {
 			// Create a test class
-			@Http.controller({
-				path: '/test'
-			})
+			@Http.controller('/test')
 			class TestController {
-				@Http.post({ path: '/users' })
+				@Http.post('/users')
 				createUser(@Http.body() body: any) {
 					return body;
 				}
@@ -426,11 +396,9 @@ describe('Http namespace', () => {
 
 		it('should register a query parameter', async () => {
 			// Create a test class
-			@Http.controller({
-				path: '/test'
-			})
+			@Http.controller('/test')
 			class TestController {
-				@Http.get({ path: '/users' })
+				@Http.get('/users')
 				getUsers(@Http.query() query: any) {
 					return query;
 				}
@@ -446,11 +414,9 @@ describe('Http namespace', () => {
 
 		it('should register a path parameter', async () => {
 			// Create a test class
-			@Http.controller({
-				path: '/test'
-			})
+			@Http.controller('/test')
 			class TestController {
-				@Http.get({ path: '/users/:id' })
+				@Http.get('/users/:id')
 				getUser(@Http.param('id') id: string) {
 					return { id };
 				}
@@ -468,11 +434,9 @@ describe('Http namespace', () => {
 
 		it('should register a context parameter', async () => {
 			// Create a test class
-			@Http.controller({
-				path: '/test'
-			})
+			@Http.controller('/test')
 			class TestController {
-				@Http.get({ path: '/users' })
+				@Http.get('/users')
 				getUsers(@Http.context() ctx: Context) {
 					return ctx;
 				}
@@ -491,11 +455,9 @@ describe('Http namespace', () => {
 			const customDecorator = Http.decorate((c) => c.headers['x-custom-header']);
 
 			// Create a test class
-			@Http.controller({
-				path: '/test'
-			})
+			@Http.controller('/test')
 			class TestController {
-				@Http.get({ path: '/users' })
+				@Http.get('/users')
 				getUsers(@customDecorator() customHeader: string) {
 					return { customHeader };
 				}
@@ -525,8 +487,7 @@ describe('Http namespace', () => {
 			const handleRequestSpy = mock();
 
 			// Create a test class
-			@Http.controller({
-				path: '/test',
+			@Http.controller('/test', {
 				scope: HttpControllerScope.REQUEST
 			})
 			class TestController {
@@ -570,12 +531,11 @@ describe('Http namespace', () => {
 
 		it('should mark a controller as transactional', async () => {
 			// Create a test class
-			@Http.controller({
-				path: '/test',
+			@Http.controller('/test', {
 				transactional: true
 			})
 			class TestController {
-				@Http.get({ path: '/users' })
+				@Http.get('/users')
 				getUsers() {
 					return ['user1', 'user2'];
 				}
@@ -592,11 +552,9 @@ describe('Http namespace', () => {
 
 		it('should mark a route as transactional', async () => {
 			// Create a test class
-			@Http.controller({
-				path: '/test'
-			})
+			@Http.controller('/test')
 			class TestController {
-				@Http.get({ path: '/users', transactional: true })
+				@Http.get('/users', { transactional: true })
 				getUsers() {
 					return ['user1', 'user2'];
 				}
@@ -660,9 +618,9 @@ describe('Http namespace', () => {
 			expect(pkg.DATABASE_TRANSACTION_SERVICE).toBe('db.transaction');
 			const service = Service.instance(pkg.DATABASE_TRANSACTION_SERVICE, transactionService());
 
-			@Http.controller({ path: '/tx' })
+			@Http.controller('/tx')
 			class TxController {
-				@Http.get({ path: '/plain', transactional: true })
+				@Http.get('/plain', { transactional: true })
 				async plain() {
 					events.push(`handler:${currentEntries()}`);
 					return 'done';
@@ -676,9 +634,9 @@ describe('Http namespace', () => {
 		});
 
 		it('fails clearly when no db.transaction service is registered', async () => {
-			@Http.controller({ path: '/tx' })
+			@Http.controller('/tx')
 			class TxController {
-				@Http.get({ path: '/missing', transactional: true })
+				@Http.get('/missing', { transactional: true })
 				async missing() {
 					return 'done';
 				}
@@ -691,9 +649,9 @@ describe('Http namespace', () => {
 		it('keeps the transaction open until a transactional generator is consumed', async () => {
 			Service.instance('db.transaction', transactionService());
 
-			@Http.controller({ path: '/tx' })
+			@Http.controller('/tx')
 			class TxController {
-				@Http.get({ path: '/stream', transactional: true })
+				@Http.get('/stream', { transactional: true })
 				async *stream() {
 					events.push(`step1:${currentEntries()}`);
 					yield 1;
@@ -723,9 +681,9 @@ describe('Http namespace', () => {
 		it('rolls back the transaction of a generator that throws', async () => {
 			Service.instance('db.transaction', transactionService());
 
-			@Http.controller({ path: '/tx' })
+			@Http.controller('/tx')
 			class TxController {
-				@Http.get({ path: '/failing', transactional: true })
+				@Http.get('/failing', { transactional: true })
 				async *failing() {
 					yield 1;
 					throw new Error('boom');
@@ -746,9 +704,9 @@ describe('Http namespace', () => {
 		it('rolls back the transaction of a generator closed early', async () => {
 			Service.instance('db.transaction', transactionService());
 
-			@Http.controller({ path: '/tx' })
+			@Http.controller('/tx')
 			class TxController {
-				@Http.get({ path: '/early', transactional: true })
+				@Http.get('/early', { transactional: true })
 				async *early() {
 					try {
 						yield 1;
@@ -770,9 +728,9 @@ describe('Http namespace', () => {
 		it('rolls back when the client disconnects while the handler is waiting', async () => {
 			Service.instance('db.transaction', transactionService());
 
-			@Http.controller({ path: '/tx' })
+			@Http.controller('/tx')
 			class TxController {
-				@Http.get({ path: '/stuck', transactional: true })
+				@Http.get('/stuck', { transactional: true })
 				async *stuck() {
 					yield 1;
 					await new Promise(() => {});
@@ -798,9 +756,9 @@ describe('Http namespace', () => {
 		it('closes an idle generator before rolling back when the client disconnects', async () => {
 			Service.instance('db.transaction', transactionService());
 
-			@Http.controller({ path: '/tx' })
+			@Http.controller('/tx')
 			class TxController {
-				@Http.get({ path: '/idle', transactional: true })
+				@Http.get('/idle', { transactional: true })
 				async *idle() {
 					try {
 						yield 1;
@@ -835,9 +793,9 @@ describe('Http namespace', () => {
 			});
 			const gate = Promise.withResolvers<void>();
 
-			@Http.controller({ path: '/tx' })
+			@Http.controller('/tx')
 			class TxController {
-				@Http.get({ path: '/busy', transactional: true })
+				@Http.get('/busy', { transactional: true })
 				async *busy() {
 					yield 1;
 					try {
@@ -877,9 +835,9 @@ describe('Http namespace', () => {
 		});
 
 		it('exposes the request context to the body of a generator handler', async () => {
-			@Http.controller({ path: '/tx' })
+			@Http.controller('/tx')
 			class TxController {
-				@Http.get({ path: '/context' })
+				@Http.get('/context')
 				async *context() {
 					yield Application.context.getStore()?.get('tenant');
 				}
@@ -897,9 +855,9 @@ describe('Http namespace', () => {
 
 	describe('Http.describe', () => {
 		it('describes the routes and their decorated parameters', async () => {
-			@Http.controller({ path: '/posts' })
+			@Http.controller('/posts')
 			class PostController {
-				@Http.get({ path: '/:id' })
+				@Http.get('/:id')
 				show(@Http.param('id') id: string, @Http.query() query: unknown) {
 					return { id, query };
 				}
@@ -909,12 +867,12 @@ describe('Http namespace', () => {
 					return { c, body };
 				}
 
-				@Http.sse({ path: '/feed' })
+				@Http.sse('/feed')
 				feed() {
 					return {};
 				}
 
-				@Http.custom({ method: 'trace', path: '/trace' })
+				@Http.custom('trace', '/trace')
 				trace() {
 					return {};
 				}
@@ -978,16 +936,14 @@ describe('Http namespace', () => {
 
 		it('should register routes with Elysia', async () => {
 			// Create a test class
-			@Http.controller({
-				path: '/test'
-			})
+			@Http.controller('/test')
 			class TestController {
-				@Http.get({ path: '/users' })
+				@Http.get('/users')
 				getUsers() {
 					return ['user1', 'user2'];
 				}
 
-				@Http.post({ path: '/users' })
+				@Http.post('/users')
 				createUser(@Http.body() body: any) {
 					return body;
 				}
@@ -1021,9 +977,9 @@ describe('Http namespace', () => {
 		it('should close a generator handler in the module context when iteration stops early', async () => {
 			const closed: (string | undefined)[] = [];
 
-			@Http.controller({ path: '/test' })
+			@Http.controller('/test')
 			class TestController {
-				@Http.get({ path: '/stream' })
+				@Http.get('/stream')
 				async *stream() {
 					try {
 						yield 1;

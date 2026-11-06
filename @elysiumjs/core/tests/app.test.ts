@@ -891,11 +891,11 @@ describe('Application class', () => {
 				}
 			}
 
-			@Http.controller({ path: '/greet' })
+			@Http.controller('/greet')
 			class GreetController {
 				public constructor(@Service.inject('build.greeter') private readonly greeter: Greeter) {}
 
-				@Http.get({ path: '/:name' })
+				@Http.get('/:name')
 				public greet(@Http.param('name', t.String()) name: string) {
 					return this.greeter.greet(name);
 				}
@@ -1060,7 +1060,7 @@ describe('Application class', () => {
 
 				@Service.register()
 				class Listener {
-					@Lifecycle.on({ event: 'retry:evt' })
+					@Lifecycle.on('retry:evt')
 					public handle(e: unknown) {
 						received.push(e);
 					}
@@ -1144,9 +1144,9 @@ describe('Application class', () => {
 
 			let seen: string | undefined;
 
-			@Http.controller({ path: '/a' })
+			@Http.controller('/a')
 			class AController {
-				@Http.get({ path: '/x' })
+				@Http.get('/x')
 				x() {
 					seen = ModuleContext.current()?.id;
 					return { value: Service.make(PrivateService).value };
@@ -1177,14 +1177,14 @@ describe('Application class', () => {
 
 			const seen: (string | undefined)[] = [];
 
-			@Http.controller({ path: '/p' })
+			@Http.controller('/p')
 			class PController {
-				@Http.get({ path: '/inject' })
+				@Http.get('/inject')
 				inject(@Service.inject(Greeter) greeter: Greeter) {
 					return greeter.hello;
 				}
 
-				@Http.get({ path: '/stream' })
+				@Http.get('/stream')
 				async *stream() {
 					seen.push(ModuleContext.current()?.id);
 					await Promise.resolve();
@@ -1212,9 +1212,9 @@ describe('Application class', () => {
 		});
 
 		it('should prefix the controllers of a module with its prefix', async () => {
-			@Http.controller({ path: '/x' })
+			@Http.controller('/x')
 			class XController {
-				@Http.get({ path: '/' })
+				@Http.get('/')
 				x() {
 					return 'ok';
 				}
@@ -1254,9 +1254,9 @@ describe('Application class', () => {
 				}
 			}
 
-			@Http.controller({ path: '/g' })
+			@Http.controller('/g')
 			class GController {
-				@Http.get({ path: '/' })
+				@Http.get('/')
 				get() {
 					return 'ok';
 				}
@@ -1288,9 +1288,9 @@ describe('Application class', () => {
 				}
 			}
 
-			@Http.controller({ path: '/t' })
+			@Http.controller('/t')
 			class TController {
-				@Http.get({ path: '/' })
+				@Http.get('/')
 				get() {
 					return 'ok';
 				}
@@ -1317,9 +1317,9 @@ describe('Application class', () => {
 			const order: string[] = [];
 			const apps: unknown[] = [];
 
-			@Http.controller({ path: '/c' })
+			@Http.controller('/c')
 			class CController {
-				@Http.get({ path: '/' })
+				@Http.get('/')
 				get() {
 					return 'ok';
 				}
@@ -1492,9 +1492,9 @@ describe('Application class', () => {
 		});
 
 		it('should call onError when an error occurs', async () => {
-			@Http.controller({ path: '/' })
+			@Http.controller('/')
 			class FailingController {
-				@Http.get({ path: '/' })
+				@Http.get('/')
 				fail() {
 					throw new Error('Test error');
 				}

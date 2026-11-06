@@ -82,39 +82,38 @@ class CaughtFilter implements ExceptionFilter {
 	}
 }
 
-@Http.controller({ path: '/i', interceptors: [ControllerLevel] })
+@Http.controller('/i', { interceptors: [ControllerLevel] })
 class InterceptedController {
-	@Http.get({ path: '/order', interceptors: [RouteLevel] })
+	@Http.get('/order', { interceptors: [RouteLevel] })
 	public order() {
 		log.push('handler');
 		return { ok: true };
 	}
 
-	@Http.get({ path: '/short', interceptors: [ShortCircuit] })
+	@Http.get('/short', { interceptors: [ShortCircuit] })
 	public short() {
 		log.push('handler');
 		return { cached: false };
 	}
 
-	@Http.get({ path: '/twice', interceptors: [Twice] })
+	@Http.get('/twice', { interceptors: [Twice] })
 	public twice() {
 		log.push('handler');
 		return 'once';
 	}
 
-	@Http.get({ path: '/stamp', interceptors: [StampInterceptor] })
+	@Http.get('/stamp', { interceptors: [StampInterceptor] })
 	public stamp(@Service.inject(RequestId) requestId: RequestId) {
 		return { id: requestId.id };
 	}
 
-	@Http.get({ path: '/throws', filters: [CaughtFilter] })
+	@Http.get('/throws', { filters: [CaughtFilter] })
 	public throws() {
 		log.push('handler');
 		throw new Caught();
 	}
 
-	@Http.get({
-		path: '/transform',
+	@Http.get('/transform', {
 		interceptors: [
 			TimingInterceptor,
 			TransformInterceptor.with<number[], { data: number[] }>((data) => ({ data }))

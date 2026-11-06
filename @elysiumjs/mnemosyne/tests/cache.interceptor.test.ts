@@ -19,19 +19,19 @@ import { CacheInterceptor, MnemosyneModule } from '../src';
 
 let calls = 0;
 
-@Http.controller({ path: '/c' })
+@Http.controller('/c')
 class CachedController {
-	@Http.get({ path: '/trending', interceptors: [CacheInterceptor.with({ ttl: 60_000 })] })
+	@Http.get('/trending', { interceptors: [CacheInterceptor.with({ ttl: 60_000 })] })
 	public trending() {
 		return { calls: ++calls };
 	}
 
-	@Http.get({ path: '/short', interceptors: [CacheInterceptor.with({ ttl: 30 })] })
+	@Http.get('/short', { interceptors: [CacheInterceptor.with({ ttl: 30 })] })
 	public short() {
 		return { calls: ++calls };
 	}
 
-	@Http.post({ path: '/trending', interceptors: [CacheInterceptor.with({ ttl: 60_000 })] })
+	@Http.post('/trending', { interceptors: [CacheInterceptor.with({ ttl: 60_000 })] })
 	public create() {
 		return { calls: ++calls };
 	}

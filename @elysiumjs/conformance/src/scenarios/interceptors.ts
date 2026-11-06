@@ -26,9 +26,9 @@ const make = async (): Promise<Application> => {
 			}
 		};
 
-	@Http.controller({ path: '/wrapped', interceptors: [tag('controller')] })
+	@Http.controller('/wrapped', { interceptors: [tag('controller')] })
 	class WrappedController {
-		@Http.get({ interceptors: [tag('route')] })
+		@Http.get('/', { interceptors: [tag('route')] })
 		public show() {
 			return { trail: ['handler'] };
 		}

@@ -155,7 +155,7 @@ describe('createWorker', () => {
 			}
 		}
 
-		@Http.controller({ path: '/greet', scope: HttpControllerScope.REQUEST })
+		@Http.controller('/greet', { scope: HttpControllerScope.REQUEST })
 		class GreetController {
 			constructor(@Service.inject(Greeter) private readonly greeter: Greeter) {}
 
@@ -221,7 +221,7 @@ describe('createWorker', () => {
 			}
 		}
 
-		@Http.controller({ path: '/scratch' })
+		@Http.controller('/scratch')
 		class ScratchController {
 			@Http.get()
 			public show(@Service.inject(Scratch) scratch: Scratch) {

@@ -18,9 +18,9 @@ import { Application, Http, Module } from '@elysiumjs/core';
 import { t } from 'elysia';
 
 const make = async (): Promise<Application> => {
-	@Http.controller({ path: '/users' })
+	@Http.controller('/users')
 	class UsersController {
-		@Http.post({ path: '/' })
+		@Http.post('/')
 		public create(@Http.body(t.Object({ age: t.Number() })) body: { age: number }) {
 			return { age: body.age };
 		}
