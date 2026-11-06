@@ -446,6 +446,30 @@ describe('KeyvWorkersKV', () => {
 		expect(maxInFlight).toBeGreaterThan(1);
 	});
 
+	it('clear() stops at its operation budget and the next call goes on', async () => {
+		const { kv, data } = memoryKV();
+		const operations: string[] = [];
+		const counted: WorkersKVNamespace = {
+			...kv,
+			list: (options) => (operations.push('list'), kv.list(options)),
+			delete: (key) => (operations.push('delete'), kv.delete(key))
+		};
+		for (let i = 0; i < 10; i++) await kv.put(`k${i}`, 'v');
+		const store = new KeyvWorkersKV({ binding: 'CACHE', maxOperations: 6 });
+
+		await inInvocation(counted, () => store.clear());
+		expect(operations.length).toBeLessThanOrEqual(6);
+		expect(data.size).toBeGreaterThan(0);
+		expect(data.size).toBeLessThan(10);
+
+		for (let call = 0; call < 10 && data.size > 0; call++) {
+			operations.length = 0;
+			await inInvocation(counted, () => store.clear());
+			expect(operations.length).toBeLessThanOrEqual(6);
+		}
+		expect(data.size).toBe(0);
+	});
+
 	it('needs an invocation, so it holds no binding', () => {
 		const store = new KeyvWorkersKV({ binding: 'CACHE' });
 		expect(store.on('error', () => {})).toBe(store);
