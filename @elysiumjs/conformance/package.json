@@ -11,23 +11,28 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "bun test tests/bun",
-    "pretest:node": "bun run --cwd ../core build && bun run --cwd ../runtime-node build",
+    "pretest:node": "bun run --cwd ../core build && bun run --cwd ../mnemosyne build && bun run --cwd ../moirai build && bun run --cwd ../themis build && bun run --cwd ../ariadne build && bun run --cwd ../runtime-node build",
     "test:node": "vitest run -c vitest.node.config.ts",
-    "pretest:workerd": "bun run --cwd ../core build && bun run --cwd ../runtime-workers build",
+    "pretest:workerd": "bun run --cwd ../core build && bun run --cwd ../mnemosyne build && bun run --cwd ../moirai build && bun run --cwd ../themis build && bun run --cwd ../ariadne build && bun run --cwd ../ariadne-workers build && bun run --cwd ../runtime-workers build",
     "test:workerd": "vitest run -c vitest.workerd.config.ts",
-    "pretest:workerd-aot": "bun run --cwd ../core build && bun run --cwd ../runtime-workers build && bun scripts/build-aot.ts",
+    "pretest:workerd-aot": "bun run --cwd ../core build && bun run --cwd ../mnemosyne build && bun run --cwd ../moirai build && bun run --cwd ../themis build && bun run --cwd ../ariadne build && bun run --cwd ../ariadne-workers build && bun run --cwd ../runtime-workers build && bun scripts/build-aot.ts",
     "test:workerd-aot": "vitest run -c vitest.workerd-aot.config.ts"
   },
   "type": "module",
   "module": "src/index.ts",
   "types": "src/index.ts",
   "dependencies": {
+    "@elysiumjs/ariadne": "workspace:^",
     "@elysiumjs/core": "workspace:^",
+    "@elysiumjs/mnemosyne": "workspace:^",
+    "@elysiumjs/moirai": "workspace:^",
     "@elysiumjs/runtime-bun": "workspace:^",
+    "@elysiumjs/themis": "workspace:^",
     "elysia": "^2.0.0-rc.1"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.6.0",
+    "@elysiumjs/ariadne-workers": "workspace:*",
     "@elysiumjs/runtime-node": "workspace:*",
     "@elysiumjs/runtime-workers": "workspace:*",
     "@swc/core": "^1.16.22",
