@@ -17,7 +17,6 @@ import { join } from 'node:path';
 
 import { Command, CommandArgumentType } from '@elysiumjs/core';
 import { isValidTenantId } from '@elysiumjs/mnemosyne';
-import prompts from 'prompts';
 
 import { Database } from '../database';
 import { getMigrationName, planMigrations } from '../migrations';
@@ -189,6 +188,8 @@ export class MigrationRunCommand extends Command {
 			return false;
 		}
 
+		// Loaded on use: prompts needs Node.js streams, which Workers bundles leave out.
+		const { default: prompts } = await import('prompts');
 		const answers = await prompts(
 			[
 				{
