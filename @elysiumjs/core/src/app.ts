@@ -560,7 +560,8 @@ export abstract class Application extends InteractsWithConsole {
 	 * {@link build} calls it on its first request; hosts call it before other work, such as a
 	 * queue batch or a scheduled event.
 	 * @throws When a module or a singleton fails to initialise. Later calls retry the failed ones,
-	 * so that a transient failure does not break every later request.
+	 * so that a transient failure does not break every later request. A permanent failure is
+	 * retried, and fails, on every request.
 	 */
 	public boot(): Promise<void> {
 		if (this.#booting) return this.#booting;
@@ -568,7 +569,7 @@ export abstract class Application extends InteractsWithConsole {
 			if (this.#booting === attempt) {
 				this.#booting = undefined;
 				this.kernel.resetFailures();
-				Container.forgetFailures();
+				Container.forgetFailures(this.kernel.graph.nodes);
 			}
 			throw error;
 		});

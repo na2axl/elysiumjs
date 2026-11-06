@@ -215,6 +215,35 @@ describe('Container', () => {
 		expect(run(A, () => Service.get(Slow))).toBe(slow);
 	});
 
+	it('forgets only the failed singletons of the given modules', async () => {
+		const builds = { A: 0, B: 0 };
+		class FailsInA {
+			async onInit() {
+				builds.A++;
+				throw new Error('A failed');
+			}
+		}
+		class FailsInB {
+			async onInit() {
+				builds.B++;
+				throw new Error('B failed');
+			}
+		}
+		Container.register(A, FailsInA, undefined);
+		Container.register(B, { name: 'FailsInB', factory: () => new FailsInB() }, undefined);
+		await expect(run(A, () => Service.resolve(FailsInA))).rejects.toThrow('A failed');
+		await expect(run(B, () => Service.resolve('FailsInB'))).rejects.toThrow('B failed');
+
+		Container.forgetFailures([A]);
+		await expect(run(A, () => Service.resolve(FailsInA))).rejects.toThrow('A failed');
+		await expect(run(B, () => Service.resolve('FailsInB'))).rejects.toThrow('B failed');
+		expect(builds).toEqual({ A: 2, B: 1 });
+
+		Container.forgetFailures();
+		await expect(run(B, () => Service.resolve('FailsInB'))).rejects.toThrow('B failed');
+		expect(builds.B).toBe(2);
+	});
+
 	it('calls sync onInit on get', () => {
 		class Quick {
 			public ready = false;
