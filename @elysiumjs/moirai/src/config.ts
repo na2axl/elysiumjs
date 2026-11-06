@@ -48,6 +48,11 @@ export type MoiraiOptions = {
 	maxRelayAttempts: number;
 	/** The rows a relay claims at once. Defaults to 50. */
 	relayBatch: number;
+	/**
+	 * How long a relay holds the rows it claimed, in seconds. A row its relay did not mark in that
+	 * time is due again. Defaults to 300.
+	 */
+	relayLease: number;
 	/** Called when an outbox row is dead, such as to raise an alert. */
 	onDead?: (row: import('./stores').OutboxRow, error: Error) => void;
 };
@@ -57,13 +62,16 @@ const TRANSIENT_CODES = new Set(['40001', '40P01']);
 /** The default transient check: `transient: true`, or a Postgres serialization failure or deadlock. */
 export const isTransientError = (error: unknown): boolean => {
 	if (typeof error !== 'object' || error === null) return false;
-	const { transient, code, cause } = error as {
+	const { transient, code, errno, cause } = error as {
 		transient?: unknown;
 		code?: unknown;
+		errno?: unknown;
 		cause?: unknown;
 	};
 	if (transient === true) return true;
 	if (typeof code === 'string' && TRANSIENT_CODES.has(code)) return true;
+	// Bun's SQL driver keeps the SQLSTATE in `errno`.
+	if (typeof errno === 'string' && TRANSIENT_CODES.has(errno)) return true;
 	return cause !== undefined && cause !== error && isTransientError(cause);
 };
 
@@ -72,7 +80,8 @@ export const DEFAULT_OPTIONS: MoiraiOptions = {
 	isTransient: isTransientError,
 	relayOnCommit: true,
 	maxRelayAttempts: 8,
-	relayBatch: 50
+	relayBatch: 50,
+	relayLease: 300
 };
 
 /** The moirai options, or the defaults when MoiraiModule is not loaded. */

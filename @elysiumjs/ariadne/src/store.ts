@@ -38,7 +38,7 @@ export type FlowClaim = {
 	step: string;
 	/** The step the flow must stand at. */
 	expectStep: string | null;
-	/** How long the reservation lives when its caller dies before commit or release. */
+	/** How long the reservation lives when its caller dies before commit or release, in seconds. */
 	leaseSeconds: number;
 };
 
@@ -48,7 +48,11 @@ export type FlowClaim = {
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export type FlowClaimResult =
-	| { ok: true }
+	| {
+			ok: true;
+			/** The state the step runs on, as the store held it when the step was reserved. */
+			state: unknown;
+	  }
 	| { ok: false; reason: 'in-flight' }
 	| { ok: false; reason: 'replay'; answer: unknown }
 	| { ok: false; reason: 'unexpected-step' | 'completed' | 'missing' };
@@ -101,8 +105,9 @@ export interface FlowStore {
 	init(key: string, owner: string, ttlSeconds: number): Promise<void>;
 	load(key: string): Promise<FlowRecord | null>;
 	/**
-	 * Reserves a step before it runs, so that its side effects happen once. A repeat of the last
-	 * committed step id replays its answer, and a repeat of a running one is `in-flight`.
+	 * Reserves a step before it runs, so that its side effects happen once, and answers the state
+	 * it runs on. A repeat of the last committed step id replays its answer, and a step submitted
+	 * while another submission holds the reservation is `in-flight`.
 	 */
 	claim(key: string, claim: FlowClaim): Promise<FlowClaimResult>;
 	/** Gives a reservation back, so that the same step id can be retried. */
@@ -114,7 +119,10 @@ export interface FlowStore {
 /** How long a finished flow's last answer stays replayable, at most, in seconds. */
 export const FLOW_TOMBSTONE_SECONDS = 600;
 
-/** How long a step's reservation lives when its caller dies, in seconds. */
+/**
+ * How long a step's reservation lives by default, in seconds. A step that runs longer may run
+ * again when its submission is retried, so a slow step sets `lease` on `@Flow.step()`.
+ */
 export const FLOW_STEP_LEASE_SECONDS = 30;
 
 /** The header that carries the owner token of a guest flow. */

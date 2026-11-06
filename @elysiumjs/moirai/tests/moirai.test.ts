@@ -30,6 +30,7 @@ import {
 	IdempotencyKeyReusedError,
 	Inbox,
 	InvalidInputError,
+	isTransientError,
 	MemoryCommandLock,
 	MemoryIdempotencyStore,
 	MemoryInboxStore,
@@ -195,6 +196,25 @@ describe('commands', () => {
 		expect(reused.status).toBe(422);
 	});
 
+	it('keeps the keys of two owners apart', async () => {
+		const first = await Commands.execute(
+			TopUp,
+			{ amount: 2 },
+			{ idempotencyKey: 'k', scope: 'ada' }
+		);
+		const other = await Commands.execute(
+			TopUp,
+			{ amount: 5 },
+			{ idempotencyKey: 'k', scope: 'bob' }
+		);
+		expect(first).toEqual({ balance: 20 });
+		expect(other).toEqual({ balance: 50 });
+		expect(runs).toBe(2);
+		// Without a user, the key belongs to anonymous callers.
+		expect(await idempotency.get('anonymous:TopUp:k')).toBeUndefined();
+		expect(await idempotency.get('ada:TopUp:k')).toMatchObject({ response: { balance: 20 } });
+	});
+
 	it('rolls back and stores nothing when the handler returns a DomainError', async () => {
 		const error = await Commands.execute(
 			TopUp,
@@ -246,6 +266,15 @@ describe('commands', () => {
 
 		expect(await Commands.execute(Flaky, { mode: 'deadlock' })).toEqual({ attempt: 3 });
 		expect(attempts).toBe(3);
+		// Bun's SQL driver keeps the SQLSTATE in errno.
+		expect(
+			isTransientError(
+				Object.assign(new Error('could not serialize'), {
+					code: 'ERR_POSTGRES_SERVER_ERROR',
+					errno: '40001'
+				})
+			)
+		).toBe(true);
 
 		attempts = 0;
 		expect(Commands.execute(Flaky, { mode: 'broken' })).rejects.toThrow('broken');
@@ -369,6 +398,40 @@ describe('outbox', () => {
 		expect(await Outbox.relay()).toEqual({ dispatched: 0, retried: 0, dead: 1 });
 		expect(outbox.rows[0]!.deadAt).toBeInstanceOf(Date);
 		expect(dead).toEqual([id!]);
+	});
+
+	it('claims, handles and marks each row in units of work of their own', async () => {
+		setOptions({ relayOnCommit: false });
+		await Outbox.enqueue({ kind: 'mail.send', payload: { to: 'x', fail: true } });
+		await Outbox.enqueue({ kind: 'mail.send', payload: { to: 'y' } });
+		log.length = 0;
+		expect(await Outbox.relay()).toEqual({ dispatched: 1, retried: 1, dead: 0 });
+		// The claim, the failing row (rolled back), its failure, and the other row.
+		expect(log).toEqual([
+			'BEGIN',
+			'COMMIT',
+			'BEGIN',
+			'ROLLBACK',
+			'BEGIN',
+			'COMMIT',
+			'BEGIN',
+			'COMMIT'
+		]);
+	});
+
+	it('keeps other relays off the rows it claimed until its lease ends', async () => {
+		setOptions({ relayOnCommit: false });
+		await Outbox.enqueue({ kind: 'mail.send', payload: { to: 'z' } });
+		const now = new Date();
+		const claimed = await outbox.claimDue({
+			now,
+			leaseUntil: new Date(now.getTime() + 300_000),
+			limit: 10
+		});
+		expect(claimed).toHaveLength(1);
+		expect(await Outbox.relay()).toEqual({ dispatched: 0, retried: 0, dead: 0 });
+		const later = new Date(now.getTime() + 301_000);
+		expect(await outbox.claimDue({ now: later, leaseUntil: later, limit: 10 })).toHaveLength(1);
 	});
 
 	it('fails the rows of an unknown kind', async () => {

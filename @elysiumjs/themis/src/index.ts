@@ -19,6 +19,7 @@ export {
 	AuthMiddleware,
 	type AuthOptions,
 	type Guard,
+	type GuardClass,
 	jwtGuard,
 	sessionGuard
 } from './auth';
@@ -27,10 +28,13 @@ export { type CookieOptions, type HttpContext } from './context';
 export { Csrf, CsrfMiddleware } from './csrf';
 export {
 	CsrfTokenMismatchError,
+	MIN_SECRET_BYTES,
 	MissingThemisConfigError,
 	NoSessionError,
+	SessionTooLargeError,
 	UnauthenticatedError,
-	UnknownGuardError
+	UnknownGuardError,
+	WeakSecretError
 } from './errors';
 export {
 	InvalidTokenError,
@@ -42,11 +46,8 @@ export {
 export { BunPasswordHasher, Password, type PasswordHasher, Pbkdf2PasswordHasher } from './password';
 export {
 	commitSession,
-	type KvNamespaceLike,
-	KvSessionStore,
 	loadSession,
 	MemorySessionStore,
-	RedisSessionStore,
 	Session,
 	type SessionData,
 	SessionMiddleware,

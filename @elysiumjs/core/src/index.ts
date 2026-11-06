@@ -42,6 +42,8 @@ export {
 	Http
 } from './http';
 export { Metadata } from './metadata';
+export { currentUserId, userIdOf } from './user';
+export { currentEnvironment } from './utils';
 export { Middleware } from './middleware';
 export { RequestLoggerMiddleware } from './middlewares/request-logger.middleware';
 export {

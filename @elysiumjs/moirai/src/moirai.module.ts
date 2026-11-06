@@ -50,9 +50,9 @@ const build = <T>(option: StoreOption<T>): T =>
  * @example
  * ```ts
  * MoiraiModule.with({
- * 	idempotency: () => new DrizzleIdempotencyStore(tables.idempotencyKeys),
- * 	outbox: () => new DrizzleOutboxStore(tables.outbox),
- * 	inbox: () => new DrizzleInboxStore(tables.inbox),
+ * 	idempotency: () => new DrizzleIdempotencyStore({ table: tables.idempotencyKeys }),
+ * 	outbox: () => new DrizzleOutboxStore({ table: tables.outbox }),
+ * 	inbox: () => new DrizzleInboxStore({ table: tables.inbox }),
  * 	lock: () => new PgAdvisoryLock()
  * });
  * ```

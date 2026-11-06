@@ -89,14 +89,26 @@ export interface OutboxClaimFilter {
 }
 
 /**
- * Where the outbox rows live. `claimDue` returns the rows that are neither dispatched nor dead and
- * whose `availableAt` has passed, oldest first, and keeps other relays off them until the claim
- * ends (`FOR UPDATE SKIP LOCKED` on Postgres).
+ * Claims due outbox rows for one relay.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export interface OutboxClaim extends OutboxClaimFilter {
+	now: Date;
+	/** The claimed rows become due again at this date, when the relay dies before marking them. */
+	leaseUntil: Date;
+	limit: number;
+}
+
+/**
+ * Where the outbox rows live. `claimDue` takes the rows that are neither dispatched nor dead and
+ * whose `availableAt` has passed, oldest first, and moves their `availableAt` to `leaseUntil` in
+ * the same statement, so that other relays leave them alone while this one handles them. Each
+ * row is then handled and marked in a transaction of its own.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export interface OutboxStore {
 	insert(rows: readonly OutboxRow[]): Promise<void>;
-	claimDue(now: Date, limit: number, filter?: OutboxClaimFilter): Promise<readonly OutboxRow[]>;
+	claimDue(claim: OutboxClaim): Promise<readonly OutboxRow[]>;
 	markDispatched(id: string, dispatchedAt: Date): Promise<void>;
 	markFailed(
 		id: string,
@@ -157,13 +169,11 @@ export class MemoryCommandLock implements CommandLock {
 }
 
 /**
- * Keeps outbox rows in memory, for tests and single-process apps. Claims last until the row is
- * marked.
+ * Keeps outbox rows in memory, for tests and single-process apps.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export class MemoryOutboxStore implements OutboxStore {
 	readonly #rows = new Map<string, OutboxRow>();
-	readonly #claimed = new Set<string>();
 
 	/** Every row, for assertions. */
 	public get rows(): OutboxRow[] {
@@ -174,26 +184,22 @@ export class MemoryOutboxStore implements OutboxStore {
 		for (const row of rows) this.#rows.set(row.id, { ...row });
 	}
 
-	public async claimDue(
-		now: Date,
-		limit: number,
-		filter: OutboxClaimFilter = {}
-	): Promise<readonly OutboxRow[]> {
-		if (filter.kinds?.length === 0 || filter.ids?.length === 0) return [];
+	public async claimDue(claim: OutboxClaim): Promise<readonly OutboxRow[]> {
+		const { now, leaseUntil, limit, kinds, ids } = claim;
+		if (kinds?.length === 0 || ids?.length === 0) return [];
 		const due = [...this.#rows.values()]
 			.filter(
 				(row) =>
 					row.dispatchedAt === null &&
 					row.deadAt === null &&
 					row.availableAt.getTime() <= now.getTime() &&
-					!this.#claimed.has(row.id) &&
-					(!filter.kinds || filter.kinds.includes(row.kind)) &&
-					(!filter.ids || filter.ids.includes(row.id))
+					(!kinds || kinds.includes(row.kind)) &&
+					(!ids || ids.includes(row.id))
 			)
 			.sort((a, b) => a.availableAt.getTime() - b.availableAt.getTime())
 			.slice(0, limit);
-		for (const row of due) this.#claimed.add(row.id);
-		return due.map((row) => ({ ...row }));
+		for (const row of due) this.#rows.set(row.id, { ...row, availableAt: leaseUntil });
+		return due.map((row) => ({ ...row, availableAt: leaseUntil }));
 	}
 
 	public async markDispatched(id: string, dispatchedAt: Date): Promise<void> {
@@ -217,7 +223,6 @@ export class MemoryOutboxStore implements OutboxStore {
 	#update(id: string, update: Partial<OutboxRow>): void {
 		const row = this.#rows.get(id);
 		if (row) this.#rows.set(id, { ...row, ...update });
-		this.#claimed.delete(id);
 	}
 }
 

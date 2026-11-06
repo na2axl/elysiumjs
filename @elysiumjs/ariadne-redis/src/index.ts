@@ -40,20 +40,16 @@ if redis.call('EXISTS', KEYS[1]) == 0 then
 	if redis.call('EXISTS', KEYS[3]) == 1 then return {'completed'} end
 	return {'missing'}
 end
-local r = redis.call('HMGET', KEYS[1], 'step', 'lastStepId', 'completedAt', 'answer')
+local r = redis.call('HMGET', KEYS[1], 'step', 'lastStepId', 'completedAt', 'answer', 'state')
 if r[2] == ARGV[1] then
 	if r[1] == ARGV[2] then return {'replay', r[4]} end
 	return {'unexpected-step'}
 end
 if r[3] ~= '' then return {'completed'} end
-local lease = redis.call('GET', KEYS[2])
-if lease then
-	if string.match(lease, '^([^\\n]*)') == ARGV[1] then return {'in-flight'} end
-	return {'unexpected-step'}
-end
+if redis.call('EXISTS', KEYS[2]) == 1 then return {'in-flight'} end
 if r[1] ~= ARGV[3] then return {'unexpected-step'} end
 redis.call('SET', KEYS[2], ARGV[1] .. '\\n' .. ARGV[2], 'PX', ARGV[4])
-return {'ok'}`;
+return {'ok', r[5]}`;
 
 const RELEASE = `
 local lease = redis.call('GET', KEYS[1])
@@ -172,14 +168,14 @@ export class RedisFlowStore implements FlowStore {
 	}
 
 	public async claim(key: string, input: FlowClaim): Promise<FlowClaimResult> {
-		const [reason, answer] = (await this.run(CLAIM, this.keys(key), [
+		const [reason, payload] = (await this.run(CLAIM, this.keys(key), [
 			input.stepId,
 			input.step,
 			input.expectStep ?? '',
 			input.leaseSeconds * 1000
 		])) as [string, string?];
-		if (reason === 'ok') return { ok: true };
-		if (reason === 'replay') return { ok: false, reason, answer: parse(answer) };
+		if (reason === 'ok') return { ok: true, state: parse(payload) };
+		if (reason === 'replay') return { ok: false, reason, answer: parse(payload) };
 		return {
 			ok: false,
 			reason: reason as 'in-flight' | 'unexpected-step' | 'completed' | 'missing'

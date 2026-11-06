@@ -22,6 +22,7 @@ import { Http, Metadata } from '@elysiumjs/core';
 
 import { FlowEngine } from './engine';
 import { InvalidFlowError } from './errors';
+import { FLOW_STEP_LEASE_SECONDS } from './store';
 
 /**
  * What a step learns about its flow, through {@link Flow.context}.
@@ -95,6 +96,11 @@ export type FlowStepOptions<S = any> = Omit<RequestHandlerDecoratorProps, 'metho
 	back?: string[];
 	/** Runs on the state of a step submitted again through `back`, before the step itself. */
 	onRewind?: (state: S, ctx: FlowContext) => S | Promise<S>;
+	/**
+	 * How long a submission holds the step, in seconds. Defaults to 30. A retry of a submission
+	 * that outlives it runs the step again, so a step that may run longer sets more.
+	 */
+	lease?: number;
 };
 
 /**
@@ -106,6 +112,8 @@ export type FlowStepDescription = {
 	next: (state: unknown) => string[];
 	back: string[];
 	onRewind?: (state: unknown, ctx: FlowContext) => unknown;
+	/** How long a submission holds the step, in seconds. */
+	lease: number;
 };
 
 /**
@@ -213,15 +221,22 @@ export namespace Flow {
 	 */
 	export const step = <S = any>(options: FlowStepOptions<S> = {}): MethodDecorator => {
 		return (target, key, descriptor) => {
-			const { name: stepName, next, back, onRewind, ...http } = options;
+			const { name: stepName, next, back, onRewind, lease, ...http } = options;
 			const name = stepName ?? String(key);
+			if (lease !== undefined && !(lease > 0)) {
+				throw new InvalidFlowError(
+					String(target.constructor.name),
+					`needs a positive lease on step "${name}"`
+				);
+			}
 			const steps: Map<string, FlowStepDescription> = new Map(Metadata.get(STEPS, target) ?? []);
 			steps.set(name, {
 				name,
 				next:
 					typeof next === 'function' ? (next as (state: unknown) => string[]) : () => next ?? [],
 				back: back ?? [],
-				onRewind: onRewind as FlowStepDescription['onRewind']
+				onRewind: onRewind as FlowStepDescription['onRewind'],
+				lease: lease ?? FLOW_STEP_LEASE_SECONDS
 			});
 			Metadata.define(STEPS, steps, target);
 

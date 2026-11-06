@@ -58,6 +58,7 @@ describe('passwords', () => {
 	});
 
 	it('hashes with PBKDF2, which every runtime has', async () => {
+		expect(new Pbkdf2PasswordHasher().needsRehash('$pbkdf2-sha256$i=100000$AAAA$AAAA')).toBe(true);
 		const hasher = new Pbkdf2PasswordHasher({ iterations: 1000 });
 		const hash = await hasher.hash('pw');
 		expect(hash).toMatch(/^\$pbkdf2-sha256\$i=1000\$[\w-]+\$[\w-]+$/);
@@ -142,7 +143,7 @@ describe('API keys', () => {
 });
 
 describe('signed URLs', () => {
-	const secret = 'url-secret';
+	const secret = 'u'.repeat(32);
 
 	it('signs the path and the parameters, not the origin', async () => {
 		const link = await SignedUrl.sign('https://api.test/files/1?b=2&a=1', {
@@ -156,7 +157,7 @@ describe('signed URLs', () => {
 		).toBe(true);
 		expect(await SignedUrl.verify(link.replace('/files/1', '/files/2'), { secret })).toBe(false);
 		expect(await SignedUrl.verify(link.replace('a=1', 'a=9'), { secret })).toBe(false);
-		expect(await SignedUrl.verify(link, { secret: 'other' })).toBe(false);
+		expect(await SignedUrl.verify(link, { secret: 'o'.repeat(32) })).toBe(false);
 	});
 
 	it('refuses an expired link with a 403 problem', async () => {

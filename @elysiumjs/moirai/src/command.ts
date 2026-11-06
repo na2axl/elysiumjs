@@ -14,7 +14,13 @@
 
 import type { Static, TSchema } from 'typebox';
 
-import { DATABASE_TRANSACTION_SERVICE, DomainError, Metadata, Service } from '@elysiumjs/core';
+import {
+	currentUserId,
+	DATABASE_TRANSACTION_SERVICE,
+	DomainError,
+	Metadata,
+	Service
+} from '@elysiumjs/core';
 import { UnitOfWork } from '@elysiumjs/mnemosyne';
 import Value from 'typebox/value';
 
@@ -81,6 +87,12 @@ export type CommandOptions<S extends TSchema = TSchema> = {
 	 * stored response; with another input, it is refused with a 422 problem. Defaults to `false`.
 	 */
 	idempotent?: boolean;
+	/**
+	 * Who owns the idempotency keys of the command, so that the keys of two owners never meet,
+	 * such as a tenant and a user. Defaults to the id of the current user (`currentUserId()`),
+	 * else `anonymous`. `Commands.execute()` may pass its own.
+	 */
+	scope?: (input: Static<S>) => string;
 	/** Whether the command runs in a unit of work, or joins the open one. Defaults to `true`. */
 	transactional?: boolean;
 	/** The database connection of the unit of work. Defaults to `default`. */
@@ -223,7 +235,7 @@ export namespace Commands {
 	export const execute = async <C extends HandlerClass>(
 		command: C,
 		input: InputOf<C>,
-		call: { idempotencyKey?: string } = {}
+		call: { idempotencyKey?: string; scope?: string } = {}
 	): Promise<ResultOf<C>> => {
 		const props = Metadata.get(COMMAND, command) as (CommandOptions & { name: string }) | undefined;
 		if (!props) throw new TypeError(`${command.name} is not marked with @Moirai.command().`);
@@ -234,6 +246,12 @@ export namespace Commands {
 		if (props.authorize && !(await props.authorize(value))) throw new CommandForbiddenError(name);
 		const key = call.idempotencyKey;
 		if (idempotent && !key) throw new IdempotencyKeyRequiredError(name);
+		// A key belongs to its owner and its command: another owner presenting it runs on its own.
+		const storedKey = idempotent
+			? [call.scope ?? props.scope?.(value) ?? currentUserId() ?? 'anonymous', name, key!]
+					.map(encodeURIComponent)
+					.join(':')
+			: undefined;
 
 		const body = async (attempt: number): Promise<ResultOf<C>> => {
 			const release = props.serializeBy
@@ -246,7 +264,7 @@ export namespace Commands {
 
 				const store = idempotencyStore();
 				const hash = await requestHash(value);
-				const seen = await store.get(key!);
+				const seen = await store.get(storedKey!);
 				if (seen) {
 					if (seen.command === name && seen.requestHash === hash)
 						return seen.response as ResultOf<C>;
@@ -254,10 +272,11 @@ export namespace Commands {
 				}
 				const response = unwrap(await handler.handle(value, context)) as ResultOf<C>;
 				await store.put({
-					key: key!,
+					key: storedKey!,
 					command: name,
 					requestHash: hash,
-					response: response === undefined ? null : structuredClone(response),
+					// Kept as JSON, which is what a replay answers.
+					response: response === undefined ? null : JSON.parse(JSON.stringify(response)),
 					createdAt: new Date()
 				});
 				return response;

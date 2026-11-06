@@ -142,6 +142,11 @@ const RATE_LIMIT = Symbol.for('elysium:RateLimit');
  * Sets the rate limit of a route, or of every route of a controller. A limit on a route wins over
  * the one of its controller, which wins over the app's default (`rateLimit` of
  * `@Application.register()`). Pass `false` to turn the limit off. Each route counts on its own.
+ *
+ * The limit is counted in the route's `beforeHandle`, after the body is parsed and validated and
+ * after the `onBeforeHandle` middlewares of the application ran. A middleware that is costly for a
+ * client over the limit (a database lookup, say) runs on the routes that need it, not on the
+ * application.
  * @author Axel Nana <axel.nana@workbud.com>
  * @param limit The limit, or `false` for none.
  * @example

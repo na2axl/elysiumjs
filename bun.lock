@@ -375,17 +375,35 @@
       },
       "devDependencies": {
         "@elysiumjs/core": "workspace:*",
-        "@elysiumjs/redis": "workspace:*",
         "@elysiumjs/runtime-bun": "workspace:*",
         "elysia": "^2.0.0-rc.1",
       },
       "peerDependencies": {
         "@elysiumjs/core": "workspace:^",
-        "@elysiumjs/redis": "workspace:^",
       },
-      "optionalPeers": [
-        "@elysiumjs/redis",
-      ],
+    },
+    "@elysiumjs/themis-redis": {
+      "name": "@elysiumjs/themis-redis",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@elysiumjs/core": "workspace:*",
+        "@elysiumjs/themis": "workspace:*",
+      },
+      "peerDependencies": {
+        "@elysiumjs/redis": "workspace:^",
+        "@elysiumjs/themis": "workspace:^",
+      },
+    },
+    "@elysiumjs/themis-workers": {
+      "name": "@elysiumjs/themis-workers",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@elysiumjs/core": "workspace:*",
+        "@elysiumjs/themis": "workspace:*",
+      },
+      "peerDependencies": {
+        "@elysiumjs/themis": "workspace:^",
+      },
     },
     "create-elysium": {
       "name": "create-elysium",
@@ -562,6 +580,10 @@
     "@elysiumjs/styx": ["@elysiumjs/styx@workspace:@elysiumjs/styx"],
 
     "@elysiumjs/themis": ["@elysiumjs/themis@workspace:@elysiumjs/themis"],
+
+    "@elysiumjs/themis-redis": ["@elysiumjs/themis-redis@workspace:@elysiumjs/themis-redis"],
+
+    "@elysiumjs/themis-workers": ["@elysiumjs/themis-workers@workspace:@elysiumjs/themis-workers"],
 
     "@emnapi/runtime": ["@emnapi/runtime@1.11.3", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-Xz4Tpyki7XyrpbUK1jR1AhdAdaXyhhY4lZ3neLodmhpuWfy2PAQN5B46sAiU4liOXGLkHypn/qU+jvfWSCYYLA=="],
 

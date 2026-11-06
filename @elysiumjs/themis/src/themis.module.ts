@@ -17,6 +17,7 @@ import type { ThemisConfig } from './config';
 import { Module } from '@elysiumjs/core';
 
 import { THEMIS_CONFIG } from './config';
+import { assertStrongSecret } from './errors';
 
 /**
  * Configures Themis: the secret, the sessions and the guards of `@Auth()`.
@@ -34,6 +35,9 @@ import { THEMIS_CONFIG } from './config';
  * ```
  */
 @Module.register<ThemisConfig>({
-	services: (config) => [{ name: THEMIS_CONFIG, global: true, factory: () => config }]
+	services: (config) => {
+		assertStrongSecret(config.secret, 'themis secret');
+		return [{ name: THEMIS_CONFIG, global: true, factory: () => config }];
+	}
 })
 export class ThemisModule extends Module.configurable<ThemisConfig>({ required: ['secret'] }) {}

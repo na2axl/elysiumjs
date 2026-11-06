@@ -33,8 +33,9 @@ import { Event } from './event';
 import { FILTER_LEVELS, routeFilterLevels } from './filter';
 import { runInterceptors } from './interceptor';
 import { Metadata } from './metadata';
-import { applyMiddlewares, executeMiddlewareChain, makeMiddlewares } from './middleware';
+import { applyMiddlewares, enlist, executeMiddlewareChain, makeMiddlewares } from './middleware';
 import { ModuleContext } from './module-context';
+import { DomainError } from './problem';
 import { enforceRateLimit, rateLimitOf } from './rate-limit';
 import { isSerializable, readFields, Resource } from './resource';
 import { Runtime } from './runtime';
@@ -910,7 +911,7 @@ export namespace Http {
 									return toBody(c, await handler(...(await getParameters(c))));
 								}
 
-								throw c.status(400, 'Invalid request body');
+								throw DomainError.badRequest('The request body is invalid.');
 							};
 						}
 
@@ -971,6 +972,7 @@ export namespace Http {
 								);
 							},
 							async beforeHandle(c: Context) {
+								enlist(c, mi, node);
 								const limit = routeRateLimit();
 								if (limit) {
 									await enforceRateLimit(limit, appRateLimit()?.store, {

@@ -171,6 +171,18 @@ describe('cursors', () => {
 		});
 		expect(problemOf(() => Query.parse(spec, { cursor })).status).toBe(400);
 	});
+
+	it('refuses a cursor whose values do not read as their sort keys', () => {
+		const crafted = (values: unknown[]) =>
+			Buffer.from(JSON.stringify(values)).toString('base64url');
+		for (const values of [
+			['not a date', 2],
+			[{ $gt: 1 }, 2],
+			['2026-01-01T00:00:00.000Z', 'x']
+		]) {
+			expect(problemOf(() => Query.parse(spec, { cursor: crafted(values) })).status).toBe(400);
+		}
+	});
 });
 
 describe('Query.schema', () => {

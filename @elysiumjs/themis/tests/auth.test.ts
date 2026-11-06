@@ -13,9 +13,9 @@
 // limitations under the License.
 
 import type { TestingHttpApp, TestResponse } from '@elysiumjs/core';
-import type { SessionStore } from '../src';
+import type { Guard, SessionStore } from '../src';
 
-import { Application, Http, Middleware, Module, t } from '@elysiumjs/core';
+import { Application, DomainError, Http, Middleware, Module, Service, t } from '@elysiumjs/core';
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import {
@@ -27,13 +27,12 @@ import {
 	CsrfMiddleware,
 	Jwt,
 	jwtGuard,
-	KvSessionStore,
 	MemorySessionStore,
-	RedisSessionStore,
 	Session,
 	sessionGuard,
 	SessionMiddleware,
-	ThemisModule
+	ThemisModule,
+	WeakSecretError
 } from '../src';
 
 const SECRET = 's'.repeat(32);
@@ -68,6 +67,18 @@ class SessionController {
 		return { ok: true };
 	}
 
+	@Http.post({ path: '/login-then-refuse', body: t.Object({ id: t.String() }) })
+	public loginThenRefuse(@Http.body() body: { id: string }) {
+		Auth.login(body.id);
+		throw DomainError.conflict('signed in, but refused');
+	}
+
+	@Http.post({ path: '/big' })
+	public big() {
+		Session.current().set('blob', 'x'.repeat(5000));
+		return {};
+	}
+
 	@Http.post({ path: '/logout' })
 	public logout() {
 		Auth.logout();
@@ -96,6 +107,31 @@ class MeController {
 	}
 }
 
+/** A guard class: its constructor gets a service injected. */
+class DeviceDirectory {
+	public ownerOf(token: string) {
+		return token === 'device-1' ? users.u1 : undefined;
+	}
+}
+
+class DeviceGuard implements Guard {
+	constructor(@Service.inject(DeviceDirectory) private readonly devices: DeviceDirectory) {}
+
+	public authenticate(context: { request: Request }) {
+		const token = context.request.headers.get('x-device-token');
+		return token ? this.devices.ownerOf(token) : undefined;
+	}
+}
+
+@Http.controller({ path: '/device' })
+class DeviceController {
+	@Http.get()
+	@Auth({ guards: ['device'] })
+	public show() {
+		return { user: Auth.user(), guard: Auth.guard() };
+	}
+}
+
 @Http.controller({ path: '/public' })
 class PublicController {
 	@Http.get()
@@ -105,7 +141,10 @@ class PublicController {
 	}
 }
 
-@Module.register({ controllers: [SessionController, MeController, PublicController] })
+@Module.register({
+	controllers: [SessionController, MeController, PublicController, DeviceController],
+	services: [{ name: DeviceDirectory, global: true, factory: () => new DeviceDirectory() }]
+})
 class AuthModule extends Module {}
 
 const makeApp = (store: SessionStore | 'cookie' = new MemorySessionStore()) => {
@@ -117,7 +156,8 @@ const makeApp = (store: SessionStore | 'cookie' = new MemorySessionStore()) => {
 				guards: {
 					session: sessionGuard({ user: (id) => users[id] }),
 					jwt: jwtGuard({ secret: JWT_SECRET, user: (claims) => users[claims.sub as string] }),
-					apiKey: apiKeyGuard({ find: (hash) => (hash === apiKey.hash ? users.u1 : undefined) })
+					apiKey: apiKeyGuard({ find: (hash) => (hash === apiKey.hash ? users.u1 : undefined) }),
+					device: DeviceGuard
 				}
 			}),
 			AuthModule
@@ -277,45 +317,65 @@ describe('sessions, auth and CSRF', () => {
 	});
 });
 
+describe('session edges, guard classes and secrets', () => {
+	let testing: TestingHttpApp | undefined;
+
+	afterEach(async () => {
+		await testing?.shutdown();
+		testing = undefined;
+	});
+
+	it('saves the session of a request refused with a client error', async () => {
+		testing = await Application.testing({ app: makeApp() });
+		const jar = new Jar();
+		const http = testing.http;
+		const csrf = (await jar.keep(await http.get('/session/read')).json()).csrf as string;
+		const refused = jar.keep(
+			await http
+				.post('/session/login-then-refuse')
+				.header('cookie', jar.header)
+				.header('x-csrf-token', csrf)
+				.json({ id: 'u1' })
+		);
+		expect(refused.status).toBe(409);
+		expect(refused.headers.getSetCookie()[0]).toContain('elysium_session=');
+		const me = await http.get('/me').header('cookie', jar.header);
+		expect((await me.json()).guard).toBe('session');
+	});
+
+	it('takes the CSRF token from the _csrf body field too', async () => {
+		testing = await Application.testing({ app: makeApp() });
+		const jar = new Jar();
+		const http = testing.http;
+		const csrf = (await jar.keep(await http.get('/session/read')).json()).csrf as string;
+		const visit = await http
+			.post('/session/visit')
+			.header('cookie', jar.header)
+			.json({ _csrf: csrf });
+		expect(visit.status).toBe(200);
+	});
+
+	it('refuses a cookie session larger than browsers keep', async () => {
+		testing = await Application.testing({ app: makeApp('cookie') });
+		expect((await testing.http.post('/session/big')).status).toBe(500);
+	});
+
+	it('builds a guard class through the container', async () => {
+		testing = await Application.testing({ app: makeApp() });
+		const response = await testing.http.get('/device').header('x-device-token', 'device-1');
+		expect(await response.json()).toEqual({ user: users.u1, guard: 'device' });
+		expect((await testing.http.get('/device')).status).toBe(401);
+	});
+
+	it('refuses secrets shorter than 32 bytes', async () => {
+		@Application.register({ modules: [ThemisModule.with({ secret: 'short' })], openapi: false })
+		class WeakApp extends Application {}
+		await expect(Application.testing({ app: WeakApp })).rejects.toBeInstanceOf(WeakSecretError);
+		await expect(Jwt.sign({}, { secret: 'short' })).rejects.toBeInstanceOf(WeakSecretError);
+	});
+});
+
 describe('session stores', () => {
-	it('keeps sessions in Redis with an expiry', async () => {
-		const calls: unknown[][] = [];
-		const values = new Map<string, string>();
-		const redis = {
-			async send(command: string, args: string[]) {
-				calls.push([command, ...args]);
-				values.set(args[0]!, args[1]!);
-			},
-			get: async (key: string) => values.get(key) ?? null,
-			del: async (key: string) => Number(values.delete(key))
-		};
-		const store = new RedisSessionStore({ connection: () => redis as never });
-		await store.save('id', { a: 1 }, 60);
-		expect(calls).toEqual([['SET', 'session:id', '{"a":1}', 'EX', '60']]);
-		expect(await store.load('id')).toEqual({ a: 1 });
-		await store.destroy('id');
-		expect(await store.load('id')).toBeNull();
-	});
-
-	it('keeps sessions in Workers KV, with at least the KV minimum expiry', async () => {
-		const puts: unknown[] = [];
-		const values = new Map<string, string>();
-		const kv = {
-			get: async (key: string) => values.get(key) ?? null,
-			async put(key: string, value: string, options?: { expirationTtl?: number }) {
-				puts.push(options);
-				values.set(key, value);
-			},
-			delete: async (key: string) => void values.delete(key)
-		};
-		const store = new KvSessionStore({ namespace: kv, prefix: 's:' });
-		await store.save('id', { b: 2 }, 10);
-		expect(puts).toEqual([{ expirationTtl: 60 }]);
-		expect(await store.load('id')).toEqual({ b: 2 });
-		await store.destroy('id');
-		expect(await store.load('id')).toBeNull();
-	});
-
 	it('expires memory sessions', async () => {
 		const store = new MemorySessionStore();
 		await store.save('id', { c: 3 }, -1);

@@ -80,7 +80,24 @@ describe('moirai stores', () => {
 		answer = () => {
 			throw Object.assign(new Error('duplicate key'), { code: '23505' });
 		};
-		expect(
+		await expect(
+			store.put({
+				key: 'k',
+				command: 'pay',
+				requestHash: 'h',
+				response: null,
+				createdAt: new Date(0)
+			})
+		).rejects.toBeInstanceOf(IdempotencyConflictError);
+
+		// Bun's SQL driver keeps the SQLSTATE in errno.
+		answer = () => {
+			throw Object.assign(new Error('duplicate key'), {
+				code: 'ERR_POSTGRES_SERVER_ERROR',
+				errno: '23505'
+			});
+		};
+		await expect(
 			store.put({
 				key: 'k',
 				command: 'pay',
@@ -93,17 +110,24 @@ describe('moirai stores', () => {
 
 	it('claims due outbox rows with skip locked, filtered, and marks them', async () => {
 		const store = new DrizzleOutboxStore({ table: tables.outbox });
-		expect(await store.claimDue(new Date(0), 10, { kinds: [] })).toEqual([]);
+		const window = { now: new Date(0), leaseUntil: new Date(300_000), limit: 10 };
+		expect(await store.claimDue({ ...window, kinds: [] })).toEqual([]);
 		expect(fake.log).toEqual([]);
 
-		await store.claimDue(new Date(0), 10, { kinds: ['mail'], ids: ['a'] });
+		await store.claimDue({ ...window, kinds: ['mail'], ids: ['a'] });
 		const claim = queries()[0]!;
+		// One statement moves the claimed rows past the lease, so that the relay can work on them
+		// outside the claiming transaction.
+		expect(claim).toStartWith(
+			'update "billing"."outbox" set "available_at" = $1 where "billing"."outbox"."id" in (select'
+		);
+		expect(claim).toContain('returning');
 		expect(claim).toContain('"dispatched_at" is null');
 		expect(claim).toContain('"dead_at" is null');
-		expect(claim).toContain('"kind" in ($2)');
-		expect(claim).toContain('"id" in ($3)');
-		expect(claim).toEndWith(
-			'order by "billing"."outbox"."available_at" asc limit $4 for update skip locked'
+		expect(claim).toContain('"kind" in ($3)');
+		expect(claim).toContain('"id" in ($4)');
+		expect(claim).toContain(
+			'order by "billing"."outbox"."available_at" asc limit $5 for update skip locked)'
 		);
 
 		await store.insert([]);

@@ -104,6 +104,10 @@ export class MissingStoreError extends ElysiumError {
  */
 export class UnknownEffectError extends ElysiumError {
 	constructor(public readonly kind: string) {
-		super(`No @Moirai.effect('${kind}') handles the outbox rows of kind "${kind}".`);
+		super(
+			`No @Moirai.effect('${kind}') handles the outbox rows of kind "${kind}". Effects register when ` +
+				'their module is imported, so the process that relays must import it' +
+				(kind === 'heracles.job' ? " (here '@elysiumjs/moirai/heracles')." : '.')
+		);
 	}
 }

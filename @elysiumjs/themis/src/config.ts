@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Guard } from './auth';
+import type { Guard, GuardClass } from './auth';
 import type { CookieOptions } from './context';
 import type { SessionStore } from './session';
 
@@ -38,8 +38,11 @@ export type ThemisConfig = {
 		/** How long a session lives without being saved, in seconds. Defaults to 7 days. */
 		ttl?: number;
 	};
-	/** The guards `@Auth()` can use, by name. `@Auth()` without guards tries them all, in order. */
-	guards?: Record<string, Guard>;
+	/**
+	 * The guards `@Auth()` can use, by name: guard objects, or guard classes built through the
+	 * service container. `@Auth()` without guards tries them all, in order.
+	 */
+	guards?: Record<string, Guard | GuardClass>;
 	/** CSRF protection of cookie sessions. */
 	csrf?: {
 		/** The header that carries the token. Defaults to `x-csrf-token`. */

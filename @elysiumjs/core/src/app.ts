@@ -45,7 +45,7 @@ import { FILTER_LEVELS, routeFilterLevels, runFilters } from './filter';
 import { Kernel } from './kernel';
 import { getLogger } from './logger';
 import { Metadata } from './metadata';
-import { applyMiddlewares, middlewareStops } from './middleware';
+import { applyMiddlewares, middlewareStops, runErrorMiddlewares } from './middleware';
 import { ModuleContext } from './module-context';
 import { buildModuleGraph } from './module-graph';
 import { problemResponse, toProblem, unwrapParseError } from './problem';
@@ -737,6 +737,8 @@ export abstract class Application extends InteractsWithConsole {
 		// A middleware that stopped the request already chose its response.
 		if (middlewareStops.has(error)) return;
 
+		await runErrorMiddlewares(e);
+
 		// A thrown status is already a response.
 		if (error instanceof ElysiaStatus) {
 			if (Number(error.status) >= 500 && !(await this.reportError(e))) return;
@@ -761,7 +763,11 @@ export abstract class Application extends InteractsWithConsole {
 
 		if (problem.status >= 500 && !(await this.reportError(e))) return;
 
-		return problemResponse(problem);
+		// Headers set by the request, such as by an onError middleware, go on the problem response.
+		const headers = Object.fromEntries(
+			Object.entries(e.set?.headers ?? {}).map(([name, value]) => [name, String(value)])
+		);
+		return problemResponse(problem, headers);
 	}
 
 	/**

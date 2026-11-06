@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { RedisConnection } from '@elysiumjs/redis';
 import type { HttpContext } from './context';
 
-import { Middleware } from '@elysiumjs/core';
+import { currentEnvironment, getLogger, Middleware } from '@elysiumjs/core';
 
 import { currentContext, readCookie, themisConfig, writeCookie } from './context';
 import { decrypt, encrypt, hmac, randomToken, verifyHmac } from './crypto';
-import { NoSessionError } from './errors';
+import { NoSessionError, SessionTooLargeError } from './errors';
 
 /** The data of a session. */
 export type SessionData = Record<string, unknown>;
@@ -63,97 +62,28 @@ export class MemorySessionStore implements SessionStore {
 	}
 }
 
-/**
- * Keeps sessions in Redis, under `session:<id>`, expiring with the session.
- * @author Axel Nana <axel.nana@workbud.com>
- */
-export class RedisSessionStore implements SessionStore {
-	constructor(
-		private readonly options: {
-			/** The Redis connection, or a function that returns it (such as `() => Redis.connection()`). */
-			connection: RedisConnection | (() => RedisConnection);
-			/** The prefix of the keys. Defaults to `session:`. */
-			prefix?: string;
-		}
-	) {}
-
-	private get redis(): RedisConnection {
-		const { connection } = this.options;
-		return typeof connection === 'function' ? connection() : connection;
-	}
-
-	private key(id: string): string {
-		return `${this.options.prefix ?? 'session:'}${id}`;
-	}
-
-	public async load(id: string): Promise<SessionData | null> {
-		const raw = await this.redis.get(this.key(id));
-		return raw === null ? null : (JSON.parse(raw) as SessionData);
-	}
-
-	public async save(id: string, data: SessionData, ttlSeconds: number): Promise<void> {
-		await this.redis.send('SET', [this.key(id), JSON.stringify(data), 'EX', String(ttlSeconds)]);
-	}
-
-	public async destroy(id: string): Promise<void> {
-		await this.redis.del(this.key(id));
-	}
-}
-
-/**
- * The part of a Workers KV namespace binding the KV session store uses.
- * @author Axel Nana <axel.nana@workbud.com>
- */
-export interface KvNamespaceLike {
-	get(key: string): Promise<string | null>;
-	put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>;
-	delete(key: string): Promise<void>;
-}
-
-/**
- * Keeps sessions in a Cloudflare Workers KV namespace. KV is eventually consistent: a session saved
- * in one location can take a few seconds to be seen in another.
- * @author Axel Nana <axel.nana@workbud.com>
- */
-export class KvSessionStore implements SessionStore {
-	constructor(
-		private readonly options: {
-			/** The KV namespace, or a function that returns it (such as `() => Workers.binding('SESSIONS')`). */
-			namespace: KvNamespaceLike | (() => KvNamespaceLike);
-			prefix?: string;
-		}
-	) {}
-
-	private get kv(): KvNamespaceLike {
-		const { namespace } = this.options;
-		return typeof namespace === 'function' ? namespace() : namespace;
-	}
-
-	private key(id: string): string {
-		return `${this.options.prefix ?? 'session:'}${id}`;
-	}
-
-	public async load(id: string): Promise<SessionData | null> {
-		const raw = await this.kv.get(this.key(id));
-		return raw === null ? null : (JSON.parse(raw) as SessionData);
-	}
-
-	public async save(id: string, data: SessionData, ttlSeconds: number): Promise<void> {
-		// KV refuses expirations under 60 seconds.
-		await this.kv.put(this.key(id), JSON.stringify(data), {
-			expirationTtl: Math.max(60, ttlSeconds)
-		});
-	}
-
-	public async destroy(id: string): Promise<void> {
-		await this.kv.delete(this.key(id));
-	}
-}
-
 const FLASH = '_flash';
 const SESSION = 'themis:session';
 const DEFAULT_TTL = 7 * 24 * 3600;
 const defaultStore = new MemorySessionStore();
+let warned = false;
+
+/** The configured store, or the process memory store, with a warning outside tests. */
+const storeOf = (config: ReturnType<typeof themisConfig>): SessionStore | 'cookie' => {
+	const store = config.session?.store;
+	if (store) return store;
+	if (!warned && currentEnvironment() !== 'test') {
+		warned = true;
+		getLogger().warn(
+			'Sessions live in the memory of this process: they are lost on restart and not shared ' +
+				'between instances. Set session.store in ThemisModule.with().'
+		);
+	}
+	return defaultStore;
+};
+
+/** The largest cookie session browsers keep, in characters. */
+const MAX_COOKIE_SESSION = 4000;
 
 /**
  * The session of a request: data kept between the requests of one client, behind a cookie. Read
@@ -266,7 +196,7 @@ export const loadSession = async (context: HttpContext): Promise<Session> => {
 	const loaded = context[SESSION] as Session | undefined;
 	if (loaded) return loaded;
 	const config = themisConfig();
-	const store = config.session?.store ?? defaultStore;
+	const store = storeOf(config);
 	const raw = readCookie(context.request, config.session?.cookie?.name ?? 'elysium_session');
 
 	let session: Session | undefined;
@@ -297,7 +227,7 @@ export const commitSession = async (context: HttpContext): Promise<void> => {
 	const session = context[SESSION] as Session | undefined;
 	if (!session) return;
 	const config = themisConfig();
-	const store = config.session?.store ?? defaultStore;
+	const store = storeOf(config);
 	const cookie = config.session?.cookie ?? {};
 	const name = cookie.name ?? 'elysium_session';
 	const ttl = config.session?.ttl ?? DEFAULT_TTL;
@@ -317,6 +247,7 @@ export const commitSession = async (context: HttpContext): Promise<void> => {
 			COOKIE_PURPOSE,
 			JSON.stringify({ id: session.id, data, exp: Date.now() + ttl * 1000 })
 		);
+		if (sealed.length > MAX_COOKIE_SESSION) throw new SessionTooLargeError(sealed.length);
 		writeCookie(context, name, sealed, { ...cookie, maxAge: ttl });
 		return;
 	}
@@ -328,8 +259,8 @@ export const commitSession = async (context: HttpContext): Promise<void> => {
 };
 
 /**
- * Loads the session before the handler, and saves it after. Register it on the application, or on
- * the controllers that use sessions.
+ * Loads the session before the handler, and saves it after, also when the request ends with a
+ * client error. Register it on the application, or on the controllers that use sessions.
  * @author Axel Nana <axel.nana@workbud.com>
  * @example
  * ```ts
@@ -345,5 +276,14 @@ export class SessionMiddleware extends Middleware {
 
 	public override async onAfterHandle(context: HttpContext): Promise<void> {
 		await commitSession(context);
+	}
+
+	/**
+	 * Saves the session of a request refused with a client error too, such as a sign-in followed by
+	 * a thrown problem. A server error keeps the session as it was.
+	 */
+	public override async onError(context: HttpContext & { error: unknown }): Promise<void> {
+		const status = Number((context.error as { status?: unknown } | null)?.status ?? 500);
+		if (status < 500) await commitSession(context);
 	}
 }

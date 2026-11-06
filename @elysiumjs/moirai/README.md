@@ -45,7 +45,8 @@ await Queries.ask(WalletBalanceQuery, { walletId });
 - When `authorize(input)` returns `false`, the call answers a 403 problem.
 - A command runs in a unit of work, or joins the one already open. A transient failure retries in a new unit of work, up to 3 attempts. Transient failures are errors with `transient: true`, and Postgres serialization failures and deadlocks.
 - A handler refuses a call by returning or throwing a `DomainError`. The unit of work then rolls back, and the error reaches the caller.
-- An idempotent command needs a key, or it answers a 428 problem. A repeat with the same key and input replays the stored response; with another input, it answers a 422 problem.
+- An idempotent command needs a key, or it answers a 428 problem. A repeat with the same key and input replays the stored response, as JSON; with another input, it answers a 422 problem.
+- A key belongs to its owner: the current user by default (`currentUserId()` of core, else `anonymous`), or what `scope(input)` of the command or `Commands.execute(..., { scope })` returns, such as a tenant and a user. Another owner presenting the same key runs the command on its own.
 - `serializeBy` makes calls that share a key run one after the other, so a double tap waits for the first call and replays its response.
 
 ## Outbox and inbox
@@ -74,6 +75,8 @@ import { job } from '@elysiumjs/moirai/heracles';
 
 await Outbox.enqueue(job(SendReceiptJob, [order.id]));
 ```
+
+Effect handlers register when their module is imported, `@elysiumjs/moirai/heracles` included. A process that relays the outbox, such as a cron sweeper, imports the modules of the effects it relays.
 
 ## Stores
 

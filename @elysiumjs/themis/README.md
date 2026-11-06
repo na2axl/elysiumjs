@@ -6,6 +6,8 @@ Authentication for [Elysium.js](../core) apps: passwords, tokens, sessions, guar
 
 ```bash
 bun add @elysiumjs/themis
+# Sessions in Redis or Workers KV
+bun add @elysiumjs/themis-redis   # or @elysiumjs/themis-workers
 ```
 
 ## Setup
@@ -16,17 +18,21 @@ import {
 	apiKeyGuard,
 	CsrfMiddleware,
 	jwtGuard,
-	RedisSessionStore,
 	sessionGuard,
 	SessionMiddleware,
 	ThemisModule
 } from '@elysiumjs/themis';
+import { RedisSessionStore } from '@elysiumjs/themis-redis';
+import { Redis } from '@elysiumjs/redis';
 
 @Application.register({
 	modules: [
 		ThemisModule.with({
 			secret: env.APP_SECRET,
-			session: { store: new RedisSessionStore(), ttl: 60 * 60 * 24 * 7 },
+			session: {
+					store: new RedisSessionStore({ connection: () => Redis.connection() }),
+					ttl: 60 * 60 * 24 * 7
+				},
 			guards: {
 				session: sessionGuard({ user: (id) => users.find(id) }),
 				jwt: jwtGuard({ secret: env.JWT_SECRET, user: (claims) => users.find(claims.sub) }),
@@ -40,7 +46,7 @@ import {
 class App extends Application {}
 ```
 
-`secret` signs the session cookie, encrypts cookie sessions and binds CSRF tokens. Keep it in an environment secret, with at least 32 random characters.
+`secret` signs the session cookie, encrypts cookie sessions and binds CSRF tokens. Keep it in an environment secret. A secret under 32 bytes is refused at boot (`WeakSecretError`), and so are shorter JWT and signed URL secrets.
 
 ## Auth
 
@@ -64,7 +70,7 @@ class MeController {
 }
 ```
 
-- `@Auth()` tries the configured guards in order, and `@Auth({ guards })` only the named ones. It registers `AuthMiddleware`, so `@Middleware.register(AuthMiddleware.guards(['jwt']))` does the same as `@Auth({ guards: ['jwt'] })`. A custom guard implements `Guard`.
+- `@Auth()` tries the configured guards in order, and `@Auth({ guards })` only the named ones. A guard is an object that implements `Guard`, or a guard class, which is built once through the service container so that its constructor gets services injected. It registers `AuthMiddleware`, so `@Middleware.register(AuthMiddleware.guards(['jwt']))` does the same as `@Auth({ guards: ['jwt'] })`. 
 - A request no guard accepts answers a 401 problem. `@Auth({ optional: true })` lets it through, and `Auth.check()` tells whether a user is signed in.
 - The user is available through `Auth.user()` and `ctx.currentUser`, so cerberus can read it with `getSubject: (ctx) => ctx.currentUser`.
 - `Auth.login(id)` signs a user in on the session (and regenerates it), and `Auth.logout()` signs them out.
@@ -80,13 +86,14 @@ session.flash('notice', 'Saved');
 session.regenerate();
 ```
 
-- The stores are `MemorySessionStore`, `RedisSessionStore` and `KvSessionStore` (a Workers KV binding). `store: 'cookie'` keeps the whole session in an AES-GCM encrypted cookie.
+- The stores are `MemorySessionStore`, `RedisSessionStore` of [`@elysiumjs/themis-redis`](../themis-redis) and `KvSessionStore` of [`@elysiumjs/themis-workers`](../themis-workers) (a Workers KV binding). Without a store, sessions live in the memory of the process, and themis warns about it outside tests.
+- `store: 'cookie'` keeps the whole session in an AES-GCM encrypted cookie. It must stay under 4000 characters (`SessionTooLargeError`), and a copied cookie stays valid until it expires, so keep revocable sessions in a store.
 - The session cookie is signed, `HttpOnly`, `SameSite=Lax` and `Secure` by default.
-- The session is saved after the handler runs.
+- The session is saved after the handler runs, and also when the request ends with a client error (4xx), such as a sign-in followed by a thrown problem.
 
 ## CSRF
 
-`CsrfMiddleware` protects cookie sessions with a double-submit token. Unsafe methods need the `x-csrf-token` header or the `_csrf` field to match `Csrf.token()`, or they answer a 403 problem.
+`CsrfMiddleware` protects cookie sessions with a synchronizer token kept in the session. Unsafe methods need the `x-csrf-token` header or the `_csrf` field to match `Csrf.token()`, or they answer a 403 problem.
 
 ## Passwords
 
@@ -99,7 +106,7 @@ if ((await Password.verify(input, hash)) && Password.needsRehash(hash)) {
 }
 ```
 
-The hasher is argon2id (`BunPasswordHasher`) on Bun and PBKDF2-SHA256 (`Pbkdf2PasswordHasher`) elsewhere. `ScryptPasswordHasher`, from `@elysiumjs/themis/scrypt`, uses `node:crypto`. Pick one with `Password.use(hasher)`. Hashes describe their format, so `verify` reads all three.
+The hasher is argon2id (`BunPasswordHasher`) on Bun and PBKDF2-SHA256 (`Pbkdf2PasswordHasher`) elsewhere, with 600,000 iterations (100,000 on Cloudflare Workers, which cap PBKDF2 there). `ScryptPasswordHasher`, from `@elysiumjs/themis/scrypt`, uses `node:crypto`. Pick one with `Password.use(hasher)`. Hashes describe their format, so `verify` reads all three.
 
 ## Tokens
 
@@ -152,7 +159,7 @@ const url = await google.authorize();
 const { tokens, claims, userInfo } = await google.callback(request.url);
 ```
 
-The client uses the authorization code flow with PKCE. The state, the verifier and the OpenID Connect nonce are kept in the session. A provider without discovery takes `authorizationServer` with its endpoints. A callback with a wrong state or a failed exchange answers a 400 problem.
+The client uses the authorization code flow with PKCE. The state, the verifier and the OpenID Connect nonce are kept in the session. A provider without discovery takes `authorizationServer` with its endpoints. A callback with a wrong state or a failed exchange answers a 400 problem. Its detail names the OAuth error code the provider answered; any other failure is logged and answered with a fixed detail.
 
 ## Passkeys
 

@@ -66,6 +66,7 @@ export class SignUpFlow {
 - `Flow.advance(state, answer)` moves the flow forward. A step that returns anything else answers it and keeps the state.
 - `Flow.refuse(state, error)` refuses the step but keeps its state, such as a counted attempt. With `{ end: true }`, the flow is deleted.
 - A step that throws commits nothing, and the client may retry the same step id.
+- A submission holds its step for `lease` seconds (30 by default) while it runs, and the step runs on the state the store holds at that moment, so attempts that race see each other's refusals. A retry of a submission that outlives its lease runs the step again, so a step that may run longer sets a longer `lease`.
 
 The other options of `@Http.controller()` apply to `@Flow.controller()`, and those of the route decorators to `@Flow.step()`. Guards, rate limits, interceptors and filters decorate a flow like any controller.
 
@@ -98,12 +99,12 @@ A flow answers under `path`, which defaults to `/flows/{name}`:
 
 - `x-flow-step` is the id of the submission, which the client picks and sends again to retry it.
 - A `guest` flow belongs to the `owner` token answered at start. Later calls send it in the `x-flow-owner` header.
-- A `user` flow belongs to the signed-in user, so its controller needs a guard, such as `@Auth()` from themis. `user` in the module options reads the user id from the context (the `id` of `currentUser` by default, which `@Auth()` sets).
+- A `user` flow belongs to the signed-in user, so its controller needs a guard, such as `@Auth()` from themis. `user` in the module options reads the user id from the context. By default it reads `currentUser`, which `@Auth()` sets: the user itself when it is a string (the session guard without a loader), else its `id`, else its `sub` (JWT claims).
 
 The routes answer problems:
 
 - 410 when the flow expired, or is finished;
-- 409 for a step the flow does not accept now (with `nextSteps`, `backSteps` and the last `answer`), and for a step another request is running;
+- 409 for a step the flow does not accept now (with `nextSteps`, `backSteps` and the last `answer`), and for a step submitted while another submission of the flow runs (`flow-step-in-progress`);
 - 403 when the caller does not own the flow, and 401 for a user flow without a user;
 - 422 for a body that does not match the step's schema, or a request without `x-flow-key` or `x-flow-step`.
 
