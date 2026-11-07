@@ -1,5 +1,11 @@
 # @elysiumjs/core
 
+## 0.11.2
+
+### Patch Changes
+
+- [#30](https://github.com/na2axl/elysiumjs/pull/30) [`79c5c18`](https://github.com/na2axl/elysiumjs/commit/79c5c180f48e31b0be083beb84f6f6c60752a9bf) Thanks [@na2axl](https://github.com/na2axl)! - The OpenAPI page is served on Cloudflare Workers when the app is compiled ahead of time: on the Workers runtime the page embeds the spec, so the route compiled by the build matches the one workerd mounts.
+
 ## 0.11.1
 
 ### Patch Changes
