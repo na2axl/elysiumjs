@@ -1,5 +1,11 @@
 # @elysiumjs/core
 
+## 0.13.0
+
+### Minor Changes
+
+- [#38](https://github.com/na2axl/elysiumjs/pull/38) [`c8d9f53`](https://github.com/na2axl/elysiumjs/commit/c8d9f534eef32621eae121f7008f97dc24808141) Thanks [@na2axl](https://github.com/na2axl)! - A validator's `validate` and `authorize` may return a `DomainError`, answered as is with its own status, code and extensions. `false` still answers a generic 400 from `validate` and a 401 from `authorize`.
+
 ## 0.12.0
 
 ### Minor Changes

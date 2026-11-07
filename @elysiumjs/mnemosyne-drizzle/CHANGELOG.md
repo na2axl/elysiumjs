@@ -1,5 +1,14 @@
 # @elysiumjs/mnemosyne-drizzle
 
+## 0.4.3
+
+### Patch Changes
+
+- Updated dependencies [[`c8d9f53`](https://github.com/na2axl/elysiumjs/commit/c8d9f534eef32621eae121f7008f97dc24808141)]:
+  - @elysiumjs/core@0.13.0
+  - @elysiumjs/mnemosyne@0.5.2
+  - @elysiumjs/runtime-workers@0.1.2
+
 ## 0.4.2
 
 ### Patch Changes
