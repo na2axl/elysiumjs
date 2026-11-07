@@ -22,7 +22,8 @@ import {
 	Jwt,
 	Password,
 	Pbkdf2PasswordHasher,
-	SignedUrl
+	SignedUrl,
+	WeakSecretError
 } from '../src';
 import { decrypt, encrypt, fromBase64Url, safeEqual, toBase64Url } from '../src/crypto';
 import { ScryptPasswordHasher } from '../src/scrypt';
@@ -125,10 +126,99 @@ describe('JWT', () => {
 			'sign',
 			'verify'
 		])) as CryptoKeyPair;
-		const token = await Jwt.sign({ a: 1 }, { key: pair.privateKey, algorithm: 'EdDSA' });
+		const token = await Jwt.sign(
+			{ a: 1 },
+			{ key: pair.privateKey, algorithm: 'EdDSA', expiresIn: 60 }
+		);
 		expect(await Jwt.verify(token, { key: pair.publicKey, algorithm: 'EdDSA' })).toMatchObject({
 			a: 1
 		});
+	});
+});
+
+describe('JWT keys, claims and clock', () => {
+	const current = 'c'.repeat(32);
+	const previous = 'p'.repeat(32);
+
+	it('reads a secret from a function, sync or async', async () => {
+		const token = await Jwt.sign({}, { secret: async () => current, expiresIn: 60 });
+		expect(await Jwt.verify(token, { secret: () => current })).toMatchObject({});
+		await expect(Jwt.sign({}, { secret: () => 'short' })).rejects.toBeInstanceOf(WeakSecretError);
+	});
+
+	it('tries each key in order, so a token of the previous key verifies during a rotation', async () => {
+		const old = await Jwt.sign({ v: 'old' }, { secret: previous, expiresIn: 60 });
+		const keys = [{ secret: current }, { secret: previous }];
+		expect(await Jwt.verify(old, { keys })).toMatchObject({ v: 'old' });
+		const forged = await Jwt.sign({}, { secret: 'f'.repeat(32), expiresIn: 60 });
+		expect(Jwt.verify(forged, { keys })).rejects.toThrow('does not verify');
+		expect(Jwt.verify(old, { keys: [] })).rejects.toBeInstanceOf(InvalidTokenError);
+	});
+
+	it('does not try the next key for an expired token', async () => {
+		let previousRead = false;
+		const expired = await Jwt.sign({}, { secret: current, expiresIn: -60 });
+		const keys = [
+			{ secret: current },
+			{
+				secret: () => {
+					previousRead = true;
+					return previous;
+				}
+			}
+		];
+		expect(Jwt.verify(expired, { keys })).rejects.toThrow('has expired');
+		await Jwt.verify(expired, { keys }).catch(() => undefined);
+		expect(previousRead).toBe(false);
+	});
+
+	it('mixes keys of different algorithms', async () => {
+		const pair = (await crypto.subtle.generateKey({ name: 'Ed25519' }, true, [
+			'sign',
+			'verify'
+		])) as CryptoKeyPair;
+		const token = await Jwt.sign({}, { key: pair.privateKey, algorithm: 'EdDSA', expiresIn: 60 });
+		const keys = [{ secret: current }, { key: pair.publicKey, algorithm: 'EdDSA' }];
+		expect(await Jwt.verify(token, { keys })).toMatchObject({});
+	});
+
+	it('requires an expiry unless told otherwise, and other claims when asked', async () => {
+		const forever = await Jwt.sign({}, { secret: current });
+		expect(Jwt.verify(forever, { secret: current })).rejects.toThrow('"exp"');
+		expect(await Jwt.verify(forever, { secret: current, requiredClaims: [] })).toMatchObject({});
+		const anonymous = await Jwt.sign({}, { secret: current, expiresIn: 60 });
+		expect(
+			Jwt.verify(anonymous, { secret: current, requiredClaims: ['exp', 'sub'] })
+		).rejects.toThrow('"sub"');
+	});
+
+	it('signs from an issue time and verifies against a given time', async () => {
+		const issuedAt = new Date('2026-01-01T00:00:00Z');
+		const token = await Jwt.sign({}, { secret: current, issuedAt, expiresIn: '10m' });
+		const at = (iso: string) =>
+			Jwt.verify(token, { secret: current, currentDate: new Date(iso), clockTolerance: 0 });
+		expect(await at('2026-01-01T00:09:59Z')).toMatchObject({
+			iat: issuedAt.getTime() / 1000,
+			exp: issuedAt.getTime() / 1000 + 600
+		});
+		expect(at('2026-01-01T00:10:00Z')).rejects.toThrow('has expired');
+
+		const numeric = await Jwt.sign({}, { secret: current, issuedAt, expiresIn: 90 });
+		expect(
+			await Jwt.verify(numeric, { secret: current, currentDate: new Date('2026-01-01T00:01:00Z') })
+		).toMatchObject({ exp: issuedAt.getTime() / 1000 + 90 });
+		await expect(
+			Jwt.sign({}, { secret: current, issuedAt, expiresIn: 'ten minutes' })
+		).rejects.toBeInstanceOf(TypeError);
+	});
+});
+
+describe('signed URL secrets', () => {
+	it('reads the secret from a function', async () => {
+		const secret = () => 's'.repeat(32);
+		const link = await SignedUrl.sign('https://x.test/a?b=1', { secret, expiresIn: 60 });
+		expect(await SignedUrl.verify(link, { secret })).toBe(true);
+		expect(await SignedUrl.verify(link, { secret: () => 't'.repeat(32) })).toBe(false);
 	});
 });
 

@@ -36,7 +36,7 @@ import { assertStrongSecret } from './errors';
  */
 @Module.register<ThemisConfig>({
 	services: (config) => {
-		assertStrongSecret(config.secret, 'themis secret');
+		if (typeof config.secret === 'string') assertStrongSecret(config.secret, 'themis secret');
 		return [{ name: THEMIS_CONFIG, global: true, factory: () => config }];
 	}
 })

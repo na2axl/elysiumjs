@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { Secret } from './secret';
+
 import { DomainError } from '@elysiumjs/core';
 
 import { hmac, verifyHmac } from './crypto';
-import { assertStrongSecret } from './errors';
+import { resolveSecret } from './secret';
 
 /**
  * Raised when a signed URL was tampered with or has expired. Rendered as a 403 problem.
@@ -50,15 +52,15 @@ export namespace SignedUrl {
 	 */
 	export const sign = async (
 		url: string | URL,
-		options: { secret: string; expiresIn?: number }
+		options: { secret: Secret; expiresIn?: number }
 	): Promise<string> => {
 		const target = new URL(url);
 		target.searchParams.delete('signature');
 		if (options.expiresIn !== undefined) {
 			target.searchParams.set('expires', String(Math.floor(Date.now() / 1000) + options.expiresIn));
 		}
-		assertStrongSecret(options.secret, 'signed URL secret');
-		target.searchParams.set('signature', await hmac(options.secret, signedPart(target)));
+		const secret = await resolveSecret(options.secret, 'signed URL secret');
+		target.searchParams.set('signature', await hmac(secret, signedPart(target)));
 		return target.toString();
 	};
 
@@ -68,7 +70,7 @@ export namespace SignedUrl {
 	 */
 	export const verify = async (
 		url: string | URL,
-		options: { secret: string }
+		options: { secret: Secret }
 	): Promise<boolean> => {
 		try {
 			await assert(url, options);
@@ -83,10 +85,11 @@ export namespace SignedUrl {
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @throws {InvalidSignatureError} When the URL was tampered with or has expired (403).
 	 */
-	export const assert = async (url: string | URL, options: { secret: string }): Promise<void> => {
+	export const assert = async (url: string | URL, options: { secret: Secret }): Promise<void> => {
 		const target = new URL(url);
 		const signature = target.searchParams.get('signature');
-		if (!signature || !(await verifyHmac(options.secret, signedPart(target), signature))) {
+		const secret = await resolveSecret(options.secret, 'signed URL secret');
+		if (!signature || !(await verifyHmac(secret, signedPart(target), signature))) {
 			throw new InvalidSignatureError(false);
 		}
 		const expires = target.searchParams.get('expires');

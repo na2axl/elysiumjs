@@ -14,6 +14,7 @@
 
 import type { Guard, GuardClass } from './auth';
 import type { CookieOptions } from './context';
+import type { Secret } from './secret';
 import type { SessionStore } from './session';
 
 /** The service name of the Themis configuration. */
@@ -26,9 +27,10 @@ export const THEMIS_CONFIG = 'themis.settings';
 export type ThemisConfig = {
 	/**
 	 * The secret that signs the session cookie, encrypts cookie sessions and binds CSRF tokens. At
-	 * least 32 random characters, kept out of the code (an environment secret).
+	 * least 32 random characters, kept out of the code (an environment secret). A function is called
+	 * each time the secret is needed, so it can read it from a store bound to the request.
 	 */
-	secret: string;
+	secret: Secret;
 	/** The sessions. */
 	session?: {
 		/** Where sessions live. `cookie` keeps the whole session in an encrypted cookie. Defaults to memory. */

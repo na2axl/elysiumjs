@@ -19,6 +19,7 @@ import { currentEnvironment, getLogger, Middleware } from '@elysiumjs/core';
 import { currentContext, readCookie, themisConfig, writeCookie } from './context';
 import { decrypt, encrypt, hmac, randomToken, verifyHmac } from './crypto';
 import { NoSessionError, SessionTooLargeError } from './errors';
+import { resolveSecret } from './secret';
 
 /** The data of a session. */
 export type SessionData = Record<string, unknown>;
@@ -61,6 +62,9 @@ export class MemorySessionStore implements SessionStore {
 		this.#sessions.delete(id);
 	}
 }
+
+/** What the themis secret is called in errors. */
+const SECRET = 'themis secret';
 
 const FLASH = '_flash';
 const SESSION = 'themis:session';
@@ -201,7 +205,7 @@ export const loadSession = async (context: HttpContext): Promise<Session> => {
 
 	let session: Session | undefined;
 	if (raw && store === 'cookie') {
-		const opened = await decrypt(config.secret, COOKIE_PURPOSE, raw);
+		const opened = await decrypt(await resolveSecret(config.secret, SECRET), COOKIE_PURPOSE, raw);
 		const parsed = opened
 			? (JSON.parse(opened) as { id: string; data: SessionData; exp: number })
 			: null;
@@ -209,7 +213,8 @@ export const loadSession = async (context: HttpContext): Promise<Session> => {
 	} else if (raw && store !== 'cookie') {
 		const dot = raw.lastIndexOf('.');
 		const id = raw.slice(0, dot);
-		if (dot > 0 && (await verifyHmac(config.secret, id, raw.slice(dot + 1)))) {
+		const secret = await resolveSecret(config.secret, SECRET);
+		if (dot > 0 && (await verifyHmac(secret, id, raw.slice(dot + 1)))) {
 			const data = await store.load(id);
 			if (data) session = new Session(id, data, false);
 		}
@@ -241,9 +246,10 @@ export const commitSession = async (context: HttpContext): Promise<void> => {
 	}
 	if (!dirty) return;
 
+	const secret = await resolveSecret(config.secret, SECRET);
 	if (store === 'cookie') {
 		const sealed = await encrypt(
-			config.secret,
+			secret,
 			COOKIE_PURPOSE,
 			JSON.stringify({ id: session.id, data, exp: Date.now() + ttl * 1000 })
 		);
@@ -252,7 +258,7 @@ export const commitSession = async (context: HttpContext): Promise<void> => {
 		return;
 	}
 	await store.save(session.id, data, ttl);
-	writeCookie(context, name, `${session.id}.${await hmac(config.secret, session.id)}`, {
+	writeCookie(context, name, `${session.id}.${await hmac(secret, session.id)}`, {
 		...cookie,
 		maxAge: ttl
 	});

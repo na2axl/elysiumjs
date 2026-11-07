@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import type { TestingHttpApp, TestResponse } from '@elysiumjs/core';
-import type { Guard, SessionStore } from '../src';
+import type { Guard, Secret, SessionStore } from '../src';
 
 import { Application, ConflictError, Http, Middleware, Module, Service, t } from '@elysiumjs/core';
 import { afterEach, describe, expect, it } from 'bun:test';
@@ -147,11 +147,14 @@ class PublicController {
 })
 class AuthModule extends Module {}
 
-const makeApp = (store: SessionStore | 'cookie' = new MemorySessionStore()) => {
+const makeApp = (
+	store: SessionStore | 'cookie' = new MemorySessionStore(),
+	secret: Secret = SECRET
+) => {
 	@Application.register({
 		modules: [
 			ThemisModule.with({
-				secret: SECRET,
+				secret,
 				session: { store, cookie: { secure: false } },
 				guards: {
 					session: sessionGuard({ user: (id) => users[id] }),
@@ -292,7 +295,7 @@ describe('sessions, auth and CSRF', () => {
 	it('authenticates bearer tokens and API keys, and limits a route to some guards', async () => {
 		const { http } = await flow();
 		apiKey = await ApiKeys.generate({ prefix: 'sk' });
-		const token = await Jwt.sign({}, { secret: JWT_SECRET, subject: 'u1' });
+		const token = await Jwt.sign({}, { secret: JWT_SECRET, subject: 'u1', expiresIn: '5m' });
 
 		expect(await (await http.get('/me').header('authorization', `Bearer ${token}`)).json()).toEqual(
 			{
@@ -365,6 +368,28 @@ describe('session edges, guard classes and secrets', () => {
 		const response = await testing.http.get('/device').header('x-device-token', 'device-1');
 		expect(await response.json()).toEqual({ user: users.u1, guard: 'device' });
 		expect((await testing.http.get('/device')).status).toBe(401);
+	});
+
+	it('reads the secret from a function on every use', async () => {
+		let reads = 0;
+		const app = makeApp(undefined, () => {
+			reads++;
+			return SECRET;
+		});
+		testing = await Application.testing({ app });
+		const jar = new Jar();
+		const first = await (jar.keep(await testing.http.get('/session/read'))).json();
+		const second = await (
+			await testing.http.get('/session/read').header('cookie', jar.header)
+		).json();
+		// The second request found the session of the first: its cookie verified.
+		expect(second.csrf).toBe(first.csrf);
+		expect(reads).toBe(2);
+	});
+
+	it('refuses a short secret read from a function when it is used', async () => {
+		testing = await Application.testing({ app: makeApp(undefined, async () => 'short') });
+		expect((await testing.http.get('/session/read')).status).toBe(500);
 	});
 
 	it('refuses secrets shorter than 32 bytes', async () => {
