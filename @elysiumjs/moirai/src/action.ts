@@ -53,29 +53,60 @@ export type HandlerContext = {
 };
 
 /**
- * What `handle()` gives: the result, or a DomainError that refuses the call.
+ * What `handle()` gives: the result, or one of the DomainErrors that refuse the call.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export type HandlerResult<TResult> = Promise<TResult | DomainError> | TResult | DomainError;
+export type HandlerResult<TResult, TErrors extends DomainError = DomainError> =
+	Promise<TResult | TErrors> | TResult | TErrors;
 
 /**
  * An action class.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export type ActionClass<TInput = any, TResult = any> = new (
-	...args: any[]
-) => Action<TInput, TResult>;
+export type ActionClass<
+	TInput = any,
+	TResult = any,
+	TErrors extends DomainError = DomainError
+> = new (...args: any[]) => Action<TInput, TResult, TErrors>;
 
 /**
  * A query class.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export type QueryClass<TInput = any, TResult = any> = new (
-	...args: any[]
-) => Query<TInput, TResult>;
+export type QueryClass<
+	TInput = any,
+	TResult = any,
+	TErrors extends DomainError = DomainError
+> = new (...args: any[]) => Query<TInput, TResult, TErrors>;
 
 type HandlerClass = ActionClass | QueryClass;
-type InputOf<C extends HandlerClass> = Parameters<InstanceType<C>['handle']>[0];
+type HandleParameters<C extends HandlerClass> = Parameters<InstanceType<C>['handle']>;
+type InputOf<C extends HandlerClass> =
+	HandleParameters<C> extends [] ? undefined : HandleParameters<C>[0];
+
+/**
+ * How an action or a query is called.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type ActionCall = { idempotencyKey?: string; scope?: string };
+
+/**
+ * The arguments of `Moirai.execute()` after the action: its input, which may be left out when
+ * `handle()` takes none (or an optional one), and how it is called.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type ExecuteArgs<C extends ActionClass> =
+	undefined extends InputOf<C>
+		? [input?: InputOf<C>, call?: ActionCall]
+		: [input: InputOf<C>, call?: ActionCall];
+
+/**
+ * The arguments of `Moirai.ask()` after the query: its input, which may be left out when
+ * `handle()` takes none (or an optional one).
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type AskArgs<C extends QueryClass> =
+	undefined extends InputOf<C> ? [input?: InputOf<C>] : [input: InputOf<C>];
 type OutcomeOf<C extends HandlerClass> = Awaited<ReturnType<InstanceType<C>['handle']>>;
 type ResultOf<C extends HandlerClass> = Exclude<OutcomeOf<C>, DomainError>;
 
@@ -119,8 +150,8 @@ export type ActionRetry = {
 export type ActionOptions<S extends TSchema = TSchema> = {
 	/** The name of the action, in idempotency records and problems. Defaults to the class name. */
 	name?: string;
-	/** The schema of the input. */
-	input: S;
+	/** The schema of the input. An action without one takes no input. */
+	input?: S;
 	/**
 	 * Whether a call needs an idempotency key. A repeat with the same key and input replays the
 	 * stored response; with another input, it is refused with a 422 problem. Defaults to `false`.
@@ -159,8 +190,8 @@ export type ActionOptions<S extends TSchema = TSchema> = {
 export type QueryOptions<S extends TSchema = TSchema> = {
 	/** The name of the query. Defaults to the class name. */
 	name?: string;
-	/** The schema of the input. */
-	input: S;
+	/** The schema of the input. A query without one takes no input. */
+	input?: S;
 	/** Decides whether the call may run. */
 	authorize?: (input: Static<S>) => boolean | Promise<boolean>;
 };
@@ -186,7 +217,11 @@ export type QueryOptions<S extends TSchema = TSchema> = {
  * }
  * ```
  */
-export abstract class Action<TInput = any, TResult = any> {
+export abstract class Action<
+	TInput = any,
+	TResult = any,
+	TErrors extends DomainError = DomainError
+> {
 	/**
 	 * Marks a class as an action.
 	 * @param props The options of the action.
@@ -201,7 +236,7 @@ export abstract class Action<TInput = any, TResult = any> {
 	 * Runs the action with its validated input. Returning or throwing a DomainError refuses the
 	 * call and rolls its unit of work back.
 	 */
-	public abstract handle(input: TInput, context: HandlerContext): HandlerResult<TResult>;
+	public abstract handle(input: TInput, context: HandlerContext): HandlerResult<TResult, TErrors>;
 }
 
 /**
@@ -209,7 +244,11 @@ export abstract class Action<TInput = any, TResult = any> {
  * `@Query.register()` and run it with {@link Moirai.ask}.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export abstract class Query<TInput = any, TResult = any> {
+export abstract class Query<
+	TInput = any,
+	TResult = any,
+	TErrors extends DomainError = DomainError
+> {
 	/**
 	 * Marks a class as a query.
 	 * @param props The options of the query.
@@ -221,7 +260,7 @@ export abstract class Query<TInput = any, TResult = any> {
 	}
 
 	/** Runs the query with its validated input. Returning or throwing a DomainError refuses it. */
-	public abstract handle(input: TInput, context: HandlerContext): HandlerResult<TResult>;
+	public abstract handle(input: TInput, context: HandlerContext): HandlerResult<TResult, TErrors>;
 }
 
 /** The instance of a handler: the registered service, or a new one with its dependencies. */
@@ -229,7 +268,13 @@ const instanceOf = <T>(target: new (...args: any[]) => T): T =>
 	Service.get(target) ?? Service.make(target);
 
 /** The input, with its defaults, or an {@link InvalidInputError} listing the mistakes. */
-const validate = <S extends TSchema>(schema: S, raw: unknown, name: string): Static<S> => {
+const validate = <S extends TSchema>(
+	schema: S | undefined,
+	raw: unknown,
+	name: string
+): Static<S> => {
+	// A handler without an input schema takes no input.
+	if (schema === undefined) return undefined as Static<S>;
 	const value = Value.Default(schema, structuredClone(raw)) as Static<S>;
 	const errors = [...Value.Errors(schema, value)];
 	if (errors.length > 0) {
@@ -272,13 +317,12 @@ export namespace Moirai {
 	 * that returns it sends it as the problem of its route.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param action The action class.
-	 * @param input The raw input.
-	 * @param call The idempotency key of the call.
+	 * @param args The raw input, left out when `handle()` takes none, and the idempotency key and
+	 * scope of the call.
 	 */
 	export const execute = <C extends ActionClass>(
 		action: C,
-		input: InputOf<C>,
-		call: { idempotencyKey?: string; scope?: string } = {}
+		...[input, call = {}]: ExecuteArgs<C>
 	): Promise<ActionOutcome<C>> =>
 		settle(() => {
 			const props = Metadata.get(ACTION, action) as (ActionOptions & { name: string }) | undefined;
@@ -315,8 +359,8 @@ export namespace Moirai {
 	const run = async <C extends ActionClass>(
 		action: C,
 		props: ActionOptions & { name: string },
-		input: InputOf<C>,
-		call: { idempotencyKey?: string; scope?: string }
+		input: InputOf<C> | undefined,
+		call: ActionCall
 	): Promise<ResultOf<C>> => {
 		const { name, idempotent = false, transactional = true, retry = true } = props;
 		const config = options();
@@ -389,11 +433,11 @@ export namespace Moirai {
 	 * `authorize`.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param query The query class.
-	 * @param input The raw input.
+	 * @param args The raw input, left out when `handle()` takes none.
 	 */
 	export const ask = <C extends QueryClass>(
 		query: C,
-		input: InputOf<C>
+		...[input]: AskArgs<C>
 	): Promise<QueryOutcome<C>> =>
 		settle(async () => {
 			const props = Metadata.get(QUERY, query) as (QueryOptions & { name: string }) | undefined;

@@ -13,10 +13,13 @@
 // limitations under the License.
 
 export {
+	type ActionCall,
 	type ActionClass,
 	type ActionOptions,
 	type ActionOutcome,
 	type ActionRetry,
+	type AskArgs,
+	type ExecuteArgs,
 	type HandlerContext,
 	type HandlerResult,
 	type QueryClass,
