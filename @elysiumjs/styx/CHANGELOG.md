@@ -1,5 +1,11 @@
 # @elysiumjs/styx
 
+## 0.9.2
+
+### Patch Changes
+
+- [#36](https://github.com/na2axl/elysiumjs/pull/36) [`0f64f52`](https://github.com/na2axl/elysiumjs/commit/0f64f5209dd0a6f094b3336b0ca2831e28099861) Thanks [@na2axl](https://github.com/na2axl)! - Styx commands load apps that import `cloudflare:workers` (to export a Durable Object, such as the flow store of `@elysiumjs/ariadne-workers`): stand-ins of the `cloudflare:*` modules are registered while Styx reads the app's code.
+
 ## 0.9.1
 
 ### Patch Changes

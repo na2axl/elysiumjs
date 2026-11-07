@@ -1,5 +1,11 @@
 # @elysiumjs/hephaestus
 
+## 0.5.0
+
+### Minor Changes
+
+- [#36](https://github.com/na2axl/elysiumjs/pull/36) [`0f64f52`](https://github.com/na2axl/elysiumjs/commit/0f64f5209dd0a6f094b3336b0ca2831e28099861) Thanks [@na2axl](https://github.com/na2axl)! - Workers builds copy imported `.wasm` files next to the bundle and keep them as imports, so workerd loads them as compiled WebAssembly modules. Bun plugins listed in `build.plugins` of a TypeScript or JavaScript config now run in the Workers and Node builds. An entry that imports `cloudflare:workers` (to export a Durable Object, such as the flow store of `@elysiumjs/ariadne-workers`) now builds: the routes compile against stand-ins of the `cloudflare:*` modules, and the bundle keeps the real imports.
+
 ## 0.4.1
 
 ### Patch Changes
