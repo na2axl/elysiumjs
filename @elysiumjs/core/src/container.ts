@@ -15,7 +15,7 @@
 import type { Class } from 'type-fest';
 import type { ModuleNode } from './module-graph';
 import type { ServiceDefinition, ServiceFactoryDefinition } from './service';
-import type { ServiceToken } from './token';
+import type { Injection, ServiceTag, ServiceToken } from './token';
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 
@@ -74,6 +74,9 @@ export type ContainerEntry = {
 
 	/** The service class, when the entry was registered from one. Used to await its dependencies. */
 	cls?: Class<any>;
+
+	/** The names of the tags the service is registered with. */
+	tags?: readonly string[];
 };
 
 /**
@@ -86,9 +89,10 @@ export type VisibilityResolver = {
 
 	/** The service tokens `owner` exports, or `true` when it exports all its services. */
 	exportsOf(owner: ModuleNode): readonly ServiceToken[] | true;
-};
 
-type InjectedService = { token: ServiceToken; index: number };
+	/** The active modules of the application, whose tagged services every module sees. */
+	readonly nodes?: readonly ModuleNode[];
+};
 
 /** The request-scoped instances of the request being handled. */
 type RequestStore = Map<ContainerEntry, Instantiation>;
@@ -99,8 +103,32 @@ const GLOBAL_OWNER = '<global>';
 
 const isDefined = <T>(value: T | undefined): value is T => value !== undefined;
 
+const tagNames = (tags: readonly ServiceTag[] | undefined): string[] => [
+	...new Set((tags ?? []).map((tag) => tag.tag))
+];
+
+/** Adds an entry to the index of each of its tags. */
+const indexTags = (entry: ContainerEntry, tags: readonly string[]): void => {
+	for (const tag of tags) {
+		const entries = tagged.get(tag) ?? [];
+		if (!entries.includes(entry)) entries.push(entry);
+		tagged.set(tag, entries);
+	}
+};
+
+/** Removes entries from the tag index. */
+const unindexTags = (drop: (entry: ContainerEntry) => boolean): void => {
+	for (const [tag, entries] of tagged) {
+		const kept = entries.filter((entry) => !drop(entry));
+		if (kept.length > 0) tagged.set(tag, kept);
+		else tagged.delete(tag);
+	}
+};
+
 const globalScope = new Map<ServiceToken, ContainerEntry>();
 const moduleScopes = new Map<ModuleNode, Map<ServiceToken, ContainerEntry>>();
+/** The entries of each tag, in registration order. */
+const tagged = new Map<string, ContainerEntry[]>();
 const requestStorage = new AsyncLocalStorage<RequestStore>();
 const keyedRequestStores = new WeakMap<object, RequestStore>();
 /** The disposals of keyed scopes, so that a later dispose of the same key waits for them. */
@@ -282,25 +310,29 @@ const prepare = async (entry: ContainerEntry, path: readonly ContainerEntry[]): 
 	}
 	if (!entry.cls || ('instance' in entry && entry.scope === ServiceScope.SINGLETON)) return;
 
-	const dependencies: InjectedService[] = Metadata.get(Symbols.services, entry.cls) ?? [];
+	const dependencies: Injection[] = Metadata.get(Symbols.services, entry.cls) ?? [];
 	// Look dependencies up synchronously, in the owner's context.
-	const found = inOwnerContext(entry.owner, () =>
-		dependencies.map((dependency) => Container.lookup(dependency.token, ModuleContext.current()))
-	);
+	const found = inOwnerContext(entry.owner, () => {
+		const from = ModuleContext.current();
+		return dependencies.flatMap((dependency) =>
+			'tag' in dependency
+				? Container.lookupAll(dependency.tag, from)
+				: [Container.lookup(dependency.token, from)?.entry].filter(isDefined)
+		);
+	});
 	for (const dependency of found) {
-		if (!dependency) continue;
-		if (dependency.entry.scope === ServiceScope.SINGLETON) {
-			await entryValueAsync(dependency.entry, trail);
+		if (dependency.scope === ServiceScope.SINGLETON) {
+			await entryValueAsync(dependency, trail);
 		} else if (
-			dependency.entry.scope === ServiceScope.REQUEST &&
+			dependency.scope === ServiceScope.REQUEST &&
 			!trail.some((e) => e.scope === ServiceScope.SINGLETON) &&
 			requestStorage.getStore()
 		) {
 			// Built ahead in the request store, so that the dependant finds it ready. Under a
 			// singleton, it is left to fail with a ScopeMismatchError when it is built.
-			await entryValueAsync(dependency.entry, trail);
+			await entryValueAsync(dependency, trail);
 		} else {
-			await prepare(dependency.entry, trail);
+			await prepare(dependency, trail);
 		}
 	}
 };
@@ -340,7 +372,13 @@ export namespace Container {
 			? (Metadata.get(Symbols.serviceOptions, def) ?? {})
 			: def;
 		const token: ServiceToken = options.name ?? (isClass ? def : '');
-		if (overridden.has(token)) return token;
+		const tags = tagNames(options.tags);
+		if (overridden.has(token)) {
+			// The override stands in for the service in its tags too.
+			const override = globalScope.get(token);
+			if (override) indexTags(override, tags);
+			return token;
+		}
 
 		add({
 			token,
@@ -352,7 +390,8 @@ export namespace Container {
 			create: isClass
 				? () => make(def)
 				: () => def.factory(config, (service) => require(service, tokenLabel(def.name))),
-			initialised: false
+			initialised: false,
+			tags
 		});
 
 		return token;
@@ -372,6 +411,7 @@ export namespace Container {
 				]);
 			}
 			globalScope.set(entry.token, entry);
+			indexTags(entry, entry.tags ?? []);
 			return;
 		}
 
@@ -386,6 +426,7 @@ export namespace Container {
 			);
 		}
 		scope.set(entry.token, entry);
+		indexTags(entry, entry.tags ?? []);
 	}
 
 	/**
@@ -451,6 +492,55 @@ export namespace Container {
 		}
 
 		return found(globalScope.get(name));
+	}
+
+	/**
+	 * Finds the services registered with a tag, in registration order: the global ones, the ones of
+	 * `from`, and the ones of every active module of the application. A tag is an extension point
+	 * open to the whole application, so a module sees the tagged services of modules it does not
+	 * import; looking them up by token still follows the visibility rules.
+	 */
+	export function lookupAll(tag: ServiceTag, from: ModuleNode | undefined): ContainerEntry[] {
+		const nodes = new Set(visibility?.nodes ?? []);
+		return (tagged.get(tag.tag) ?? []).filter(
+			(entry) => entry.global || !entry.owner || entry.owner === from || nodes.has(entry.owner)
+		);
+	}
+
+	/**
+	 * Gets every service registered with a tag, from the current module context.
+	 * @returns The services, in registration order; empty when none has the tag.
+	 * @throws {ServiceNotReadyError} If a service or its module is still initialising.
+	 */
+	export function getAll(tag: ServiceTag): unknown[] {
+		return lookupAll(tag, ModuleContext.current()).map(entryValue);
+	}
+
+	/**
+	 * Like {@link getAll}, but awaits the `onInit` of each service and of its owning module.
+	 */
+	export async function resolveAll(tag: ServiceTag): Promise<unknown[]> {
+		const instances: unknown[] = [];
+		for (const entry of lookupAll(tag, ModuleContext.current())) {
+			instances.push(await entryValueAsync(entry));
+		}
+		return instances;
+	}
+
+	/**
+	 * Awaits a found entry like {@link resolve}: its module's initialisation, its dependencies and
+	 * its `onInit`.
+	 */
+	export function resolveEntry(entry: ContainerEntry): Promise<unknown> {
+		return entryValueAsync(entry);
+	}
+
+	/**
+	 * Awaits what a parameter receives from the container: a service, `null` when it is not
+	 * visible, or every service of a tag.
+	 */
+	export function resolveInjection(injection: Injection): Promise<unknown> {
+		return 'tag' in injection ? resolveAll(injection.tag) : resolveVisible(injection.token);
 	}
 
 	/**
@@ -520,10 +610,11 @@ export namespace Container {
 	 * @throws {ServiceNotFoundError | ServiceNotVisibleError | EnvironmentSkippedModuleError}
 	 */
 	export function make<T>(cls: Class<T>): T {
-		const dependencies: InjectedService[] = Metadata.get(Symbols.services, cls) ?? [];
+		const dependencies: Injection[] = Metadata.get(Symbols.services, cls) ?? [];
 		const params: unknown[] = [];
 		for (const dependency of dependencies) {
-			params[dependency.index] = require(dependency.token, cls.name);
+			params[dependency.index] =
+				'tag' in dependency ? getAll(dependency.tag) : require(dependency.token, cls.name);
 		}
 		return new cls(...params);
 	}
@@ -593,7 +684,9 @@ export namespace Container {
 
 	/** Removes a service from the global scope. */
 	export const removeGlobal = (service: ServiceToken): void => {
+		const entry = globalScope.get(tokenOf(service));
 		globalScope.delete(tokenOf(service));
+		if (entry) unindexTags((e) => e === entry);
 	};
 
 	/**
@@ -653,7 +746,9 @@ export namespace Container {
 
 	/** Clears the global scope. */
 	export const clearGlobal = (): void => {
+		const entries = new Set(globalScope.values());
 		globalScope.clear();
+		unindexTags((entry) => entries.has(entry));
 	};
 
 	/** The live singletons, in construction order (those whose `onInit` failed are left out). Returns a snapshot. */
@@ -706,6 +801,7 @@ export namespace Container {
 	export function reset(): void {
 		globalScope.clear();
 		moduleScopes.clear();
+		tagged.clear();
 		constructedEntries.length = 0;
 	}
 }

@@ -22,7 +22,7 @@ import type { Middleware } from './middleware';
 import type { Module } from './module';
 import type { ModuleNode } from './module-graph';
 import type { AppRateLimitOptions, RateLimitOptions } from './rate-limit';
-import type { ServiceToken } from './token';
+import type { Injection } from './token';
 
 import { Elysia, sse as esse, t } from 'elysia';
 import { assign, isEmpty, objectify } from 'radash';
@@ -167,7 +167,7 @@ type HttpRequestHandlerMetadata = {
 	/**
 	 * The list of services injected in the handler.
 	 */
-	services: Array<{ token: ServiceToken; index: number }>;
+	services: Injection[];
 
 	/**
 	 * Whether the request handler is transactional.
@@ -804,7 +804,7 @@ export namespace Http {
 						if (!isEmpty(route.services)) {
 							for (const service of route.services) {
 								parameters[service.index] = await ModuleContext.run(node, () =>
-									Container.resolveVisible(service.token)
+									Container.resolveInjection(service)
 								);
 							}
 						}

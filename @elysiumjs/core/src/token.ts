@@ -44,3 +44,44 @@ export const tokenOf = (service: ServiceToken): ServiceToken =>
  */
 export const tokenLabel = (token: ServiceToken): string =>
 	typeof token === 'string' ? token : token.name || '<anonymous class>';
+
+/**
+ * A tag that groups services: every service registered with it is injected together with
+ * `@Service.injectAll(tag)`, or retrieved with `Service.getAll(tag)`. Tags are matched by name.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @template T The type every tagged service implements.
+ */
+export type ServiceTag<T = unknown> = {
+	/** The name of the tag. */
+	readonly tag: string;
+
+	/** Carries the type of the tagged services; never set at runtime. */
+	readonly __services?: T;
+};
+
+/**
+ * Creates a tag.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @template T The type every tagged service implements.
+ * @param name The name of the tag, unique in the application.
+ */
+export const serviceTag = <T>(name: string): ServiceTag<T> => Object.freeze({ tag: name });
+
+/**
+ * Checks whether a value is a service tag.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param value The value to check.
+ */
+export const isServiceTag = (value: unknown): value is ServiceTag =>
+	typeof value === 'object' &&
+	value !== null &&
+	typeof (value as { tag?: unknown }).tag === 'string';
+
+/**
+ * What a constructor or handler parameter receives from the container: one service by its token,
+ * or every service of a tag.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type Injection =
+	| { readonly token: ServiceToken; readonly index: number }
+	| { readonly tag: ServiceTag; readonly index: number };

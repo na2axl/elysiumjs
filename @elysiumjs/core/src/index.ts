@@ -102,6 +102,7 @@ export {
 	ServiceScope,
 	Service
 } from './service';
+export { type ServiceTag } from './token';
 export {
 	type WampRegistrationOptions,
 	type WampSubscriptionOptions,
