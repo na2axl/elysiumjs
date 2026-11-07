@@ -187,8 +187,23 @@ describe('problem details over HTTP', () => {
 		}
 	}
 
+	class PositiveBody {
+		static readonly schema = t.Object({ n: t.Number() });
+		static async authorize(c: { headers: Record<string, string | undefined> }) {
+			return c.headers['x-blocked'] ? new ConflictError('blocked') : true;
+		}
+		static async validate(c: { body: { n: number } }) {
+			return c.body.n > 0 || new InsufficientFundsError(c.body.n);
+		}
+	}
+
 	@Http.controller('/p')
 	class ProblemController {
+		@Http.post('/positive')
+		public positive(@Http.body(PositiveBody as never) body: unknown) {
+			return body;
+		}
+
 		@Http.post('/even')
 		public even(@Http.body(EvenBody as never) body: unknown) {
 			return body;
@@ -367,6 +382,27 @@ describe('problem details over HTTP', () => {
 		expect(refused.headers.get('content-type')).toBe(PROBLEM_CONTENT_TYPE);
 		expect((await refused.json()).detail).toBe('The request body is invalid.');
 		expect((await http.post('/p/even').json({ n: 4 })).status).toBe(200);
+	});
+
+	it('answers the DomainError a custom validator returns', async () => {
+		const http = await start();
+		const refused = await http.post('/p/positive').json({ n: -1 });
+		expect(refused.status).toBe(409);
+		expect(refused.headers.get('content-type')).toBe(PROBLEM_CONTENT_TYPE);
+		expect(await refused.json()).toMatchObject({
+			code: 'INSUFFICIENT_FUNDS',
+			detail: 'The balance is -1.',
+			balance: -1
+		});
+		expect((await http.post('/p/positive').json({ n: 1 })).status).toBe(200);
+	});
+
+	it('answers the DomainError a custom validator returns from authorize', async () => {
+		const http = await start();
+		const refused = await http.post('/p/positive').header('x-blocked', '1').json({ n: 1 });
+		expect(refused.status).toBe(409);
+		expect(refused.headers.get('content-type')).toBe(PROBLEM_CONTENT_TYPE);
+		expect((await refused.json()).code).toBe('CONFLICT');
 	});
 
 	it('runs the onError middlewares of a failed request before its problem is built', async () => {

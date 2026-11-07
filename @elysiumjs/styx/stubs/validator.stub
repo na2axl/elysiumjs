@@ -1,4 +1,4 @@
-import type { Context } from '@elysiumjs/core';
+import type { Context, DomainError } from '@elysiumjs/core';
 
 import { t } from 'elysia';
 
@@ -42,10 +42,12 @@ export class {name} {
      *
      * If the request is not authorized, the validation will be skipped.
      *
+     * Return a `DomainError` to answer it instead of a 401.
+     *
      * @param ctx The request context.
-     * @returns Whether the request is authorized.
+     * @returns Whether the request is authorized, or the error to answer.
      */
-    public static async authorize(ctx: Context<{request_name}>): Promise<boolean> {
+    public static async authorize(ctx: Context<{request_name}>): Promise<boolean | DomainError> {
         return true;
     }
 
@@ -56,12 +58,13 @@ export class {name} {
      * So it's safe to assume that the schema is valid.
      *
      * You can use this method to perform any custom validation logic on the request body or
-     * query parameters.
+     * query parameters. Return `false` to answer a generic 400, or a `DomainError` to answer it
+     * instead, with its own status, code and extensions.
      *
      * @param ctx The request context.
-     * @returns Whether the input data is valid.
+     * @returns Whether the input data is valid, or the error to answer.
      */
-    public static async validate(ctx: Context<{request_name}>): Promise<boolean> {
+    public static async validate(ctx: Context<{request_name}>): Promise<boolean | DomainError> {
         return true;
     }
 }
