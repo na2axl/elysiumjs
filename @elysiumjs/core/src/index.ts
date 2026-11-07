@@ -13,7 +13,7 @@
 // limitations under the License.
 
 export { type Elysia, t } from 'elysia';
-export { type Static, type TObject, type TSchema } from 'typebox';
+export { type Static, type TObject, type TOptional, type TSchema, type TString } from 'typebox';
 export { type AppContext, type ElysiumPlugin, type ServerError, Application } from './app';
 export {
 	type CommandArgumentProps,

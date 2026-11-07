@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { Static } from '@elysiumjs/core';
 import type { ColumnMetadata, ModelClass } from '../src/interfaces';
 
 import { DomainError } from '@elysiumjs/core';
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, expectTypeOf, it } from 'bun:test';
 
 import { createSchemaFromModel } from '../src/model';
 import { Query } from '../src/query';
@@ -192,5 +193,75 @@ describe('Query.schema', () => {
 		expect(keys).toContain('filter[status][in]');
 		expect(keys).toContain('filter[archived][isNull]');
 		expect(keys).toEqual(expect.arrayContaining(['sort', 'cursor', 'limit', 'fields']));
+	});
+});
+
+describe('Query.Params', () => {
+	it('names every parameter of the spec, as optional strings', () => {
+		expectTypeOf<Query.Params<typeof spec>>().toEqualTypeOf<{
+			'filter[status]'?: string;
+			'filter[status][eq]'?: string;
+			'filter[status][in]'?: string;
+			'filter[status][ne]'?: string;
+			'filter[views]'?: string;
+			'filter[views][gte]'?: string;
+			'filter[views][lte]'?: string;
+			'filter[createdAt]'?: string;
+			'filter[createdAt][gte]'?: string;
+			'filter[createdAt][lt]'?: string;
+			'filter[title]'?: string;
+			'filter[title][contains]'?: string;
+			'filter[archived]'?: string;
+			'filter[archived][isNull]'?: string;
+			sort?: string;
+			cursor?: string;
+			limit?: string;
+			fields?: string;
+		}>();
+	});
+
+	it('has no sort parameter when nothing is sortable', () => {
+		const unsorted = Query.define(Post, { filters: { title: ['contains'] } });
+		expectTypeOf<Query.Params<typeof unsorted>>().toEqualTypeOf<{
+			'filter[title]'?: string;
+			'filter[title][contains]'?: string;
+			cursor?: string;
+			limit?: string;
+			fields?: string;
+		}>();
+		expect(Object.keys((Query.schema(unsorted) as any).properties)).not.toContain('sort');
+	});
+
+	it('is the static type of Query.schema, whose keys match it', () => {
+		const schema = Query.schema(spec);
+		expectTypeOf<Static<typeof schema>>().toEqualTypeOf<Query.Params<typeof spec>>();
+		const keys: (keyof Query.Params<typeof spec>)[] = [
+			'filter[status]',
+			'filter[status][eq]',
+			'filter[status][in]',
+			'filter[status][ne]',
+			'filter[views]',
+			'filter[views][gte]',
+			'filter[views][lte]',
+			'filter[createdAt]',
+			'filter[createdAt][gte]',
+			'filter[createdAt][lt]',
+			'filter[title]',
+			'filter[title][contains]',
+			'filter[archived]',
+			'filter[archived][isNull]',
+			'sort',
+			'cursor',
+			'limit',
+			'fields'
+		];
+		expect(Object.keys(schema.properties).sort()).toEqual([...keys].sort());
+	});
+
+	it('is accepted by Query.parse', () => {
+		const query: Query.Params<typeof spec> = { 'filter[status][in]': 'draft,published' };
+		expect(Query.parse(spec, query).filters).toEqual([
+			{ field: 'status', column: 'status', operator: 'in', value: ['draft', 'published'] }
+		]);
 	});
 });
