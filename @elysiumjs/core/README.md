@@ -137,6 +137,26 @@ A service has one of three scopes:
 
 A request-scoped service resolves only inside a request: resolving it elsewhere throws `OutsideRequestScopeError`. Code outside a route, such as a job or a test, opens a scope with `Service.runInRequestScope(fn)`; every request-scoped service resolved inside `fn`, including after an `await`, is shared for that run. A singleton, or a controller with the default server scope, cannot depend on a request-scoped service, since it would keep the first request's instance: Elysium throws `ScopeMismatchError`. Use a request-scoped controller (`scope: HttpControllerScope.REQUEST`), or inject the service in the route handler's parameters.
 
+### Tags
+
+A tag groups services: each service registered with it is injected together with the others. Use it for extension points that modules contribute to, such as health checks or permission rules.
+
+```typescript
+import { Service } from '@elysiumjs/core';
+
+export const HealthChecks = Service.tag<HealthCheck>('health.checks');
+
+@Service.register({ tags: [HealthChecks] })
+export class DatabaseCheck implements HealthCheck {}
+
+@Service.register()
+export class Health {
+	constructor(@Service.injectAll(HealthChecks) private readonly checks: HealthCheck[]) {}
+}
+```
+
+`@Service.injectAll(tag)` and `Service.getAll(tag)` give the tagged services in registration order, and an empty array when there is none; `Service.resolveAll(tag)` also waits for their `onInit`. A module receives the tagged services of every module of the application, including the ones it does not import, while getting one of them by its class still follows the module's imports and exports. Scopes apply to each tagged service as they do to `@Service.inject()`.
+
 ## Lazy boot
 
 A CLI command boots lazily: running `app:cmd` initialises the command's own module and the modules it imports, not the whole graph. `help <cmd>` is always lazy, even for commands with `static boot = true`.

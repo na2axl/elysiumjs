@@ -17,7 +17,7 @@ import type { WiredListener } from './lifecycle-wiring';
 import type { Module } from './module';
 import type { ModuleGraph, ModuleNode } from './module-graph';
 import type { ServiceDefinition } from './service';
-import type { ServiceToken } from './token';
+import type { Injection, ServiceToken } from './token';
 
 import { isEqual } from 'radash';
 
@@ -174,10 +174,18 @@ export class Kernel {
 	 */
 	public async prepare<T>(cls: Class<T>, owner: ModuleNode): Promise<T> {
 		await this.initModule(owner);
-		const dependencies: { token: ServiceToken }[] = Metadata.get(Symbols.services, cls) ?? [];
-		for (const { token } of dependencies) {
+		const dependencies: Injection[] = Metadata.get(Symbols.services, cls) ?? [];
+		for (const dependency of dependencies) {
+			if ('tag' in dependency) {
+				// Request-scoped dependencies are built with the class, inside a request scope.
+				for (const entry of Container.lookupAll(dependency.tag, owner)) {
+					if (entry.scope === ServiceScope.REQUEST) continue;
+					await ModuleContext.run(owner, () => Container.resolveEntry(entry));
+				}
+				continue;
+			}
+			const { token } = dependency;
 			const found = ModuleContext.run(owner, () => Container.lookup(token, owner));
-			// Request-scoped dependencies are built with the class, inside a request scope.
 			if (found?.entry.scope === ServiceScope.REQUEST) continue;
 			await ModuleContext.run(owner, () => Container.resolve(token, cls.name));
 		}

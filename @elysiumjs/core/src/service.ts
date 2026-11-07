@@ -14,14 +14,14 @@
 
 import type { Class } from 'type-fest';
 import type { ModuleNode } from './module-graph';
-import type { ServiceToken } from './token';
+import type { ServiceTag, ServiceToken } from './token';
 
 import { isString } from 'radash';
 
 import { Container } from './container';
 import { ElysiumError } from './errors';
 import { Metadata } from './metadata';
-import { tokenLabel, tokenOf } from './token';
+import { isServiceTag, serviceTag, tokenLabel, tokenOf } from './token';
 import { Symbols } from './utils';
 
 /**
@@ -104,6 +104,12 @@ export type ServiceProps = Partial<{
 	 * Whether the service is visible from every module without being exported.
 	 */
 	global: boolean;
+
+	/**
+	 * The tags the service is registered with: it is part of what `@Service.injectAll(tag)` and
+	 * `Service.getAll(tag)` return for each of them.
+	 */
+	tags: readonly ServiceTag<any>[];
 }>;
 
 /**
@@ -122,6 +128,9 @@ export type ServiceFactoryDefinition = {
 
 	/** Whether the service is visible from every module. */
 	global?: boolean;
+
+	/** The tags the service is registered with. */
+	tags?: readonly ServiceTag<any>[];
 };
 
 /**
@@ -173,6 +182,67 @@ export namespace Service {
 			Metadata.define(Symbols.services, services, target, propertyKey!);
 		};
 	};
+
+	/**
+	 * Creates a tag, the token of a group of services. Services join it with
+	 * `@Service.register({ tags: [tag] })` (or `tags` on a factory definition), and a consumer
+	 * receives them all with `@Service.injectAll(tag)` or `Service.getAll(tag)`.
+	 *
+	 * A tag is an extension point open to the whole application: a module receives the tagged
+	 * services of every active module, including the ones it does not import.
+	 *
+	 * @example
+	 * ```ts
+	 * export const HealthChecks = Service.tag<HealthCheck>('health.checks');
+	 *
+	 * @Service.register({ tags: [HealthChecks] })
+	 * class DatabaseCheck implements HealthCheck {}
+	 *
+	 * @Service.register()
+	 * class Health {
+	 * 	constructor(@Service.injectAll(HealthChecks) private readonly checks: HealthCheck[]) {}
+	 * }
+	 * ```
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @template T The type every tagged service implements.
+	 * @param name The name of the tag, unique in the application. Two tags with the same name are
+	 * the same tag.
+	 */
+	export const tag = <T>(name: string): ServiceTag<T> => serviceTag<T>(name);
+
+	/**
+	 * Sets a parameter to every service registered with a tag, in registration order (an empty
+	 * array when there is none). The same scope rules as `inject` apply to each of them: a
+	 * singleton that receives a request-scoped service throws `ScopeMismatchError`.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param tag The tag, from `Service.tag()`.
+	 */
+	export const injectAll = (tag: ServiceTag<any>): ParameterDecorator => {
+		if (!isServiceTag(tag))
+			throw new ElysiumError('@Service.injectAll() expects a tag from Service.tag().');
+		return function (target, propertyKey, parameterIndex) {
+			const services = Metadata.get(Symbols.services, target, propertyKey!) ?? [];
+			services.push({ tag, index: parameterIndex });
+			Metadata.define(Symbols.services, services, target, propertyKey!);
+		};
+	};
+
+	/**
+	 * Retrieves every service registered with a tag, in registration order.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param tag The tag, from `Service.tag()`.
+	 * @returns The services; empty when none has the tag.
+	 * @throws {ServiceNotReadyError} If a service, or its module, is still initialising.
+	 */
+	export const getAll = <T>(tag: ServiceTag<T>): T[] => Container.getAll(tag) as T[];
+
+	/**
+	 * Like `getAll`, but waits for the `onInit` of each service and of its owning module.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param tag The tag, from `Service.tag()`.
+	 */
+	export const resolveAll = <T>(tag: ServiceTag<T>): Promise<T[]> =>
+		Container.resolveAll(tag) as Promise<T[]>;
 
 	/**
 	 * Retrieves a service visible from the current module context (global services only
