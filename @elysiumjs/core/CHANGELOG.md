@@ -1,5 +1,11 @@
 # @elysiumjs/core
 
+## 0.12.0
+
+### Minor Changes
+
+- [#32](https://github.com/na2axl/elysiumjs/pull/32) [`651a755`](https://github.com/na2axl/elysiumjs/commit/651a7557173ce2c6155bcfa8d90cf388ac419821) Thanks [@na2axl](https://github.com/na2axl)! - Add service tags (multi-binding). `Service.tag<T>(name)` creates a tag, `@Service.register({ tags })` (or `tags` on a factory definition) adds a service to it, and `@Service.injectAll(tag)`, `Service.getAll(tag)` and `Service.resolveAll(tag)` give every tagged service of the application in registration order. Tagged services follow the usual scope rules, and an overridden service keeps its tags.
+
 ## 0.11.2
 
 ### Patch Changes
