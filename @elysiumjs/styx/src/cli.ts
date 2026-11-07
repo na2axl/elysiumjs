@@ -96,6 +96,8 @@ switch (decision.kind) {
 		process.exit(await proc.exited);
 	}
 	case 'cli': {
+		const { stubCloudflareModules } = await import('./cloudflare-stubs');
+		stubCloudflareModules();
 		const { runCli } = await import('./cli/app');
 		await runCli(decision.argv, await loadTools(project, projectCli === self));
 		break;
