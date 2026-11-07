@@ -1,5 +1,12 @@
 # @elysiumjs/themis-redis
 
+## 0.0.2
+
+### Patch Changes
+
+- Updated dependencies [[`89fb829`](https://github.com/na2axl/elysiumjs/commit/89fb8296d6894f240513f6224093292af4046635)]:
+  - @elysiumjs/themis@0.2.0
+
 ## 0.0.1
 
 ### Patch Changes
