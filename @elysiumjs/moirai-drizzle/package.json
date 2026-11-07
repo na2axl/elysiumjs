@@ -1,6 +1,6 @@
 {
 	"name": "@elysiumjs/moirai-drizzle",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"license": "Apache-2.0",
 	"description": "Postgres stores for @elysiumjs/moirai through Drizzle ORM: idempotency keys, outbox, inbox and advisory locks.",
 	"private": false,
