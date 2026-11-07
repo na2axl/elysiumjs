@@ -1,5 +1,14 @@
 # @elysiumjs/moirai
 
+## 0.1.1
+
+### Patch Changes
+
+- Updated dependencies [[`4cd1ef2`](https://github.com/na2axl/elysiumjs/commit/4cd1ef217826164e69cd641ca99f74c6f5a7ebe7)]:
+  - @elysiumjs/mnemosyne@0.5.0
+  - @elysiumjs/core@0.11.1
+  - @elysiumjs/heracles@0.8.0
+
 ## 0.1.0
 
 ### Minor Changes

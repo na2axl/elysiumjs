@@ -1,5 +1,17 @@
 # @elysiumjs/mnemosyne
 
+## 0.5.0
+
+### Minor Changes
+
+- [#26](https://github.com/na2axl/elysiumjs/pull/26) [`4cd1ef2`](https://github.com/na2axl/elysiumjs/commit/4cd1ef217826164e69cd641ca99f74c6f5a7ebe7) Thanks [@na2axl](https://github.com/na2axl)! - Type the query string of the query DSL. `Query.define` keeps the names of the filters, their operators and the sortable fields, `Query.Params<typeof spec>` types the parameter that `@Http.query()` decorates (`filter[status]`, `filter[status][in]`, `sort`, `cursor`, `limit`, `fields`, each an optional string), and `Query.schema(spec)` returns a schema of that type. Because the generated routes read the parameter's type, clients get typed query keys. Core re-exports TypeBox's `TOptional` and `TString` types.
+
+### Patch Changes
+
+- Updated dependencies [[`4cd1ef2`](https://github.com/na2axl/elysiumjs/commit/4cd1ef217826164e69cd641ca99f74c6f5a7ebe7)]:
+  - @elysiumjs/core@0.11.1
+  - @elysiumjs/redis@0.1.0
+
 ## 0.4.0
 
 ### Minor Changes
