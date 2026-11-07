@@ -13,30 +13,47 @@ bun add @elysiumjs/moirai @elysiumjs/mnemosyne
 An action is a write: a class that extends `Action`, marked with `@Action.register()`. A query is a read: a class that extends `Query`, marked with `@Query.register()`. `Moirai.execute()` runs an action and `Moirai.ask()` runs a query.
 
 ```ts
-import { Service, t } from '@elysiumjs/core';
+import type { Static } from '@elysiumjs/core';
+
+import { DomainError, Service, t } from '@elysiumjs/core';
 import { Action, Moirai, Outbox, Query } from '@elysiumjs/moirai';
 
+const TopUpInput = t.Object({ walletId: t.String(), amount: t.Integer({ minimum: 1 }) });
+export type TopUpInput = Static<typeof TopUpInput>;
+export type TopUpResult = { balance: number };
+
+class WalletClosed extends DomainError.for('CONFLICT', 409) {}
+
 @Action.register({
-	input: t.Object({ walletId: t.String(), amount: t.Integer({ minimum: 1 }) }),
+	input: TopUpInput,
 	idempotent: true,
 	serializeBy: (input) => `wallet:${input.walletId}`
 })
-class TopUp extends Action {
+class TopUp extends Action<TopUpInput, TopUpResult, WalletClosed> {
 	constructor(@Service.inject() private readonly wallets: WalletRepository) {
 		super();
 	}
 
-	public async handle(input: { walletId: string; amount: number }) {
-		const wallet = await this.wallets.credit(input.walletId, input.amount);
-		await Outbox.enqueue({ kind: 'wallet.credited', payload: { walletId: wallet.id } });
-		return { balance: wallet.balance };
+	public override async handle(input: TopUpInput): Promise<TopUpResult | WalletClosed> {
+		const wallet = await this.wallets.find(input.walletId);
+		if (wallet.closed) return new WalletClosed(`wallet ${input.walletId} is closed`);
+		const credited = await this.wallets.credit(input.walletId, input.amount);
+		await Outbox.enqueue({ kind: 'wallet.credited', payload: { walletId: credited.id } });
+		return { balance: credited.balance };
 	}
 }
 
-@Query.register({ input: t.Object({ walletId: t.String() }) })
-class WalletBalance extends Query {
-	public handle(input: { walletId: string }) {
-		/* ... */
+const WalletBalanceInput = t.Object({ walletId: t.String() });
+export type WalletBalanceInput = Static<typeof WalletBalanceInput>;
+
+@Query.register({ input: WalletBalanceInput })
+class WalletBalance extends Query<WalletBalanceInput, { balance: number }> {
+	constructor(@Service.inject() private readonly wallets: WalletRepository) {
+		super();
+	}
+
+	public override async handle(input: WalletBalanceInput) {
+		return { balance: await this.wallets.balance(input.walletId) };
 	}
 }
 
@@ -45,6 +62,7 @@ return Moirai.execute(TopUp, body, { idempotencyKey: headers['idempotency-key'] 
 return Moirai.ask(WalletBalance, { walletId });
 ```
 
+- `Action<TInput, TResult, TErrors>` and `Query<TInput, TResult, TErrors>` type `handle()`: it takes `TInput` and gives `TResult` or one of `TErrors`, the DomainErrors it returns (any DomainError by default). `Moirai.execute()` and `Moirai.ask()` take their input type and return types from `handle()`.
 - A refusal is a value. `Moirai.execute()` and `Moirai.ask()` return the DomainError that refused the call, and their return type lists it next to the result. A controller that returns it sends it as the problem of its route, and typed clients see it under its status. Check one with `isDomainError(outcome)`.
 - An input that does not match the schema is refused with a 422 `VALIDATION_FAILED` problem, with one entry per mistake.
 - When `authorize(input)` returns `false`, the call is refused with a 403 `FORBIDDEN` problem.

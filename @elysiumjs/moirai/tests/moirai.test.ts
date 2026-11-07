@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { TestingApp } from '@elysiumjs/core';
+import type { Static, TestingApp } from '@elysiumjs/core';
 import type { MoiraiOptions } from '../src';
 
 import {
@@ -27,7 +27,7 @@ import {
 } from '@elysiumjs/core';
 import { Job, JobRegistry, WithId } from '@elysiumjs/heracles';
 import { UnitOfWork, withUnitOfWork } from '@elysiumjs/mnemosyne';
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'bun:test';
 
 import { HERACLES_JOB_EFFECT, InvalidOnceJobError, job, Once } from '../src/heracles';
 import {
@@ -371,6 +371,71 @@ describe('queries', () => {
 		expect(await Moirai.ask(FindUser, { id: 'a' })).toBeInstanceOf(InvalidInputError);
 		const missing = await Moirai.ask(FindUser, { id: 'gone' });
 		expect(missing).toBeInstanceOf(NotFoundError);
+	});
+});
+
+describe('typed handlers', () => {
+	const CitiesInput = t.Object({ country: t.String({ pattern: '^[A-Z]{2}$' }) });
+	type CitiesInput = Static<typeof CitiesInput>;
+	type CitiesResult = string[];
+	class CountryClosed extends DomainError.for('NOT_FOUND', 404) {}
+
+	@Query.register({ name: 'cities', input: CitiesInput })
+	class Cities extends Query<CitiesInput, CitiesResult, CountryClosed> {
+		public override handle({ country }: CitiesInput): CitiesResult | CountryClosed {
+			return country === 'FR' ? new CountryClosed('closed') : ['Douala', 'Yaoundé'];
+		}
+	}
+
+	@Query.register({ name: 'categories' })
+	class Categories extends Query<void, string[]> {
+		public override handle(): string[] {
+			return ['music', 'comedy'];
+		}
+	}
+
+	@Action.register({ name: 'ping' })
+	class Ping extends Action<void, { pong: true }> {
+		public override async handle() {
+			log.push('ping');
+			return { pong: true as const };
+		}
+	}
+
+	@Action.register({ name: 'idempotent-ping', idempotent: true })
+	class IdempotentPing extends Action<void, number> {
+		private static calls = 0;
+		public override handle() {
+			return ++IdempotentPing.calls;
+		}
+	}
+
+	it('types the input and the outcome from the class parameters', async () => {
+		const outcome = await Moirai.ask(Cities, { country: 'CM' });
+		expectTypeOf(outcome).toEqualTypeOf<
+			CitiesResult | CountryClosed | InvalidInputError | CallForbiddenError
+		>();
+		expect(outcome).toEqual(['Douala', 'Yaoundé']);
+		expect(await Moirai.ask(Cities, { country: 'FR' })).toBeInstanceOf(CountryClosed);
+		expect(await Moirai.ask(Cities, { country: 'cm' })).toBeInstanceOf(InvalidInputError);
+	});
+
+	it('runs a query and an action that take no input, without one', async () => {
+		expect(await Moirai.ask(Categories)).toEqual(['music', 'comedy']);
+		expect(await Moirai.execute(Ping)).toEqual({ pong: true });
+		expect(log).toContain('ping');
+		const first = await Moirai.execute(IdempotentPing, undefined, { idempotencyKey: 'once' });
+		expect(await Moirai.execute(IdempotentPing, undefined, { idempotencyKey: 'once' })).toBe(first);
+		expect(await Moirai.execute(IdempotentPing)).toBeInstanceOf(IdempotencyKeyRequiredError);
+	});
+
+	it('requires the input of a handler that takes one', () => {
+		expectTypeOf<Parameters<typeof Moirai.ask<typeof Cities>>>().toEqualTypeOf<
+			[query: typeof Cities, input: CitiesInput]
+		>();
+		expectTypeOf<Parameters<typeof Moirai.ask<typeof Categories>>>().toEqualTypeOf<
+			[query: typeof Categories, input?: undefined]
+		>();
 	});
 });
 
