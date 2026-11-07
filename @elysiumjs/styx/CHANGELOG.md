@@ -1,5 +1,14 @@
 # @elysiumjs/styx
 
+## 0.9.3
+
+### Patch Changes
+
+- [#38](https://github.com/na2axl/elysiumjs/pull/38) [`c8d9f53`](https://github.com/na2axl/elysiumjs/commit/c8d9f534eef32621eae121f7008f97dc24808141) Thanks [@na2axl](https://github.com/na2axl)! - The `make:validator` stub types `validate` and `authorize` as returning `boolean | DomainError`.
+- Updated dependencies [[`c8d9f53`](https://github.com/na2axl/elysiumjs/commit/c8d9f534eef32621eae121f7008f97dc24808141)]:
+  - @elysiumjs/core@0.13.0
+  - @elysiumjs/runtime-bun@0.1.2
+
 ## 0.9.2
 
 ### Patch Changes
