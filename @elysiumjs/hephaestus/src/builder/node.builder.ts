@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { BunPlugin } from 'bun';
+
 import { join } from 'node:path';
 
 /**
@@ -31,6 +33,8 @@ export interface NodeBuildOptions {
 	minify?: boolean;
 	/** Whether to write a linked source map. Defaults to `true`. */
 	sourcemap?: boolean;
+	/** Bun plugins added to the build. */
+	plugins?: BunPlugin[];
 }
 
 /**
@@ -68,7 +72,8 @@ export class NodeBuilder {
 			conditions: ['node'],
 			external: options.external ?? [],
 			minify: options.minify ?? true,
-			sourcemap: (options.sourcemap ?? true) ? 'linked' : 'none'
+			sourcemap: (options.sourcemap ?? true) ? 'linked' : 'none',
+			plugins: options.plugins ?? []
 		});
 		if (!result.success) {
 			throw new AggregateError(result.logs, `The Node.js bundle of ${options.entry} failed.`);

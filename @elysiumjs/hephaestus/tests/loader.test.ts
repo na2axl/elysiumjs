@@ -53,6 +53,26 @@ describe('loadConfig', () => {
 		expect(config.entry).toBe('./src/index.ts');
 	});
 
+	it('should load Bun plugins from a TypeScript config, and refuse anything else', async () => {
+		await writeFile(
+			join(tempDir, 'hephaestus.config.ts'),
+			`export default { output: { name: 'app' }, build: { plugins: [{ name: 'noop', setup() {} }] } };`
+		);
+		const config = await loadConfig(tempDir);
+		expect(config.build.plugins.map((plugin) => plugin.name)).toEqual(['noop']);
+
+		const other = await mkdtemp(join(tmpdir(), 'hephaestus-test-'));
+		try {
+			await writeFile(
+				join(other, 'hephaestus.config.json'),
+				JSON.stringify({ output: { name: 'app' }, build: { plugins: [{ name: 'noop' }] } })
+			);
+			await expect(loadConfig(other)).rejects.toThrow('expected a Bun plugin');
+		} finally {
+			await rm(other, { recursive: true, force: true });
+		}
+	});
+
 	it('should validate the loaded config', async () => {
 		const invalidConfig = JSON.stringify({
 			output: {} // missing required 'name'

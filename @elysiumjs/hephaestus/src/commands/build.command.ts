@@ -24,14 +24,16 @@ import { loadConfig } from '../config/loader';
 /**
  * Runs the Workers builder in a process of its own. The AOT plugin imports the entry to capture
  * its routes, which boots the app; the services container is global to the process, and this
- * one already runs the CLI app.
+ * one already runs the CLI app. The child loads the config itself for its plugins, which are
+ * functions and cannot be handed over as JSON.
  */
 const buildWorkerInChildProcess = async (
-	options: WorkersBuildOptions
+	options: Omit<WorkersBuildOptions, 'plugins'>
 ): Promise<WorkersBuildResult> => {
 	const script = `
-		const { WorkersBuilder } = await import(${JSON.stringify(import.meta.resolve('@elysiumjs/hephaestus'))});
-		const result = await new WorkersBuilder().build(${JSON.stringify(options)});
+		const { loadConfig, WorkersBuilder } = await import(${JSON.stringify(import.meta.resolve('@elysiumjs/hephaestus'))});
+		const config = await loadConfig(process.cwd(), { optional: true });
+		const result = await new WorkersBuilder().build({ ...${JSON.stringify(options)}, plugins: config.build.plugins });
 		process.stdout.write('\\n' + JSON.stringify(result));
 		process.exit(0);
 	`;
@@ -181,7 +183,8 @@ export class HephaestusBuildCommand extends Command {
 				outfile: config.node.outfile,
 				external: config.node.external,
 				minify: config.build.minify,
-				sourcemap: config.build.sourcemap
+				sourcemap: config.build.sourcemap,
+				plugins: config.build.plugins
 			});
 			spinner.complete('Build completed');
 

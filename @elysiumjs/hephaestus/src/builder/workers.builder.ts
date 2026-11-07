@@ -14,9 +14,9 @@
 
 import type { BunPlugin } from 'bun';
 
-import { readFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { builtinModules } from 'node:module';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { gzipSync } from 'node:zlib';
 
 /**
@@ -34,6 +34,8 @@ export interface WorkersBuildOptions {
 	minify?: boolean;
 	/** Whether to write a linked source map. Defaults to `true`. */
 	sourcemap?: boolean;
+	/** Bun plugins run after the built-in ones. */
+	plugins?: BunPlugin[];
 }
 
 /**
@@ -83,6 +85,40 @@ const browserEntries: BunPlugin = {
 };
 
 /**
+ * Leaves `.wasm` imports to workerd, which loads them as compiled WebAssembly modules (what
+ * `WebAssembly.compile()` would give, which workerd forbids at runtime). Bun's `file` loader would
+ * turn the import into a path string, so the import stays external and the file is copied next to
+ * the bundle. Files of the same name from different packages are told apart by a numeric suffix.
+ * @param outdir The output folder.
+ */
+const wasmModules = (outdir: string): BunPlugin => {
+	const copied = new Map<string, string>();
+	const taken = new Set<string>();
+	return {
+		name: 'elysium-wasm-modules',
+		setup(build) {
+			build.onResolve({ filter: /\.wasm$/ }, (args) => {
+				const from = args.importer ? dirname(args.importer) : process.cwd();
+				const source = args.path.startsWith('.')
+					? resolve(from, args.path)
+					: Bun.resolveSync(args.path, from);
+				let name = copied.get(source);
+				if (!name) {
+					const stem = basename(source, '.wasm');
+					name = `${stem}.wasm`;
+					for (let n = 2; taken.has(name); n++) name = `${stem}-${n}.wasm`;
+					taken.add(name);
+					copied.set(source, name);
+					mkdirSync(outdir, { recursive: true });
+					copyFileSync(source, join(outdir, name));
+				}
+				return { path: `./${name}`, external: true };
+			});
+		}
+	};
+};
+
+/**
  * Bundles an Elysium app for Cloudflare Workers, with its routes compiled ahead of time by
  * `elysia/plugin/aot`, since workerd forbids generating code at runtime.
  * @author Axel Nana <axel.nana@workbud.com>
@@ -108,7 +144,12 @@ export class WorkersBuilder {
 			external: ['node:*', 'cloudflare:*'],
 			minify: options.minify ?? true,
 			sourcemap: (options.sourcemap ?? true) ? 'linked' : 'none',
-			plugins: [browserEntries, aot(options.entry, { target: 'workerd' })]
+			plugins: [
+				wasmModules(options.outdir),
+				browserEntries,
+				aot(options.entry, { target: 'workerd' }),
+				...(options.plugins ?? [])
+			]
 		});
 		if (!result.success) {
 			throw new AggregateError(result.logs, `The Worker bundle of ${options.entry} failed.`);
