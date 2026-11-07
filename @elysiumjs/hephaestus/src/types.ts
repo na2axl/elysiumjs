@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { BunPlugin } from 'bun';
+
 import { z } from 'zod';
 
 /**
@@ -49,7 +51,23 @@ export const HephaestusConfigSchema = z.object({
 			minify: z.boolean().default(true),
 			sourcemap: z.boolean().default(true),
 			bytecode: z.boolean().default(true),
-			split: z.boolean().default(false)
+			split: z.boolean().default(false),
+			/**
+			 * Bun plugins added to the Worker and Node.js bundles, after the built-in ones. Only a
+			 * `hephaestus.config.ts` or `.js` can hold them.
+			 */
+			plugins: z
+				.array(
+					z.custom<BunPlugin>(
+						(value) =>
+							typeof value === 'object' &&
+							value !== null &&
+							typeof (value as BunPlugin).name === 'string' &&
+							typeof (value as BunPlugin).setup === 'function',
+						{ message: 'expected a Bun plugin: { name, setup }' }
+					)
+				)
+				.default([])
 		})
 		.prefault({}),
 	workers: z
