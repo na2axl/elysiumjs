@@ -125,6 +125,26 @@ await SignedUrl.verify(link, { secret });
 
 `Jwt` signs with a secret (HS256) or with an asymmetric key and its algorithm. An invalid or expired token is a 401 problem, and an invalid or expired link a 403 problem.
 
+`Jwt.verify` refuses a token without an expiry; pass `requiredClaims` to change the claims a token must carry (`[]` accepts one without `exp`). `currentDate` checks the expiry against another time, and `issuedAt` signs as of another time.
+
+### Secrets read when they are used
+
+Every secret (the `ThemisModule` secret, JWT secrets and signed URL secrets) can be a function, sync or async, called each time the secret is needed. Read it from a store bound to the request, such as a secrets binding on Cloudflare Workers, and a rotated secret is picked up without a restart. The 32-byte minimum is checked on each read.
+
+```ts
+ThemisModule.with({ secret: () => secrets.get('app-secret') });
+```
+
+During a rotation, verify with the current key and then the previous one:
+
+```ts
+const claims = await Jwt.verify(token, {
+	keys: [{ secret: () => secrets.get('jwt-current') }, { secret: () => secrets.get('jwt-previous') }]
+});
+```
+
+The keys are tried in order until one verifies the signature; an expired token or a wrong claim is refused at once.
+
 ## Two-factor codes
 
 ```ts

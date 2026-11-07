@@ -19,9 +19,12 @@ import { Auth, jwtGuard, Password, Pbkdf2PasswordHasher, ThemisModule } from '@e
 
 const JWT_SECRET = 'conformance-jwt-secret-of-32-chars!';
 
-/** A token for `u1`, signed with {@link JWT_SECRET}: the AOT lane sends requests from outside the app. */
+/**
+ * A token for `u1`, signed with {@link JWT_SECRET} and expiring in 2100: the AOT lane sends requests
+ * from outside the app.
+ */
 const TOKEN =
-	'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE3OTM5Mzk1MTIsInN1YiI6InUxIn0.4UbHnkIPn19oxYVHQC3m4nD6JOiMsI9xijSS32Jm_VA';
+	'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE3OTM5Mzk1MTIsImV4cCI6NDEwMjQ0NDgwMCwic3ViIjoidTEifQ.qCL4IwM_73qFOLP2_ibEcFY48KFAVov9TEgHz0KRul4';
 
 const make = async (): Promise<Application> => {
 	const users: Record<string, { id: string; name: string }> = { u1: { id: 'u1', name: 'Ada' } };
