@@ -38,6 +38,10 @@ export {
 	type ParsedSort,
 	type QueryFieldType,
 	type QueryFilterSpec,
+	type QueryFilters,
+	type QueryParamKeys,
+	type QueryParams,
+	type QuerySchemaProperties,
 	type QuerySpec,
 	Query
 } from './query';

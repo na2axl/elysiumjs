@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ProblemValidationError, TObject, TSchema } from '@elysiumjs/core';
+import type { ProblemValidationError, TObject, TOptional, TSchema, TString } from '@elysiumjs/core';
 import type { ModelClass } from './interfaces';
 
 import { BadRequestError } from '@elysiumjs/core';
@@ -40,9 +40,9 @@ export type QueryFieldType = 'string' | 'number' | 'boolean' | 'date' | 'uuid';
  * A filterable field.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export type QueryFilterSpec = {
+export type QueryFilterSpec<TOperator extends FilterOperator = FilterOperator> = {
 	/** The operators the field accepts. The first one is used by `filter[field]=value`. */
-	operators: FilterOperator[];
+	operators: readonly TOperator[];
 	/** The type of the values. Read from the model by {@link Query.define}; `string` otherwise. */
 	type?: QueryFieldType;
 	/** The model property behind the field, when it has another name. */
@@ -50,14 +50,26 @@ export type QueryFilterSpec = {
 };
 
 /**
- * What clients may filter and sort by, and how many rows a page holds.
+ * The filterable fields of a spec, each with its operators or its {@link QueryFilterSpec}.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export type QuerySpec = {
+export type QueryFilters = Record<string, QueryFilterSpec | readonly FilterOperator[]>;
+
+/**
+ * What clients may filter and sort by, and how many rows a page holds.
+ *
+ * The type parameters keep the names of the filters and the sortable fields, so that
+ * {@link Query.Params} and {@link Query.schema} can type the query string.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type QuerySpec<
+	TFilters extends QueryFilters = QueryFilters,
+	TSort extends string = string
+> = {
 	/** The filterable fields, with their operators. */
-	filters?: Record<string, QueryFilterSpec | FilterOperator[]>;
+	filters?: TFilters;
 	/** The sortable fields. Sortable columns should not be nullable, for cursor pagination. */
-	sort?: string[];
+	sort?: readonly TSort[];
 	/** The sort used when the query sets none, such as `-createdAt`. */
 	defaultSort?: string;
 	/** The page size: the default, and the largest a client may ask for. */
@@ -109,6 +121,44 @@ export type CursorPage<T> = {
 	/** The cursor of the next page, or `null` on the last page. */
 	nextCursor: string | null;
 };
+
+/** The operators of one filter of a spec. */
+type OperatorsOf<TFilter> = TFilter extends readonly (infer TOperator)[]
+	? TOperator
+	: TFilter extends { operators: readonly (infer TOperator)[] }
+		? TOperator
+		: never;
+
+/** The filter keys of a spec: `filter[field]` and `filter[field][operator]`. */
+type FilterKeysOf<TFilters> = {
+	[K in keyof TFilters & string]:
+		`filter[${K}]` | `filter[${K}][${OperatorsOf<TFilters[K]> & string}]`;
+}[keyof TFilters & string];
+
+/**
+ * The parameter names of the query string of a spec.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type QueryParamKeys<TSpec> =
+	TSpec extends QuerySpec<infer TFilters, infer TSort>
+		? | FilterKeysOf<TFilters>
+			| ([TSort] extends [never] ? never : 'sort')
+			| 'cursor'
+			| 'limit'
+			| 'fields'
+		: never;
+
+/**
+ * The query string of a spec, as Elysia parses it: every parameter is an optional string.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type QueryParams<TSpec> = { [K in QueryParamKeys<TSpec>]?: string };
+
+/**
+ * The properties of the query schema of a spec.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type QuerySchemaProperties<TSpec> = { [K in QueryParamKeys<TSpec>]: TOptional<TString> };
 
 const DEFAULT_LIMIT = 20;
 const DEFAULT_MAX_LIMIT = 100;
@@ -168,8 +218,8 @@ const typeOfSchema = (schema: {
 	return 'string';
 };
 
-const normalizeFilter = (spec: QueryFilterSpec | FilterOperator[]): QueryFilterSpec =>
-	Array.isArray(spec) ? { operators: spec } : spec;
+const normalizeFilter = (spec: QueryFilterSpec | readonly FilterOperator[]): QueryFilterSpec =>
+	'operators' in spec ? spec : { operators: spec };
 
 export namespace Query {
 	/**
@@ -187,10 +237,14 @@ export namespace Query {
 	 * });
 	 * ```
 	 */
-	export const define = <TModel extends ModelClass>(
+	export const define = <
+		TModel extends ModelClass,
+		const TFilters extends QueryFilters = {},
+		const TSort extends string = never
+	>(
 		model: TModel,
-		spec: Omit<QuerySpec, 'types'>
-	): QuerySpec => {
+		spec: Omit<QuerySpec<TFilters, TSort>, 'types'>
+	): QuerySpec<TFilters, TSort> => {
 		const properties =
 			(model.selectSchema as unknown as { properties?: Record<string, object> }).properties ?? {};
 		const types: Record<string, QueryFieldType> = {};
@@ -215,12 +269,28 @@ export namespace Query {
 	};
 
 	/**
+	 * The query string of a spec, for the parameter that `@Http.query()` decorates.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @example
+	 * ```ts
+	 * @Http.get('/posts')
+	 * list(@Http.query(Query.schema(PostQuery)) query: Query.Params<typeof PostQuery>) {
+	 *   return this.posts.list(Query.parse(PostQuery, query));
+	 * }
+	 * ```
+	 */
+	export type Params<TSpec> = QueryParams<TSpec>;
+
+	/**
 	 * The query schema of a spec, for `@Http.query()`: it documents the filters, `sort`, `cursor`,
-	 * `limit` and `fields` parameters in OpenAPI.
+	 * `limit` and `fields` parameters in OpenAPI. Its static type is {@link Query.Params}, and other
+	 * parameters are let through.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param spec The query spec.
 	 */
-	export const schema = (spec: QuerySpec): TObject => {
+	export const schema = <TSpec extends QuerySpec>(
+		spec: TSpec
+	): TObject<QuerySchemaProperties<TSpec>> => {
 		const properties: Record<string, TSchema> = {};
 		for (const [field, raw] of Object.entries(spec.filters ?? {})) {
 			const filter = normalizeFilter(raw);
@@ -247,7 +317,9 @@ export namespace Query {
 			})
 		);
 		properties.fields = t.Optional(t.String({ description: 'Comma-separated fields to return.' }));
-		return t.Object(properties, { additionalProperties: true });
+		return t.Object(properties, { additionalProperties: true }) as unknown as TObject<
+			QuerySchemaProperties<TSpec>
+		>;
 	};
 
 	/**
