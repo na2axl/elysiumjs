@@ -643,7 +643,11 @@ export abstract class Application extends InteractsWithConsole {
 		DomainError.typeBase = this.props().problems?.typeBase;
 
 		if (openapi) {
-			this.#elysia.use(openapiPlugin(openapi));
+			// On Workers the plugin serves the page from a handler, but under the Bun process of an
+			// ahead-of-time build it registers a static page, so the compiled route would differ from
+			// the one workerd mounts. Embedding the spec makes both register the same handler.
+			const workers = Runtime.find()?.name === 'workers';
+			this.#elysia.use(openapiPlugin(workers ? { embedSpec: true, ...openapi } : openapi));
 		}
 
 		for (const plugin of plugins ?? []) {

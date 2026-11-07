@@ -22,6 +22,7 @@ import { flows } from './flows';
 import { interceptors } from './interceptors';
 import { lifecycle } from './lifecycle';
 import { middleware } from './middleware';
+import { openapi } from './openapi';
 import { problems } from './problems';
 import { rateLimits } from './rate-limits';
 import { resources } from './resources';
@@ -56,5 +57,6 @@ export const scenarios = [
 	sseDisposal,
 	actions,
 	auth,
-	flows
+	flows,
+	openapi
 ];
