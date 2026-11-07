@@ -83,6 +83,18 @@ describe('WorkersBuilder', () => {
 		expect(bundle).toMatch(/from ["']node:events["']/);
 	});
 
+	it('builds an entry that exports a Durable Object, leaving cloudflare:workers to workerd', async () => {
+		const result = await new WorkersBuilder().build({
+			entry: join(fixtures, 'durable-object.ts'),
+			outdir,
+			minify: false,
+			sourcemap: false
+		});
+		const bundle = await Bun.file(result.outputPath).text();
+		expect(bundle).toMatch(/from\s*["']cloudflare:workers["']/);
+		expect(bundle).toContain('extends DurableObject');
+	});
+
 	it('leaves WebAssembly modules to workerd and copies them next to the bundle', async () => {
 		const result = await new WorkersBuilder().build({
 			entry: join(fixtures, 'wasm-modules.ts'),

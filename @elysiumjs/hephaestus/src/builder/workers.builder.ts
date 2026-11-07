@@ -19,6 +19,45 @@ import { builtinModules } from 'node:module';
 import { basename, dirname, join, resolve } from 'node:path';
 import { gzipSync } from 'node:zlib';
 
+/** Stands for a class of `cloudflare:workers` while the entry is imported at build time. */
+class BuildTimeStub {}
+
+/**
+ * The `cloudflare:*` modules, as the AOT plugin sees them when it imports the entry in Bun to
+ * compile its routes: Bun has no such modules, so classes and functions that do nothing stand
+ * for their exports. A Durable Object class exported by the entry can then extend
+ * `DurableObject`. The bundle keeps the real imports, which workerd provides.
+ */
+const CLOUDFLARE_STUBS: Record<string, Record<string, unknown>> = {
+	'cloudflare:workers': {
+		DurableObject: BuildTimeStub,
+		WorkerEntrypoint: BuildTimeStub,
+		WorkflowEntrypoint: BuildTimeStub,
+		RpcTarget: BuildTimeStub,
+		RpcStub: BuildTimeStub,
+		env: {},
+		waitUntil: () => {}
+	},
+	'cloudflare:email': { EmailMessage: BuildTimeStub },
+	'cloudflare:sockets': { connect: () => ({}) }
+};
+
+let stubbed = false;
+
+/** Registers the `cloudflare:*` stubs with Bun's runtime, once per process. */
+const stubCloudflareModules = (): void => {
+	if (stubbed) return;
+	stubbed = true;
+	Bun.plugin({
+		name: 'elysium-cloudflare-stubs',
+		setup(build) {
+			for (const [specifier, exports] of Object.entries(CLOUDFLARE_STUBS)) {
+				build.module(specifier, () => ({ exports, loader: 'object' }));
+			}
+		}
+	});
+};
+
 /**
  * Options of {@link WorkersBuilder.build}.
  * @author Axel Nana <axel.nana@workbud.com>
@@ -133,6 +172,7 @@ export class WorkersBuilder {
 		const startTime = Date.now();
 		const outfile = options.outfile ?? 'worker.js';
 		const { aot } = await import('elysia/plugin/aot/bun');
+		stubCloudflareModules();
 
 		const result = await Bun.build({
 			entrypoints: [options.entry],
