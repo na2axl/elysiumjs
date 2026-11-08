@@ -1,5 +1,17 @@
 # @elysiumjs/styx
 
+## 0.10.0
+
+### Minor Changes
+
+- [#52](https://github.com/na2axl/elysiumjs/pull/52) [`762661e`](https://github.com/na2axl/elysiumjs/commit/762661e362444f431ea84576494322a9a7a81539) Thanks [@na2axl](https://github.com/na2axl)! - New projects declare their environment in `src/env.ts`: the schema the app passes as `env`, and the declaration that types `Env.get()` from it. It replaces `types.d.ts`, whose declaration did not compile and was skipped by `skipLibCheck`.
+
+### Patch Changes
+
+- Updated dependencies [[`762661e`](https://github.com/na2axl/elysiumjs/commit/762661e362444f431ea84576494322a9a7a81539)]:
+  - @elysiumjs/core@0.17.0
+  - @elysiumjs/runtime-bun@0.1.6
+
 ## 0.9.7
 
 ### Patch Changes
