@@ -324,7 +324,7 @@
     },
     "@elysiumjs/styx": {
       "name": "@elysiumjs/styx",
-      "version": "0.9.3",
+      "version": "0.9.4",
       "bin": {
         "styx": "dist/cli.js",
       },

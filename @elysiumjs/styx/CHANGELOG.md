@@ -1,5 +1,11 @@
 # @elysiumjs/styx
 
+## 0.9.4
+
+### Patch Changes
+
+- [#40](https://github.com/na2axl/elysiumjs/pull/40) [`2183717`](https://github.com/na2axl/elysiumjs/commit/218371727fd17fa6191e7f5a208a88e66ff64497) Thanks [@na2axl](https://github.com/na2axl)! - Inside a project, `styx`, `styx list` and `styx help` show Styx's commands (generators, `routes:generate`, build tools) beside the app's, and loading an app that imports `cloudflare:*` modules works. A generator given a module missing from `.elysiumrc` refuses instead of writing under `undefined/`. The validator stub types its request with `Static<typeof X.schema>` and returns promises without `async`.
+
 ## 0.9.3
 
 ### Patch Changes
