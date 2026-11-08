@@ -345,7 +345,7 @@
     },
     "@elysiumjs/themis": {
       "name": "@elysiumjs/themis",
-      "version": "0.2.1",
+      "version": "0.3.0",
       "dependencies": {
         "@simplewebauthn/server": "^14.0.3",
         "jose": "^6.2.15",
@@ -362,7 +362,7 @@
     },
     "@elysiumjs/themis-redis": {
       "name": "@elysiumjs/themis-redis",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "devDependencies": {
         "@elysiumjs/core": "workspace:*",
         "@elysiumjs/themis": "workspace:*",
@@ -374,7 +374,7 @@
     },
     "@elysiumjs/themis-workers": {
       "name": "@elysiumjs/themis-workers",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "devDependencies": {
         "@elysiumjs/core": "workspace:*",
         "@elysiumjs/themis": "workspace:*",

@@ -1,5 +1,11 @@
 # @elysiumjs/themis
 
+## 0.3.0
+
+### Minor Changes
+
+- [#42](https://github.com/na2axl/elysiumjs/pull/42) [`95d63ee`](https://github.com/na2axl/elysiumjs/commit/95d63ee3d6272e5a1ca330b4bb3506e926ca0cb8) Thanks [@na2axl](https://github.com/na2axl)! - `Passkeys` takes `challenges: 'caller'` to leave the challenges to the app, such as in the state of a multi-step flow: `verifyRegistration` and `verifyAuthentication` then take the challenge (and the user) as a second argument. `verifyAuthentication` refuses a passkey of another user than the one given, and `PasskeyRepository.updateCounter` receives the previous counter and may answer `false` to refuse a sign-in that lost a race. `BackupCodes.generate` and `consume` take a `secret` to hash the codes with HMAC, and `consume` answers the hash it used. `Passkeys` also takes `residentKey` and `timeout`, and refuses an assertion whose user handle is another user's than the passkey's.
+
 ## 0.2.1
 
 ### Patch Changes
