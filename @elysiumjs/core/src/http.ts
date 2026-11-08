@@ -14,7 +14,7 @@
 
 import type { Context as ElysiaContext, SSEPayload } from 'elysia';
 import type { Class, MergeDeep } from 'type-fest';
-import type { Static, TSchema } from 'typebox';
+import type { Static, TObject, TSchema } from 'typebox';
 import type { AppHttpContext } from '.';
 import type { FilterClass, FilterLevel } from './filter';
 import type { InterceptorClass, InterceptorContext, InterceptorLevel } from './interceptor';
@@ -142,6 +142,16 @@ type HttpRequestHandlerMetadata = {
 	params: Array<{ slug: string; schema: TSchema; index: number }>;
 
 	/**
+	 * The request headers the handler reads, by lowercase name.
+	 */
+	headerParams?: Array<{ name: string; schema: TSchema; index: number }>;
+
+	/**
+	 * The request headers the route declares, from its `headers` option.
+	 */
+	headers?: TObject;
+
+	/**
 	 * The raw context for the handler.
 	 */
 	rawContext?: { index: number };
@@ -205,6 +215,7 @@ type HttpRequestHandlerRegistrationProps = Pick<
 	| 'serialize'
 	| 'filters'
 	| 'interceptors'
+	| 'headers'
 > & {
 	target: Object;
 	propertyKey: string | symbol;
@@ -400,10 +411,24 @@ const getTransactionRunner = (): TransactionRunner => {
 	return runner;
 };
 
+/**
+ * The headers schema of a route: the headers of its `headers` option and those its handler
+ * reads with `@Http.header()`. Other headers are let through.
+ */
+const headersSchema = (route: HttpRequestHandlerMetadata): TObject | undefined => {
+	const properties: Record<string, TSchema> = {};
+	for (const [name, schema] of Object.entries(route.headers?.properties ?? {})) {
+		properties[name.toLowerCase()] = schema as TSchema;
+	}
+	for (const header of route.headerParams ?? []) properties[header.name] = header.schema;
+	return isEmpty(properties) ? undefined : t.Object(properties, { additionalProperties: true });
+};
+
 const registerHttpRequestHandler = (props: HttpRequestHandlerRegistrationProps) => {
 	const body = Metadata.get('http:body', props.target, props.propertyKey);
 	const params = Metadata.get('http:params', props.target, props.propertyKey) ?? [];
 	const query = Metadata.get('http:query', props.target, props.propertyKey);
+	const headerParams = Metadata.get('http:headers', props.target, props.propertyKey);
 	const rawContext = Metadata.get('http:rawContext', props.target, props.propertyKey);
 	const customDecorators =
 		Metadata.get('http:customDecorators', props.target, props.propertyKey) ?? [];
@@ -421,7 +446,8 @@ const registerHttpRequestHandler = (props: HttpRequestHandlerRegistrationProps) 
 		transactional,
 		serialize,
 		filters,
-		interceptors
+		interceptors,
+		headers
 	} = props;
 
 	const metadata: HttpRequestHandlerMetadata[] =
@@ -434,6 +460,8 @@ const registerHttpRequestHandler = (props: HttpRequestHandlerRegistrationProps) 
 		body,
 		params,
 		query,
+		headerParams,
+		headers,
 		customDecorators,
 		rawContext,
 		handler,
@@ -552,6 +580,17 @@ export type HttpRouteOptions = {
 
 	/** Interceptors around this handler, inside those of the controller. */
 	interceptors?: InterceptorClass[];
+
+	/**
+	 * The request headers of the route, validated before the handler runs and documented in
+	 * OpenAPI. Header names are lowercase. A request whose headers do not match gets a 400
+	 * `BAD_REQUEST` problem. `@Http.header()` adds the headers it reads to these.
+	 * @example
+	 * ```ts
+	 * @Http.post('/', { headers: t.Object({ 'x-flow-key': t.String() }) })
+	 * ```
+	 */
+	headers?: TObject;
 };
 
 /**
@@ -789,6 +828,10 @@ export namespace Http {
 							parameters[route.query.index] = c.query;
 						}
 
+						for (const header of route.headerParams ?? []) {
+							parameters[header.index] = c.headers[header.name];
+						}
+
 						if (!isEmpty(route.params)) {
 							for (const param of route.params) {
 								parameters[param.index] = c.params[param.slug];
@@ -953,6 +996,8 @@ export namespace Http {
 						(p) => p.schema
 					);
 
+					const headers = headersSchema(route);
+
 					const mi = makeMiddlewares(route.middlewares, node);
 
 					const routeName = `${route.method.toUpperCase()} ${joinPath(props.path, route.path)}`;
@@ -1034,6 +1079,7 @@ export namespace Http {
 							},
 							body: isValidator ? route.body?.validator?.schema : route.body?.schema,
 							query: route.query?.schema,
+							headers,
 							response: route.response ? Resource.projectResponse(route.response) : undefined,
 							params: isEmpty(params) ? undefined : t.Object(params)
 						},
@@ -1194,6 +1240,32 @@ export namespace Http {
 			const params = Metadata.get('http:params', target, propertyKey!) ?? [];
 			params.push({ slug, schema: schema ?? t.String(), index: parameterIndex });
 			Metadata.define('http:params', params, target, propertyKey!);
+		};
+	};
+
+	/**
+	 * Resolves the value of a request header in the annotated parameter. The header is validated
+	 * with the route's other headers (a 400 `BAD_REQUEST` problem when it does not match) and
+	 * documented in OpenAPI.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param name The name of the header, in any case.
+	 * @param schema The schema of the header. Defaults to a required string; wrap it in
+	 * `t.Optional()` for a header the request may leave out.
+	 * @example
+	 * ```ts
+	 * @Http.get('/')
+	 * public list(@Http.header('x-tenant-id') tenant: string) {}
+	 * ```
+	 */
+	export const header = (name: string, schema?: TSchema): ParameterDecorator => {
+		return function (target, propertyKey, parameterIndex) {
+			const headers = Metadata.get('http:headers', target, propertyKey!) ?? [];
+			headers.push({
+				name: name.toLowerCase(),
+				schema: schema ?? t.String(),
+				index: parameterIndex
+			});
+			Metadata.define('http:headers', headers, target, propertyKey!);
 		};
 	};
 

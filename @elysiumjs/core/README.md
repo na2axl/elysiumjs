@@ -103,6 +103,30 @@ Or, if using `styx`, run:
 bun styx serve
 ```
 
+## Request values
+
+Route parameters receive the parts of the request. Their schemas validate the request before the handler runs and document the route in OpenAPI:
+
+```typescript
+import { Http, t } from '@elysiumjs/core';
+
+@Http.controller('/users')
+export class UserController {
+	@Http.patch('/:id', { headers: t.Object({ 'if-match': t.Optional(t.String()) }) })
+	public update(
+		@Http.param('id') id: string,
+		@Http.body(t.Object({ name: t.String() })) body: { name: string },
+		@Http.query(t.Object({ notify: t.Optional(t.String()) })) query: { notify?: string },
+		@Http.header('x-tenant-id') tenant: string
+	) {
+		return { id, tenant, ...body };
+	}
+}
+```
+
+- `@Http.param()`, `@Http.body()` and `@Http.query()` give the URL parameter, the body and the query. A value that does not match its schema gets a 422 `VALIDATION_FAILED` problem.
+- `@Http.header()` gives a header, a required string unless a schema says otherwise. The `headers` option declares headers the handler does not read itself. Missing or malformed headers get a 400 `BAD_REQUEST` problem.
+
 ## Services
 
 A service is identified by its class. Give it a name with `@Service.register({ name })` to look it up by that string instead. Class names are never used as identifiers, so services resolve the same way after a bundler renames classes (`bun run check:minified` builds a minified app and checks it).

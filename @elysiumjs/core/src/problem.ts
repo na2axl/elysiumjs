@@ -442,7 +442,8 @@ export const requestIdOf = (request: Request, make?: (request: Request) => strin
  *
  * - A {@link DomainError} keeps its code, status, title, detail and members.
  * - Elysia's request validation errors give `VALIDATION_FAILED` at `validationStatus` (422), with
- *   an `errors` list.
+ *   an `errors` list, except for headers: missing or malformed headers give `BAD_REQUEST` (400),
+ *   with the same list.
  * - Elysia's not found, parse and invalid cookie signature errors give `NOT_FOUND` (404) and
  *   `BAD_REQUEST` (400).
  * - Anything else is an `INTERNAL_ERROR` (500) whose detail and stack are only shown in
@@ -493,6 +494,14 @@ export const toProblem = (error: unknown, context: ProblemContext): ProblemDetai
 
 	const elysia = error as { code?: unknown; status?: unknown; type?: string; all?: unknown[] };
 	const code = typeof elysia?.code === 'string' ? elysia.code : undefined;
+
+	if (code === 'validation' && elysia.status !== 500 && elysia.type === 'headers') {
+		// Missing or malformed headers make a bad request, not invalid input.
+		return make(ELYSIUM_PROBLEM_CODES.BAD_REQUEST, 400, {
+			detail: 'The request headers are invalid.',
+			errors: validationErrors('headers', elysia.all ?? [])
+		});
+	}
 
 	if (code === 'validation' && elysia.status !== 500) {
 		return make(ELYSIUM_PROBLEM_CODES.VALIDATION_FAILED, context.validationStatus ?? 422, {

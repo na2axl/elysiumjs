@@ -33,7 +33,15 @@ class UserController {
 	}
 }
 
-@Module.register({ controllers: [UserController] })
+@Http.controller('/tenants')
+class TenantController {
+	@Http.get('/', { headers: t.Object({ 'X-Source': t.Optional(t.String()) }) })
+	public show(@Http.header('X-Tenant-Id') tenant: string) {
+		return { tenant };
+	}
+}
+
+@Module.register({ controllers: [UserController, TenantController] })
 class UserModule extends Module {}
 
 const appWith = (http: object) => {
@@ -87,5 +95,42 @@ describe('Query validation', () => {
 		} finally {
 			await testing.shutdown();
 		}
+	});
+});
+
+describe('Request headers', () => {
+	let testing: Awaited<ReturnType<typeof createTestingHttpApp>> | undefined;
+
+	afterEach(async () => {
+		await testing?.shutdown();
+		testing = undefined;
+	});
+
+	it('documents the headers of the route option and of @Http.header()', async () => {
+		testing = await createTestingHttpApp({ app: appWith({}) });
+		const response = await testing.http.get('/openapi/json').send();
+		const { paths } = (await response.json()) as any;
+		const op = (paths['/tenants'] ?? paths['/tenants/']).get;
+
+		expect(op.parameters).toEqual([
+			{ name: 'x-source', in: 'header', required: false, schema: { type: 'string' } },
+			{ name: 'x-tenant-id', in: 'header', required: true, schema: { type: 'string' } }
+		]);
+	});
+
+	it('gives the handler the header, and refuses a missing one with 400', async () => {
+		testing = await createTestingHttpApp({ app: appWith({}) });
+
+		const ok = await testing.http.get('/tenants').header('x-tenant-id', 'acme').send();
+		expect(ok.status).toBe(200);
+		expect(await ok.json()).toEqual({ tenant: 'acme' });
+
+		const missing = await testing.http.get('/tenants').send();
+		expect(missing.status).toBe(400);
+		const problem = (await missing.json()) as any;
+		expect(problem.code).toBe('BAD_REQUEST');
+		expect(problem.errors).toEqual([
+			expect.objectContaining({ pointer: '/headers/x-tenant-id', message: 'is required' })
+		]);
 	});
 });
