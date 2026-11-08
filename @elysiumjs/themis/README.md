@@ -139,7 +139,10 @@ During a rotation, verify with the current key and then the previous one:
 
 ```ts
 const claims = await Jwt.verify(token, {
-	keys: [{ secret: () => secrets.get('jwt-current') }, { secret: () => secrets.get('jwt-previous') }]
+	keys: [
+		{ secret: () => secrets.get('jwt-current') },
+		{ secret: () => secrets.get('jwt-previous') }
+	]
 });
 ```
 
@@ -159,6 +162,19 @@ const { valid, remaining } = await BackupCodes.consume(typed, hashes);
 ```
 
 Store the counter `Totp.verify` returns and refuse a code whose counter is not greater, so that a code works once.
+
+Plain hashes let anyone with a copy of the table test guesses offline. Pass a key to hash the codes with HMAC instead, and the same key to use them:
+
+```ts
+const { codes, hashes } = await BackupCodes.generate(8, {
+	secret: () => secrets.get('backup-codes')
+});
+const { valid, used } = await BackupCodes.consume(typed, hashes, {
+	secret: () => secrets.get('backup-codes')
+});
+```
+
+`used` is the hash the code matched, to mark that one used.
 
 ## OAuth and OpenID Connect
 
@@ -200,4 +216,16 @@ const challenge = await passkeys.authenticationOptions();
 const used = await passkeys.verifyAuthentication(assertion); // used.userId signs the user in
 ```
 
-The challenge is kept in the session. The app stores credentials by implementing `PasskeyRepository`. A response that does not verify answers a 400 problem.
+The challenge is kept in the session. The app stores credentials by implementing `PasskeyRepository`. A response that does not verify answers a 400 problem. `updateCounter` gets the previous counter too: answer `false` when the stored one is no longer it, and the sign-in that lost the race is refused.
+
+An app that keeps its own state between the two calls, such as a multi-step flow, or a client without a session cookie, sets `challenges: 'caller'` and passes the challenge back:
+
+```ts
+const passkeys = new Passkeys({ ...options, challenges: 'caller' });
+
+const request = await passkeys.authenticationOptions({ id: user.id });
+// keep request.challenge with the flow, then:
+const used = await passkeys.verifyAuthentication(assertion, { challenge, userId: user.id });
+```
+
+`residentKey: 'required'` makes every new passkey discoverable, for a sign-in without a username, and `timeout` (in milliseconds) is how long the client has to answer. An assertion whose user handle names another user than the passkey's is refused. With a `userId`, a passkey of another user is refused like an unknown one. A registration needs the `userId` it was for.

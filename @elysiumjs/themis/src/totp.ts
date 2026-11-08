@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { randomBytes, safeEqual, sha256 } from './crypto';
+import type { Secret } from './secret';
+
+import { hmac, randomBytes, safeEqual, sha256 } from './crypto';
+import { resolveSecret } from './secret';
 
 const BASE32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
@@ -171,20 +174,41 @@ const CODE_ALPHABET = '23456789abcdefghjkmnpqrstuvwxyz';
 
 const normalize = (code: string): string => code.toLowerCase().replace(/[\s-]/g, '');
 
+/**
+ * The options of {@link BackupCodes.generate} and {@link BackupCodes.consume}.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type BackupCodeOptions = {
+	/**
+	 * A key the hashes are HMACs with. Without it they are plain SHA-256, which a leaked table
+	 * lets anyone test guesses against offline; with it, guesses need the key too.
+	 */
+	secret?: Secret;
+};
+
+const hashCode = async (code: string, options: BackupCodeOptions): Promise<string> =>
+	options.secret === undefined
+		? sha256(normalize(code))
+		: hmac(await resolveSecret(options.secret, 'backup code secret'), normalize(code));
+
 export namespace BackupCodes {
 	/**
 	 * Generates one-time backup codes, such as `k3m9q-x7t2p`. Show the codes once and store only
 	 * their hashes.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param count The number of codes. Defaults to 10.
+	 * @param options The key of the hashes, if any.
 	 * @returns The codes, and their hashes in the same order.
 	 */
-	export const generate = async (count = 10): Promise<{ codes: string[]; hashes: string[] }> => {
+	export const generate = async (
+		count = 10,
+		options: BackupCodeOptions = {}
+	): Promise<{ codes: string[]; hashes: string[] }> => {
 		const codes = Array.from({ length: count }, () => {
 			const chars = [...randomBytes(10)].map((byte) => CODE_ALPHABET[byte % CODE_ALPHABET.length]);
 			return `${chars.slice(0, 5).join('')}-${chars.slice(5).join('')}`;
 		});
-		return { codes, hashes: await Promise.all(codes.map((code) => sha256(normalize(code)))) };
+		return { codes, hashes: await Promise.all(codes.map((code) => hashCode(code, options))) };
 	};
 
 	/**
@@ -193,14 +217,17 @@ export namespace BackupCodes {
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param code The code the user typed.
 	 * @param hashes The stored hashes.
+	 * @param options The key the hashes were made with, if any.
+	 * @returns Whether the code is valid, the hash it matched, and the hashes left.
 	 */
 	export const consume = async (
 		code: string,
-		hashes: readonly string[]
-	): Promise<{ valid: boolean; remaining: string[] }> => {
-		const hash = await sha256(normalize(code));
+		hashes: readonly string[],
+		options: BackupCodeOptions = {}
+	): Promise<{ valid: boolean; used?: string; remaining: string[] }> => {
+		const hash = await hashCode(code, options);
 		const index = hashes.findIndex((stored) => safeEqual(stored, hash));
 		if (index < 0) return { valid: false, remaining: [...hashes] };
-		return { valid: true, remaining: hashes.filter((_, i) => i !== index) };
+		return { valid: true, used: hashes[index], remaining: hashes.filter((_, i) => i !== index) };
 	};
 }

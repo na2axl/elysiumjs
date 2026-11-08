@@ -60,6 +60,7 @@ export {
 	type OAuthResult
 } from './oauth';
 export {
+	type PasskeyChallenge,
 	type PasskeyRecord,
 	type PasskeyRepository,
 	Passkeys,
@@ -69,4 +70,4 @@ export {
 export { type Secret } from './secret';
 export { InvalidSignatureError, SignedUrl } from './signed-url';
 export { ThemisModule } from './themis.module';
-export { BackupCodes, Totp, type TotpOptions } from './totp';
+export { type BackupCodeOptions, BackupCodes, Totp, type TotpOptions } from './totp';
