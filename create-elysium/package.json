@@ -1,6 +1,6 @@
 {
   "name": "create-elysium",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "license": "Apache-2.0",
   "description": "Bootstrap your next Elysium.js app (runs styx create).",
   "author": {
