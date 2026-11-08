@@ -142,7 +142,7 @@
     },
     "@elysiumjs/heracles-workers": {
       "name": "@elysiumjs/heracles-workers",
-      "version": "0.1.2",
+      "version": "0.2.0",
       "devDependencies": {
         "@elysiumjs/core": "workspace:*",
         "@elysiumjs/heracles": "workspace:*",

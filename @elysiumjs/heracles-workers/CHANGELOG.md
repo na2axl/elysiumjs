@@ -1,5 +1,11 @@
 # @elysiumjs/heracles-workers
 
+## 0.2.0
+
+### Minor Changes
+
+- [#44](https://github.com/na2axl/elysiumjs/pull/44) [`4cb0916`](https://github.com/na2axl/elysiumjs/commit/4cb0916d5c6cda8a77adbdf6bd0d53644094cfaf) Thanks [@na2axl](https://github.com/na2axl)! - Each queue sets its own dead letter queue: `deadLetterQueue` moves from `HeraclesWorkersModule.with()` to the `transportOptions` of a `CloudflareQueueTransport` queue, next to its `binding`. A job that fails its last retry goes to the dead letter queue of its own queue. `onDead` stays on the module and is called for every queue.
+
 ## 0.1.2
 
 ### Patch Changes
