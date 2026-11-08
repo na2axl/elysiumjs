@@ -23,6 +23,7 @@ import {
 	Jwt,
 	OAuthClient,
 	Passkeys,
+	PasskeyVerificationError,
 	SessionMiddleware,
 	ThemisModule,
 	Totp
@@ -65,8 +66,73 @@ describe('backup codes', () => {
 		expect(codes[0]).toMatch(/^[2-9a-z]{5}-[2-9a-z]{5}$/);
 
 		const used = await BackupCodes.consume(codes[1]!.toUpperCase().replace('-', ' '), hashes);
-		expect(used).toEqual({ valid: true, remaining: [hashes[0]!, hashes[2]!] });
+		expect(used).toEqual({ valid: true, used: hashes[1], remaining: [hashes[0]!, hashes[2]!] });
 		expect((await BackupCodes.consume(codes[1]!, used.remaining)).valid).toBe(false);
+	});
+
+	it('hashes with a key when given one, and needs the same key to use a code', async () => {
+		const secret = 'k'.repeat(32);
+		const plain = await BackupCodes.generate(1);
+		const keyed = await BackupCodes.generate(1, { secret: () => secret });
+		expect(keyed.hashes[0]).not.toMatch(/^[0-9a-f]{64}$/);
+		expect(plain.hashes[0]).toMatch(/^[0-9a-f]{64}$/);
+
+		expect((await BackupCodes.consume(keyed.codes[0]!, keyed.hashes)).valid).toBe(false);
+		const other = { secret: 'o'.repeat(32) };
+		expect((await BackupCodes.consume(keyed.codes[0]!, keyed.hashes, other)).valid).toBe(false);
+		expect((await BackupCodes.consume(keyed.codes[0]!, keyed.hashes, { secret })).valid).toBe(true);
+	});
+
+	it('refuses a short key', async () => {
+		await expect(BackupCodes.generate(1, { secret: 'short' })).rejects.toThrow();
+	});
+});
+
+describe('passkeys with challenges kept by the app', () => {
+	const stored: PasskeyRecord = {
+		id: 'cred-1',
+		userId: 'u1',
+		publicKey: 'AQID',
+		counter: 0,
+		backedUp: false,
+		deviceType: 'singleDevice'
+	};
+	const keys = new Passkeys({
+		rpName: 'Klapzi',
+		rpID: 'example.com',
+		origin: 'https://example.com',
+		challenges: 'caller',
+		repository: {
+			forUser: async (userId) => (userId === stored.userId ? [stored] : []),
+			find: async (id) => (id === stored.id ? stored : undefined),
+			save: async () => {},
+			updateCounter: async () => false
+		}
+	});
+	const answer = (id: string) => ({ id, rawId: id, response: {}, type: 'public-key' }) as never;
+
+	it('issues options outside any session', async () => {
+		const options = await keys.registrationOptions({ id: 'u1', name: 'ada' });
+		expect(options.excludeCredentials).toEqual([{ id: 'cred-1', type: 'public-key' }]);
+		const login = await keys.authenticationOptions({ id: 'u1' });
+		expect(typeof login.challenge).toBe('string');
+	});
+
+	it('refuses an answer without the challenge, or a registration without its user', async () => {
+		await expect(keys.verifyRegistration(answer('x'))).rejects.toThrow('no registration');
+		await expect(keys.verifyRegistration(answer('x'), { challenge: 'c' })).rejects.toThrow(
+			'no registration'
+		);
+		await expect(keys.verifyAuthentication(answer('cred-1'))).rejects.toThrow('no sign-in');
+	});
+
+	it("reads another user's passkey as an unknown one", async () => {
+		await expect(
+			keys.verifyAuthentication(answer('cred-1'), { challenge: 'c', userId: 'u2' })
+		).rejects.toThrow('unknown');
+		await expect(
+			keys.verifyAuthentication(answer('cred-1'), { challenge: 'c', userId: 'u1' })
+		).rejects.toThrow(PasskeyVerificationError);
 	});
 });
 

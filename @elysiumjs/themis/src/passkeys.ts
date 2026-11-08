@@ -57,7 +57,11 @@ export interface PasskeyRepository {
 	forUser(userId: string): Promise<PasskeyRecord[]>;
 	find(id: string): Promise<PasskeyRecord | undefined>;
 	save(record: PasskeyRecord): Promise<void>;
-	updateCounter(id: string, counter: number): Promise<void>;
+	/**
+	 * Moves the counter of a passkey from `previous` to `counter`. Answer `false` when it no longer
+	 * is `previous`, such as when another sign-in used the passkey first, to refuse this one.
+	 */
+	updateCounter(id: string, counter: number, previous: number): Promise<void | boolean>;
 }
 
 /**
@@ -84,6 +88,26 @@ export type PasskeysOptions = {
 	repository: PasskeyRepository;
 	/** Defaults to `preferred`. */
 	userVerification?: 'required' | 'preferred' | 'discouraged';
+	/**
+	 * Where the challenges live between the options and the answer. `session` (the default) keeps
+	 * them in the session. `caller` leaves them to the app, such as in the state of a multi-step
+	 * flow: it reads `challenge` from the options and passes it back to the verify method.
+	 */
+	challenges?: 'session' | 'caller';
+};
+
+/**
+ * A challenge the app kept itself (`challenges: 'caller'`), passed back to a verify method.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type PasskeyChallenge = {
+	/** The `challenge` of the options the client answered. */
+	challenge: string;
+	/**
+	 * The user the options were for. Required to register; to sign in, a passkey of another user
+	 * is refused.
+	 */
+	userId?: string;
 };
 
 const REGISTRATION = '_passkey:registration';
@@ -91,11 +115,16 @@ const AUTHENTICATION = '_passkey:authentication';
 
 /**
  * Registers passkeys and signs users in with them (WebAuthn), through @simplewebauthn/server. The
- * challenges live in the session; the passkeys in the app's {@link PasskeyRepository}.
+ * challenges live in the session, or with the app (`challenges: 'caller'`); the passkeys in the
+ * app's {@link PasskeyRepository}.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export class Passkeys {
 	constructor(private readonly options: PasskeysOptions) {}
+
+	private get callerKeeps(): boolean {
+		return this.options.challenges === 'caller';
+	}
 
 	/** The options of a new passkey of a user, for `navigator.credentials.create()`. */
 	public async registrationOptions(user: {
@@ -120,17 +149,26 @@ export class Passkeys {
 				userVerification: this.options.userVerification ?? 'preferred'
 			}
 		});
-		Session.current().set(REGISTRATION, { challenge: options.challenge, userId: user.id });
+		if (!this.callerKeeps)
+			Session.current().set(REGISTRATION, { challenge: options.challenge, userId: user.id });
 		return options;
 	}
 
 	/**
 	 * Verifies the answer of `navigator.credentials.create()` and saves the new passkey.
+	 * @param response The answer of the client.
+	 * @param kept The challenge and the user, when the app keeps the challenges.
 	 * @throws {PasskeyVerificationError} When it does not verify (400).
 	 */
-	public async verifyRegistration(response: RegistrationResponseJSON): Promise<PasskeyRecord> {
-		const pending = Session.current().pull<{ challenge: string; userId: string }>(REGISTRATION);
-		if (!pending) throw new PasskeyVerificationError('no registration is in progress');
+	public async verifyRegistration(
+		response: RegistrationResponseJSON,
+		kept?: PasskeyChallenge
+	): Promise<PasskeyRecord> {
+		const pending = this.callerKeeps
+			? kept
+			: Session.current().pull<{ challenge: string; userId: string }>(REGISTRATION);
+		if (!pending?.userId) throw new PasskeyVerificationError('no registration is in progress');
+		const userId = pending.userId;
 		let result;
 		try {
 			result = await verifyRegistrationResponse({
@@ -147,7 +185,7 @@ export class Passkeys {
 		const { credential, credentialBackedUp, credentialDeviceType } = result.registrationInfo;
 		const record: PasskeyRecord = {
 			id: credential.id,
-			userId: pending.userId,
+			userId,
 			publicKey: toBase64Url(credential.publicKey),
 			counter: credential.counter,
 			transports: credential.transports,
@@ -174,20 +212,29 @@ export class Passkeys {
 				transports: passkey.transports as AuthenticatorTransport[] | undefined
 			}))
 		});
-		Session.current().set(AUTHENTICATION, options.challenge);
+		if (!this.callerKeeps) Session.current().set(AUTHENTICATION, options.challenge);
 		return options;
 	}
 
 	/**
 	 * Verifies the answer of `navigator.credentials.get()`, updates the counter, and returns the
 	 * passkey, whose `userId` is the user to sign in.
+	 * @param response The answer of the client.
+	 * @param kept The challenge, when the app keeps the challenges, and the user it was for, if any.
 	 * @throws {PasskeyVerificationError} When it does not verify (400).
 	 */
-	public async verifyAuthentication(response: AuthenticationResponseJSON): Promise<PasskeyRecord> {
-		const challenge = Session.current().pull<string>(AUTHENTICATION);
+	public async verifyAuthentication(
+		response: AuthenticationResponseJSON,
+		kept?: PasskeyChallenge
+	): Promise<PasskeyRecord> {
+		const challenge = this.callerKeeps
+			? kept?.challenge
+			: Session.current().pull<string>(AUTHENTICATION);
 		if (!challenge) throw new PasskeyVerificationError('no sign-in is in progress');
 		const passkey = await this.options.repository.find(response.id);
-		if (!passkey) throw new PasskeyVerificationError('the passkey is unknown');
+		// Another user's passkey reads like an unknown one, so the answer tells nothing about it.
+		if (!passkey || (kept?.userId !== undefined && passkey.userId !== kept.userId))
+			throw new PasskeyVerificationError('the passkey is unknown');
 		let result;
 		try {
 			result = await verifyAuthenticationResponse({
@@ -207,7 +254,12 @@ export class Passkeys {
 			throw new PasskeyVerificationError((error as Error).message);
 		}
 		if (!result.verified) throw new PasskeyVerificationError('the response does not verify');
-		await this.options.repository.updateCounter(passkey.id, result.authenticationInfo.newCounter);
+		const moved = await this.options.repository.updateCounter(
+			passkey.id,
+			result.authenticationInfo.newCounter,
+			passkey.counter
+		);
+		if (moved === false) throw new PasskeyVerificationError('the passkey was used meanwhile');
 		return { ...passkey, counter: result.authenticationInfo.newCounter };
 	}
 }
