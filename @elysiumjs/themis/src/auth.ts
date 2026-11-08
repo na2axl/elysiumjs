@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { ProblemClass } from '@elysiumjs/core';
 import type { HttpContext } from './context';
 import type { JwtVerifyOptions } from './jwt';
 
@@ -157,6 +158,9 @@ const OPTIONAL = Symbol.for('elysium:themis:auth-optional');
  * ```
  */
 export class AuthMiddleware extends Middleware {
+	/** The problems it answers with, documented on the routes it guards. */
+	public static errors: readonly ProblemClass[] = [UnauthenticatedError];
+
 	public override async onBeforeHandle(context: HttpContext): Promise<void> {
 		const guards = themisConfig().guards ?? {};
 		const names = this.guards.length > 0 ? this.guards : Object.keys(guards);
@@ -184,7 +188,10 @@ export function Auth(options: AuthOptions = {}): ClassDecorator & MethodDecorato
 		options.guards ? AuthMiddleware.guards(options.guards) : AuthMiddleware
 	) as typeof AuthMiddleware;
 	class ConfiguredAuthMiddleware extends base {}
-	if (options.optional) Metadata.define(OPTIONAL, true, ConfiguredAuthMiddleware);
+	if (options.optional) {
+		Metadata.define(OPTIONAL, true, ConfiguredAuthMiddleware);
+		ConfiguredAuthMiddleware.errors = [];
+	}
 	return Middleware.register(ConfiguredAuthMiddleware);
 }
 

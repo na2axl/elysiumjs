@@ -265,3 +265,88 @@ describe('Query.Params', () => {
 		]);
 	});
 });
+
+describe('offset pagination', () => {
+	const offsetSpec = Query.define(Post, {
+		filters: { status: ['eq'] },
+		sort: ['createdAt'],
+		defaultSort: '-createdAt',
+		limit: { default: 10, max: 50 },
+		pagination: 'offset'
+	});
+
+	it('reads the page, from 1 by default', () => {
+		expect(Query.parse(offsetSpec).page).toBe(1);
+		const query = Query.parse(offsetSpec, { page: '3', limit: '5' });
+		expect(query.page).toBe(3);
+		expect(query.limit).toBe(5);
+		expect(query.after).toBeUndefined();
+	});
+
+	it('refuses a page that is not a whole number from 1', () => {
+		const problem = problemOf(() => Query.parse(offsetSpec, { page: '0' }));
+		expect(problem.errors).toEqual([
+			{ pointer: '/query/page', message: 'must be a whole number from 1', code: 'page' }
+		]);
+	});
+
+	it('names page instead of cursor in the query string', () => {
+		expectTypeOf<Query.Params<typeof offsetSpec>>().toEqualTypeOf<{
+			'filter[status]'?: string;
+			'filter[status][eq]'?: string;
+			sort?: string;
+			page?: string;
+			limit?: string;
+			fields?: string;
+		}>();
+		const keys = Object.keys((Query.schema(offsetSpec) as any).properties);
+		expect(keys).toContain('page');
+		expect(keys).not.toContain('cursor');
+	});
+
+	it('types the parsed query by the pagination of the spec', () => {
+		expectTypeOf(Query.parse(offsetSpec).page).toEqualTypeOf<number>();
+		expectTypeOf(Query.parse(spec).page).toEqualTypeOf<undefined>();
+	});
+});
+
+describe('pages', () => {
+	const Item = { type: 'object', properties: { id: { type: 'string' } } } as any;
+
+	it('marks the pages they build, without a member of their own', () => {
+		const cursor = Query.page(Query.parse(spec), [{ id: 1 }]);
+		const offset = Query.offsetPage(
+			Query.parse({ ...spec, pagination: 'offset' as const }),
+			[{ id: 1 }],
+			1
+		);
+
+		expect(Query.isPage(cursor)).toBe(true);
+		expect(Query.isPage(offset)).toBe(true);
+		expect(Query.isPage({ data: [], nextCursor: null })).toBe(false);
+		expect(Query.paginationOf(cursor)).toBe('cursor');
+		expect(Query.paginationOf(offset)).toBe('offset');
+		expect(Object.keys(offset)).toEqual(['data', 'page', 'limit', 'total']);
+		expect(JSON.parse(JSON.stringify(cursor))).toEqual({ data: [{ id: 1 }], nextCursor: null });
+	});
+
+	it('maps the rows of a page and keeps it a page', () => {
+		const page = Query.page(Query.parse(spec), [{ id: 1 }, { id: 2 }]);
+		const mapped = Query.mapPage(page, (row) => ({ ref: `p${row.id}` }));
+
+		expect(mapped).toEqual({ data: [{ ref: 'p1' }, { ref: 'p2' }], nextCursor: null });
+		expect(Query.isPage(mapped)).toBe(true);
+		expectTypeOf(mapped.nextCursor).toEqualTypeOf<string | null>();
+	});
+
+	it('tags the schemas of pages with their pagination, and gives the schema of a row', () => {
+		const cursor = Query.pageSchema(Item);
+		const offset = Query.offsetPageSchema(Item);
+
+		expect(Query.pageSchemaPagination(cursor)).toBe('cursor');
+		expect(Query.pageSchemaPagination(offset)).toBe('offset');
+		expect(Query.isPageSchema(Item)).toBe(false);
+		expect(Query.itemSchemaOf(offset)).toBe(Item);
+		expect(Object.keys((offset as any).properties)).toEqual(['data', 'page', 'limit', 'total']);
+	});
+});

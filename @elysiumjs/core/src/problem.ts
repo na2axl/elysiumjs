@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { Static, TObject, TProperties } from 'typebox';
+
 import { HTTPError, t } from 'elysia';
 import { status as httpStatus } from 'http-status';
 
@@ -181,19 +183,97 @@ export const problemType = (code: string, base?: string): string => {
 /**
  * The options of a {@link DomainError}.
  * @author Axel Nana <axel.nana@workbud.com>
+ * @template X The extension members, typed from the `extensions` schema of `DomainError.for()`.
  */
-export type DomainErrorOptions = {
+export type DomainErrorOptions<X = Readonly<Record<string, unknown>>> = {
 	/** The invalid values, served as `errors`. */
 	errors?: readonly ProblemValidationError[];
 	/** Seconds until the client may retry, served as `retryAfter` and the Retry-After header. */
 	retryAfterSeconds?: number;
 	/** Extra members of the problem; the standard members win over them. */
-	extensions?: Readonly<Record<string, unknown>>;
+	extensions?: X;
 	/** A title of its own. Defaults to the reason phrase of the status. */
 	title?: string;
 	/** The error that caused this one, kept for logs. */
 	cause?: unknown;
 };
+
+/**
+ * What `DomainError.for()` takes besides the code and the status.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @template E The schemas of the extension members.
+ */
+export type DomainErrorDefinition<E extends TProperties = {}> = {
+	/**
+	 * The schemas of the extension members, documented in the problem's schema and typing the
+	 * `extensions` of the constructor.
+	 */
+	extensions?: E;
+	/** What the problem means, for the OpenAPI document. */
+	description?: string;
+};
+
+/**
+ * The extension members of a problem class: typed from its schemas, or any record without them.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type ProblemExtensions<E extends TProperties> = [keyof E] extends [never]
+	? Readonly<Record<string, unknown>>
+	: Static<TObject<E>>;
+
+/**
+ * A class of {@link DomainError}, with its code, status and the schema of its problem, as
+ * `DomainError.for()` makes them. Routes list the ones they answer with in `errors`.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @template T The error the class makes.
+ */
+export type ProblemClass<T extends DomainError = DomainError> = (abstract new (
+	...args: any[]
+) => T) & {
+	/** The problem code. */
+	readonly code: string;
+	/** The HTTP status. */
+	readonly status: number;
+	/** The schema of the problem: problem details with the literal code and status. */
+	readonly schema: TObject;
+};
+
+/** The problem details members every problem of the framework carries besides the RFC ones. */
+const problemMembers = () => ({
+	requestId: t.Optional(t.String({ description: 'The id of the request, to find it in the logs.' }))
+});
+
+/** The schema of a problem: the RFC 9457 members, the literal code and status, and extensions. */
+const problemSchemaOf = (
+	code: string,
+	status: number,
+	definition: DomainErrorDefinition<TProperties>
+): TObject =>
+	t.Problem(
+		{
+			code: t.Literal(code),
+			status: t.Literal(status),
+			...problemMembers(),
+			...definition.extensions
+		},
+		definition.description ? { description: definition.description } : {}
+	) as unknown as TObject;
+
+/** The schema of one invalid value, in the `errors` member of a problem. */
+const validationErrorSchema = () =>
+	t.Object({
+		pointer: t.String({ description: 'A JSON Pointer to the value: /body/email.' }),
+		message: t.String(),
+		code: t.Optional(t.String())
+	});
+
+/**
+ * The extension schemas of problems that list invalid values: `errors`, one per mistake.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export const validationExtensions = () => ({
+	errors: t.Optional(t.Array(validationErrorSchema()))
+});
 
 /**
  * An error the application expects and reports to the client as problem details, and an Elysia
@@ -261,14 +341,41 @@ export abstract class DomainError<
 	}
 
 	/**
-	 * The base class of one error, with its code and status kept as literal types.
+	 * The base class of one error, with its code and status kept as literal types. The class has
+	 * them as static members too, with `schema`: the problem details it is sent as, for the
+	 * `errors` of routes and the OpenAPI document.
 	 * @param code The problem code, from the {@link ProblemCatalogue} once it has keys.
 	 * @param status The HTTP status.
+	 * @param definition The schemas of the extension members, and a description.
+	 * @example
+	 * ```ts
+	 * class InsufficientFunds extends DomainError.for('INSUFFICIENT_FUNDS', 409, {
+	 *   extensions: { missing: t.Integer() }
+	 * }) {}
+	 *
+	 * new InsufficientFunds('Top up first.', { extensions: { missing: 300 } });
+	 * InsufficientFunds.schema; // { code: 'INSUFFICIENT_FUNDS', status: 409, missing: integer, ... }
+	 * ```
 	 */
-	public static for<const C extends ProblemCode, const S extends number>(code: C, status: S) {
+	public static for<
+		const C extends ProblemCode,
+		const S extends number,
+		const E extends TProperties = {}
+	>(code: C, status: S, definition: DomainErrorDefinition<E> = {}) {
+		let schema: TObject | undefined;
 		return class extends DomainError<C, S> {
-			constructor(detail?: string, options?: DomainErrorOptions) {
-				super(code, status, detail, options);
+			/** The problem code. */
+			public static readonly code: C = code;
+			/** The HTTP status. */
+			public static readonly status: S = status;
+
+			/** The schema of the problem: problem details with the literal code and status. */
+			public static get schema(): TObject {
+				return (schema ??= problemSchemaOf(code, status, definition));
+			}
+
+			constructor(detail?: string, options?: DomainErrorOptions<ProblemExtensions<E>>) {
+				super(code, status, detail, options as DomainErrorOptions);
 			}
 		};
 	}
@@ -294,13 +401,17 @@ export const isDomainError = (value: unknown): value is DomainError => value ins
  * A request that cannot be read: a 400 problem.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class BadRequestError extends DomainError.for('BAD_REQUEST', 400) {}
+export class BadRequestError extends DomainError.for('BAD_REQUEST', 400, {
+	extensions: validationExtensions()
+}) {}
 
 /**
  * Request values that do not match their schema: a 422 problem with one entry per mistake.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class ValidationFailedError extends DomainError.for('VALIDATION_FAILED', 422) {
+export class ValidationFailedError extends DomainError.for('VALIDATION_FAILED', 422, {
+	extensions: validationExtensions()
+}) {
 	constructor(errors: readonly ProblemValidationError[], detail = 'The request is invalid.') {
 		super(detail, { errors });
 	}
@@ -333,6 +444,28 @@ export class NotFoundError extends DomainError.for('NOT_FOUND', 404) {}
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export class ConflictError extends DomainError.for('CONFLICT', 409) {}
+
+/**
+ * An unexpected failure: a 500 problem. Anything thrown that is not a DomainError is sent as one,
+ * with its detail and stack only in development.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class InternalError extends DomainError.for('INTERNAL_ERROR', 500, {
+	extensions: { stack: t.Optional(t.Array(t.String(), { description: 'In development only.' })) }
+}) {}
+
+/**
+ * The schema of the problems request validation answers with, at the `validationStatus` of the
+ * application.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param status The status of validation errors: 422 or 400.
+ */
+export const validationProblemSchema = (status: number): TObject =>
+	status === ValidationFailedError.status
+		? ValidationFailedError.schema
+		: problemSchemaOf(ELYSIUM_PROBLEM_CODES.VALIDATION_FAILED, status, {
+				extensions: validationExtensions()
+			});
 
 /**
  * Checks whether a value is a problem details object: a `status` number and a `title` string.

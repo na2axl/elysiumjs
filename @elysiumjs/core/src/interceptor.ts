@@ -13,7 +13,9 @@
 // limitations under the License.
 
 import type { Class } from 'type-fest';
+import type { TSchema } from 'typebox';
 import type { ModuleNode } from './module-graph';
+import type { ProblemClass } from './problem';
 
 import { InterceptorNextCalledTwiceError } from './errors';
 import { Metadata } from './metadata';
@@ -47,11 +49,26 @@ export interface Interceptor {
 }
 
 /**
- * A class of interceptor. Interceptors are services: they can inject other services of their
- * module. A request-scoped interceptor is built for each request.
+ * Gives the schema of what an interceptor returns from the schema of what it wraps, so that the
+ * OpenAPI document, the validation and the serialization of a route describe the body the client
+ * receives. It must make the same choice as the interceptor: a schema the interceptor leaves as it
+ * is gives itself back.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export type InterceptorClass = Class<Interceptor>;
+export type ResponseSchemaHook = (schema: TSchema) => TSchema;
+
+/**
+ * A class of interceptor. Interceptors are services: they can inject other services of their
+ * module. A request-scoped interceptor is built for each request.
+ *
+ * An interceptor that changes the shape of results gives `responseSchema`, applied to the success
+ * schemas of the routes it wraps. One that answers with problems of its own lists them in `errors`.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type InterceptorClass = Class<Interceptor> & {
+	readonly responseSchema?: ResponseSchemaHook;
+	readonly errors?: readonly ProblemClass[];
+};
 
 /**
  * One level of interceptors (app, module, controller or route) and the module they run in.
@@ -128,6 +145,19 @@ export class TimingInterceptor implements Interceptor {
 }
 
 /**
+ * The options of {@link TransformInterceptor.with}.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type TransformOptions = {
+	/**
+	 * The schema of what `transform` returns, from the schema the route declares. Routes then
+	 * declare the result of their handler, and the OpenAPI document, the validation and the
+	 * serialization use the transformed schema. Applied to success schemas only.
+	 */
+	schema?: ResponseSchemaHook;
+};
+
+/**
  * Builds interceptors that transform the result of handlers.
  * @author Axel Nana <axel.nana@workbud.com>
  */
@@ -138,20 +168,39 @@ export abstract class TransformInterceptor {
 	 * the interceptor trusts the handlers it is set on to return it.
 	 * @template TOut The result the interceptor returns instead.
 	 * @param transform Receives the result and the request context; returns the new result.
+	 * @param options The schema of the new result, from the schema of the result.
 	 * @example
 	 * ```ts
-	 * const Envelope = TransformInterceptor.with<Post[], { data: Post[] }>((data) => ({ data }));
+	 * const Envelope = TransformInterceptor.with<Post[], { data: Post[] }>((data) => ({ data }), {
+	 *   schema: (schema) => t.Object({ data: schema })
+	 * });
 	 *
 	 * @Http.controller('/posts', { interceptors: [Envelope] })
 	 * ```
 	 */
 	public static with<TIn = unknown, TOut = unknown>(
-		transform: (result: TIn, ctx: InterceptorContext) => TOut | Promise<TOut>
+		transform: (result: TIn, ctx: InterceptorContext) => TOut | Promise<TOut>,
+		options: TransformOptions = {}
 	): InterceptorClass {
 		return class Transform implements Interceptor {
+			public static readonly responseSchema = options.schema;
+
 			public async intercept(ctx: InterceptorContext, next: () => Promise<unknown>) {
 				return transform((await next()) as TIn, ctx);
 			}
 		};
 	}
 }
+
+/**
+ * The success schema of a route as the client receives it: the schema of the handler's result,
+ * passed through the `responseSchema` of each interceptor in the order results go through them,
+ * from the innermost (route) to the outermost (application).
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param levels The levels, outermost first (app, module, controller, route).
+ * @param schema The schema of the handler's result.
+ */
+export const interceptedSchema = (levels: InterceptorLevel[], schema: TSchema): TSchema =>
+	levels
+		.flatMap((level) => level.interceptors)
+		.reduceRight((current, cls) => cls.responseSchema?.(current) ?? current, schema);

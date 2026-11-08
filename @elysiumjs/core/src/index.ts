@@ -138,17 +138,21 @@ export interface AppEnv {
 export {
 	type DomainErrorOptions,
 	type ElysiumProblemCode,
+	type DomainErrorDefinition,
 	type ProblemCatalogue,
+	type ProblemClass,
 	type ProblemCode,
 	type ProblemContext,
 	type ProblemDetails,
 	type ProblemOptions,
+	type ProblemExtensions,
 	type ProblemValidationError,
 	BadRequestError,
 	ConflictError,
 	DomainError,
 	ELYSIUM_PROBLEM_CODES,
 	ForbiddenError,
+	InternalError,
 	isDomainError,
 	isProblemDetails,
 	NotFoundError,
@@ -161,7 +165,8 @@ export {
 	toProblem,
 	UnauthenticatedError,
 	ValidationFailedError,
-	validationErrors
+	validationErrors,
+	validationExtensions
 } from './problem';
 export { type ExceptionFilter, type FilterClass, type FilterContext, Catch } from './filter';
 export { type ResponseSchemas, Resource } from './resource';
@@ -179,6 +184,8 @@ export {
 	type Interceptor,
 	type InterceptorClass,
 	type InterceptorContext,
+	type ResponseSchemaHook,
+	type TransformOptions,
 	TimingInterceptor,
 	TransformInterceptor
 } from './interceptor';

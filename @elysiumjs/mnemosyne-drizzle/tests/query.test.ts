@@ -93,6 +93,26 @@ describe('DrizzleRepository.list()', () => {
 		expect(page.nextCursor).toBeNull();
 	});
 
+	it('lists a page of an offset listing, with the total of its filters', async () => {
+		use((query) => (query.startsWith('select count') ? [{ count: 5 }] : rows.slice(0, 2)));
+		const query = Query.parse(
+			{ ...spec, pagination: 'offset' as const },
+			{
+				'filter[status]': 'draft',
+				page: '2'
+			}
+		);
+
+		const page = await new PostRepository().list(query);
+
+		expect(fake.log[0]!.query).toBe(
+			'select "id", "title", "status", "created_at" from "query_posts" where "query_posts"."status" = $1 order by "query_posts"."created_at" desc, "query_posts"."id" desc limit $2 offset $3'
+		);
+		expect(fake.log[0]!.params).toEqual(['draft', 2, 2]);
+		expect(page).toEqual({ data: rows.slice(0, 2) as any, page: 2, limit: 2, total: 5 });
+		expect(Query.isPage(page)).toBe(true);
+	});
+
 	it('counts the rows matching the filters', async () => {
 		use(() => [{ count: 7 }]);
 

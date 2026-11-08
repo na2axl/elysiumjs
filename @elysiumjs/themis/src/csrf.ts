@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { ProblemClass } from '@elysiumjs/core';
 import type { HttpContext } from './context';
 
 import { Middleware } from '@elysiumjs/core';
@@ -32,6 +33,9 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export class CsrfMiddleware extends Middleware {
+	/** The problems it answers with, documented on the routes it protects. */
+	public static readonly errors: readonly ProblemClass[] = [CsrfTokenMismatchError];
+
 	public override async onBeforeHandle(context: HttpContext): Promise<void> {
 		const config = themisConfig();
 		const session = await loadSession(context);

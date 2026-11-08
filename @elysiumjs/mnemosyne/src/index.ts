@@ -32,6 +32,9 @@ export { ModelResource, type ModelResourceOptions } from './resource';
 export { type TransactionRunner, Transactional, UnitOfWork, withUnitOfWork } from './unit-of-work';
 export {
 	type CursorPage,
+	type OffsetPage,
+	type Page,
+	type PaginationOf,
 	type FilterOperator,
 	type ParsedFilter,
 	type ParsedQuery,
@@ -39,6 +42,7 @@ export {
 	type QueryFieldType,
 	type QueryFilterSpec,
 	type QueryFilters,
+	type QueryPagination,
 	type QueryParamKeys,
 	type QueryParams,
 	type QuerySchemaProperties,
