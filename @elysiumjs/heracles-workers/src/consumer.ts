@@ -15,8 +15,8 @@
 import type { TransportProcessMessage } from '@elysiumjs/heracles';
 import type { WorkersQueueMessage } from '@elysiumjs/runtime-workers';
 
-import { getLogger, ModuleContext } from '@elysiumjs/core';
-import { JobRegistry, JobStatus, WithId } from '@elysiumjs/heracles';
+import { getLogger, ModuleContext, Service } from '@elysiumjs/core';
+import { JobRegistry, JobStatus, Queue, QUEUES_SERVICE, WithId } from '@elysiumjs/heracles';
 import { Workers } from '@elysiumjs/runtime-workers';
 
 /** Whether a queue message carries a Heracles job. */
@@ -45,15 +45,21 @@ export type DeadJob = {
 	message: TransportProcessMessage;
 };
 
-/** Where the jobs that failed their last retry go. */
+/** What happens to the jobs that failed their last retry, besides their queue's dead letter queue. */
 export type DeadLetterOptions = {
-	/** The queue binding that receives them. */
-	deadLetterQueue?: string;
 	/** Called with each one. */
 	onDead?: (dead: DeadJob) => unknown;
 };
 
-/** Sends a dead job to the dead letter queue and calls the hook; a failure of either is logged. */
+/** The dead letter queue binding set in the `transportOptions` of a Heracles queue, if any. */
+const deadLetterQueueOf = async (name: string): Promise<string | undefined> => {
+	if (Service.exists(QUEUES_SERVICE)) await Service.resolve(QUEUES_SERVICE);
+	if (!Queue.exists(name)) return undefined;
+	const binding: unknown = Queue.get(name).getOptions().transportOptions?.deadLetterQueue;
+	return typeof binding === 'string' && binding !== '' ? binding : undefined;
+};
+
+/** Sends a dead job to its queue's dead letter queue and calls the hook; a failure of either is logged. */
 const bury = async (dead: DeadJob, options: DeadLetterOptions): Promise<void> => {
 	const logger = getLogger();
 	logger.error('A Heracles job failed after its last retry', {
@@ -62,11 +68,10 @@ const bury = async (dead: DeadJob, options: DeadLetterOptions): Promise<void> =>
 		attempts: dead.attempts,
 		error: dead.error
 	});
-	if (options.deadLetterQueue) {
+	const deadLetterQueue = await deadLetterQueueOf(dead.queue);
+	if (deadLetterQueue) {
 		try {
-			const queue = Workers.binding<{ send(body: unknown): Promise<void> }>(
-				options.deadLetterQueue
-			);
+			const queue = Workers.binding<{ send(body: unknown): Promise<void> }>(deadLetterQueue);
 			await queue.send({
 				...dead.message,
 				failure: {
@@ -79,6 +84,7 @@ const bury = async (dead: DeadJob, options: DeadLetterOptions): Promise<void> =>
 			logger.error('Could not send a dead Heracles job to its dead letter queue', {
 				job: dead.job,
 				jobId: dead.jobId,
+				deadLetterQueue,
 				error
 			});
 		}
@@ -95,12 +101,12 @@ const bury = async (dead: DeadJob, options: DeadLetterOptions): Promise<void> =>
 /**
  * Runs the Heracles job a queue message carries, in its module's context. A completed job is
  * acked. A failed one is retried after its `retryDelay` while its attempts stay within
- * `maxRetries`; after that it goes to the dead letter queue and the `onDead` hook, when set, and
- * is acked. A message for an unknown job is logged and acked. Messages that carry no job are left
+ * `maxRetries`; after that it goes to the `deadLetterQueue` of its queue's `transportOptions` and
+ * to the `onDead` hook, when set, and is acked. A message for an unknown job is logged and acked. Messages that carry no job are left
  * to the other consumers.
  * @author Axel Nana <axel.nana@workbud.com>
  * @param message The queue message.
- * @param options Where the jobs that failed their last retry go.
+ * @param options What else happens to the jobs that failed their last retry.
  */
 export const runJobMessage = async (
 	message: WorkersQueueMessage,

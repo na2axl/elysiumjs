@@ -26,12 +26,6 @@ import { runJobMessage } from './consumer';
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export type HeraclesWorkersConfig = {
-	/**
-	 * The queue binding that receives the jobs that failed their last retry, as they were sent with
-	 * a `failure` member, so that they can be looked at and sent again. Without it, they are logged
-	 * and dropped.
-	 */
-	deadLetterQueue?: string;
 	/** Called with each job that failed its last retry, such as to alert. A failing hook is logged. */
 	onDead?: (dead: DeadJob) => unknown;
 };
@@ -77,8 +71,8 @@ export class HeraclesWorkersHandlers {
  * Runs Heracles on Cloudflare Workers: consumes the jobs sent with `CloudflareQueueTransport`
  * from the Worker's queues (`queue` handler), and dispatches the scheduled jobs whose
  * expression is the cron of a trigger (`scheduled` handler). Declare each consumer queue and each
- * cron expression in the wrangler config. Use it as is, or with `.with({ deadLetterQueue, onDead })`
- * to keep the jobs that failed their last retry.
+ * cron expression in the wrangler config. A queue keeps the jobs that failed their last retry with
+ * the `deadLetterQueue` of its `transportOptions`; `.with({ onDead })` also hands each one to a hook.
  * @author Axel Nana <axel.nana@workbud.com>
  * @example
  * ```ts
@@ -86,7 +80,12 @@ export class HeraclesWorkersHandlers {
  * 	runtime,
  * 	modules: [
  * 		HeraclesModule.with({
- * 			queues: { emails: { transport: CloudflareQueueTransport, transportOptions: { binding: 'EMAILS' } } }
+ * 			queues: {
+ * 				emails: {
+ * 					transport: CloudflareQueueTransport,
+ * 					transportOptions: { binding: 'EMAILS', deadLetterQueue: 'EMAILS_DLQ' }
+ * 				}
+ * 			}
  * 		}),
  * 		HeraclesWorkersModule,
  * 		MailModule

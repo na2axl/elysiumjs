@@ -23,7 +23,10 @@ import { runtime } from '@elysiumjs/runtime-workers';
 	modules: [
 		HeraclesModule.with({
 			queues: {
-				emails: { transport: CloudflareQueueTransport, transportOptions: { binding: 'EMAILS' } }
+				emails: {
+					transport: CloudflareQueueTransport,
+					transportOptions: { binding: 'EMAILS', deadLetterQueue: 'EMAILS_DLQ' }
+				}
 			}
 		}),
 		HeraclesWorkersModule,
@@ -37,14 +40,17 @@ class App extends Application {}
 // wrangler.jsonc
 {
 	"queues": {
-		"producers": [{ "binding": "EMAILS", "queue": "emails" }],
+		"producers": [
+			{ "binding": "EMAILS", "queue": "emails" },
+			{ "binding": "EMAILS_DLQ", "queue": "emails-dlq" }
+		],
 		"consumers": [{ "queue": "emails" }]
 	},
 	"triggers": { "crons": ["0 3 * * *"] }
 }
 ```
 
-- A completed job is acked. A failed job is retried after its `retryDelay` while its attempts stay within `maxRetries`. After its last retry, it is logged and acked; with `HeraclesWorkersModule.with({ deadLetterQueue: 'JOBS_DLQ', onDead })`, it is also sent to that queue binding, as it was sent with a `failure` member (error, attempts, time), and handed to `onDead`.
+- A completed job is acked. A failed job is retried after its `retryDelay` while its attempts stay within `maxRetries`. After its last retry, it is logged and acked. When its queue's `transportOptions` set a `deadLetterQueue` binding, it is also sent there, as it was sent with a `failure` member (error, attempts, time); each queue has its own. With `HeraclesWorkersModule.with({ onDead })`, it is also handed to `onDead`, whatever its queue.
 - A job scheduled for later is delayed with `delaySeconds`, up to the 12 hours Cloudflare Queues allow.
 - Cloudflare Queues keep no job status and cannot cancel a message: `getJobStatus()` throws, and cancellations are dropped with a warning.
 - Each cron trigger dispatches the jobs of `@Scheduler.job()` and the `Scheduler` classes whose expression is exactly the trigger's expression, at the trigger's time: a scheduler selects its cases for that tick. Times are UTC.

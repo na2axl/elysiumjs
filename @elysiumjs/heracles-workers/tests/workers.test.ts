@@ -52,7 +52,7 @@ class GreetModule extends Module {}
 
 const ctx = (): WorkersExecutionContext => ({ waitUntil() {}, passThroughOnException() {} });
 
-const setup = async (workers?: HeraclesWorkersConfig) => {
+const setup = async (workers?: HeraclesWorkersConfig, deadLetterQueue?: string) => {
 	const sent: { body: TransportProcessMessage; options?: { delaySeconds?: number } }[] = [];
 	const dead: unknown[] = [];
 	const JOBS = {
@@ -71,7 +71,10 @@ const setup = async (workers?: HeraclesWorkersConfig) => {
 		modules: [
 			HeraclesModule.with({
 				queues: {
-					jobs: { transport: CloudflareQueueTransport, transportOptions: { binding: 'JOBS' } }
+					jobs: {
+						transport: CloudflareQueueTransport,
+						transportOptions: { binding: 'JOBS', ...(deadLetterQueue && { deadLetterQueue }) }
+					}
 				}
 			}),
 			workers ? HeraclesWorkersModule.with(workers) : HeraclesWorkersModule,
@@ -130,7 +133,7 @@ describe('Heracles on Cloudflare Workers', () => {
 	});
 
 	it('retries a failed job after its delay, then gives up after its last retry', async () => {
-		const { app, worker, env, sent } = await setup();
+		const { app, worker, env, sent, dead } = await setup();
 		await worker.fetch(new Request('http://localhost/greet/fail', { method: 'POST' }), env, ctx());
 		const message = sent[0]!.body;
 
@@ -143,15 +146,17 @@ describe('Heracles on Cloudflare Workers', () => {
 		await worker.queue(last.batch, env, ctx());
 		expect(last.retried).toEqual([]);
 		expect(last.acked).toEqual([0]);
+		// Its queue sets no dead letter queue: the job is logged and dropped.
+		expect(dead).toEqual([]);
 		await app.kernel.shutdown();
 	});
 
-	it('sends a job that failed its last retry to the dead letter queue, and to onDead', async () => {
+	it("sends a job that failed its last retry to its queue's dead letter queue, and to onDead", async () => {
 		const buried: DeadJob[] = [];
-		const { app, worker, env, sent, dead } = await setup({
-			deadLetterQueue: 'JOBS_DLQ',
-			onDead: (job) => void buried.push(job)
-		});
+		const { app, worker, env, sent, dead } = await setup(
+			{ onDead: (job) => void buried.push(job) },
+			'JOBS_DLQ'
+		);
 		await worker.fetch(new Request('http://localhost/greet/fail', { method: 'POST' }), env, ctx());
 
 		const last = batchOf([sent[0]!.body], 3);

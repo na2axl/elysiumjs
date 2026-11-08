@@ -32,6 +32,12 @@ export interface WorkersQueueBinding {
 export type CloudflareQueueTransportOptions = {
 	/** The name of the queue producer binding, as declared in the wrangler config. */
 	binding: string;
+	/**
+	 * The queue binding that receives the jobs of this queue that failed their last retry, as they
+	 * were sent with a `failure` member, so that they can be looked at and sent again. Without it,
+	 * they are logged and dropped.
+	 */
+	deadLetterQueue?: string;
 };
 
 /** Cloudflare Queues delay a message by 12 hours at most. */
@@ -47,7 +53,10 @@ const MAX_DELAY_SECONDS = 12 * 60 * 60;
  * ```ts
  * HeraclesModule.with({
  * 	queues: {
- * 		emails: { transport: CloudflareQueueTransport, transportOptions: { binding: 'EMAILS_QUEUE' } }
+ * 		emails: {
+ * 			transport: CloudflareQueueTransport,
+ * 			transportOptions: { binding: 'EMAILS_QUEUE', deadLetterQueue: 'EMAILS_DLQ' }
+ * 		}
  * 	}
  * });
  * ```
