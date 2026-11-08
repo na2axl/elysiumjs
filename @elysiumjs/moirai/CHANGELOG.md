@@ -1,5 +1,18 @@
 # @elysiumjs/moirai
 
+## 0.3.0
+
+### Minor Changes
+
+- [#50](https://github.com/na2axl/elysiumjs/pull/50) [`afcb25c`](https://github.com/na2axl/elysiumjs/commit/afcb25c31ee29f358a46bc801dba8ecf53f30df9) Thanks [@na2axl](https://github.com/na2axl)! - `@Action.register()` and `@Query.register()` take `result` and `errors`. The static `result` and `errors` of the class give them back for routes (`response: TopUp.result, errors: TopUp.errors`); `errors` adds the problems of moirai that apply (invalid input, refused call, idempotency keys). A registration whose `errors` miss a DomainError that `handle()` gives does not compile. The problems of moirai describe their extension members.
+
+### Patch Changes
+
+- Updated dependencies [[`afcb25c`](https://github.com/na2axl/elysiumjs/commit/afcb25c31ee29f358a46bc801dba8ecf53f30df9), [`afcb25c`](https://github.com/na2axl/elysiumjs/commit/afcb25c31ee29f358a46bc801dba8ecf53f30df9)]:
+  - @elysiumjs/core@0.16.0
+  - @elysiumjs/mnemosyne@0.6.0
+  - @elysiumjs/heracles@0.8.5
+
 ## 0.2.4
 
 ### Patch Changes
