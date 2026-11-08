@@ -72,6 +72,22 @@ return Moirai.ask(WalletBalance, { walletId });
 - A key belongs to its owner: the current user by default (`currentUserId()` of core, else `anonymous`), or what `scope(input)` of the action or `Moirai.execute(..., { scope })` returns, such as a tenant and a user. Another owner presenting the same key runs the action on its own.
 - `serializeBy` makes calls that share a key run one after the other, so a double tap waits for the first call and replays its response.
 
+### Routes
+
+`result` and `errors` of the registration describe what a call gives, for the routes that run it. `errors` must list every DomainError that `handle()` gives, or the registration does not compile:
+
+```ts
+@Action.register({ input: TopUpInput, idempotent: true, result: Receipt, errors: [WalletClosed] })
+class TopUp extends Action<TopUpInput, TopUpResult, WalletClosed> {}
+
+@Http.post('/top-ups', { response: TopUp.result, errors: TopUp.errors })
+public topUp(@Http.body(TopUpInput) body: TopUpInput, @Http.header('idempotency-key') key: string) {
+	return Moirai.execute(TopUp, body, { idempotencyKey: key });
+}
+```
+
+The static `result` gives the schema back. The static `errors` lists the declared classes, then the problems of moirai that apply: invalid input when there is an input schema, a refused call with `authorize`, and the idempotency key problems of an idempotent action.
+
 ## Outbox and inbox
 
 ```ts

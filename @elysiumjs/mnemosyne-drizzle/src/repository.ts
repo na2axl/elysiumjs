@@ -12,7 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { CursorPage, IdType, ModelClass, ParsedQuery } from '@elysiumjs/mnemosyne';
+import type {
+	CursorPage,
+	IdType,
+	ModelClass,
+	OffsetPage,
+	Page,
+	ParsedQuery
+} from '@elysiumjs/mnemosyne';
 import type { PgColumn, PgTable, PgTableWithColumns } from 'drizzle-orm/pg-core';
 import type { DrizzleConnection } from './database';
 
@@ -88,6 +95,10 @@ export const DrizzleRepository = <
 			return this.withConnection((db) => db.select().from(table()));
 		}
 
+		/**
+		 * @deprecated Use `list()` with a spec whose `pagination` is `offset`: it applies the
+		 * filters and the sort of the query string.
+		 */
 		public async paginate(
 			count: number,
 			page: number = 1
@@ -146,13 +157,30 @@ export const DrizzleRepository = <
 
 		/**
 		 * Lists a page of rows matching a parsed query (see `Query.parse`): its filters, its sort and
-		 * cursor pagination. One row more than the limit is fetched to tell whether a next page
-		 * exists.
+		 * its page. With cursor pagination, one row more than the limit is fetched to tell whether a
+		 * next page exists. With offset pagination, the rows matching the filters are counted.
 		 * @param query The parsed query.
-		 * @returns The rows of the page and the cursor of the next one.
+		 * @returns The rows of the page and the cursor of the next one, or the page and the total.
 		 */
-		public async list(query: ParsedQuery): Promise<CursorPage<TSelect>> {
+		public async list(query: ParsedQuery<'offset'>): Promise<OffsetPage<TSelect>>;
+		public async list(query: ParsedQuery<'cursor'>): Promise<CursorPage<TSelect>>;
+		public async list(query: ParsedQuery): Promise<Page<TSelect>>;
+		public async list(query: ParsedQuery): Promise<Page<TSelect>> {
 			const { where, orderBy } = compileQuery(table(), query);
+			if (query.page !== undefined) {
+				const offsetQuery = query as ParsedQuery<'offset'>;
+				return this.withConnection(async (db) => {
+					const rows = await db
+						.select()
+						.from(table())
+						.where(where)
+						.orderBy(...orderBy)
+						.offset((offsetQuery.page - 1) * offsetQuery.limit)
+						.limit(offsetQuery.limit);
+					const total = await db.$count(table(), where);
+					return Query.offsetPage(offsetQuery, rows as TSelect[], total);
+				});
+			}
 			const rows = await this.withConnection((db) =>
 				db
 					.select()

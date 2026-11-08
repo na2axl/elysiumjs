@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { t } from 'elysia';
+
 import { Metadata } from './metadata';
 import { DomainError } from './problem';
 
@@ -126,7 +128,9 @@ export type AppRateLimitOptions = Partial<RateLimitOptions>;
  * Raised when a client goes over a rate limit. Rendered as a 429 problem, with `Retry-After`.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class TooManyRequestsError extends DomainError.for('RATE_LIMITED', 429) {
+export class TooManyRequestsError extends DomainError.for('RATE_LIMITED', 429, {
+	extensions: { retryAfter: t.Integer({ description: 'Seconds until the client may retry.' }) }
+}) {
 	constructor(public readonly retryAfter: number) {
 		super(`Too many requests. Try again in ${retryAfter} seconds.`, {
 			retryAfterSeconds: retryAfter

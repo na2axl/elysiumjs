@@ -41,6 +41,30 @@ MnemosyneModule.with({
 await Cache.store('kv').set('greeting', 'hello', 120_000);
 ```
 
+## Listings
+
+`Query.define()` says what clients may filter and sort a listing by, and how it pages. `Query.parse()` validates the query string, and a repository's `list()` runs it:
+
+```ts
+import { Query } from '@elysiumjs/mnemosyne';
+
+const PostListing = Query.define(Post, {
+	filters: { status: ['eq', 'in'], title: ['contains'] },
+	sort: ['createdAt', 'title'],
+	defaultSort: '-createdAt'
+});
+
+@Http.get('/', { response: Query.pageSchema(PostResource) })
+public list(@Http.query(Query.schema(PostListing)) query: Query.Params<typeof PostListing>) {
+	return this.posts.list(Query.parse(PostListing, query));
+}
+```
+
+- Cursor pagination is the default: `cursor` points after the last row of the previous page, and a page gives `{ data, nextCursor }`. Pages stay stable while rows are added, and each costs the same.
+- `pagination: 'offset'` numbers the pages from 1 with `page`, and a page gives `{ data, page, limit, total }`, the total counting the rows the filters match. It suits tables that jump to a page.
+- `Query.pageSchema(item)` and `Query.offsetPageSchema(item)` describe the pages. `Query.page()` and `Query.offsetPage()` build them, and `Query.mapPage(page, map)` maps their rows, such as models to resources.
+- Pages and their schemas are marked, so that an interceptor can render them on its own: `Query.isPage(value)` and `Query.paginationOf(page)` read a page, `Query.pageSchemaPagination(schema)` and `Query.itemSchemaOf(schema)` read a page schema.
+
 Models and repositories are built with a driver package. See [`@elysiumjs/mnemosyne-drizzle`](../mnemosyne-drizzle/README.md).
 
 ## License

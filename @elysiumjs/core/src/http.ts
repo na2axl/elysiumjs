@@ -21,7 +21,9 @@ import type { InterceptorClass, InterceptorContext, InterceptorLevel } from './i
 import type { Middleware } from './middleware';
 import type { Module } from './module';
 import type { ModuleNode } from './module-graph';
+import type { ProblemClass } from './problem';
 import type { AppRateLimitOptions, RateLimitOptions } from './rate-limit';
+import type { ResponseSchemas } from './resource';
 import type { Injection } from './token';
 
 import { Elysia, sse as esse, t } from 'elysia';
@@ -30,15 +32,16 @@ import { assign, isEmpty, objectify } from 'radash';
 import { Application } from './app';
 import { Container } from './container';
 import { FILTER_LEVELS, routeFilterLevels } from './filter';
-import { runInterceptors } from './interceptor';
+import { interceptedSchema, runInterceptors } from './interceptor';
 import { Lifecycle } from './lifecycle';
 import { Metadata } from './metadata';
 import { applyMiddlewares, enlist, executeMiddlewareChain, makeMiddlewares } from './middleware';
 import { ModuleContext } from './module-context';
-import { BadRequestError, DomainError } from './problem';
-import { enforceRateLimit, rateLimitOf } from './rate-limit';
-import { isSerializable, readFields, Resource } from './resource';
+import { BadRequestError, DomainError, InternalError, validationProblemSchema } from './problem';
+import { enforceRateLimit, rateLimitOf, TooManyRequestsError } from './rate-limit';
+import { isSerializable, isStatusMap, readFields, Resource } from './resource';
 import { Runtime } from './runtime';
+import { PayloadTooLargeError } from './security';
 import { Service } from './service';
 import { nextTick, Symbols } from './utils';
 
@@ -65,6 +68,9 @@ type Handler = (c: Context) => unknown;
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export type ValidatorClass<T extends TSchema = TSchema> = {
+	/** The problems the validator answers with besides failed validation, for the OpenAPI document. */
+	readonly errors?: readonly ProblemClass[];
+
 	/**
 	 * The validation schema. This schema is automatically checked against the input data during
 	 * the validation stage of the HTTP request.
@@ -125,6 +131,11 @@ type HttpRequestHandlerMetadata = {
 	 * The response schema.
 	 */
 	response?: TSchema | Record<number, TSchema>;
+
+	/**
+	 * The problems the route answers with.
+	 */
+	errors?: readonly ProblemClass[];
 
 	/**
 	 * The request body schema.
@@ -209,6 +220,7 @@ type HttpRequestHandlerRegistrationProps = Pick<
 	| 'method'
 	| 'handler'
 	| 'response'
+	| 'errors'
 	| 'operationId'
 	| 'description'
 	| 'transactional'
@@ -441,6 +453,7 @@ const registerHttpRequestHandler = (props: HttpRequestHandlerRegistrationProps) 
 		handler,
 		target,
 		response,
+		errors,
 		operationId,
 		description,
 		transactional,
@@ -467,6 +480,7 @@ const registerHttpRequestHandler = (props: HttpRequestHandlerRegistrationProps) 
 		handler,
 		middlewares,
 		response,
+		errors,
 		operationId,
 		description,
 		services,
@@ -546,9 +560,23 @@ export type HttpControllerProps = HttpControllerOptions & {
  */
 export type HttpRouteOptions = {
 	/**
-	 * The schema of the response body.
+	 * The schema of the response body: the handler's result, or one schema per status. Interceptors
+	 * that change the shape of results (see `TransformInterceptor.with()`) give the schema of what
+	 * the client receives from it.
 	 */
 	response?: TSchema | Record<number, TSchema>;
+
+	/**
+	 * The problems the route answers with, by their classes (made with `DomainError.for()`). They
+	 * are documented under their status, next to the problems of the framework: validation (422),
+	 * malformed requests (400), bodies over the limit (413), rate limits (429), server errors (500),
+	 * and those that the route's middlewares, interceptors and validator list in their own `errors`.
+	 * @example
+	 * ```ts
+	 * @Http.post('/', { response: Receipt, errors: [InsufficientFunds, ...TopUp.errors] })
+	 * ```
+	 */
+	errors?: readonly ProblemClass[];
 
 	/**
 	 * The operation ID for the handler.
@@ -677,6 +705,93 @@ const appDefaultRateLimit = (): RateLimitOptions | undefined => {
 		? (options as RateLimitOptions)
 		: undefined;
 };
+
+/** The options of the running application that decide the problems of every route. */
+const appProblemOptions = (): { validationStatus: number; bodyLimit: boolean } => {
+	const app = Service.get<object>('elysium.app');
+	const props = app ? Metadata.get(Symbols.app, app.constructor) : undefined;
+	return {
+		validationStatus: props?.problems?.validationStatus ?? ValidationStatus,
+		bodyLimit: props?.http?.bodyLimit !== false
+	};
+};
+
+/** The status of validation problems when the application sets none. */
+const ValidationStatus = 422;
+
+/** The problems a class lists in its static `errors`: a middleware, an interceptor or a validator. */
+const declaredErrors = (cls: unknown): readonly ProblemClass[] =>
+	(cls as { errors?: readonly ProblemClass[] } | undefined)?.errors ?? [];
+
+/** What decides the problems of a route besides those it lists. */
+type RouteProblems = {
+	/** The problems the route lists, then those of its middlewares, interceptors and validator. */
+	declared: readonly ProblemClass[];
+	/** Whether the body or the query is validated. */
+	validated: boolean;
+	/** Whether a request can be refused as malformed: a body to parse, or declared headers. */
+	malformed: boolean;
+	/** Whether the route reads a body, which the body limit applies to. */
+	body: boolean;
+	/** Whether the route has a rate limit. */
+	rateLimited: boolean;
+};
+
+/**
+ * The response schemas of a route, by status: the success schemas as the interceptors make them,
+ * and the problems of the route and of the framework. Several problems of one status make a union.
+ */
+const routeResponses = (
+	response: ResponseSchemas | undefined,
+	levels: InterceptorLevel[],
+	problems: RouteProblems
+): Record<number, TSchema> => {
+	const responses: Record<number, TSchema> = {};
+	const declared =
+		response === undefined ? {} : isStatusMap(response) ? response : { 200: response };
+	for (const [key, schema] of Object.entries(declared)) {
+		const status = Number(key);
+		responses[status] = status >= 200 && status < 300 ? interceptedSchema(levels, schema) : schema;
+	}
+
+	const { validationStatus, bodyLimit } = appProblemOptions();
+	const errors: Array<{ status: number; code: string; schema: TSchema }> = problems.declared.map(
+		(problem) => ({ status: problem.status, code: problem.code, schema: problem.schema })
+	);
+	if (problems.validated) {
+		errors.push({
+			status: validationStatus,
+			code: ValidationFailedCode,
+			schema: validationProblemSchema(validationStatus)
+		});
+	}
+	const framework: ProblemClass[] = [
+		...(problems.malformed ? [BadRequestError] : []),
+		...(problems.body && bodyLimit ? [PayloadTooLargeError] : []),
+		...(problems.rateLimited ? [TooManyRequestsError] : []),
+		InternalError
+	];
+	for (const problem of framework) {
+		errors.push({ status: problem.status, code: problem.code, schema: problem.schema });
+	}
+
+	const byStatus = new Map<number, Map<string, TSchema>>();
+	for (const { status, code, schema } of errors) {
+		// A schema the route gives for a status wins over the problems of that status.
+		if (status in declared) continue;
+		let codes = byStatus.get(status);
+		if (!codes) byStatus.set(status, (codes = new Map()));
+		if (!codes.has(code)) codes.set(code, schema);
+	}
+	for (const [status, codes] of [...byStatus].sort(([a], [b]) => a - b)) {
+		const schemas = [...codes.values()];
+		responses[status] = schemas.length === 1 ? schemas[0]! : t.Union(schemas);
+	}
+	return responses;
+};
+
+/** The code of validation problems. */
+const ValidationFailedCode = 'VALIDATION_FAILED';
 
 /** Joins a controller path and a route path into the route's full path. */
 const joinPath = (base: string, path: string): string =>
@@ -954,7 +1069,7 @@ export namespace Http {
 
 						const successSchema =
 							route.response && route.serialize !== false
-								? Resource.successSchema(route.response)
+								? Resource.successSchema(responses)
 								: undefined;
 
 						/**
@@ -997,6 +1112,34 @@ export namespace Http {
 					);
 
 					const headers = headersSchema(route);
+
+					const appMiddlewares = (() => {
+						const app = Service.get<object>('elysium.app');
+						return app ? (Metadata.get(Symbols.middlewares, app.constructor) ?? []) : [];
+					})();
+					const interceptorLevels = [
+						appInterceptorLevel(),
+						moduleInterceptorLevel(node),
+						{ interceptors: props.interceptors ?? [], node },
+						{ interceptors: route.interceptors ?? [], node }
+					];
+					const responses = routeResponses(route.response, interceptorLevels, {
+						declared: [
+							...(route.errors ?? []),
+							...[
+								...route.middlewares,
+								...middlewares,
+								...(Metadata.get(Symbols.middlewares, node.moduleClass) ?? []),
+								...appMiddlewares
+							].flatMap(declaredErrors),
+							...interceptorLevels.flatMap((level) => level.interceptors).flatMap(declaredErrors),
+							...declaredErrors(route.body?.validator)
+						],
+						validated: Boolean(route.body || route.query),
+						malformed: Boolean(route.body || headers),
+						body: Boolean(route.body),
+						rateLimited: Boolean(rateLimitOf(target, route.name) ?? appDefaultRateLimit())
+					});
 
 					const mi = makeMiddlewares(route.middlewares, node);
 
@@ -1080,7 +1223,7 @@ export namespace Http {
 							body: isValidator ? route.body?.validator?.schema : route.body?.schema,
 							query: route.query?.schema,
 							headers,
-							response: route.response ? Resource.projectResponse(route.response) : undefined,
+							response: Resource.projectResponse(responses),
 							params: isEmpty(params) ? undefined : t.Object(params)
 						},
 						handler

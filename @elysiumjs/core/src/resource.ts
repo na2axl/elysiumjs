@@ -72,7 +72,7 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> => {
 export type ResponseSchemas = TSchema | Record<number, TSchema>;
 
 /** Whether a `response` option maps status codes to schemas. */
-const isStatusMap = (response: ResponseSchemas): response is Record<number, TSchema> => {
+export const isStatusMap = (response: ResponseSchemas): response is Record<number, TSchema> => {
 	const keys = Object.keys(response);
 	return keys.length > 0 && keys.every((key) => /^\d{3}$/.test(key));
 };

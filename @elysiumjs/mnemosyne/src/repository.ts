@@ -66,6 +66,8 @@ export const AbstractRepository = <TModel extends ModelClass, TConnection>(
 		 * @param count The number of records to retrieve per page.
 		 * @param page The page number to retrieve.
 		 * @returns A paginated response containing the records and the total number of records.
+		 * @deprecated Use `list()` with a spec whose `pagination` is `offset`: it applies the
+		 * filters and the sort of the query string.
 		 */
 		public abstract paginate(
 			count: number,

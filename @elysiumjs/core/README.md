@@ -127,6 +127,43 @@ export class UserController {
 - `@Http.param()`, `@Http.body()` and `@Http.query()` give the URL parameter, the body and the query. A value that does not match its schema gets a 422 `VALIDATION_FAILED` problem.
 - `@Http.header()` gives a header, a required string unless a schema says otherwise. The `headers` option declares headers the handler does not read itself. Missing or malformed headers get a 400 `BAD_REQUEST` problem.
 
+## Responses and problems
+
+A route declares the schema of its handler's result in `response`, and the problems it answers with in `errors`. Both are documented in OpenAPI.
+
+```typescript
+import { DomainError, Http, t } from '@elysiumjs/core';
+
+export class InsufficientFunds extends DomainError.for('INSUFFICIENT_FUNDS', 409, {
+	extensions: { missing: t.Integer() }
+}) {}
+
+const Wallet = t.Object({ id: t.String(), balance: t.Integer() });
+
+@Http.controller('/wallets')
+export class WalletController {
+	@Http.post('/:id/pay', { response: Wallet, errors: [InsufficientFunds] })
+	public pay(@Http.param('id') id: string, @Http.body(t.Object({ amount: t.Integer() })) body: { amount: number }) {
+		if (body.amount > 100) return new InsufficientFunds('Top up first.', { extensions: { missing: body.amount - 100 } });
+		return { id, balance: 100 - body.amount };
+	}
+}
+```
+
+- A class made with `DomainError.for(code, status, { extensions })` has static `code`, `status` and `schema`. `schema` is the problem details it is sent as, with the code and the status as literals and the extension members; the constructor's `extensions` are typed from them.
+- The problems of one status are documented as a union. A schema the route gives for that status in `response` wins over them.
+- The framework adds its own: 422 `VALIDATION_FAILED` when the body or the query is validated (400 with `problems.validationStatus`), 400 `BAD_REQUEST` for a body to parse or declared headers, 413 `PAYLOAD_TOO_LARGE` under the body limit, 429 `RATE_LIMITED` with a rate limit, and 500 `INTERNAL_ERROR` on every route.
+- A middleware, an interceptor or a validator that answers with problems lists their classes in a static `errors`, and the routes they apply to document them.
+
+An interceptor that changes the shape of results describes it, so that routes declare the result of their handler. `TransformInterceptor.with(transform, { schema })` passes the success schemas of the routes it wraps through `schema`, in the order results go through the interceptors (route, controller, module, then application). The new schema is the one documented, validated and serialized, and `schema` must leave alone what `transform` leaves alone:
+
+```typescript
+const Envelope = TransformInterceptor.with(
+	(result) => (isEnveloped(result) ? result : { data: result }),
+	{ schema: (schema) => (isEnvelopedSchema(schema) ? schema : t.Object({ data: schema })) }
+);
+```
+
 ## Services
 
 A service is identified by its class. Give it a name with `@Service.register({ name })` to look it up by that string instead. Class names are never used as identifiers, so services resolve the same way after a bundler renames classes (`bun run check:minified` builds a minified app and checks it).

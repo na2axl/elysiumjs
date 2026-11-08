@@ -56,16 +56,30 @@ export type QueryFilterSpec<TOperator extends FilterOperator = FilterOperator> =
 export type QueryFilters = Record<string, QueryFilterSpec | readonly FilterOperator[]>;
 
 /**
- * What clients may filter and sort by, and how many rows a page holds.
+ * How a listing pages its rows.
  *
- * The type parameters keep the names of the filters and the sortable fields, so that
- * {@link Query.Params} and {@link Query.schema} can type the query string.
+ * - `cursor`: `cursor` points after the last row of the previous page. Pages stay stable while rows
+ *   are added, and each page costs the same: the choice for feeds and long listings.
+ * - `offset`: `page` numbers the pages from 1, and each page tells the total. The choice for
+ *   tables that jump to a page; deep pages cost more, and added rows shift them.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type QueryPagination = 'cursor' | 'offset';
+
+/**
+ * What clients may filter and sort by, how a page is found, and how many rows it holds.
+ *
+ * The type parameters keep the names of the filters and the sortable fields and the pagination,
+ * so that {@link Query.Params} and {@link Query.schema} can type the query string.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export type QuerySpec<
 	TFilters extends QueryFilters = QueryFilters,
-	TSort extends string = string
+	TSort extends string = string,
+	TPagination extends QueryPagination = QueryPagination
 > = {
+	/** How pages are found: `cursor` (the default) or `offset`. */
+	pagination?: TPagination;
 	/** The filterable fields, with their operators. */
 	filters?: TFilters;
 	/** The sortable fields. Sortable columns should not be nullable, for cursor pagination. */
@@ -99,18 +113,31 @@ export type ParsedFilter = {
  */
 export type ParsedSort = { field: string; column: string; direction: 'asc' | 'desc' };
 
-/**
- * A query string, validated against a {@link QuerySpec}, that repositories run.
- * @author Axel Nana <axel.nana@workbud.com>
- */
-export type ParsedQuery = {
+/** The members of every parsed query. */
+type ParsedQueryBase = {
 	filters: ParsedFilter[];
 	/** The sort keys, ending with the row key as the tiebreaker. */
 	sort: ParsedSort[];
-	/** The values of the sort keys of the last row of the previous page. */
-	after?: unknown[];
 	limit: number;
 };
+
+/**
+ * A query string, validated against a {@link QuerySpec}, that repositories run: with `after` for
+ * cursor pagination, or `page` for offset pagination.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @template P The pagination of the spec.
+ */
+export type ParsedQuery<P extends QueryPagination = QueryPagination> = P extends 'offset'
+	? ParsedQueryBase & {
+			/** The page, from 1. */
+			page: number;
+			after?: undefined;
+		}
+	: ParsedQueryBase & {
+			/** The values of the sort keys of the last row of the previous page. */
+			after?: unknown[];
+			page?: undefined;
+		};
 
 /**
  * A page of rows from cursor pagination.
@@ -121,6 +148,32 @@ export type CursorPage<T> = {
 	/** The cursor of the next page, or `null` on the last page. */
 	nextCursor: string | null;
 };
+
+/**
+ * A page of rows from offset pagination.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type OffsetPage<T> = {
+	data: T[];
+	/** The page, from 1. */
+	page: number;
+	/** The rows per page. */
+	limit: number;
+	/** The rows matching the filters, on every page. */
+	total: number;
+};
+
+/**
+ * A page of rows, from either pagination.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type Page<T> = CursorPage<T> | OffsetPage<T>;
+
+/**
+ * The pagination of a spec.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type PaginationOf<TSpec> = TSpec extends QuerySpec<any, any, infer P> ? P : QueryPagination;
 
 /** The operators of one filter of a spec. */
 type OperatorsOf<TFilter> = TFilter extends readonly (infer TOperator)[]
@@ -140,10 +193,10 @@ type FilterKeysOf<TFilters> = {
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export type QueryParamKeys<TSpec> =
-	TSpec extends QuerySpec<infer TFilters, infer TSort>
+	TSpec extends QuerySpec<infer TFilters, infer TSort, infer TPagination>
 		? | FilterKeysOf<TFilters>
 			| ([TSort] extends [never] ? never : 'sort')
-			| 'cursor'
+			| (TPagination extends 'offset' ? 'page' : 'cursor')
 			| 'limit'
 			| 'fields'
 		: never;
@@ -162,6 +215,16 @@ export type QuerySchemaProperties<TSpec> = { [K in QueryParamKeys<TSpec>]: TOpti
 
 const DEFAULT_LIMIT = 20;
 const DEFAULT_MAX_LIMIT = 100;
+
+/** The JSON Schema keyword that marks the schema of a page, with its pagination. */
+const PAGE_KEYWORD = 'x-elysium-page';
+
+/** The symbol that marks a page built by {@link Query.page} or {@link Query.offsetPage}. */
+const PAGE = Symbol.for('elysium:mnemosyne:page');
+
+/** Marks a page with its pagination, without adding an enumerable member. */
+const brand = <P extends object>(page: P, pagination: QueryPagination): P =>
+	Object.defineProperty(page, PAGE, { value: pagination, enumerable: false });
 
 const FILTER_KEY = /^filter\[([^\]]+)\](?:\[([^\]]+)\])?$/;
 
@@ -240,11 +303,12 @@ export namespace Query {
 	export const define = <
 		TModel extends ModelClass,
 		const TFilters extends QueryFilters = {},
-		const TSort extends string = never
+		const TSort extends string = never,
+		const TPagination extends QueryPagination = 'cursor'
 	>(
 		model: TModel,
-		spec: Omit<QuerySpec<TFilters, TSort>, 'types'>
-	): QuerySpec<TFilters, TSort> => {
+		spec: Omit<QuerySpec<TFilters, TSort, TPagination>, 'types'>
+	): QuerySpec<TFilters, TSort, TPagination> => {
 		const properties =
 			(model.selectSchema as unknown as { properties?: Record<string, object> }).properties ?? {};
 		const types: Record<string, QueryFieldType> = {};
@@ -282,8 +346,8 @@ export namespace Query {
 	export type Params<TSpec> = QueryParams<TSpec>;
 
 	/**
-	 * The query schema of a spec, for `@Http.query()`: it documents the filters, `sort`, `cursor`,
-	 * `limit` and `fields` parameters in OpenAPI. Its static type is {@link Query.Params}, and other
+	 * The query schema of a spec, for `@Http.query()`: it documents the filters, `sort`, `cursor`
+	 * (or `page` for offset pagination), `limit` and `fields` parameters in OpenAPI. Its static type is {@link Query.Params}, and other
 	 * parameters are let through.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param spec The query spec.
@@ -310,7 +374,11 @@ export namespace Query {
 				})
 			);
 		}
-		properties.cursor = t.Optional(t.String({ description: 'The cursor of the next page.' }));
+		if (spec.pagination === 'offset') {
+			properties.page = t.Optional(t.String({ description: 'The page, from 1.' }));
+		} else {
+			properties.cursor = t.Optional(t.String({ description: 'The cursor of the next page.' }));
+		}
 		properties.limit = t.Optional(
 			t.String({
 				description: `Rows per page, up to ${spec.limit?.max ?? DEFAULT_MAX_LIMIT}.`
@@ -330,7 +398,10 @@ export namespace Query {
 	 * @returns The parsed query, for a repository's `list()`.
 	 * @throws {BadRequestError} A 400 problem whose `errors` name every invalid parameter.
 	 */
-	export const parse = (spec: QuerySpec, query: Record<string, unknown> = {}): ParsedQuery => {
+	export const parse = <TSpec extends QuerySpec>(
+		spec: TSpec,
+		query: Record<string, unknown> = {}
+	): ParsedQuery<PaginationOf<TSpec>> => {
 		const errors: ProblemValidationError[] = [];
 		const fail = (parameter: string, message: string, code: string) =>
 			errors.push({ pointer: `/query/${parameter.replaceAll('/', '~1')}`, message, code });
@@ -412,6 +483,18 @@ export namespace Query {
 			}
 		}
 
+		if (spec.pagination === 'offset') {
+			let page = 1;
+			if (query.page !== undefined && query.page !== '') {
+				const value = Number(query.page);
+				if (!Number.isInteger(value) || value < 1)
+					fail('page', 'must be a whole number from 1', 'page');
+				else page = value;
+			}
+			if (errors.length > 0) throw new BadRequestError('The query is invalid.', { errors });
+			return { filters, sort, limit, page } as ParsedQuery<PaginationOf<TSpec>>;
+		}
+
 		let after: unknown[] | undefined;
 		if (typeof query.cursor === 'string' && query.cursor !== '') {
 			const decoded = decodeCursor(query.cursor, sort.length);
@@ -433,7 +516,7 @@ export namespace Query {
 		if (errors.length > 0) {
 			throw new BadRequestError('The query is invalid.', { errors });
 		}
-		return { filters, sort, after, limit };
+		return { filters, sort, after, limit } as ParsedQuery<PaginationOf<TSpec>>;
 	};
 
 	/**
@@ -475,14 +558,105 @@ export namespace Query {
 	): CursorPage<T> => {
 		const data = rows.slice(0, query.limit);
 		const more = rows.length > query.limit;
-		return { data, nextCursor: more ? cursorAfter(query, data.at(-1)!) : null };
+		return brand({ data, nextCursor: more ? cursorAfter(query, data.at(-1)!) : null }, 'cursor');
 	};
 
 	/**
-	 * The response schema of a page of resources.
+	 * Builds a page from the rows of an offset query and the count of the rows its filters match.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param query The parsed query, with its page.
+	 * @param rows The rows of the page.
+	 * @param total The rows matching the filters.
+	 */
+	export const offsetPage = <T>(
+		query: ParsedQuery<'offset'>,
+		rows: T[],
+		total: number
+	): OffsetPage<T> => brand({ data: rows, page: query.page, limit: query.limit, total }, 'offset');
+
+	/**
+	 * Checks whether a value is a page built by {@link page} or {@link offsetPage}, such as the
+	 * result of a handler, so that an interceptor can render it.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param value The value.
+	 */
+	export const isPage = (value: unknown): value is Page<unknown> =>
+		typeof value === 'object' && value !== null && PAGE in value;
+
+	/**
+	 * The pagination of a page built by {@link page} or {@link offsetPage}.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param page The page.
+	 */
+	export const paginationOf = (page: Page<unknown>): QueryPagination =>
+		(page as unknown as Record<symbol, QueryPagination>)[PAGE] ??
+		('total' in page ? 'offset' : 'cursor');
+
+	/**
+	 * Maps the rows of a page, such as models to resources, and keeps it a page.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param page The page.
+	 * @param map Maps one row.
+	 */
+	export function mapPage<T, U>(page: CursorPage<T>, map: (row: T) => U): CursorPage<U>;
+	export function mapPage<T, U>(page: OffsetPage<T>, map: (row: T) => U): OffsetPage<U>;
+	export function mapPage<T, U>(page: Page<T>, map: (row: T) => U): Page<U>;
+	export function mapPage<T, U>(page: Page<T>, map: (row: T) => U): Page<U> {
+		return brand({ ...page, data: page.data.map(map) }, paginationOf(page));
+	}
+
+	/**
+	 * The response schema of a page of resources from cursor pagination.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param item The schema of one row.
 	 */
 	export const pageSchema = <S extends TSchema>(item: S) =>
-		t.Object({ data: t.Array(item), nextCursor: t.Nullable(t.String()) });
+		t.Object(
+			{ data: t.Array(item), nextCursor: t.Nullable(t.String()) },
+			{ [PAGE_KEYWORD]: 'cursor' }
+		);
+
+	/**
+	 * The response schema of a page of resources from offset pagination.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param item The schema of one row.
+	 */
+	export const offsetPageSchema = <S extends TSchema>(item: S) =>
+		t.Object(
+			{
+				data: t.Array(item),
+				page: t.Integer({ minimum: 1 }),
+				limit: t.Integer({ minimum: 1 }),
+				total: t.Integer({ minimum: 0 })
+			},
+			{ [PAGE_KEYWORD]: 'offset' }
+		);
+
+	/**
+	 * The pagination of a schema made by {@link pageSchema} or {@link offsetPageSchema}, or
+	 * `undefined` for any other schema, so that an interceptor can describe what it renders.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param schema The schema.
+	 */
+	export const pageSchemaPagination = (schema: TSchema): QueryPagination | undefined => {
+		const pagination = (schema as Record<string, unknown>)[PAGE_KEYWORD];
+		return pagination === 'cursor' || pagination === 'offset' ? pagination : undefined;
+	};
+
+	/**
+	 * Checks whether a schema is the schema of a page, made by {@link pageSchema} or
+	 * {@link offsetPageSchema}.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param schema The schema.
+	 */
+	export const isPageSchema = (schema: TSchema): boolean =>
+		pageSchemaPagination(schema) !== undefined;
+
+	/**
+	 * The schema of one row of a page schema.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param schema A schema made by {@link pageSchema} or {@link offsetPageSchema}.
+	 */
+	export const itemSchemaOf = (schema: TSchema): TSchema | undefined =>
+		(schema as { properties?: { data?: { items?: TSchema } } }).properties?.data?.items;
 }

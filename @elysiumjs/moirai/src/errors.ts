@@ -14,14 +14,16 @@
 
 import type { ProblemValidationError } from '@elysiumjs/core';
 
-import { DomainError, ElysiumError } from '@elysiumjs/core';
+import { DomainError, ElysiumError, t, validationExtensions } from '@elysiumjs/core';
 
 /**
  * Raised when an idempotent action is called without an idempotency key. Rendered as a 400
  * problem.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class IdempotencyKeyRequiredError extends DomainError.for('IDEMPOTENCY_KEY_REQUIRED', 400) {
+export class IdempotencyKeyRequiredError extends DomainError.for('IDEMPOTENCY_KEY_REQUIRED', 400, {
+	extensions: { action: t.String() }
+}) {
 	constructor(public readonly action: string) {
 		super(`The ${action} action needs an Idempotency-Key.`, { extensions: { action } });
 	}
@@ -32,7 +34,9 @@ export class IdempotencyKeyRequiredError extends DomainError.for('IDEMPOTENCY_KE
  * 422 problem.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class IdempotencyKeyReusedError extends DomainError.for('IDEMPOTENCY_KEY_REUSED', 422) {
+export class IdempotencyKeyReusedError extends DomainError.for('IDEMPOTENCY_KEY_REUSED', 422, {
+	extensions: { idempotencyKey: t.String() }
+}) {
 	constructor(public readonly key: string) {
 		super('This Idempotency-Key was already used for another request.', {
 			extensions: { idempotencyKey: key }
@@ -59,7 +63,9 @@ export class IdempotencyConflictError extends ElysiumError {
  * problem, with one entry per mistake in `errors`.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export class InvalidInputError extends DomainError.for('VALIDATION_FAILED', 422) {
+export class InvalidInputError extends DomainError.for('VALIDATION_FAILED', 422, {
+	extensions: validationExtensions()
+}) {
 	constructor(
 		public readonly target: string,
 		errors: readonly ProblemValidationError[]

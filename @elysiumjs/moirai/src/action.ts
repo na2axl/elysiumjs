@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ServiceDefinition } from '@elysiumjs/core';
+import type { ProblemClass, ServiceDefinition } from '@elysiumjs/core';
 import type { Static, TSchema } from 'typebox';
 import type { MoiraiStores } from './moirai.module';
 
@@ -109,6 +109,22 @@ export type AskArgs<C extends QueryClass> =
 	undefined extends InputOf<C> ? [input?: InputOf<C>] : [input: InputOf<C>];
 type OutcomeOf<C extends HandlerClass> = Awaited<ReturnType<InstanceType<C>['handle']>>;
 type ResultOf<C extends HandlerClass> = Exclude<OutcomeOf<C>, DomainError>;
+type ErrorsOf<C extends HandlerClass> = Extract<OutcomeOf<C>, DomainError>;
+
+/**
+ * Checks that the `errors` of a registration list every DomainError `handle()` gives. Without
+ * `errors`, any class passes.
+ */
+type ListsErrorsOf<C extends HandlerClass, E extends readonly ProblemClass[]> = [
+	Exclude<ErrorsOf<C>, InstanceType<E[number]>>
+] extends [never]
+	? unknown
+	: {
+			'errors must list every DomainError handle() gives': Exclude<
+				ErrorsOf<C>,
+				InstanceType<E[number]>
+			>;
+		};
 
 /**
  * What `Moirai.execute()` gives: the result, or the DomainError that refused the call, from the
@@ -147,11 +163,25 @@ export type ActionRetry = {
  * The options of an action.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export type ActionOptions<S extends TSchema = TSchema> = {
+export type ActionOptions<
+	S extends TSchema = TSchema,
+	E extends readonly ProblemClass[] = readonly ProblemClass[]
+> = {
 	/** The name of the action, in idempotency records and problems. Defaults to the class name. */
 	name?: string;
 	/** The schema of the input. An action without one takes no input. */
 	input?: S;
+	/**
+	 * The schema of the result, given back by the static `result` of the class for the `response`
+	 * of the routes that run it.
+	 */
+	result?: TSchema;
+	/**
+	 * The DomainError classes `handle()` gives, checked against the errors of the class. The static
+	 * `errors` of the class lists them, with those moirai answers with, for the `errors` of the
+	 * routes that run it.
+	 */
+	errors?: E;
 	/**
 	 * Whether a call needs an idempotency key. A repeat with the same key and input replays the
 	 * stored response; with another input, it is refused with a 422 problem. Defaults to `false`.
@@ -187,11 +217,25 @@ export type ActionOptions<S extends TSchema = TSchema> = {
  * The options of a query.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export type QueryOptions<S extends TSchema = TSchema> = {
+export type QueryOptions<
+	S extends TSchema = TSchema,
+	E extends readonly ProblemClass[] = readonly ProblemClass[]
+> = {
 	/** The name of the query. Defaults to the class name. */
 	name?: string;
 	/** The schema of the input. A query without one takes no input. */
 	input?: S;
+	/**
+	 * The schema of the result, given back by the static `result` of the class for the `response`
+	 * of the routes that run it.
+	 */
+	result?: TSchema;
+	/**
+	 * The DomainError classes `handle()` gives, checked against the errors of the class. The static
+	 * `errors` of the class lists them, with those moirai answers with, for the `errors` of the
+	 * routes that run it.
+	 */
+	errors?: E;
 	/** Decides whether the call may run. */
 	authorize?: (input: Static<S>) => boolean | Promise<boolean>;
 };
@@ -226,10 +270,39 @@ export abstract class Action<
 	 * Marks a class as an action.
 	 * @param props The options of the action.
 	 */
-	public static register<S extends TSchema>(props: ActionOptions<S>) {
-		return (target: ActionClass): void => {
+	public static register<
+		S extends TSchema,
+		const E extends readonly ProblemClass[] = readonly ProblemClass[]
+	>(props: ActionOptions<S, E>) {
+		return <T extends ActionClass>(target: T & ListsErrorsOf<T, E>): void => {
 			Metadata.define(ACTION, { ...props, name: props.name ?? target.name }, target);
 		};
+	}
+
+	/**
+	 * The schema of the result, from `result` of `@Action.register()`, for the `response` of the
+	 * routes that run the action.
+	 * @example
+	 * ```ts
+	 * @Http.post('/top-ups', { response: TopUp.result, errors: TopUp.errors })
+	 * ```
+	 */
+	public static get result(): TSchema | undefined {
+		return (Metadata.get(ACTION, this) as ActionOptions | undefined)?.result;
+	}
+
+	/**
+	 * The problems a call can answer with: the `errors` of `@Action.register()`, then those of
+	 * moirai: invalid input, a refused call, a missing or reused idempotency key.
+	 */
+	public static get errors(): readonly ProblemClass[] {
+		const props = Metadata.get(ACTION, this) as ActionOptions | undefined;
+		return [
+			...(props?.errors ?? []),
+			...(props?.input ? [InvalidInputError] : []),
+			...(props?.authorize ? [CallForbiddenError] : []),
+			...(props?.idempotent ? [IdempotencyKeyRequiredError, IdempotencyKeyReusedError] : [])
+		];
 	}
 
 	/**
@@ -253,10 +326,34 @@ export abstract class Query<
 	 * Marks a class as a query.
 	 * @param props The options of the query.
 	 */
-	public static register<S extends TSchema>(props: QueryOptions<S>) {
-		return (target: QueryClass): void => {
+	public static register<
+		S extends TSchema,
+		const E extends readonly ProblemClass[] = readonly ProblemClass[]
+	>(props: QueryOptions<S, E>) {
+		return <T extends QueryClass>(target: T & ListsErrorsOf<T, E>): void => {
 			Metadata.define(QUERY, { ...props, name: props.name ?? target.name }, target);
 		};
+	}
+
+	/**
+	 * The schema of the result, from `result` of `@Query.register()`, for the `response` of the
+	 * routes that run the query.
+	 */
+	public static get result(): TSchema | undefined {
+		return (Metadata.get(QUERY, this) as QueryOptions | undefined)?.result;
+	}
+
+	/**
+	 * The problems a call can answer with: the `errors` of `@Query.register()`, then those of
+	 * moirai: invalid input and a refused call.
+	 */
+	public static get errors(): readonly ProblemClass[] {
+		const props = Metadata.get(QUERY, this) as QueryOptions | undefined;
+		return [
+			...(props?.errors ?? []),
+			...(props?.input ? [InvalidInputError] : []),
+			...(props?.authorize ? [CallForbiddenError] : [])
+		];
 	}
 
 	/** Runs the query with its validated input. Returning or throwing a DomainError refuses it. */
