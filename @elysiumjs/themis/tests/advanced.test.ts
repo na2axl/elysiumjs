@@ -126,6 +126,44 @@ describe('passkeys with challenges kept by the app', () => {
 		await expect(keys.verifyAuthentication(answer('cred-1'))).rejects.toThrow('no sign-in');
 	});
 
+	it('passes the timeout and the resident key requirement to the client', async () => {
+		const strict = new Passkeys({
+			rpName: 'Klapzi',
+			rpID: 'example.com',
+			origin: 'https://example.com',
+			challenges: 'caller',
+			residentKey: 'required',
+			userVerification: 'required',
+			timeout: 300_000,
+			repository: {
+				forUser: async () => [],
+				find: async () => undefined,
+				save: async () => {},
+				updateCounter: async () => {}
+			}
+		});
+		const options = await strict.registrationOptions({ id: 'u1', name: 'ada' });
+		expect(options.timeout).toBe(300_000);
+		expect(options.authenticatorSelection).toMatchObject({
+			residentKey: 'required',
+			userVerification: 'required'
+		});
+		expect((await strict.authenticationOptions()).timeout).toBe(300_000);
+	});
+
+	it('refuses a user handle of another user', async () => {
+		const handle = btoa('u2').replace(/=+$/, '');
+		const forged = {
+			id: 'cred-1',
+			rawId: 'cred-1',
+			response: { userHandle: handle },
+			type: 'public-key'
+		} as never;
+		await expect(keys.verifyAuthentication(forged, { challenge: 'c' })).rejects.toThrow(
+			'another user'
+		);
+	});
+
 	it("reads another user's passkey as an unknown one", async () => {
 		await expect(
 			keys.verifyAuthentication(answer('cred-1'), { challenge: 'c', userId: 'u2' })

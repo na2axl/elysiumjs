@@ -228,4 +228,4 @@ const request = await passkeys.authenticationOptions({ id: user.id });
 const used = await passkeys.verifyAuthentication(assertion, { challenge, userId: user.id });
 ```
 
-With a `userId`, a passkey of another user is refused like an unknown one. A registration needs the `userId` it was for.
+`residentKey: 'required'` makes every new passkey discoverable, for a sign-in without a username, and `timeout` (in milliseconds) is how long the client has to answer. An assertion whose user handle names another user than the passkey's is refused. With a `userId`, a passkey of another user is refused like an unknown one. A registration needs the `userId` it was for.

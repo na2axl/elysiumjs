@@ -89,6 +89,13 @@ export type PasskeysOptions = {
 	/** Defaults to `preferred`. */
 	userVerification?: 'required' | 'preferred' | 'discouraged';
 	/**
+	 * Whether a new passkey must be discoverable, so that it can sign in without a username.
+	 * Defaults to `preferred`.
+	 */
+	residentKey?: 'required' | 'preferred' | 'discouraged';
+	/** How long the client has to answer, in milliseconds. */
+	timeout?: number;
+	/**
 	 * Where the challenges live between the options and the answer. `session` (the default) keeps
 	 * them in the session. `caller` leaves them to the app, such as in the state of a multi-step
 	 * flow: it reads `challenge` from the options and passes it back to the verify method.
@@ -108,6 +115,15 @@ export type PasskeyChallenge = {
 	 * is refused.
 	 */
 	userId?: string;
+};
+
+/** The user id behind a user handle, or `undefined` when it is not UTF-8 text in base64url. */
+const userOfHandle = (handle: string): string | undefined => {
+	try {
+		return new TextDecoder('utf-8', { fatal: true }).decode(fromBase64Url(handle));
+	} catch {
+		return undefined;
+	}
 };
 
 const REGISTRATION = '_passkey:registration';
@@ -140,12 +156,13 @@ export class Passkeys {
 			userDisplayName: user.displayName ?? user.name,
 			userID: utf8(user.id),
 			attestationType: 'none',
+			...(this.options.timeout !== undefined && { timeout: this.options.timeout }),
 			excludeCredentials: existing.map((passkey) => ({
 				id: passkey.id,
 				transports: passkey.transports as AuthenticatorTransport[] | undefined
 			})),
 			authenticatorSelection: {
-				residentKey: 'preferred',
+				residentKey: this.options.residentKey ?? 'preferred',
 				userVerification: this.options.userVerification ?? 'preferred'
 			}
 		});
@@ -207,6 +224,7 @@ export class Passkeys {
 		const options = await generateAuthenticationOptions({
 			rpID: this.options.rpID,
 			userVerification: this.options.userVerification ?? 'preferred',
+			...(this.options.timeout !== undefined && { timeout: this.options.timeout }),
 			allowCredentials: allowed.map((passkey) => ({
 				id: passkey.id,
 				transports: passkey.transports as AuthenticatorTransport[] | undefined
@@ -235,6 +253,10 @@ export class Passkeys {
 		// Another user's passkey reads like an unknown one, so the answer tells nothing about it.
 		if (!passkey || (kept?.userId !== undefined && passkey.userId !== kept.userId))
 			throw new PasskeyVerificationError('the passkey is unknown');
+		// The user handle the authenticator kept must be the passkey's user.
+		const handle = response.response.userHandle;
+		if (handle !== undefined && userOfHandle(handle) !== passkey.userId)
+			throw new PasskeyVerificationError('the passkey belongs to another user');
 		let result;
 		try {
 			result = await verifyAuthenticationResponse({
