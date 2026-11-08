@@ -38,7 +38,7 @@ import { getCommandName } from './command';
 import { mergeEnvironmentSchemas, validateEnvironment } from './config';
 import { ConsoleFormat, InteractsWithConsole } from './console';
 import { Container } from './container';
-import { Env, initEnv } from './env';
+import { awaitEnv, Env, initEnv } from './env';
 import { ElysiumError, InvalidControllerError } from './errors';
 import { FILTER_LEVELS, routeFilterLevels, runFilters } from './filter';
 import { Kernel } from './kernel';
@@ -276,8 +276,10 @@ export abstract class Application extends InteractsWithConsole {
 		this.#debug = debug ?? false;
 		if (runtime) Runtime.use(runtime);
 
-		// Raw until the module graph is known: `run()` and `build()` validate the merged schemas.
-		initEnv(Runtime.get().env());
+		// `run()` and `build()` validate the merged schemas once the module graph is known. Until
+		// then, an app with a schema exposes nothing, so that no raw value is read as a validated one.
+		if (this.props().env) awaitEnv();
+		else initEnv(Runtime.get().env());
 
 		Service.remove('elysium.app');
 		Service.instance('elysium.app', this);

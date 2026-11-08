@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { TObject, TSchema } from 'typebox';
+import type { TObject, TOptional, TSchema, TString } from 'typebox';
 import type { ModuleGraph } from './module-graph';
 
 import { t } from 'elysia';
@@ -21,6 +21,23 @@ import Value from 'typebox/value';
 import { ElysiumError } from './errors';
 
 const SECRET = Symbol.for('elysium:Secret');
+
+/** Marks the type of a schema made by `Secret.schema()`; it has no value at runtime. */
+declare const SECRET_SCHEMA: unique symbol;
+
+/**
+ * The type of a schema made by {@link Secret.schema}: `Env.Infer` reads its value as a `Secret`.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type SecretSchema<S extends TSchema = TSchema> = S & { readonly [SECRET_SCHEMA]: S };
+
+/** The schema under the mark of a {@link SecretSchema}, kept optional, or the schema itself. */
+export type UnmarkedSchema<S extends TSchema> =
+	S extends TOptional<infer Inner extends TSchema>
+		? TOptional<UnmarkedSchema<Inner>>
+		: S extends { readonly [SECRET_SCHEMA]: infer U extends TSchema }
+			? U
+			: S;
 const REDACTED = '[secret]';
 
 /**
@@ -62,8 +79,10 @@ export class Secret<T = string> {
 	 * @Application.register({ env: t.Object({ DATABASE_URL: Secret.schema() }) })
 	 * ```
 	 */
-	public static schema<S extends TSchema = ReturnType<typeof t.String>>(schema?: S): S {
-		return { ...(schema ?? t.String()), [SECRET]: true } as S;
+	public static schema(): SecretSchema<TString>;
+	public static schema<S extends TSchema>(schema: S): SecretSchema<S>;
+	public static schema(schema?: TSchema): SecretSchema {
+		return { ...(schema ?? t.String()), [SECRET]: true } as unknown as SecretSchema;
 	}
 
 	/** Whether a schema was made by {@link Secret.schema}. */

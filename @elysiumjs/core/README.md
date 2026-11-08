@@ -143,8 +143,12 @@ const Wallet = t.Object({ id: t.String(), balance: t.Integer() });
 @Http.controller('/wallets')
 export class WalletController {
 	@Http.post('/:id/pay', { response: Wallet, errors: [InsufficientFunds] })
-	public pay(@Http.param('id') id: string, @Http.body(t.Object({ amount: t.Integer() })) body: { amount: number }) {
-		if (body.amount > 100) return new InsufficientFunds('Top up first.', { extensions: { missing: body.amount - 100 } });
+	public pay(
+		@Http.param('id') id: string,
+		@Http.body(t.Object({ amount: t.Integer() })) body: { amount: number }
+	) {
+		if (body.amount > 100)
+			return new InsufficientFunds('Top up first.', { extensions: { missing: body.amount - 100 } });
 		return { id, balance: 100 - body.amount };
 	}
 }
@@ -163,6 +167,39 @@ const Envelope = TransformInterceptor.with(
 	{ schema: (schema) => (isEnvelopedSchema(schema) ? schema : t.Object({ data: schema })) }
 );
 ```
+
+## Environment
+
+The app and its modules declare the environment variables they read as TypeBox objects. They are validated when the app runs or is built, with every missing or invalid variable listed, and read with `Env.get()`. A file that declares a schema also augments `AppEnv`, so that `Env.get()` knows each name and its type:
+
+```typescript
+// src/env.ts
+import type { Env } from '@elysiumjs/core';
+
+import { Secret, t } from '@elysiumjs/core';
+
+export const env = t.Object({
+	PORT: t.Number({ default: 3000 }),
+	DATABASE_URL: Secret.schema()
+});
+
+declare module '@elysiumjs/core' {
+	interface AppEnv extends Env.Infer<typeof env> {}
+}
+```
+
+The app passes the schema as its `env` option, and a module as its `envSchema` option, declared the same way in its own file. Then:
+
+```typescript
+Env.get('PORT'); // number
+Env.get('DATABASE_URL').reveal(); // string: a Secret prints as [secret] in logs and JSON
+Env.get('PROT'); // compile error: not declared
+```
+
+- Once any variable is declared, `Env.get()` only accepts declared names. Without any, it takes any name and returns the raw string.
+- A variable is typed even when its module is inactive in the current environment: declare the variables of such a module with `t.Optional()`.
+- In an app with a schema, reading `Env` before the environment is validated throws `EnvironmentNotReadyError`. Read it in `onInit`, a service, or a `with()` factory.
+- The runtime's `env()` stays the raw environment, before validation.
 
 ## Services
 

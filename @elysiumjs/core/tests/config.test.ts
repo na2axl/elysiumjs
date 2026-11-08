@@ -23,7 +23,7 @@ import {
 	Secret,
 	validateEnvironment
 } from '../src/config';
-import { Env } from '../src/env';
+import { Env, EnvironmentNotReadyError } from '../src/env';
 import { Http } from '../src/http';
 import { ConsoleLogger } from '../src/logger';
 import { Module } from '../src/module';
@@ -151,7 +151,7 @@ describe('environment at boot', () => {
 	class EnvController {
 		@Http.get()
 		public show() {
-			return { port: Env.get('PORT' as never), secret: String(Env.get('API_KEY' as never)) };
+			return { port: Env.get('PORT'), secret: String(Env.get('API_KEY')) };
 		}
 	}
 
@@ -183,5 +183,27 @@ describe('environment at boot', () => {
 
 		expect(error).toBeInstanceOf(InvalidEnvironmentError);
 		expect(error.issues.map((i: { key: string }) => i.key).sort()).toEqual(['API_KEY', 'PORT']);
+	});
+
+	it('refuses to read the environment of an app with a schema before it is validated', async () => {
+		withEnv({ PORT: '3000', API_KEY: 'sk_live_123' });
+		const app = new EnvApp();
+
+		expect(() => Env.get('PORT')).toThrow(EnvironmentNotReadyError);
+		expect(() => Env.exists('PORT')).toThrow(EnvironmentNotReadyError);
+
+		await app.build();
+		expect(Env.get('PORT')).toBe(3000);
+		await app.kernel.shutdown();
+	});
+
+	it('reads the raw environment of an app without a schema', () => {
+		@Application.register({ openapi: false })
+		class RawApp extends Application {}
+
+		withEnv({ PORT: '3000' });
+		new RawApp();
+
+		expect(Env.get('PORT')).toBe('3000');
 	});
 });

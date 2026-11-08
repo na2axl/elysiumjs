@@ -13,6 +13,8 @@ bun add @elysiumjs/ariadne
 A flow is a controller. Each step is a `POST` route of it, so the `@Http.*()` parameter decorators work on a step like on any route.
 
 ```ts
+import type { Static } from '@elysiumjs/core';
+
 import { Flow } from '@elysiumjs/ariadne';
 import { BadRequestError, Http, t } from '@elysiumjs/core';
 
@@ -35,7 +37,7 @@ export class SignUpFlow {
 
 	@Flow.step({ next: ['code'], back: ['email'] })
 	public async email(
-		@Http.body(EmailBody) { email }: typeof EmailBody.static,
+		@Http.body(EmailBody) { email }: Static<typeof EmailBody>,
 		@Flow.state() state: SignUp
 	) {
 		await this.codes.send(email);
@@ -44,7 +46,7 @@ export class SignUpFlow {
 
 	@Flow.step()
 	public async code(
-		@Http.body(CodeBody) { code }: typeof CodeBody.static,
+		@Http.body(CodeBody) { code }: Static<typeof CodeBody>,
 		@Flow.state() state: SignUp
 	) {
 		if (!(await this.codes.check(state.email!, code))) {
