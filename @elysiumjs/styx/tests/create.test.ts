@@ -15,7 +15,7 @@
 import type { CreateOptions } from '../src/create/create.command';
 
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -297,4 +297,56 @@ describe('embedded assets', () => {
 		expect(await listAssets('templates/feature-prettier')).toContain('.prettierrc');
 		expect(await readAsset('stubs/job.stub')).toContain('Job');
 	});
+});
+
+describe('the environment of a new project', () => {
+	// Inside the repository, so that the project resolves the workspace packages.
+	const dir = join(import.meta.dir, '.tmp-env');
+
+	afterEach(async () => {
+		await rm(dir, { recursive: true, force: true });
+	});
+
+	it('types Env.get() from the schema in src/env.ts, checked by the compiler', async () => {
+		const path = await createProject(
+			defaults({ path: dir, name: 'env-app', database: false, cache: false }),
+			async () => {}
+		);
+		expect(existsSync(join(path, 'types.d.ts'))).toBe(false);
+		const app = await Bun.file(join(path, 'src', 'app.ts')).text();
+		expect(app).toContain("import { env } from './env';");
+
+		const envFile = join(path, 'src', 'env.ts');
+		const code = await Bun.file(envFile).text();
+		await writeFile(
+			envFile,
+			code
+				.replace(
+					"import { t } from '@elysiumjs/core';",
+					"import { Secret, t } from '@elysiumjs/core';"
+				)
+				.replace(
+					'export const env = t.Object({});',
+					'export const env = t.Object({ PORT: t.Number({ default: 3000 }), API_KEY: Secret.schema() });'
+				)
+		);
+		await writeFile(
+			join(path, 'src', 'check.ts'),
+			[
+				"import type { Secret } from '@elysiumjs/core';",
+				"import { Env } from '@elysiumjs/core';",
+				"export const port: number = Env.get('PORT');",
+				"export const key: Secret<string> = Env.get('API_KEY');",
+				'// @ts-expect-error unknown variable',
+				"Env.get('NOPE');",
+				''
+			].join('\n')
+		);
+
+		const tsc = Bun.spawnSync([process.execPath, 'x', 'tsc', '--noEmit', '-p', 'tsconfig.json'], {
+			cwd: path
+		});
+		expect(tsc.stdout.toString() + tsc.stderr.toString()).toBe('');
+		expect(tsc.exitCode).toBe(0);
+	}, 60_000);
 });

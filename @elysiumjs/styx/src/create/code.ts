@@ -240,7 +240,7 @@ export const getAppCode = (
 	];
 	return /* js */ `import type { ServerError } from '@elysiumjs/core';
 
-import { Application, getLogger, t } from '@elysiumjs/core';
+import { Application, getLogger } from '@elysiumjs/core';
 import { HermesModule } from '@elysiumjs/hermes';
 import { runtime as ${choice.alias} } from '${choice.package}';
 ${[...part.imports, ...enabledModules.map((module) => `import { ${module.import} } from '${module.name}';`)].join('\n')}
@@ -248,8 +248,7 @@ ${[...part.imports, ...enabledModules.map((module) => `import { ${module.import}
 ${Object.keys(modules)
 	.map((module) => `import { ${pascal(module)}Module } from '${modules[module]}';`)
 	.join('\n')}
-
-export const env = t.Object({});
+import { env } from './env';
 
 @Application.register({
 	runtime: ${choice.alias},
@@ -281,6 +280,26 @@ export class App extends Application {
 }
 `;
 };
+
+/**
+ * The environment schema of a project, with the declaration that types `Env.get()` from it. A
+ * `.ts` file, so that the compiler checks it even with `skipLibCheck`.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export const getEnvCode = () => /* js */ `import type { Env } from '@elysiumjs/core';
+
+import { t } from '@elysiumjs/core';
+
+/**
+ * The environment variables of the app, validated at boot and read with \`Env.get()\`. Modules
+ * declare theirs in their own \`envSchema\` the same way.
+ */
+export const env = t.Object({});
+
+declare module '@elysiumjs/core' {
+	interface AppEnv extends Env.Infer<typeof env> {}
+}
+`;
 
 /**
  * The scripts of a project, per runtime and package manager.

@@ -63,3 +63,4 @@ conformance/.aot
 
 # wrangler
 **/.wrangler
+@elysiumjs/styx/tests/.tmp-env

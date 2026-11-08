@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { TestingHttpApp } from '@elysiumjs/core';
+import type { Static, TestingHttpApp } from '@elysiumjs/core';
 import type { FlowContext, FlowStore } from '../src';
 
 import { Application, BadRequestError, ConflictError, Http, Module, t } from '@elysiumjs/core';
@@ -49,7 +49,7 @@ class SignUpFlow {
 		onRewind: (state) => ({ ...state, rewound: (state.rewound ?? 0) + 1 })
 	})
 	public email(
-		@Http.body(EmailBody) { email }: typeof EmailBody.static,
+		@Http.body(EmailBody) { email }: Static<typeof EmailBody>,
 		@Flow.state() state: SignUp
 	) {
 		effects.push(`mail:${email}`);
@@ -57,7 +57,7 @@ class SignUpFlow {
 	}
 
 	@Flow.step()
-	public code(@Flow.state() state: SignUp, @Http.body(CodeBody) { code }: typeof CodeBody.static) {
+	public code(@Flow.state() state: SignUp, @Http.body(CodeBody) { code }: Static<typeof CodeBody>) {
 		if (code === 'boom') throw new Error('provider down');
 		if (code === 'later') throw new ConflictError('Try again later.');
 		if (code === 'busy') return new ConflictError('Busy, try again.');

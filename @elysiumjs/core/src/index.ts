@@ -27,7 +27,7 @@ export {
 	type ConsoleTagStyle,
 	InteractsWithConsole
 } from './console';
-export { Env } from './env';
+export { type AppEnv, type EnvName, type EnvValue, Env, EnvironmentNotReadyError } from './env';
 export { type LifecycleEvent, type LifecycleHandler, Lifecycle } from './lifecycle';
 export { type LoggerInterface, ConsoleLogger, getLogger, LOGGER_SERVICE } from './logger';
 export {
@@ -128,13 +128,6 @@ export interface AppHttpContext {
 	derive: Record<string, unknown>;
 }
 
-/**
- * The type for all registered environment variables.
- * @author Axel Nana <axel.nana@workbud.com>
- */
-export interface AppEnv {
-	[key: string]: string;
-}
 export {
 	type DomainErrorOptions,
 	type ElysiumProblemCode,
@@ -191,6 +184,7 @@ export {
 } from './interceptor';
 export {
 	type EnvironmentIssue,
+	type SecretSchema,
 	ConflictingEnvironmentSchemaError,
 	InvalidEnvironmentError,
 	mergeEnvironmentSchemas,
