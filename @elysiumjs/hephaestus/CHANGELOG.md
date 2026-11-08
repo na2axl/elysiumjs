@@ -1,5 +1,12 @@
 # @elysiumjs/hephaestus
 
+## 0.5.2
+
+### Patch Changes
+
+- Updated dependencies [[`359f157`](https://github.com/na2axl/elysiumjs/commit/359f1579b9ad69643da5360d9ca9e80104fbe2f1)]:
+  - @elysiumjs/core@0.14.0
+
 ## 0.5.1
 
 ### Patch Changes
