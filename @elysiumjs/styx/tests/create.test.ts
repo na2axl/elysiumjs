@@ -164,7 +164,12 @@ describe('createProject', () => {
 
 		const app = await Bun.file(join(path, 'src', 'app.ts')).text();
 		expect(app).toContain("from '@elysiumjs/runtime-node'");
-		expect(app).toContain('postgresJs({ connection: process.env.DATABASE_URL! })');
+		expect(app).toContain("postgresJs({ connection: Env.get('DATABASE_URL').reveal() })");
+		const env = await Bun.file(join(path, 'src', 'env.ts')).text();
+		expect(env).toContain('PORT: t.Number({ default: 3000 })');
+		expect(env).toContain('DATABASE_URL: Secret.schema()');
+		expect(env).toContain('REDIS_URL: Secret.schema()');
+		expect(app).not.toContain('process.env');
 		expect(app).toContain('ioredis((url, options)');
 
 		const tsconfig = await Bun.file(join(path, 'tsconfig.json')).text();
@@ -197,7 +202,11 @@ describe('createProject', () => {
 		const app = await Bun.file(join(path, 'src', 'app.ts')).text();
 		expect(app).toContain("transport: 'console'");
 		expect(app).toContain("hyperdrive({\n\t\t\t\t\t\tbinding: 'HYPERDRIVE'");
-		expect(app).toContain('upstash({ token: process.env.UPSTASH_REDIS_REST_TOKEN! })');
+		expect(app).toContain("upstash({ token: Env.get('UPSTASH_REDIS_REST_TOKEN').reveal() })");
+		const env = await Bun.file(join(path, 'src', 'env.ts')).text();
+		expect(env).toContain('UPSTASH_REDIS_REST_TOKEN: Secret.schema()');
+		expect(env).not.toContain('PORT');
+		expect(env).not.toContain('DATABASE_URL');
 	});
 
 	it('leaves the database and the cache out when not asked for', async () => {
@@ -210,6 +219,12 @@ describe('createProject', () => {
 		const app = await Bun.file(join(path, 'src', 'app.ts')).text();
 		expect(app).not.toContain('DrizzleModule');
 		expect(app).not.toContain('RedisModule');
+		expect(app).not.toContain('Env');
+		const env = await Bun.file(join(path, 'src', 'env.ts')).text();
+		expect(env).toContain(
+			'export const env = t.Object({\n\tPORT: t.Number({ default: 3000 })\n});'
+		);
+		expect(env).not.toContain('Secret');
 	});
 
 	it('refuses unknown choices', async () => {
@@ -307,46 +322,32 @@ describe('the environment of a new project', () => {
 		await rm(dir, { recursive: true, force: true });
 	});
 
+	const typecheck = (path: string) => {
+		const tsc = Bun.spawnSync([process.execPath, 'x', 'tsc', '--noEmit', '-p', 'tsconfig.json'], {
+			cwd: path
+		});
+		return { output: tsc.stdout.toString() + tsc.stderr.toString(), code: tsc.exitCode };
+	};
+
 	it('types Env.get() from the schema in src/env.ts, checked by the compiler', async () => {
-		const path = await createProject(
-			defaults({ path: dir, name: 'env-app', database: false, cache: false }),
-			async () => {}
-		);
+		const path = await createProject(defaults({ path: dir, name: 'env-app' }), async () => {});
 		expect(existsSync(join(path, 'types.d.ts'))).toBe(false);
 		const app = await Bun.file(join(path, 'src', 'app.ts')).text();
 		expect(app).toContain("import { env } from './env';");
 
-		const envFile = join(path, 'src', 'env.ts');
-		const code = await Bun.file(envFile).text();
-		await writeFile(
-			envFile,
-			code
-				.replace(
-					"import { t } from '@elysiumjs/core';",
-					"import { Secret, t } from '@elysiumjs/core';"
-				)
-				.replace(
-					'export const env = t.Object({});',
-					'export const env = t.Object({ PORT: t.Number({ default: 3000 }), API_KEY: Secret.schema() });'
-				)
-		);
 		await writeFile(
 			join(path, 'src', 'check.ts'),
 			[
 				"import type { Secret } from '@elysiumjs/core';",
 				"import { Env } from '@elysiumjs/core';",
 				"export const port: number = Env.get('PORT');",
-				"export const key: Secret<string> = Env.get('API_KEY');",
+				"export const url: Secret<string> = Env.get('DATABASE_URL');",
 				'// @ts-expect-error unknown variable',
 				"Env.get('NOPE');",
 				''
 			].join('\n')
 		);
 
-		const tsc = Bun.spawnSync([process.execPath, 'x', 'tsc', '--noEmit', '-p', 'tsconfig.json'], {
-			cwd: path
-		});
-		expect(tsc.stdout.toString() + tsc.stderr.toString()).toBe('');
-		expect(tsc.exitCode).toBe(0);
+		expect(typecheck(path)).toEqual({ output: '', code: 0 });
 	}, 60_000);
 });

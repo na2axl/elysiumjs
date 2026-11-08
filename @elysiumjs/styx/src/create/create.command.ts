@@ -201,7 +201,7 @@ export const createProject = async (
 	});
 	await Bun.write(packageFile, JSON.stringify(packageJson, null, 2) + '\n');
 
-	await Bun.write(join(projectPath, 'src', 'env.ts'), getEnvCode());
+	await Bun.write(join(projectPath, 'src', 'env.ts'), getEnvCode(options.runtime, parts));
 	await Bun.write(
 		join(projectPath, 'src', 'app.ts'),
 		getAppCode(

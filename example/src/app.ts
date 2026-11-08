@@ -1,6 +1,6 @@
 import type { ServerError } from '@elysiumjs/core';
 
-import { Application, Middleware, Service, WampModule } from '@elysiumjs/core';
+import { Application, Env, Middleware, Service, WampModule } from '@elysiumjs/core';
 import { HeraclesModule, RedisTransport } from '@elysiumjs/heracles';
 import { HermesLogger, HermesModule } from '@elysiumjs/hermes';
 import { DrizzleModule } from '@elysiumjs/mnemosyne-drizzle';
@@ -11,27 +11,29 @@ import { StyxModule } from '@elysiumjs/styx';
 import { MainModule } from '#hero/hero.module';
 import { XServerMiddleware } from '#hero/middlewares/x-server.middleware';
 
+import { env } from './env';
+
 @Middleware.register(XServerMiddleware)
 @Application.register({
 	runtime: bunRuntime,
 	modules: [
 		HermesModule.with({ level: 'debug', format: 'pretty' }),
-		RedisModule.with({
+		RedisModule.with(() => ({
 			default: 'cache',
 			connections: {
-				cache: { url: process.env.REDIS_URL! }
+				cache: { url: Env.get('REDIS_URL').reveal() }
 			}
-		}),
-		WampModule.with({
+		})),
+		WampModule.with(() => ({
 			default: 'main',
 			connections: {
-				main: { url: process.env.WAMP_URL!, realm: 'realm1' }
+				main: { url: Env.get('WAMP_URL'), realm: 'realm1' }
 			}
-		}),
+		})),
 		DrizzleModule.with(() => ({
 			default: 'main',
 			connections: {
-				main: { connection: process.env.DATABASE_URL! }
+				main: { connection: Env.get('DATABASE_URL').reveal() }
 			}
 		})),
 		HeraclesModule.with({
@@ -43,10 +45,10 @@ import { XServerMiddleware } from '#hero/middlewares/x-server.middleware';
 		MainModule
 	],
 	server: {
-		name: 'App',
-		port: parseInt(process.env.PORT!, 10) || 3000
+		name: 'App'
 	},
 	debug: false,
+	env,
 	openapi: {
 		path: '/docs',
 		documentation: {
