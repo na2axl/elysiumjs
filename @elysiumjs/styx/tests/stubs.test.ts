@@ -17,7 +17,7 @@ import { mkdtemp, mkdir, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { addToModuleHint } from '../src/config';
+import { addToModuleHint, getModulePath } from '../src/config';
 import { createModule } from '../src/utils';
 
 const stubsDir = join(import.meta.dir, '..', 'stubs');
@@ -88,6 +88,27 @@ describe('generator output', () => {
 			const hint = await addToModuleHint('commands', 'DoCommand');
 			expect(hint).toBe('Add DoCommand to the commands list of the module that should own it.');
 			expect(hint).not.toContain('undefined');
+		});
+	});
+
+	describe('getModulePath', () => {
+		it('gives the path of a module listed in .elysiumrc', async () => {
+			await rc({ projectName: 'x', mono: false, modules: { billing: './src/modules/billing' } });
+			expect(await getModulePath('billing')).toBe('./src/modules/billing');
+		});
+
+		it('refuses a module missing from .elysiumrc, instead of writing under undefined/', async () => {
+			await rc({ projectName: 'x', mono: false, modules: { billing: './src/modules/billing' } });
+			await expect(getModulePath('iam')).rejects.toThrow('Module iam is not in the modules of .elysiumrc');
+		});
+	});
+
+	describe('validator stub', () => {
+		it('types the request with Static and returns promises without async', async () => {
+			const text = await Bun.file(join(stubsDir, 'validator.stub')).text();
+			expect(text).toContain('export type {request_name} = Static<typeof {name}.schema>;');
+			expect(text).not.toContain('.schema.static');
+			expect(text).not.toContain('static async');
 		});
 	});
 

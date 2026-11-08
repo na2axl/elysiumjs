@@ -1,4 +1,4 @@
-import type { Context, DomainError } from '@elysiumjs/core';
+import type { Context, DomainError, Static } from '@elysiumjs/core';
 
 import { t } from 'elysia';
 
@@ -47,8 +47,8 @@ export class {name} {
      * @param ctx The request context.
      * @returns Whether the request is authorized, or the error to answer.
      */
-    public static async authorize(ctx: Context<{request_name}>): Promise<boolean | DomainError> {
-        return true;
+    public static authorize(ctx: Context<{request_name}>): Promise<boolean | DomainError> {
+        return Promise.resolve(true);
     }
 
     /**
@@ -64,9 +64,9 @@ export class {name} {
      * @param ctx The request context.
      * @returns Whether the input data is valid, or the error to answer.
      */
-    public static async validate(ctx: Context<{request_name}>): Promise<boolean | DomainError> {
-        return true;
+    public static validate(ctx: Context<{request_name}>): Promise<boolean | DomainError> {
+        return Promise.resolve(true);
     }
 }
 
-export type {request_name} = typeof {name}.schema.static;
+export type {request_name} = Static<typeof {name}.schema>;
