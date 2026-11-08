@@ -14,8 +14,6 @@
 
 import type { AnyElysia } from 'elysia';
 
-import { ParseError } from 'elysia';
-
 import { ElysiumError } from './errors';
 import { DomainError } from './problem';
 import { Runtime } from './runtime';
@@ -198,40 +196,22 @@ const readLimited = async (
 	return bytes;
 };
 
-const formToObject = (form: FormData | URLSearchParams): Record<string, unknown> => {
-	const result: Record<string, unknown> = {};
-	for (const key of new Set(form.keys())) {
-		const values = form.getAll(key);
-		result[key] = values.length > 1 ? values : values[0];
-	}
-	return result;
-};
-
-/** Parses a body the way Elysia does, for the content types the body limit applies to. */
-const parseLimited = async (
-	request: Request,
-	contentType: string,
-	limit: number
-): Promise<unknown> => {
+/**
+ * Reads a body sent with no declared length, up to the limit, and replaces the request of the
+ * context with one that carries the bytes read and their length.
+ * @throws {PayloadTooLargeError} When the body goes over the limit.
+ */
+const limitBody = async (context: { request: Request }, limit: number): Promise<void> => {
+	const { request } = context;
 	const bytes = await readLimited(request.body!, limit);
-	const text = () => new TextDecoder().decode(bytes);
-	if (contentType.startsWith('application/json') || contentType.endsWith('+json')) {
-		if (bytes.byteLength === 0) return undefined;
-		try {
-			return JSON.parse(text());
-		} catch (error) {
-			throw new ParseError(error as Error);
-		}
-	}
-	if (contentType.startsWith('text/')) return text();
-	if (contentType.startsWith('application/x-www-form-urlencoded')) {
-		return formToObject(new URLSearchParams(text()));
-	}
-	return formToObject(
-		await new Response(bytes as Uint8Array<ArrayBuffer>, {
-			headers: { 'content-type': contentType }
-		}).formData()
-	);
+	const headers = new Headers(request.headers);
+	headers.set('content-length', String(bytes.byteLength));
+	context.request = new Request(request.url, {
+		method: request.method,
+		headers,
+		body: bytes as Uint8Array<ArrayBuffer>,
+		signal: request.signal
+	});
 };
 
 const LIMITED_TYPES =
@@ -252,7 +232,8 @@ export const applyHttpSecurity = (app: AnyElysia, options: HttpOptions = {}): vo
 
 	app.derive('global', ({ request }) => ({ ip: clientAddress(request, trustProxy) }));
 
-	app.onRequest(({ request, set }) => {
+	app.onRequest((context) => {
+		const { request, set } = context;
 		if (headers) {
 			const all = headers === true ? {} : headers;
 			const defaults = headers === true;
@@ -319,20 +300,15 @@ export const applyHttpSecurity = (app: AnyElysia, options: HttpOptions = {}): vo
 		}
 
 		if (bodyLimit !== false) {
-			const length = Number(request.headers.get('content-length'));
-			if (length > bodyLimit) throw new PayloadTooLargeError(bodyLimit);
+			const declared = request.headers.get('content-length');
+			if (declared !== null) {
+				if (Number(declared) > bodyLimit) throw new PayloadTooLargeError(bodyLimit);
+			} else if (request.body && LIMITED_TYPES.test(request.headers.get('content-type') ?? '')) {
+				// A body with no declared length is read here, up to the limit, and handed on in a
+				// request that declares it, so Elysia keeps its own parsers and the routes keep their
+				// documented media types.
+				return limitBody(context as unknown as { request: Request }, bodyLimit);
+			}
 		}
 	});
-
-	if (bodyLimit !== false) {
-		app.onParse('global', (context) => {
-			const ctx = context as unknown as { request: Request; contentType?: string };
-			const { request } = ctx;
-			const contentType = ctx.contentType ?? request.headers.get('content-type') ?? '';
-			// A declared length was checked in onRequest; the runtime holds the body to it.
-			if (!request.body || request.headers.has('content-length')) return;
-			if (!LIMITED_TYPES.test(contentType)) return;
-			return parseLimited(request, contentType, bodyLimit);
-		});
-	}
 };

@@ -1033,6 +1033,7 @@ export namespace Http {
 								operationId: route.operationId
 							},
 							body: isValidator ? route.body?.validator?.schema : route.body?.schema,
+							query: route.query?.schema,
 							response: route.response ? Resource.projectResponse(route.response) : undefined,
 							params: isEmpty(params) ? undefined : t.Object(params)
 						},
