@@ -144,7 +144,7 @@ class ClaimsFlow {
 @Module.register({ controllers: [SignUpFlow, ProfileFlow, PlanFlow, PinFlow, ClaimsFlow] })
 class FlowsModule extends Module {}
 
-const makeApp = (store: FlowStore) => {
+const makeApp = (store: FlowStore, openapi: false | object = false) => {
 	@Application.register({
 		modules: [
 			ThemisModule.with({
@@ -157,7 +157,7 @@ const makeApp = (store: FlowStore) => {
 			AriadneModule.with({ store }),
 			FlowsModule
 		],
-		openapi: false
+		openapi
 	})
 	class App extends Application {}
 	return App;
@@ -207,6 +207,29 @@ describe('flows over HTTP', () => {
 		await testing?.shutdown();
 		testing = undefined;
 		effects.length = 0;
+	});
+
+	it('documents the flow headers in OpenAPI', async () => {
+		testing = await Application.testing({ app: makeApp(new MemoryFlowStore(), {}) });
+		const { paths } = await (await testing.http.get('/openapi/json')).json();
+		const headers = (operation: {
+			parameters?: { in: string; name: string; required: boolean }[];
+		}) =>
+			Object.fromEntries(
+				(operation.parameters ?? [])
+					.filter((parameter) => parameter.in === 'header')
+					.map((parameter) => [parameter.name, parameter.required])
+			);
+
+		expect(headers(paths['/flows/sign-up/email'].post)).toEqual({
+			[FLOW_KEY_HEADER]: true,
+			[FLOW_STEP_HEADER]: true,
+			[FLOW_OWNER_HEADER]: false
+		});
+		expect(headers((paths['/flows/sign-up'] ?? paths['/flows/sign-up/']).get)).toEqual({
+			[FLOW_KEY_HEADER]: false,
+			[FLOW_OWNER_HEADER]: false
+		});
 	});
 
 	const guest = async (store: FlowStore = new MemoryFlowStore()) => {

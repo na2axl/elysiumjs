@@ -18,11 +18,40 @@ import type {
 	RequestHandlerDecoratorProps
 } from '@elysiumjs/core';
 
-import { Http, Metadata } from '@elysiumjs/core';
+import { Http, Metadata, t } from '@elysiumjs/core';
 
 import { FlowEngine } from './engine';
 import { InvalidFlowError } from './errors';
-import { FLOW_STEP_LEASE_SECONDS } from './store';
+import {
+	FLOW_KEY_HEADER,
+	FLOW_OWNER_HEADER,
+	FLOW_STEP_HEADER,
+	FLOW_STEP_LEASE_SECONDS
+} from './store';
+
+/** The owner token header, which only guest flows read. */
+const ownerHeader = {
+	[FLOW_OWNER_HEADER]: t.Optional(
+		t.String({ description: 'The owner token of a guest flow, from the start response.' })
+	)
+};
+
+/** The headers of the state route: the flow key, here or as the `flowKey` query parameter. */
+const STATE_HEADERS = t.Object({
+	[FLOW_KEY_HEADER]: t.Optional(
+		t.String({ description: 'The key of the flow, from the start response.' })
+	),
+	...ownerHeader
+});
+
+/** The headers of a step route. */
+const STEP_HEADERS = t.Object({
+	[FLOW_KEY_HEADER]: t.String({ description: 'The key of the flow, from the start response.' }),
+	[FLOW_STEP_HEADER]: t.String({
+		description: 'The id of this submission. A retry sends the same id and gets the same answer.'
+	}),
+	...ownerHeader
+});
 
 /**
  * What a step learns about its flow, through {@link Flow.context}.
@@ -202,7 +231,9 @@ export namespace Flow {
 			route('ariadne:start', Http.post('/'), function (this: object, http: any) {
 				return engine.start(http, this);
 			});
-			route('ariadne:state', Http.get('/'), (http: any) => engine.state(http));
+			route('ariadne:state', Http.get('/', { headers: STATE_HEADERS }), (http: any) =>
+				engine.state(http)
+			);
 
 			Http.controller((path ?? `/flows/${name}`) as `/${string}`, http)(target as any);
 		};
@@ -261,7 +292,13 @@ export namespace Flow {
 			};
 			Object.defineProperty(wrapped, 'name', { value: original.name });
 			(descriptor as PropertyDescriptor).value = wrapped;
-			Http.post(`/${name}`, http)(target, key, descriptor);
+			Http.post(`/${name}`, {
+				...http,
+				headers: t.Object(
+					{ ...STEP_HEADERS.properties, ...http.headers?.properties },
+					{ additionalProperties: true }
+				)
+			})(target, key, descriptor);
 		};
 	}
 
