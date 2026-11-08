@@ -69,6 +69,10 @@ const loadTools = async (
 	return hephaestus.HephaestusModule ? [hephaestus.HephaestusModule] : [];
 };
 
+/** Whether the command lists or describes commands: `styx`, `styx list`, `styx help <command>`. */
+const listsCommands = ([command]: string[]): boolean =>
+	command === undefined || command === 'list' || command === 'help';
+
 const argv = process.argv.slice(2);
 const project = findProject(process.cwd());
 const projectCli = project ? findProjectCli(project) : undefined;
@@ -103,13 +107,23 @@ switch (decision.kind) {
 		break;
 	}
 	case 'app': {
+		const { stubCloudflareModules } = await import('./cloudflare-stubs');
+		stubCloudflareModules();
 		const { resolveAppEntry } = await import('./utils');
-		const { ElysiumError } = await import('@elysiumjs/core');
+		const { Application, ElysiumError } = await import('@elysiumjs/core');
 		try {
-			const App = (await resolveAppEntry(decision.project)) as unknown as new () => {
-				run(argv: string[]): Promise<void>;
-			};
-			await new App().run(decision.argv);
+			let App = await resolveAppEntry(decision.project);
+			if (listsCommands(decision.argv)) {
+				// The listing and the help show Styx's commands beside the app's.
+				const { StyxCliModule } = await import('./cli/app');
+				const modules = [StyxCliModule, ...(await loadTools(project, true))];
+				@Application.register({ modules })
+				class AppWithStyx extends App {}
+				App = AppWithStyx;
+			}
+			await new (App as unknown as new () => { run(argv: string[]): Promise<void> })().run(
+				decision.argv
+			);
 		} catch (error) {
 			if (!(error instanceof ElysiumError)) throw error;
 			console.error(error.message);

@@ -14,6 +14,7 @@
 
 import { join } from 'node:path';
 
+import { ElysiumError } from '@elysiumjs/core';
 import { pascal } from 'radash';
 
 import { getProjectPath } from './utils';
@@ -94,7 +95,14 @@ export const getModulePath = async (moduleName: string) => {
 		return './src';
 	}
 
-	return config.modules![moduleName];
+	const path = config.modules?.[moduleName];
+	if (path === undefined) {
+		throw new ElysiumError(
+			`Module ${moduleName} is not in the modules of .elysiumrc. Add it there, or create it with: styx module:new`
+		);
+	}
+
+	return path;
 };
 
 /**
