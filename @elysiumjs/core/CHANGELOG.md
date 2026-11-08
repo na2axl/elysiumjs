@@ -1,5 +1,11 @@
 # @elysiumjs/core
 
+## 0.15.0
+
+### Minor Changes
+
+- [#48](https://github.com/na2axl/elysiumjs/pull/48) [`d663d2e`](https://github.com/na2axl/elysiumjs/commit/d663d2ed95778079f71e53fcaf60a7f8ef570f6d) Thanks [@na2axl](https://github.com/na2axl)! - Routes declare request headers: `@Http.header(name, schema?)` gives a header to the handler, and the `headers` route option declares the others. Both are validated before the handler runs and documented in OpenAPI. Missing or malformed headers get a 400 `BAD_REQUEST` problem with an `errors` list.
+
 ## 0.14.0
 
 ### Minor Changes

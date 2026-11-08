@@ -1,6 +1,6 @@
 {
   "name": "@elysiumjs/ariadne",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "license": "Apache-2.0",
   "description": "Multi-step flows for the Elysium.js framework, with replayable steps and server-side state.",
   "private": false,
