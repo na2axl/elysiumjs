@@ -1,6 +1,6 @@
 {
   "name": "@elysiumjs/styx",
-  "version": "0.9.4",
+  "version": "0.9.5",
   "license": "Apache-2.0",
   "description": "The command line tool of the Elysium.js framework: creates projects, generates code and runs app commands.",
   "private": false,

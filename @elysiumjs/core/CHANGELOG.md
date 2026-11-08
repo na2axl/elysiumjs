@@ -1,5 +1,14 @@
 # @elysiumjs/core
 
+## 0.14.0
+
+### Minor Changes
+
+- [#46](https://github.com/na2axl/elysiumjs/pull/46) [`359f157`](https://github.com/na2axl/elysiumjs/commit/359f1579b9ad69643da5360d9ca9e80104fbe2f1) Thanks [@na2axl](https://github.com/na2axl)! - The OpenAPI document describes request bodies and query parameters:
+
+  - `@Http.query(schema)` schemas are passed to Elysia, so the query is validated (422 when it does not match) and documented.
+  - The body limit reads bodies sent without a content-length in `onRequest` instead of a global parser, so Elysia keeps its own parsers and each body keeps its media types in the document.
+
 ## 0.13.0
 
 ### Minor Changes
