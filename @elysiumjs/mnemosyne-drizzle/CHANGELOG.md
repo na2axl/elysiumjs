@@ -1,5 +1,18 @@
 # @elysiumjs/mnemosyne-drizzle
 
+## 0.5.0
+
+### Minor Changes
+
+- [#50](https://github.com/na2axl/elysiumjs/pull/50) [`afcb25c`](https://github.com/na2axl/elysiumjs/commit/afcb25c31ee29f358a46bc801dba8ecf53f30df9) Thanks [@na2axl](https://github.com/na2axl)! - Listings page by offset too: `pagination: 'offset'` on a query spec reads `page` instead of `cursor`, and `list()` gives `{ data, page, limit, total }`. `Query.offsetPage()`, `Query.offsetPageSchema()` and `Query.mapPage()` are new. Pages and page schemas are marked so that interceptors can render them (`Query.isPage()`, `Query.paginationOf()`, `Query.pageSchemaPagination()`, `Query.itemSchemaOf()`). `paginate()` of repositories is deprecated.
+
+### Patch Changes
+
+- Updated dependencies [[`afcb25c`](https://github.com/na2axl/elysiumjs/commit/afcb25c31ee29f358a46bc801dba8ecf53f30df9), [`afcb25c`](https://github.com/na2axl/elysiumjs/commit/afcb25c31ee29f358a46bc801dba8ecf53f30df9)]:
+  - @elysiumjs/core@0.16.0
+  - @elysiumjs/mnemosyne@0.6.0
+  - @elysiumjs/runtime-workers@0.1.5
+
 ## 0.4.5
 
 ### Patch Changes

@@ -1,5 +1,13 @@
 # @elysiumjs/themis
 
+## 0.3.3
+
+### Patch Changes
+
+- [#50](https://github.com/na2axl/elysiumjs/pull/50) [`afcb25c`](https://github.com/na2axl/elysiumjs/commit/afcb25c31ee29f358a46bc801dba8ecf53f30df9) Thanks [@na2axl](https://github.com/na2axl)! - `AuthMiddleware` and `CsrfMiddleware` list their problems, so the routes they guard document 401 `UNAUTHENTICATED` and 403 `CSRF_TOKEN_MISMATCH`.
+- Updated dependencies [[`afcb25c`](https://github.com/na2axl/elysiumjs/commit/afcb25c31ee29f358a46bc801dba8ecf53f30df9)]:
+  - @elysiumjs/core@0.16.0
+
 ## 0.3.2
 
 ### Patch Changes

@@ -1,7 +1,7 @@
 {
   "name": "@elysiumjs/hermes",
   "description": "Structured logging for the Elysium.js framework.",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/na2axl/elysiumjs.git",
