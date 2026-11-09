@@ -143,3 +143,63 @@ export class UnknownEventConsumerError extends ElysiumError {
 		);
 	}
 }
+
+/**
+ * Raised by an {@link EventStore} when another writer appended to the stream since it was loaded.
+ * The action retries in a new unit of work, which loads the stream again.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class ConcurrencyConflictError extends ElysiumError {
+	/** Conflicts are transient: the action retries them. */
+	public readonly transient = true;
+
+	constructor(
+		public readonly aggregateType: string,
+		public readonly aggregateId: string
+	) {
+		super(`The ${aggregateType} stream ${aggregateId} changed since it was loaded.`);
+	}
+}
+
+/**
+ * Raised when two stored event classes, or two aggregate classes, have the same name.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class DuplicateStreamNameError extends ElysiumError {
+	constructor(
+		public readonly kind: 'stored event' | 'aggregate' | 'projection',
+		public readonly streamName: string
+	) {
+		super(`Two ${kind} classes are named "${streamName}". Give one of them another name.`);
+	}
+}
+
+/**
+ * Raised when a class is used as a stored event or an aggregate without its decorator.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class UnregisteredStreamClassError extends ElysiumError {
+	constructor(
+		public readonly className: string,
+		public readonly decorator: string
+	) {
+		super(`${className} is not marked with ${decorator}.`);
+	}
+}
+
+/**
+ * Raised when a stream holds an event whose type no `@StoredEvent.register()` class has, or whose
+ * version has no upcaster to the current one.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class UnknownStoredEventError extends ElysiumError {
+	constructor(
+		public readonly type: string,
+		public readonly schemaVersion: number
+	) {
+		super(
+			`No stored event class reads "${type}" at version ${schemaVersion}. Register the class ` +
+				'with @StoredEvent.register(), and give it a @StoredEvent.upcast() for every older version.'
+		);
+	}
+}

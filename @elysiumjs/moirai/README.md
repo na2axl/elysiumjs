@@ -1,6 +1,6 @@
 # @elysiumjs/moirai
 
-Actions and queries for [Elysium.js](../core) apps. An action is validated, runs in a unit of work, retries transient failures and can be idempotent. Its side effects go to an outbox that commits with it, and consumers use an inbox to process each message once.
+Actions and queries for [Elysium.js](../core) apps. An action is validated, runs in a unit of work, retries transient failures and can be idempotent. Its side effects go to an outbox that commits with it, and consumers use an inbox to process each message once. Aggregates can be event-sourced: their state is the fold of the events of their stream, and projections and reactors follow those events.
 
 ## Installation
 
@@ -151,14 +151,170 @@ class Receipts {
 - `meta` gives the id of the event, its name, when it was published and the attempt.
 - Events need the `outbox` and `inbox` stores. Handlers register when their module is imported, so the process that relays imports them.
 
+## Event sourcing
+
+### Stored events
+
+A stored event is a fact recorded in the stream of an aggregate: a class extending `StoredEvent` with its data, marked with `@StoredEvent.register()`.
+
+```ts
+import type { Static } from 'typebox';
+
+import { StoredEvent } from '@elysiumjs/moirai';
+import { Type as t } from 'typebox';
+
+const Klaps = t
+	.Codec(t.String({ pattern: '^[0-9]+$' }))
+	.Decode((value) => BigInt(value))
+	.Encode((value: bigint) => value.toString());
+
+const KlapsSpentData = t.Object({ spendId: t.String(), sellerId: t.String(), klaps: Klaps });
+
+@StoredEvent.register({ name: 'KlapsSpent', version: 2, schema: KlapsSpentData })
+export class KlapsSpent extends StoredEvent<Static<typeof KlapsSpentData>> {
+	// Version 1 kept the seller in `ref`.
+	@StoredEvent.upcast(1)
+	static fromV1({ ref, ...data }: { spendId: string; klaps: string; ref: { sellerId: string } }) {
+		return { ...data, sellerId: ref.sellerId };
+	}
+}
+```
+
+- `name` is the type kept with each event, and defaults to the class name: keep it when the class is renamed. Two classes with one name throw `DuplicateStreamNameError`.
+- `schema` encodes the data when it is appended (codecs run then, such as a bigint kept as a string) and decodes it when it loads; data that does not match it is refused. Without a schema, the data is kept as it is and must be JSON-safe.
+- `version` is the version of the data, 1 by default. A static method marked with `@StoredEvent.upcast(n)` takes the stored data of version `n` and gives the data of version `n + 1`; upcasters chain from the stored version to the current one. A stored event that no class reads throws `UnknownStoredEventError`.
+- In `development` and `test`, the data is frozen.
+
+### Aggregates
+
+An aggregate is a class extending `Aggregate`, marked with `@Aggregate.register()`. Its public methods are the commands: they check the rules against the current state, then record events with `record()`, or return the DomainError that refuses the command. Methods marked with `@Aggregate.evolve()` give the next state from the state and an event; they may be protected or private.
+
+```ts
+import { Aggregate } from '@elysiumjs/moirai';
+
+type WalletState = { klaps: bigint };
+
+@Aggregate.register({ name: 'wallet' })
+export class Wallet extends Aggregate<WalletState> {
+	static override initialState: WalletState = { klaps: 0n };
+
+	get balance(): bigint {
+		return this.state.klaps;
+	}
+
+	spend(spendId: string, sellerId: string, klaps: bigint) {
+		if (klaps > this.state.klaps) return new InsufficientKlaps(klaps - this.state.klaps);
+		this.record(new KlapsSpent({ spendId, sellerId, klaps }));
+	}
+
+	@Aggregate.evolve(KlapsSpent)
+	protected spent(state: WalletState, event: KlapsSpent): WalletState {
+		return { klaps: state.klaps - event.data.klaps };
+	}
+}
+```
+
+- A recorded event is applied at once, so a command that records two events checks the second against the state after the first.
+- The state is a value: an evolve handler gives a new one. In `development` and `test`, it is frozen, so a mutation throws. An event without an evolve handler leaves the state as it is.
+- `name` is the aggregate type kept with each event, and defaults to the class name.
+
+`Streams.act()` runs a command in the open unit of work, or a new one: it loads the stream, runs the command, appends the events it recorded at the next versions, then runs the inline projections and the reactors of each event.
+
+```ts
+import { isDomainError } from '@elysiumjs/core';
+import { Streams } from '@elysiumjs/moirai';
+
+// In an action:
+const spent = await Streams.act(Wallet, userId, (wallet) => wallet.spend(spendId, sellerId, 120n));
+if (isDomainError(spent)) return spent;
+return { balance: spent.aggregate.balance, spends: spent.of(KlapsSpent).length };
+```
+
+- A command that returns a DomainError appends nothing, and `act()` returns the error.
+- When another writer appended to the stream since it was loaded, the append rejects with `ConcurrencyConflictError`, which is transient: an action retries it in a new unit of work, which loads the stream again.
+- Each event keeps metadata: the `eventMetadata` option of the module (such as the actor and the correlation id), then the `metadata` given to `act()`.
+- `Streams.retrieve(Wallet, id)` loads an aggregate to read its state.
+
+`Aggregate.given()` runs a command on an aggregate built from past events, without a store:
+
+```ts
+Wallet.given([new KlapsToppedUp({ topUpId: 't-1', klaps: 100n })])
+	.when((wallet) => wallet.spend('s-1', 'seller-1', 30n))
+	.assertRecorded(new KlapsSpent({ spendId: 's-1', sellerId: 'seller-1', klaps: 30n }));
+
+Wallet.given()
+	.when((wallet) => wallet.spend('s-1', 'seller-1', 30n))
+	.assertRefused(InsufficientKlaps);
+```
+
+`assertRecorded()` takes events, matched on their class and data, or classes; `assertNothingRecorded()` and `assertRefused()` complete it, and `recorded` and `outcome` give the rest.
+
+### Projections
+
+A projection writes a read model from stored events. An inline projection runs in the unit of work that appends the events, so a read right after a command sees what it did, and its failure rolls the command back.
+
+```ts
+import type { StoredEventMeta } from '@elysiumjs/moirai';
+
+import { Service } from '@elysiumjs/core';
+import { Projection } from '@elysiumjs/moirai';
+
+@Projection.inline({ name: 'wallet-movements', version: 1, models: [WalletMovementModel] })
+export class WalletMovements {
+	constructor(@Service.inject() private readonly movements: WalletMovementRepository) {}
+
+	@Projection.on(KlapsSpent)
+	protected async spent(event: KlapsSpent, meta: StoredEventMeta) {
+		await this.movements.insert({
+			id: event.data.spendId,
+			userId: meta.aggregateId,
+			klaps: -event.data.klaps
+		});
+	}
+}
+```
+
+- Handlers run in the module that registers the class, with its dependencies, and may be protected or private. `meta` gives the stream, the version, when the event happened, its metadata, and whether it is replayed.
+- `Projection.rebuild(WalletMovements)` rebuilds a projection in one unit of work: it resets its `models` with the `projections` storage, replays every event it handles in the order of the log, and records its `version`. On a transactional storage, readers see the previous read model until the rebuild commits.
+- `Projection.stale()` lists the projections whose `version` differs from the one they were last built with. The `projection:rebuild` command of `MoiraiModule` rebuilds them, or the one given with `--name`, whatever its version.
+- `Projection.project(WalletMovements, [[event, meta]])` runs the handlers for given events, such as in a test.
+
+### Reactors
+
+A reactor turns a stored event into what it causes besides the state: publishing an event for other modules, enqueueing a job, running an action. Reactor methods belong to any service, and are marked with `@Reactor.on()`:
+
+```ts
+import type { StoredEventMeta } from '@elysiumjs/moirai';
+
+import { Service } from '@elysiumjs/core';
+import { Event, Reactor } from '@elysiumjs/moirai';
+
+@Service.register()
+export class GiftReactor {
+	@Reactor.on(KlapsSpent, { when: (event) => event.data.sellerId !== 'house' })
+	protected async gifted(event: KlapsSpent, meta: StoredEventMeta) {
+		await Event.publish('KlapsGifted', {
+			buyerId: meta.aggregateId,
+			klaps: event.data.klaps.toString()
+		});
+	}
+}
+```
+
+- A reactor runs in the unit of work that appends the event, after the inline projections, so its effects commit with the event. It never runs when events are replayed.
+- `when` filters the events it reacts to.
+- Stored events stay inside their module, and change shape with upcasters. A reactor that publishes an `Event` is how other modules learn what happened, with a payload that is their contract.
+
 ## Stores
 
 ```ts
 import { MoiraiModule } from '@elysiumjs/moirai';
 import {
+	DrizzleEventStore,
 	DrizzleIdempotencyStore,
 	DrizzleInboxStore,
 	DrizzleOutboxStore,
+	DrizzleProjectionStorage,
 	moiraiTables,
 	PgAdvisoryLock
 } from '@elysiumjs/moirai-drizzle';
@@ -170,12 +326,14 @@ MoiraiModule.with({
 	outbox: () => new DrizzleOutboxStore({ table: billing.outbox }),
 	inbox: () => new DrizzleInboxStore({ table: billing.inbox }),
 	lock: () => new PgAdvisoryLock(),
+	events: () => new DrizzleEventStore({ table: billing.events }),
+	projections: () => new DrizzleProjectionStorage({ table: billing.projections }),
 	// On Cloudflare Workers, answer before the relay that follows a commit:
 	defer: (work) => Workers.context().waitUntil(work)
 });
 ```
 
-The memory stores (`MemoryIdempotencyStore`, `MemoryOutboxStore`, `MemoryInboxStore` and `MemoryActionLock`) are meant for tests and single-process apps. The memory outbox and inbox drop what a unit of work that rolls back wrote, like a database table.
+The memory stores (`MemoryIdempotencyStore`, `MemoryOutboxStore`, `MemoryInboxStore`, `MemoryActionLock`, `MemoryEventStore` and `MemoryProjectionStorage`) are meant for tests and single-process apps. The memory outbox, inbox, event store and projection storage drop what a unit of work that rolls back wrote, like a database table; `MemoryProjectionStorage` resets models with the function it is given.
 
 ### Module stores
 

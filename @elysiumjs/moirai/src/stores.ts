@@ -14,7 +14,7 @@
 
 import { UnitOfWork } from '@elysiumjs/mnemosyne';
 
-import { IdempotencyConflictError } from './errors';
+import { ConcurrencyConflictError, IdempotencyConflictError } from './errors';
 
 /**
  * What an idempotency store keeps of an action call: its response, replayed when the key comes
@@ -246,5 +246,180 @@ export class MemoryInboxStore implements InboxStore {
 		// Like a database table, the record of a unit of work that rolls back is gone.
 		UnitOfWork.afterRollback(() => void this.#seen.delete(key));
 		return true;
+	}
+}
+
+/**
+ * One event of a stream, as an {@link EventStore} keeps it.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export interface StoredEventRecord {
+	/** The place of the event in the whole log, given by the store. Absent before it is appended. */
+	position?: bigint;
+	/** The id of the aggregate the stream belongs to. */
+	aggregateId: string;
+	/** The name of the aggregate class. */
+	aggregateType: string;
+	/** The version of the stream this event makes, from 1. */
+	version: number;
+	/** The name of the stored event class. */
+	type: string;
+	/** The version of the event's data. */
+	schemaVersion: number;
+	/** The JSON data of the event. */
+	data: unknown;
+	/** Who caused the event and why, such as the actor and the correlation id. */
+	metadata: Record<string, unknown>;
+	/** When the event happened. */
+	occurredAt: Date;
+}
+
+/**
+ * Keeps the event streams of aggregates.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export interface EventStore {
+	/**
+	 * The events of a stream, in version order.
+	 * @param aggregateId The id of the aggregate.
+	 * @param afterVersion Only the events after this version. Defaults to 0.
+	 */
+	load(aggregateId: string, afterVersion?: number): Promise<readonly StoredEventRecord[]>;
+	/**
+	 * Appends events to their streams, in the open unit of work. Rejects with a
+	 * `ConcurrencyConflictError` when a stream already has an event at one of their versions, or
+	 * another event than the one before the first appended.
+	 * @param records The events, in version order.
+	 */
+	append(records: readonly StoredEventRecord[]): Promise<void>;
+	/**
+	 * Events of every stream, in the order of their position, such as to replay them.
+	 * @param filter The types to read, the position to read after, and how many to read.
+	 */
+	readAll(filter: EventReadFilter): Promise<readonly StoredEventRecord[]>;
+}
+
+/**
+ * Which events {@link EventStore.readAll} reads.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type EventReadFilter = {
+	/** Only these types of events. */
+	types?: readonly string[];
+	/** Only the events after this position. */
+	afterPosition?: bigint;
+	/** How many events to read at most. */
+	limit: number;
+};
+
+/**
+ * Resets the read models of projections for their rebuild, and keeps the version each projection
+ * was last built with.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export interface ProjectionStorage {
+	/**
+	 * Removes what the models hold, in the open unit of work. Readers keep seeing it until the
+	 * unit of work commits, when the storage is transactional.
+	 * @param models The models a projection writes.
+	 */
+	reset(models: readonly object[]): Promise<void>;
+	/**
+	 * The version a projection was last built with, if any.
+	 * @param name The name of the projection.
+	 */
+	version(name: string): Promise<number | undefined>;
+	/**
+	 * Records the version a projection was built with.
+	 * @param name The name of the projection.
+	 * @param version Its version.
+	 */
+	built(name: string, version: number): Promise<void>;
+}
+
+/**
+ * Keeps event streams in memory, for tests and single-process apps.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class MemoryEventStore implements EventStore {
+	readonly #records: StoredEventRecord[] = [];
+	#position = 0n;
+
+	/** Every event, in the order they were appended, for assertions. */
+	public get records(): StoredEventRecord[] {
+		return this.#records.map((record) => ({ ...record }));
+	}
+
+	public async load(aggregateId: string, afterVersion = 0): Promise<readonly StoredEventRecord[]> {
+		return this.#records
+			.filter((record) => record.aggregateId === aggregateId && record.version > afterVersion)
+			.sort((a, b) => a.version - b.version)
+			.map((record) => ({ ...record }));
+	}
+
+	public async readAll(filter: EventReadFilter): Promise<readonly StoredEventRecord[]> {
+		const { types, afterPosition = 0n, limit } = filter;
+		return this.#records
+			.filter(
+				(record) => record.position! > afterPosition && (!types || types.includes(record.type))
+			)
+			.sort((a, b) => (a.position! < b.position! ? -1 : 1))
+			.slice(0, limit)
+			.map((record) => ({ ...record }));
+	}
+
+	public async append(records: readonly StoredEventRecord[]): Promise<void> {
+		const first = new Map<string, StoredEventRecord>();
+		for (const record of records) {
+			const known = first.get(record.aggregateId);
+			if (!known || record.version < known.version) first.set(record.aggregateId, record);
+		}
+		for (const [aggregateId, record] of first) {
+			const head = this.#records
+				.filter((stored) => stored.aggregateId === aggregateId)
+				.reduce((max, stored) => Math.max(max, stored.version), 0);
+			if (head !== record.version - 1)
+				throw new ConcurrencyConflictError(record.aggregateType, aggregateId);
+		}
+		const appended = records.map((record) => ({ ...record, position: ++this.#position }));
+		this.#records.push(...appended);
+		// Like a database table, the events of a unit of work that rolls back are gone.
+		UnitOfWork.afterRollback(() => {
+			for (const record of appended) {
+				const index = this.#records.indexOf(record);
+				if (index >= 0) this.#records.splice(index, 1);
+			}
+		});
+	}
+}
+
+/**
+ * Keeps projection versions in memory, and resets models with a function, for tests and
+ * single-process apps.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class MemoryProjectionStorage implements ProjectionStorage {
+	readonly #versions = new Map<string, number>();
+
+	/** @param onReset Removes what the models hold. */
+	constructor(
+		private readonly onReset: (models: readonly object[]) => void | Promise<void> = () => {}
+	) {}
+
+	public async reset(models: readonly object[]): Promise<void> {
+		await this.onReset(models);
+	}
+
+	public async version(name: string): Promise<number | undefined> {
+		return this.#versions.get(name);
+	}
+
+	public async built(name: string, version: number): Promise<void> {
+		const before = this.#versions.get(name);
+		this.#versions.set(name, version);
+		UnitOfWork.afterRollback(() => {
+			if (before === undefined) this.#versions.delete(name);
+			else this.#versions.set(name, before);
+		});
 	}
 }
