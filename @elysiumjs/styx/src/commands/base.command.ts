@@ -18,6 +18,4 @@ import { Command } from '@elysiumjs/core';
  * Base class for Styx commands.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export abstract class BaseCommand extends Command {
-	public static override readonly dev: boolean = true;
-}
+export abstract class BaseCommand extends Command {}

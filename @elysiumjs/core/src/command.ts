@@ -123,11 +123,6 @@ export type CommandClass<T extends Command = Command> = Class<T> & {
 	readonly description: string;
 
 	/**
-	 * Whether the command is only available in development mode.
-	 */
-	readonly dev: boolean;
-
-	/**
 	 * Whether the application is booted eagerly before the command runs.
 	 */
 	readonly boot: boolean;
@@ -183,12 +178,6 @@ export abstract class Command extends InteractsWithConsole {
 	 * This is displayed when displaying help messages for the command.
 	 */
 	public static readonly description: string = 'Command description';
-
-	/**
-	 * Whether the command is only available in development mode.
-	 * When set to `true`, the command will not be available in production builds.
-	 */
-	public static readonly dev: boolean = false;
 
 	/**
 	 * Whether the whole application is booted before the command runs.

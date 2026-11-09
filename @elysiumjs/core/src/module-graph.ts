@@ -81,10 +81,7 @@ export type ModuleGraph = {
 	/** The service tokens `node` exports, or `true` when it exports everything. */
 	exportsOf(node: ModuleNode): readonly ServiceToken[] | true;
 
-	/**
-	 * The controllers, commands or jobs of one module that are active in the graph's environment
-	 * (their own `env`, and for commands their `dev` flag).
-	 */
+	/** The controllers, commands or jobs of one module that are active in the graph's environment. */
 	own<K extends Collectable>(node: ModuleNode, key: K): readonly Class<any>[];
 
 	/** Gathers the active controllers, commands or jobs across modules, with their owner. */
@@ -167,11 +164,7 @@ function computeDepths(roots: ModuleClass[], records: Map<ModuleClass, Record_>)
 /** The items of `key` a module lists that are active in `environment`. */
 function itemsOf(props: ModuleProps, key: Collectable, environment: string): Class<any>[] {
 	const items = (props[key] ?? []) as Class<any>[];
-	return items.filter(
-		(item) =>
-			Environments.isActive(item, environment) &&
-			!(key === 'commands' && environment === 'production' && (item as any).dev === true)
-	);
+	return items.filter((item) => Environments.isActive(item, environment));
 }
 
 function assertUniqueNames(classes: readonly ModuleClass[]) {

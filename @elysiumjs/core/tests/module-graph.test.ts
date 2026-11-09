@@ -161,11 +161,9 @@ describe('buildModuleGraph', () => {
 	it('throws when two modules register the same command', () => {
 		class X {
 			static command = 'same';
-			static dev = false;
 		}
 		class Y {
 			static command = 'same';
-			static dev = false;
 		}
 		@Module.register({ commands: [X as any] })
 		class M1 extends Module {}
@@ -195,25 +193,6 @@ describe('buildModuleGraph', () => {
 		@Module.register({ commands: [Plain as any] })
 		class M2 extends Module {}
 
-		expect(() => buildModuleGraph([M1, M2], 'development')).toThrow(DuplicateCommandError);
-	});
-
-	it('drops dev commands under production', () => {
-		class X {
-			static command = 'same';
-			static dev = true;
-		}
-		class Y {
-			static command = 'same';
-			static dev = false;
-		}
-		@Module.register({ commands: [X as any] })
-		class M1 extends Module {}
-		@Module.register({ commands: [Y as any] })
-		class M2 extends Module {}
-
-		const graph = buildModuleGraph([M1, M2], 'production');
-		expect(graph.collect('commands').map((c) => c.item)).toEqual([Y as any]);
 		expect(() => buildModuleGraph([M1, M2], 'development')).toThrow(DuplicateCommandError);
 	});
 

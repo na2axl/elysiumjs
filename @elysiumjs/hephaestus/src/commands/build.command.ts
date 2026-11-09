@@ -63,7 +63,6 @@ export class HephaestusBuildCommand extends Command {
 	public static readonly command: string = 'hephaestus:build';
 	public static readonly description: string =
 		'Build the project into a standalone binary, a Cloudflare Worker bundle, or a Node.js bundle.';
-	public static override readonly dev: boolean = true;
 
 	@Command.arg({
 		name: 'target',
