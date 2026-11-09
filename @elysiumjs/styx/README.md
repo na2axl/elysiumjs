@@ -49,7 +49,7 @@ In a multi module project, pass `--module <name>`. Run `styx help <command>` for
 
 ## Typed clients
 
-`styx routes:generate` writes the route types of the app to `src/routes.gen.ts` (set `routes` in `.elysiumrc` or pass `--out` to change it). The file exports `AppRoutes`, for Eden:
+`styx routes:generate` writes the route types of the app to `src/routes.gen.ts` (set `routes` in `.elysiumrc` or pass `--out`, absolute or relative to the project, to change it). The file exports `AppRoutes`, for Eden:
 
 ```ts
 import type { AppRoutes } from './routes.gen';

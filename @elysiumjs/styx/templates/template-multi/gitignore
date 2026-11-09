@@ -42,4 +42,4 @@ package-lock.json
 **/*.bun
 
 # route types written by `styx routes:generate`
-src/routes.gen.ts
+*.gen.ts
