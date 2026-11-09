@@ -16,6 +16,7 @@ import type { ElysiaOpenAPIConfig } from '@elysia/openapi';
 import type { AnyElysia, ErrorContext } from 'elysia';
 import type { TSchema } from 'typebox';
 import type { CommandClass } from './command';
+import type { Environment } from './environments';
 import type { FilterClass, FilterContext, FilterLevel } from './filter';
 import type { ElysiaApp, Route } from './http';
 import type { InterceptorClass } from './interceptor';
@@ -39,6 +40,7 @@ import { mergeEnvironmentSchemas, validateEnvironment } from './config';
 import { ConsoleFormat, InteractsWithConsole } from './console';
 import { Container } from './container';
 import { awaitEnv, Env, initEnv } from './env';
+import { Environments } from './environments';
 import { ElysiumError, InvalidControllerError } from './errors';
 import { FILTER_LEVELS, routeFilterLevels, runFilters } from './filter';
 import { Kernel } from './kernel';
@@ -53,7 +55,7 @@ import { Runtime } from './runtime';
 import { applyHttpSecurity } from './security';
 import { Service } from './service';
 import { createTestingApp, createTestingHttpApp } from './testing';
-import { currentEnvironment, deepMerge, Symbols } from './utils';
+import { deepMerge, Symbols } from './utils';
 
 /**
  * An application plugin, consisting of a function that returns an Elysia instance.
@@ -387,7 +389,7 @@ export abstract class Application extends InteractsWithConsole {
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param environment The environment to build the graph for. Defaults to the current one.
 	 */
-	public static moduleGraph(environment?: string): ModuleGraph {
+	public static moduleGraph(environment?: Environment): ModuleGraph {
 		const { modules }: AppProps = Metadata.get(Symbols.app, this) ?? {};
 		return buildModuleGraph(modules ?? [], environment);
 	}
@@ -703,7 +705,7 @@ export abstract class Application extends InteractsWithConsole {
 		}
 
 		for (const node of nodes) {
-			if (node.props.controllers?.length) {
+			if (this.kernel.graph.own(node, 'controllers').length > 0) {
 				this.debug(`Mounting module ${node.id}...`);
 				this.#elysia.use(await this.mountModule(node));
 			}
@@ -717,7 +719,7 @@ export abstract class Application extends InteractsWithConsole {
 		const middlewares = Metadata.get(Symbols.middlewares, node.moduleClass) ?? [];
 		applyMiddlewares(middlewares, app, node);
 
-		for (const controller of node.props.controllers ?? []) {
+		for (const controller of this.kernel.graph.own(node, 'controllers')) {
 			const plugin: ElysiaPlugin | undefined = Metadata.get(Symbols.elysiaPlugin, controller);
 			if (!plugin) throw new InvalidControllerError(controller.name, node.id);
 			app.use(await plugin(node));
@@ -779,7 +781,7 @@ export abstract class Application extends InteractsWithConsole {
 			...options,
 			path: e.request ? new URL(e.request.url).pathname : undefined,
 			requestId: e.request ? requestIdOf(e.request, requestId) : undefined,
-			development: currentEnvironment() === 'development'
+			development: Environments.includes(Environments.local)
 		});
 
 		if (problem.status >= 500 && !(await this.reportError(e))) return;

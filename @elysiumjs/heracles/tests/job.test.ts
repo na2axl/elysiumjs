@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Metadata, Service } from '@elysiumjs/core';
+import { Environments, Metadata, Service } from '@elysiumjs/core';
 import { afterAll, afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
 import { Job, JobOverlapBehavior, JobStatus, WithId } from '../src/job';
@@ -70,6 +70,16 @@ describe('Job class', () => {
 			expect(metadata.retryDelay).toBe(5000);
 			expect(metadata.overlapBehavior).toBe(JobOverlapBehavior.NO_OVERLAP);
 			expect(metadata.overlapDelay).toBe(1000);
+		});
+
+		it('records the environments the job is active in', () => {
+			@Job.register({ env: ['local', 'test'] })
+			class DevJob extends Job {
+				protected async execute(): Promise<void> {}
+			}
+
+			expect(Environments.of(DevJob)).toEqual(['local', 'test']);
+			expect(Environments.isActive(DevJob, 'production')).toBe(false);
 		});
 	});
 

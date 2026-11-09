@@ -13,12 +13,14 @@
 // limitations under the License.
 
 import type { Class } from 'type-fest';
+import type { Environment } from './environments';
 import type { ConfiguredModule, ModuleClass, ModuleProps } from './module';
 import type { ServiceToken } from './token';
 
 import { isEqual } from 'radash';
 
 import { getCommandName } from './command';
+import { Environments } from './environments';
 import {
 	ConflictingModuleConfigError,
 	DuplicateCommandError,
@@ -70,7 +72,7 @@ export type ModuleGraph = {
 	readonly skipped: readonly ModuleClass[];
 
 	/** The environment the graph was built for. */
-	readonly environment: string;
+	readonly environment: Environment;
 
 	node(cls: ModuleClass): ModuleNode | undefined;
 
@@ -80,7 +82,10 @@ export type ModuleGraph = {
 	/** The service tokens `node` exports, or `true` when it exports everything. */
 	exportsOf(node: ModuleNode): readonly ServiceToken[] | true;
 
-	/** Gathers controllers, commands or jobs across modules, with their owner. */
+	/** The controllers, commands or jobs of one module that are active in the graph's environment. */
+	own<K extends Collectable>(node: ModuleNode, key: K): readonly Class<any>[];
+
+	/** Gathers the active controllers, commands or jobs across modules, with their owner. */
 	collect<K extends Collectable>(key: K): readonly { item: Class<any>; module: ModuleNode }[];
 };
 
@@ -95,11 +100,11 @@ type Record_ = {
 
 const unwrap = (entry: Entry): ModuleClass => (isConfiguredModule(entry) ? entry.module : entry);
 
-const isActive = (props: ModuleProps, environment: string) =>
-	props.env === undefined || props.env.includes(environment);
+const isActive = (props: ModuleProps, environment: Environment) =>
+	Environments.includes(props.env, environment);
 
 /** Walks the import tree depth-first, producing records in topological order. */
-function discover(roots: Entry[], environment: string) {
+function discover(roots: Entry[], environment: Environment) {
 	const records = new Map<ModuleClass, Record_>();
 	const skipped: ModuleClass[] = [];
 	const done = new Set<ModuleClass>();
@@ -157,10 +162,10 @@ function computeDepths(roots: ModuleClass[], records: Map<ModuleClass, Record_>)
 	return depths;
 }
 
-function commandsOf(props: ModuleProps, environment: string): Class<any>[] {
-	return (props.commands ?? []).filter(
-		(c) => !(environment === 'production' && (c as any).dev === true)
-	);
+/** The items of `key` a module lists that are active in `environment`. */
+function itemsOf(props: ModuleProps, key: Collectable, environment: Environment): Class<any>[] {
+	const items = (props[key] ?? []) as Class<any>[];
+	return items.filter((item) => Environments.isActive(item, environment));
 }
 
 function assertUniqueNames(classes: readonly ModuleClass[]) {
@@ -172,10 +177,10 @@ function assertUniqueNames(classes: readonly ModuleClass[]) {
 	}
 }
 
-function assertUniqueCommands(nodes: readonly ModuleNode[], environment: string) {
+function assertUniqueCommands(nodes: readonly ModuleNode[], environment: Environment) {
 	const seen = new Map<string, string>();
 	for (const node of nodes) {
-		for (const command of commandsOf(node.props, environment)) {
+		for (const command of itemsOf(node.props, 'commands', environment)) {
 			const name = getCommandName(command);
 			const owner = seen.get(name);
 			if (owner !== undefined && owner !== node.id) {
@@ -201,7 +206,7 @@ const isModuleClass = (value: unknown): value is ModuleClass =>
  */
 export function buildModuleGraph(
 	rootModules: Entry[],
-	environment: string = currentEnvironment()
+	environment: Environment = currentEnvironment()
 ): ModuleGraph {
 	const { records, skipped } = discover(rootModules, environment);
 	assertUniqueNames([...records.keys()]);
@@ -263,14 +268,11 @@ export function buildModuleGraph(
 		return (exported ?? []).filter((e) => !isModuleClass(e)).map((e) => tokenOf(e as ServiceToken));
 	};
 
+	const own = <K extends Collectable>(node: ModuleNode, key: K) =>
+		itemsOf(node.props, key, environment);
+
 	const collect = <K extends Collectable>(key: K) =>
-		nodes.flatMap((module) => {
-			const items =
-				key === 'commands'
-					? commandsOf(module.props, environment)
-					: ((module.props[key] ?? []) as Class<any>[]);
-			return items.map((item) => ({ item, module }));
-		});
+		nodes.flatMap((module) => own(module, key).map((item) => ({ item, module })));
 
 	return {
 		nodes,
@@ -279,6 +281,7 @@ export function buildModuleGraph(
 		node: (cls) => byClass.get(cls),
 		visibleOwners,
 		exportsOf,
+		own,
 		collect
 	};
 }

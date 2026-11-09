@@ -13,10 +13,12 @@
 // limitations under the License.
 
 import type { Class } from 'type-fest';
+import type { Environment } from './environments';
 
 import { isArray, trim } from 'radash';
 
 import { ConsoleFormat, InteractsWithConsole } from './console';
+import { Environments } from './environments';
 import { Metadata } from './metadata';
 import { Symbols } from './utils';
 
@@ -122,14 +124,24 @@ export type CommandClass<T extends Command = Command> = Class<T> & {
 	readonly description: string;
 
 	/**
-	 * Whether the command is only available in development mode.
-	 */
-	readonly dev: boolean;
-
-	/**
 	 * Whether the application is booted eagerly before the command runs.
 	 */
 	readonly boot: boolean;
+};
+
+/**
+ * Options of `@Command.register()`.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type CommandRegisterOptions = {
+	/** The name the command is invoked by. Defaults to the static `command`. */
+	name?: string;
+
+	/**
+	 * The environments (`NODE_ENV` values) in which the command is available. In any other, it is
+	 * not listed in the CLI.
+	 */
+	env?: readonly Environment[];
 };
 
 /**
@@ -169,12 +181,6 @@ export abstract class Command extends InteractsWithConsole {
 	public static readonly description: string = 'Command description';
 
 	/**
-	 * Whether the command is only available in development mode.
-	 * When set to `true`, the command will not be available in production builds.
-	 */
-	public static readonly dev: boolean = false;
-
-	/**
 	 * Whether the whole application is booted before the command runs.
 	 * When `true`, every module is initialised and every service constructed first,
 	 * as for `serve`. Otherwise modules are initialised lazily, on demand.
@@ -188,9 +194,10 @@ export abstract class Command extends InteractsWithConsole {
 	 * @param options Optional registration options.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 */
-	public static register(options: { name?: string } = {}): ClassDecorator {
+	public static register(options: CommandRegisterOptions = {}): ClassDecorator {
 		return function (target) {
 			Metadata.define(Symbols.command, options, target);
+			Environments.set(target, options.env);
 		} as ClassDecorator;
 	}
 

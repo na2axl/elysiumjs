@@ -281,7 +281,6 @@ const execIn = async (cwd: string, command: string[]): Promise<void> => {
 export class CreateCommand extends Command {
 	public static override readonly command: string = 'create';
 	public static override readonly description: string = 'Creates a new Elysium project.';
-	public static override readonly dev: boolean = false;
 
 	@Command.arg({ description: 'The name of the project', type: CommandArgumentType.STRING })
 	private name?: string;

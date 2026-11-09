@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { Environment } from '@elysiumjs/core';
 import type { Class } from 'type-fest';
 
-import { InteractsWithConsole, Metadata } from '@elysiumjs/core';
+import { Environments, InteractsWithConsole, Metadata } from '@elysiumjs/core';
 import { assign, uid } from 'radash';
 
 import { Symbols } from './utils';
@@ -129,6 +130,12 @@ export type JobProps = {
 	 * @default 0
 	 */
 	overlapDelay?: number;
+
+	/**
+	 * The environments (`NODE_ENV` values) in which the job is active. In any other, it is not
+	 * registered: it is neither dispatched nor scheduled.
+	 */
+	env?: readonly Environment[];
 };
 
 /**
@@ -197,6 +204,7 @@ export abstract class Job extends InteractsWithConsole {
 			};
 
 			Metadata.define(Symbols.job, metadata, target);
+			Environments.set(target, options.env);
 		};
 	}
 

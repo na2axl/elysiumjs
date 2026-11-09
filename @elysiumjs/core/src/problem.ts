@@ -447,11 +447,11 @@ export class ConflictError extends DomainError.for('CONFLICT', 409) {}
 
 /**
  * An unexpected failure: a 500 problem. Anything thrown that is not a DomainError is sent as one,
- * with its detail and stack only in development.
+ * with its detail and stack only in development and test.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export class InternalError extends DomainError.for('INTERNAL_ERROR', 500, {
-	extensions: { stack: t.Optional(t.Array(t.String(), { description: 'In development only.' })) }
+	extensions: { stack: t.Optional(t.Array(t.String(), { description: 'In development and test only.' })) }
 }) {}
 
 /**
@@ -580,7 +580,7 @@ export const requestIdOf = (request: Request, make?: (request: Request) => strin
  * - Elysia's not found, parse and invalid cookie signature errors give `NOT_FOUND` (404) and
  *   `BAD_REQUEST` (400).
  * - Anything else is an `INTERNAL_ERROR` (500) whose detail and stack are only shown in
- *   development.
+ *   development and test.
  * @author Axel Nana <axel.nana@workbud.com>
  * @param error The thrown or returned value.
  * @param context The request and the application's problem options.

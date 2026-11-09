@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { Environment } from './environments';
 import type { ServiceToken } from './token';
 
 /**
@@ -207,10 +208,28 @@ export class EnvironmentSkippedModuleError extends ElysiumError {
 		public readonly service: string,
 		public readonly requester: string,
 		public readonly skippedModule: string,
-		public readonly environment: string
+		public readonly environment: Environment
 	) {
 		super(
 			`Service "${service}" requested by ${requester} belongs to module ${skippedModule}, which is skipped in the "${environment}" environment.`
+		);
+	}
+}
+
+/**
+ * Thrown when a service is not active in the current environment (its own `env`).
+ *
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class EnvironmentSkippedServiceError extends ElysiumError {
+	constructor(
+		public readonly service: string,
+		public readonly requester: string,
+		public readonly env: readonly Environment[],
+		public readonly environment: Environment
+	) {
+		super(
+			`Service "${service}" requested by ${requester} is only active in ${env.map((e) => `"${e}"`).join(', ')}, not in the "${environment}" environment.`
 		);
 	}
 }

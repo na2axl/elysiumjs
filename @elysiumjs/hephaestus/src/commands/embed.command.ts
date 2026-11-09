@@ -28,7 +28,6 @@ export class HephaestusEmbedCommand extends Command {
 	public static readonly command: string = 'hephaestus:embed';
 	public static readonly description: string =
 		'Generate asset loader module from configured patterns.';
-	public static override readonly dev: boolean = true;
 
 	public async run(): Promise<void> {
 		try {
