@@ -1,5 +1,11 @@
 # @elysiumjs/moirai
 
+## 0.4.0
+
+### Minor Changes
+
+- [#62](https://github.com/na2axl/elysiumjs/pull/62) [`ae64ba6`](https://github.com/na2axl/elysiumjs/commit/ae64ba68a356eb6e9fbac2a6088dc324a4f50df9) Thanks [@na2axl](https://github.com/na2axl)! - Event sourcing: `StoredEvent` classes with schemas and upcasters, `Aggregate` classes with commands and evolve handlers, `Streams.act()` and `Streams.retrieve()`, inline projections with rebuilds (`Projection`, the `projection:rebuild` command), reactors (`Reactor.on`), `Aggregate.given()` scenarios, and the `events` and `projections` stores with their memory versions.
+
 ## 0.3.4
 
 ### Patch Changes

@@ -1,5 +1,16 @@
 # @elysiumjs/moirai-drizzle
 
+## 0.2.0
+
+### Minor Changes
+
+- [#62](https://github.com/na2axl/elysiumjs/pull/62) [`ae64ba6`](https://github.com/na2axl/elysiumjs/commit/ae64ba68a356eb6e9fbac2a6088dc324a4f50df9) Thanks [@na2axl](https://github.com/na2axl)! - `DrizzleEventStore` and `DrizzleProjectionStorage`, with the `events` and `projections` tables in `moiraiTables()`.
+
+### Patch Changes
+
+- Updated dependencies [[`ae64ba6`](https://github.com/na2axl/elysiumjs/commit/ae64ba68a356eb6e9fbac2a6088dc324a4f50df9)]:
+  - @elysiumjs/moirai@0.4.0
+
 ## 0.1.9
 
 ### Patch Changes
