@@ -31,6 +31,7 @@ import { assign, isEmpty, objectify } from 'radash';
 
 import { Application } from './app';
 import { Container } from './container';
+import { Environments } from './environments';
 import { FILTER_LEVELS, routeFilterLevels } from './filter';
 import { interceptedSchema, runInterceptors } from './interceptor';
 import { Lifecycle } from './lifecycle';
@@ -543,6 +544,11 @@ export type HttpControllerOptions = {
 	 * and outside those of the route.
 	 */
 	interceptors?: InterceptorClass[];
+	/**
+	 * The environments (`NODE_ENV` values) in which the controller is active. In any other, its
+	 * routes are not mounted.
+	 */
+	env?: readonly string[];
 };
 
 /**
@@ -853,6 +859,7 @@ export namespace Http {
 	export const controller = (path: Route = '/', options: HttpControllerOptions = {}) => {
 		let props: HttpControllerProps = { ...options, path };
 		return function (target: Class<any>) {
+			Environments.set(target, options.env);
 			async function handleHttp(node: ModuleNode): Promise<ElysiaApp> {
 				await nextTick();
 

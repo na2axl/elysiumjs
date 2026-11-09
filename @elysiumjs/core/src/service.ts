@@ -19,6 +19,7 @@ import type { ServiceTag, ServiceToken } from './token';
 import { isString } from 'radash';
 
 import { Container } from './container';
+import { Environments } from './environments';
 import { ElysiumError } from './errors';
 import { Metadata } from './metadata';
 import { isServiceTag, serviceTag, tokenLabel, tokenOf } from './token';
@@ -110,6 +111,12 @@ export type ServiceProps = Partial<{
 	 * `Service.getAll(tag)` return for each of them.
 	 */
 	tags: readonly ServiceTag<any>[];
+
+	/**
+	 * The environments (`NODE_ENV` values) in which the service is active. In any other, the
+	 * service is not registered: it is not injected, and `injectAll` does not return it.
+	 */
+	env: readonly string[];
 }>;
 
 /**
@@ -131,6 +138,9 @@ export type ServiceFactoryDefinition = {
 
 	/** The tags the service is registered with. */
 	tags?: readonly ServiceTag<any>[];
+
+	/** The environments (`NODE_ENV` values) in which the service is active. */
+	env?: readonly string[];
 };
 
 /**
@@ -151,6 +161,7 @@ export namespace Service {
 	export const register = (props?: ServiceProps) => {
 		return function (target: ServiceClass) {
 			Metadata.define(Symbols.serviceOptions, props ?? {}, target);
+			Environments.set(target, props?.env);
 		};
 	};
 

@@ -14,7 +14,7 @@
 
 import type { Class } from 'type-fest';
 
-import { InteractsWithConsole, Metadata } from '@elysiumjs/core';
+import { Environments, InteractsWithConsole, Metadata } from '@elysiumjs/core';
 import { assign, uid } from 'radash';
 
 import { Symbols } from './utils';
@@ -129,6 +129,12 @@ export type JobProps = {
 	 * @default 0
 	 */
 	overlapDelay?: number;
+
+	/**
+	 * The environments (`NODE_ENV` values) in which the job is active. In any other, it is not
+	 * registered: it is neither dispatched nor scheduled.
+	 */
+	env?: readonly string[];
 };
 
 /**
@@ -197,6 +203,7 @@ export abstract class Job extends InteractsWithConsole {
 			};
 
 			Metadata.define(Symbols.job, metadata, target);
+			Environments.set(target, options.env);
 		};
 	}
 

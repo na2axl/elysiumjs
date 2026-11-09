@@ -117,7 +117,7 @@ export const collectRoutes = async (
 
 	for (const node of graph.nodes) {
 		const controllers: ControllerRoutes[] = [];
-		for (const controller of node.props.controllers ?? []) {
+		for (const controller of graph.own(node, 'controllers')) {
 			const description = Http.describe(controller);
 			if (!description) continue;
 			const source = located.get(controller);

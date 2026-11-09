@@ -17,6 +17,7 @@ import type { Class } from 'type-fest';
 import { isArray, trim } from 'radash';
 
 import { ConsoleFormat, InteractsWithConsole } from './console';
+import { Environments } from './environments';
 import { Metadata } from './metadata';
 import { Symbols } from './utils';
 
@@ -133,6 +134,21 @@ export type CommandClass<T extends Command = Command> = Class<T> & {
 };
 
 /**
+ * Options of `@Command.register()`.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type CommandRegisterOptions = {
+	/** The name the command is invoked by. Defaults to the static `command`. */
+	name?: string;
+
+	/**
+	 * The environments (`NODE_ENV` values) in which the command is available. In any other, it is
+	 * not listed in the CLI.
+	 */
+	env?: readonly string[];
+};
+
+/**
  * Gets the name a command is invoked by: the `name` given to `@Command.register()`,
  * or else the static `command`.
  * @param cls The command class.
@@ -188,9 +204,10 @@ export abstract class Command extends InteractsWithConsole {
 	 * @param options Optional registration options.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 */
-	public static register(options: { name?: string } = {}): ClassDecorator {
+	public static register(options: CommandRegisterOptions = {}): ClassDecorator {
 		return function (target) {
 			Metadata.define(Symbols.command, options, target);
+			Environments.set(target, options.env);
 		} as ClassDecorator;
 	}
 

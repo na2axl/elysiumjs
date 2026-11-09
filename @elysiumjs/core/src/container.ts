@@ -24,6 +24,7 @@ import {
 	DuplicateGlobalServiceError,
 	ElysiumError,
 	EnvironmentSkippedModuleError,
+	EnvironmentSkippedServiceError,
 	OutsideRequestScopeError,
 	ScopeMismatchError,
 	ServiceNotFoundError,
@@ -139,8 +140,12 @@ const constructedEntries: { entry: ContainerEntry; instance: unknown }[] = [];
 let overridden: ReadonlySet<ServiceToken> = new Set();
 let visibility: VisibilityResolver | null = null;
 let moduleInitHook: ((owner: ModuleNode) => Promise<void> | void) | null = null;
-let skippedLookup:
-	((token: ServiceToken) => { module: string; environment: string } | null) | null = null;
+/** Why a service is not registered: its module is skipped, or the service itself is. */
+type SkippedService =
+	| { readonly module: string; readonly environment: string }
+	| { readonly env: readonly string[]; readonly environment: string };
+
+let skippedLookup: ((token: ServiceToken) => SkippedService | null) | null = null;
 
 const isPromise = (value: unknown): value is Promise<unknown> =>
 	typeof value === 'object' &&
@@ -461,7 +466,7 @@ export namespace Container {
 	 * that belong to modules skipped for the current environment.
 	 */
 	export function setSkippedLookup(
-		lookup: ((token: ServiceToken) => { module: string; environment: string } | null) | null
+		lookup: ((token: ServiceToken) => SkippedService | null) | null
 	): void {
 		skippedLookup = lookup;
 	}
@@ -565,7 +570,7 @@ export namespace Container {
 
 	/**
 	 * Like {@link get}, but awaits the `onInit` of the service and of its owning module.
-	 * @throws {ServiceNotFoundError | ServiceNotVisibleError | EnvironmentSkippedModuleError}
+	 * @throws {ServiceNotFoundError | ServiceNotVisibleError | EnvironmentSkippedModuleError | EnvironmentSkippedServiceError}
 	 */
 	export async function resolve(service: ServiceToken, requester: string): Promise<unknown> {
 		const found = lookup(service, ModuleContext.current());
@@ -607,7 +612,7 @@ export namespace Container {
 
 	/**
 	 * Builds `cls` with its injected dependencies, resolved from the current module context.
-	 * @throws {ServiceNotFoundError | ServiceNotVisibleError | EnvironmentSkippedModuleError}
+	 * @throws {ServiceNotFoundError | ServiceNotVisibleError | EnvironmentSkippedModuleError | EnvironmentSkippedServiceError}
 	 */
 	export function make<T>(cls: Class<T>): T {
 		const dependencies: Injection[] = Metadata.get(Symbols.services, cls) ?? [];
@@ -647,13 +652,16 @@ export namespace Container {
 		const token = tokenOf(service);
 		const name = tokenLabel(token);
 		const skipped = skippedLookup?.(token);
-		if (skipped) {
+		if (skipped && 'module' in skipped) {
 			return new EnvironmentSkippedModuleError(
 				name,
 				requester,
 				skipped.module,
 				skipped.environment
 			);
+		}
+		if (skipped) {
+			return new EnvironmentSkippedServiceError(name, requester, skipped.env, skipped.environment);
 		}
 
 		const hidden = [...moduleScopes.values()]

@@ -216,6 +216,24 @@ export class EnvironmentSkippedModuleError extends ElysiumError {
 }
 
 /**
+ * Thrown when a service is not active in the current environment (its own `env`).
+ *
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class EnvironmentSkippedServiceError extends ElysiumError {
+	constructor(
+		public readonly service: string,
+		public readonly requester: string,
+		public readonly env: readonly string[],
+		public readonly environment: string
+	) {
+		super(
+			`Service "${service}" requested by ${requester} is only active in ${env.map((e) => `"${e}"`).join(', ')}, not in the "${environment}" environment.`
+		);
+	}
+}
+
+/**
  * Thrown when a class listed in a module's `controllers` is not a decorated controller.
  *
  * @author Axel Nana <axel.nana@workbud.com>

@@ -22,6 +22,7 @@ import type { Injection, ServiceToken } from './token';
 import { isEqual } from 'radash';
 
 import { Container } from './container';
+import { Environments } from './environments';
 import { ConflictingModuleConfigError, ElysiumError } from './errors';
 import { LifecycleBus } from './lifecycle';
 import { wireLifecycleListeners } from './lifecycle-wiring';
@@ -52,6 +53,9 @@ const scopeOf = (def: ServiceDefinition): ServiceScope =>
 const tokenOfDefinition = (def: ServiceDefinition): ServiceToken =>
 	typeof def === 'function' ? tokenOf(def) : def.name;
 
+const environmentsOf = (def: ServiceDefinition): readonly string[] | undefined =>
+	typeof def === 'function' ? Environments.of(def) : def.env;
+
 /**
  * Turns a module graph into a running container: registers configs and services,
  * initialises modules (eagerly or on demand) and shuts everything down in order.
@@ -72,6 +76,8 @@ export class Kernel {
 		{ owned: Class<any>[]; services: Set<Class<any>> }
 	>();
 	private readonly wired: WiredListener[] = [];
+	/** The services left out by their own `env`, with the environments they are active in. */
+	private readonly skippedServices = new Map<ServiceToken, readonly string[]>();
 	private shutdownPromise: Promise<void> | undefined;
 
 	public constructor(private readonly moduleGraph: ModuleGraph) {}
@@ -117,10 +123,15 @@ export class Kernel {
 				Container.register(node, { name: node.moduleClass.config, factory: () => config }, config);
 			}
 			const { services } = node.props;
-			const defs = typeof services === 'function' ? services(config) : (services ?? []);
+			const listed = typeof services === 'function' ? services(config) : (services ?? []);
+			const defs: ServiceDefinition[] = [];
+			for (const def of listed) {
+				if (Environments.includes(environmentsOf(def), graph.environment)) defs.push(def);
+				else this.skippedServices.set(tokenOfDefinition(def), environmentsOf(def)!);
+			}
 			const serviceClasses = defs.filter((d): d is Class<any> => typeof d === 'function');
 			this.ownClasses.set(node, {
-				owned: [...serviceClasses, ...(node.props.controllers ?? [])],
+				owned: [...serviceClasses, ...graph.own(node, 'controllers')],
 				services: new Set(serviceClasses)
 			});
 			for (const def of defs) {
@@ -334,7 +345,10 @@ export class Kernel {
 		return isConfigurable(node.moduleClass) ? node.moduleClass.resolveConfig(input) : undefined;
 	}
 
-	/** Maps class and factory service names of skipped modules to the module that declares them. */
+	/**
+	 * Maps class and factory service names of skipped modules to the module that declares them,
+	 * and the services left out by their own `env` to that list.
+	 */
 	private buildSkippedLookup() {
 		const owners = new Map<ServiceToken, string>();
 		for (const cls of this.graph.skipped) {
@@ -345,7 +359,9 @@ export class Kernel {
 		const { environment } = this.graph;
 		return (token: ServiceToken) => {
 			const module = owners.get(token);
-			return module === undefined ? null : { module, environment };
+			if (module !== undefined) return { module, environment };
+			const env = this.skippedServices.get(token);
+			return env === undefined ? null : { env, environment };
 		};
 	}
 }

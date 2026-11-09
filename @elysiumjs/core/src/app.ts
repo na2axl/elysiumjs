@@ -703,7 +703,7 @@ export abstract class Application extends InteractsWithConsole {
 		}
 
 		for (const node of nodes) {
-			if (node.props.controllers?.length) {
+			if (this.kernel.graph.own(node, 'controllers').length > 0) {
 				this.debug(`Mounting module ${node.id}...`);
 				this.#elysia.use(await this.mountModule(node));
 			}
@@ -717,7 +717,7 @@ export abstract class Application extends InteractsWithConsole {
 		const middlewares = Metadata.get(Symbols.middlewares, node.moduleClass) ?? [];
 		applyMiddlewares(middlewares, app, node);
 
-		for (const controller of node.props.controllers ?? []) {
+		for (const controller of this.kernel.graph.own(node, 'controllers')) {
 			const plugin: ElysiaPlugin | undefined = Metadata.get(Symbols.elysiaPlugin, controller);
 			if (!plugin) throw new InvalidControllerError(controller.name, node.id);
 			app.use(await plugin(node));
