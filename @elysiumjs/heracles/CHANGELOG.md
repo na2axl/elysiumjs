@@ -1,5 +1,11 @@
 # @elysiumjs/heracles
 
+## 0.9.2
+
+### Patch Changes
+
+- [#64](https://github.com/na2axl/elysiumjs/pull/64) [`fb56b18`](https://github.com/na2axl/elysiumjs/commit/fb56b1836cc89d6975e390a45fc46f251db78eb6) Thanks [@na2axl](https://github.com/na2axl)! - A `Scheduler` is made and fans out in the module that declares its job, so it can inject that module's services whoever dispatches the tick, such as `HeraclesWorkersModule` on a cron trigger.
+
 ## 0.9.1
 
 ### Patch Changes
