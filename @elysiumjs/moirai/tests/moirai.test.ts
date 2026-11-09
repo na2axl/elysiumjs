@@ -714,6 +714,23 @@ describe('module stores', () => {
 		}
 	}
 
+	class Prices {
+		public of(order: string) {
+			return `${order}:42`;
+		}
+	}
+
+	@Query.register({ input: t.Object({ order: t.String() }) })
+	class Quote extends Query {
+		public constructor(@Service.inject(Prices) private readonly prices: Prices) {
+			super();
+		}
+
+		public handle(input: { order: string }) {
+			return { price: this.prices.of(input.order) };
+		}
+	}
+
 	class Notifier {
 		@Event.on('invoice.issued', { consumer: 'notify' })
 		public static notify(payload: { order: string }) {
@@ -725,6 +742,8 @@ describe('module stores', () => {
 		services: (_config) => [
 			Charge,
 			Pay,
+			Prices,
+			Quote,
 			...Moirai.stores({
 				outbox: () => billing.outbox,
 				inbox: () => billing.inbox,
@@ -790,6 +809,12 @@ describe('module stores', () => {
 		expect(billing.outbox.rows.every((row) => row.dispatchedAt !== null)).toBe(true);
 		expect(sent).toEqual([{ to: 'o1' }]);
 		expect(handled.sort()).toEqual(['ledger:o1', 'notify:o1']);
+	});
+
+	it('runs a query with the services of its module', async () => {
+		await boot();
+		// Prices is private to BillingModule, and the query is asked from outside it.
+		expect(await Moirai.ask(Quote, { order: 'o1' })).toEqual({ price: 'o1:42' });
 	});
 
 	it('records each handled event in the inbox of the handler module', async () => {

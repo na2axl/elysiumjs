@@ -525,9 +525,9 @@ export namespace Moirai {
 	};
 
 	/**
-	 * Runs a query: validates the input, checks `authorize`, and runs the handler. A refusal is a
-	 * value: the DomainError the handler returns or throws, an invalid input, or a refused
-	 * `authorize`.
+	 * Runs a query in the module that registers it: validates the input, checks `authorize`, and
+	 * runs the handler with the services of that module. A refusal is a value: the DomainError the
+	 * handler returns or throws, an invalid input, or a refused `authorize`.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param query The query class.
 	 * @param args The raw input, left out when `handle()` takes none.
@@ -539,9 +539,12 @@ export namespace Moirai {
 		settle(async () => {
 			const props = Metadata.get(QUERY, query) as (QueryOptions & { name: string }) | undefined;
 			if (!props) throw new TypeError(`${query.name} is not marked with @Query.register().`);
-			const value = validate(props.input, input, props.name);
-			if (props.authorize && !(await props.authorize(value)))
-				throw new CallForbiddenError(props.name);
-			return instanceOf(query).handle(value, { name: props.name, attempt: 1 });
+			// The query runs in its module, so that it uses the services of that module.
+			return inOwnerModule(query, async () => {
+				const value = validate(props.input, input, props.name);
+				if (props.authorize && !(await props.authorize(value)))
+					throw new CallForbiddenError(props.name);
+				return instanceOf(query).handle(value, { name: props.name, attempt: 1 });
+			});
 		}) as Promise<QueryOutcome<C>>;
 }
