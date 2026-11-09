@@ -99,10 +99,10 @@ export namespace Projection {
 	 */
 	export const on =
 		<E extends StoredEvent>(event: StoredEventClass<E>) =>
-		(
+		<T extends (event: E, meta: StoredEventMeta) => unknown>(
 			target: object,
 			method: string | symbol,
-			_descriptor: TypedPropertyDescriptor<(event: E, meta: StoredEventMeta) => unknown>
+			_descriptor: TypedPropertyDescriptor<T>
 		): void => {
 			const owner = target.constructor;
 			let handlers = HANDLERS.get(owner);

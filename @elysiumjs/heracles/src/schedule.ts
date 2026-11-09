@@ -15,7 +15,7 @@
 import type { CronSchedule } from './cron';
 import type { JobClass } from './job';
 
-import { ElysiumError, getLogger, Metadata, Service } from '@elysiumjs/core';
+import { ElysiumError, getLogger, Metadata, ModuleContext, Service } from '@elysiumjs/core';
 import { Redis } from '@elysiumjs/redis';
 
 import { Cron } from './cron';
@@ -221,8 +221,17 @@ export abstract class Scheduler<TJob extends JobClass<any, any> = JobClass<any, 
 		}
 		const tick = new Date(Math.floor(at.getTime() / 60_000) * 60_000);
 		const owner = schedule.scheduler;
-		const scheduler = (Service.exists(owner) ? Service.get(owner) : null) ?? Service.make(owner);
-		const cases = await scheduler.fanOut(tick);
+		// The scheduler is a service of the module that declares its job: it is made and fans out
+		// there, so that it sees that module's services, whoever dispatches the tick.
+		const module = JobRegistry.all().find((entry) => entry.jobClass === jobClass)?.module;
+		const fanOut = async () => {
+			const scheduler = (Service.exists(owner) ? Service.get(owner) : null) ?? Service.make(owner);
+			return scheduler.fanOut(tick);
+		};
+		const cases =
+			module && module !== ModuleContext.current()
+				? await ModuleContext.run(module, fanOut)
+				: await fanOut();
 		for (const { key, args } of cases) {
 			await Heracles.dispatch(jobClass, args as never, {
 				dispatchId: Scheduler.dispatchIdOf(name, key, tick)

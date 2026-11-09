@@ -16,11 +16,12 @@ import { Application, Module, Service } from '@elysiumjs/core';
 import { afterEach, describe, expect, it, spyOn } from 'bun:test';
 
 import { HeraclesWorkCommand } from '../src/commands';
-import { HeraclesModule } from '../src/heracles.module';
 import { Heracles } from '../src/heracles';
+import { HeraclesModule } from '../src/heracles.module';
 import { Job } from '../src/job';
 import { Queue } from '../src/queue';
 import { DuplicateJobError, JobRegistry, QUEUES_SERVICE } from '../src/registry';
+import { clearSchedulers, Scheduler } from '../src/schedule';
 import { RedisTransport } from '../src/transports/redis.transport';
 import { RedisWorker } from '../src/workers/redis.worker';
 
@@ -49,6 +50,15 @@ const makeDuplicate = () => {
 
 @Module.register({ services: [Secret], jobs: [SendInvoiceJob] })
 class BillingModule extends Module {}
+
+@Job.register({ name: 'RemindJob' })
+class RemindJob extends Job {
+	constructor(public readonly who: string) {
+		super();
+	}
+
+	protected async execute(): Promise<void> {}
+}
 
 @Module.register({ jobs: [makeDuplicate()] })
 class LegacyModule extends Module {}
@@ -113,6 +123,37 @@ describe('HeraclesModule', () => {
 		expect(JobRegistry.all().map((e) => e.jobClass)).toContain(SendInvoiceJob);
 	});
 
+	it('fans a scheduler out in the module of its job, whoever dispatches the tick', async () => {
+		@Scheduler.register({ cron: '0 7 * * *', job: RemindJob, name: 'daily-reminders' })
+		class DailyReminders extends Scheduler<typeof RemindJob> {
+			constructor(@Service.inject(Secret) private readonly secret: Secret) {
+				super();
+			}
+
+			public fanOut() {
+				return [{ key: this.secret.value, args: [this.secret.value] as [string] }];
+			}
+		}
+
+		@Module.register({ services: [Secret, DailyReminders], jobs: [RemindJob] })
+		class RemindersModule extends Module {}
+
+		app = await Application.testing({
+			modules: [HeraclesModule, RemindersModule],
+			boot: 'eager'
+		});
+		const calls: unknown[][] = [];
+		const dispatch = spyOn(Heracles, 'dispatch').mockImplementation(async (...args: unknown[]) => {
+			calls.push(args);
+			return { jobId: 'j', dispatchId: 'd' };
+		});
+		const [job] = Scheduler.jobsFor('0 7 * * *');
+		expect(await Scheduler.dispatch(job!, new Date('2026-11-09T07:00:00.000Z'))).toBe(1);
+		dispatch.mockRestore();
+		expect(calls[0]?.[1]).toEqual(['module-private']);
+		clearSchedulers();
+	});
+
 	it('ignores job classes without heracles metadata', async () => {
 		class Plain {}
 
@@ -137,7 +178,9 @@ describe('HeraclesModule', () => {
 
 	it('creates the configured queues', async () => {
 		app = await Application.testing({
-			modules: [HeraclesModule.with({ queues: { 'module-test-q': { transport: StubTransport as any } } })],
+			modules: [
+				HeraclesModule.with({ queues: { 'module-test-q': { transport: StubTransport as any } } })
+			],
 			boot: 'eager'
 		});
 		await app.get(QUEUES_SERVICE);
@@ -253,7 +296,10 @@ describe('HeraclesModule', () => {
 			]
 		});
 
-		await Promise.all([Heracles.dispatch(SendInvoiceJob, []), Heracles.dispatch(SendInvoiceJob, [])]);
+		await Promise.all([
+			Heracles.dispatch(SendInvoiceJob, []),
+			Heracles.dispatch(SendInvoiceJob, [])
+		]);
 		await Heracles.dispatch(SendInvoiceJob, []);
 
 		expect(starts).toBe(1);
