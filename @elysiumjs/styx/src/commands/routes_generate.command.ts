@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { join, relative } from 'node:path';
+import { relative, resolve } from 'node:path';
 
 import { Command, CommandArgumentType, ConsoleFormat } from '@elysiumjs/core';
 
@@ -33,7 +33,8 @@ export class RoutesGenerateCommand extends BaseCommand {
 		'Writes the route types of the app (AppRoutes) for typed clients.';
 
 	@Command.arg({
-		description: 'The file to write, relative to the project (default: src/routes.gen.ts)',
+		description:
+			'The file to write, absolute or relative to the project (default: src/routes.gen.ts)',
 		type: CommandArgumentType.STRING
 	})
 	private out?: string;
@@ -41,7 +42,7 @@ export class RoutesGenerateCommand extends BaseCommand {
 	public async run(): Promise<void> {
 		const projectPath = getProjectPath();
 		const config = await parseProjectConfig();
-		const outFile = join(projectPath, this.out ?? config.routes ?? 'src/routes.gen.ts');
+		const outFile = resolve(projectPath, this.out ?? config.routes ?? 'src/routes.gen.ts');
 
 		const app = await resolveAppEntry(projectPath);
 		const { modules, missing } = await collectRoutes(projectPath, app, outFile);
@@ -50,7 +51,7 @@ export class RoutesGenerateCommand extends BaseCommand {
 
 		for (const name of missing) {
 			this.warning(
-				`${name} is not declared in the project sources, so its routes are not in AppRoutes.`
+				`${name} is not exported by a file of the project and no contributor types all its routes, so its routes are not in AppRoutes.`
 			);
 		}
 

@@ -240,6 +240,15 @@ export namespace Service {
 	};
 
 	/**
+	 * The tags a service class is registered with by `@Service.register()`.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param service The service class.
+	 * @returns The tags; empty when it has none or is not registered.
+	 */
+	export const tagsOf = (service: Function): readonly ServiceTag<any>[] =>
+		(Metadata.get(Symbols.serviceOptions, service) as ServiceProps | undefined)?.tags ?? [];
+
+	/**
 	 * Retrieves every service registered with a tag, in registration order.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param tag The tag, from `Service.tag()`.

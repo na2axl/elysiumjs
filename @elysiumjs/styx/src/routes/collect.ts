@@ -12,12 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Application } from '@elysiumjs/core';
+import type {
+	Application,
+	HttpRouteDescription,
+	HttpRouteTypes,
+	HttpRouteTypesContributor
+} from '@elysiumjs/core';
 import type { ControllerRoutes, ModuleRoutes } from './render';
 
-import { basename, dirname, join, relative, resolve } from 'node:path';
+import { basename, dirname, relative, resolve, sep } from 'node:path';
 
-import { Http } from '@elysiumjs/core';
+import { Environments, Http, Service } from '@elysiumjs/core';
+
+import { CONTROLLER, quote } from './render';
 
 /**
  * The result of reading the routes of an app.
@@ -26,48 +33,100 @@ import { Http } from '@elysiumjs/core';
 export type CollectedRoutes = {
 	/** The modules with controllers, in mounting order. */
 	modules: ModuleRoutes[];
-	/** Controllers whose source file was not found in the project; their routes are left out. */
+	/**
+	 * Controllers that no file of the project exports and that no contributor types completely;
+	 * their routes are left out.
+	 */
 	missing: string[];
 };
+
+type ModuleNode = ReturnType<typeof Application.moduleGraph>['nodes'][number];
 
 /** Files that never declare controllers for the app. */
 const IGNORED = /(\.d|\.test|\.spec)\.tsx?$/;
 
+/** Source files, whose import specifier is the path without the extension. */
+const SOURCE = /\.tsx?$/;
+
 /**
- * Finds the file and export name of every controller class declared in the project sources.
- * Only files that mention `Http.controller` are imported.
+ * Finds the file and export name of every class exported by the project files the app has
+ * loaded. Importing the app loads every controller its modules list, whatever the file name or
+ * the decorator that declares it; importing a loaded file again gives back its exports without
+ * running it.
  */
-const locateControllers = async (
+const locateExports = async (
 	projectPath: string,
 	outFile: string
 ): Promise<Map<Function, { file: string; exportName: string; className: string }>> => {
 	const found = new Map<Function, { file: string; exportName: string; className: string }>();
-	const glob = new Bun.Glob('**/*.{ts,tsx}');
-	const roots = ['src', 'index.ts'];
+	const root = resolve(projectPath) + sep;
 
-	for (const root of roots) {
-		const base = join(projectPath, root);
-		const files = root.endsWith('.ts')
-			? (await Bun.file(base).exists())
-				? [base]
-				: []
-			: await Array.fromAsync(glob.scan({ cwd: base, absolute: true })).catch(() => []);
-
-		for (const file of files.sort()) {
-			if (IGNORED.test(file) || resolve(file) === resolve(outFile)) continue;
-			if (file.includes('/node_modules/')) continue;
-			if (!(await Bun.file(file).text()).includes('Http.controller')) continue;
-			const exports: Record<string, unknown> = await import(file);
-			for (const [exportName, value] of Object.entries(exports)) {
-				if (typeof value === 'function' && !found.has(value)) {
-					found.set(value, { file, exportName, className: value.name });
-				}
+	for (const file of Object.keys(require.cache).sort()) {
+		const path = resolve(file);
+		if (!path.startsWith(root) || !SOURCE.test(path) || IGNORED.test(path)) continue;
+		if (path === resolve(outFile) || path.includes(`${sep}node_modules${sep}`)) continue;
+		const exports: Record<string, unknown> = await import(path);
+		for (const [exportName, value] of Object.entries(exports)) {
+			if (typeof value === 'function' && !found.has(value)) {
+				found.set(value, { file: path, exportName, className: value.name });
 			}
 		}
 	}
 
 	return found;
 };
+
+/** The config of a module, best effort: `undefined` when it cannot be evaluated without booting. */
+const configOf = async (node: ModuleNode): Promise<unknown> => {
+	try {
+		const [selected] = [...node.configSources].sort((a, b) => a.depth - b.depth);
+		const config = selected?.config;
+		const input = typeof config === 'function' ? await (config as () => unknown)() : config;
+		const moduleClass = node.moduleClass as { resolveConfig?: (input: unknown) => unknown };
+		return typeof moduleClass.resolveConfig === 'function'
+			? moduleClass.resolveConfig(input)
+			: input;
+	} catch {
+		return undefined;
+	}
+};
+
+/**
+ * The route types contributors of the app: the service classes its modules register with the
+ * `Http.RouteTypes` tag, active in development.
+ */
+const contributorsOf = async (app: typeof Application): Promise<HttpRouteTypesContributor[]> => {
+	const graph = app.moduleGraph('development');
+	const contributors: HttpRouteTypesContributor[] = [];
+	const seen = new Set<Function>();
+
+	for (const node of graph.nodes) {
+		const { services } = node.props;
+		let listed: unknown[] = [];
+		try {
+			listed = typeof services === 'function' ? services(await configOf(node)) : (services ?? []);
+		} catch {
+			continue;
+		}
+		for (const def of listed) {
+			if (typeof def !== 'function' || seen.has(def)) continue;
+			if (!Service.tagsOf(def).includes(Http.RouteTypes)) continue;
+			if (!Environments.isActive(def, 'development')) continue;
+			seen.add(def);
+			contributors.push(new (def as new () => HttpRouteTypesContributor)());
+		}
+	}
+
+	return contributors;
+};
+
+/** Whether `types` give every part of `route` that would otherwise come from the method. */
+const complete = (route: HttpRouteDescription, types: HttpRouteTypes | undefined): boolean =>
+	types !== undefined &&
+	types.response !== undefined &&
+	(route.body === undefined || types.body !== undefined) &&
+	(route.query === undefined || types.query !== undefined) &&
+	(route.params.length === 0 || types.params !== undefined);
 
 /**
  * The local name of a default-exported controller: its class name, or for an anonymous class, a
@@ -109,7 +168,8 @@ export const collectRoutes = async (
 	await new Promise((resolve) => process.nextTick(resolve));
 
 	const graph = app.moduleGraph('production');
-	const located = await locateControllers(projectPath, outFile);
+	const located = await locateExports(projectPath, outFile);
+	const contributors = await contributorsOf(app);
 	await new Promise((resolve) => process.nextTick(resolve));
 
 	const modules: ModuleRoutes[] = [];
@@ -121,16 +181,38 @@ export const collectRoutes = async (
 			const description = Http.describe(controller);
 			if (!description) continue;
 			const source = located.get(controller);
-			if (!source) {
+			const supporting = contributors.filter((contributor) => contributor.supports(controller));
+
+			const types: Record<string, HttpRouteTypes> = {};
+			for (const route of description.routes) {
+				const method = `${CONTROLLER}[${quote(route.name)}]`;
+				const ref = source
+					? { method, parameter: (index: number) => `Parameters<${method}>[${index}]` }
+					: {};
+				for (const contributor of supporting) {
+					const given = contributor.route(controller, route, ref);
+					if (given) {
+						types[route.name] = given;
+						break;
+					}
+				}
+			}
+
+			if (!source && !description.routes.every((route) => complete(route, types[route.name]))) {
 				missing.push(controller.name);
 				continue;
 			}
 			controllers.push({
-				exportName: source.exportName,
-				...(source.exportName === 'default' ? { className: defaultName(source) } : {}),
-				specifier: specifierFor(outFile, source.file),
+				...(source
+					? {
+							exportName: source.exportName,
+							...(source.exportName === 'default' ? { className: defaultName(source) } : {}),
+							specifier: specifierFor(outFile, source.file)
+						}
+					: { className: controller.name }),
 				path: description.path,
-				routes: description.routes
+				routes: description.routes,
+				...(Object.keys(types).length > 0 ? { types } : {})
 			});
 		}
 		if (controllers.length > 0) {

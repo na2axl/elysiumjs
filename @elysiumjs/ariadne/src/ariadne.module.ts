@@ -17,10 +17,12 @@ import type { FlowOptions } from './engine';
 import { Module } from '@elysiumjs/core';
 
 import { ARIADNE_OPTIONS } from './engine';
+import { FlowRouteTypes } from './route-types';
 
 /**
  * Configures where flows live. The flows themselves are `@Flow.controller()` classes, listed in
- * the `controllers` of a module like any controller.
+ * the `controllers` of a module like any controller. In development, it also registers
+ * {@link FlowRouteTypes}, which types the flow routes for `styx routes:generate`.
  * @author Axel Nana <axel.nana@workbud.com>
  * @example
  * ```ts
@@ -34,6 +36,9 @@ import { ARIADNE_OPTIONS } from './engine';
  * ```
  */
 @Module.register<FlowOptions>({
-	services: (config) => [{ name: ARIADNE_OPTIONS, global: true, factory: () => config }]
+	services: (config) => [
+		{ name: ARIADNE_OPTIONS, global: true, factory: () => config },
+		FlowRouteTypes
+	]
 })
 export class AriadneModule extends Module.configurable<FlowOptions>({ required: ['store'] }) {}
