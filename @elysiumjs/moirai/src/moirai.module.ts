@@ -14,18 +14,28 @@
 
 import type { ServiceDefinition } from '@elysiumjs/core';
 import type { MoiraiOptions } from './config';
-import type { ActionLock, IdempotencyStore, InboxStore, OutboxStore } from './stores';
+import type {
+	ActionLock,
+	EventStore,
+	IdempotencyStore,
+	InboxStore,
+	OutboxStore,
+	ProjectionStorage
+} from './stores';
 
 import { Module } from '@elysiumjs/core';
 
+import { ProjectionRebuildCommand } from './commands/projection-rebuild.command';
 import {
 	DEFAULT_OPTIONS,
 	MOIRAI_ACTION_LOCK,
+	MOIRAI_EVENT_STORE,
 	MOIRAI_IDEMPOTENCY_STORE,
 	MOIRAI_INBOX_STORE,
 	MOIRAI_MODULE_OPTIONS,
 	MOIRAI_OPTIONS,
-	MOIRAI_OUTBOX_STORE
+	MOIRAI_OUTBOX_STORE,
+	MOIRAI_PROJECTION_STORAGE
 } from './config';
 
 type StoreOption<T> = T | (() => T);
@@ -39,6 +49,8 @@ export type MoiraiStores = Partial<MoiraiOptions> & {
 	outbox?: StoreOption<OutboxStore>;
 	inbox?: StoreOption<InboxStore>;
 	lock?: StoreOption<ActionLock>;
+	events?: StoreOption<EventStore>;
+	projections?: StoreOption<ProjectionStorage>;
 };
 
 /**
@@ -52,12 +64,14 @@ const build = <T>(option: StoreOption<T>): T =>
 
 /** The service definitions of stores and options, global or private to the declaring module. */
 const definitions = (config: MoiraiStores, global: boolean): ServiceDefinition[] => {
-	const { idempotency, outbox, inbox, lock, ...rest } = config;
+	const { idempotency, outbox, inbox, lock, events, projections, ...rest } = config;
 	const stores: [string, StoreOption<unknown> | undefined][] = [
 		[MOIRAI_IDEMPOTENCY_STORE, idempotency],
 		[MOIRAI_OUTBOX_STORE, outbox],
 		[MOIRAI_INBOX_STORE, inbox],
-		[MOIRAI_ACTION_LOCK, lock]
+		[MOIRAI_ACTION_LOCK, lock],
+		[MOIRAI_EVENT_STORE, events],
+		[MOIRAI_PROJECTION_STORAGE, projections]
 	];
 	const options: ServiceDefinition[] = global
 		? [{ name: MOIRAI_OPTIONS, global, factory: () => ({ ...DEFAULT_OPTIONS, ...rest }) }]
@@ -92,5 +106,8 @@ export const moduleStores = (config: MoiraiStores): ServiceDefinition[] =>
  * });
  * ```
  */
-@Module.register<MoiraiModuleConfig>({ services: (config) => definitions(config, true) })
+@Module.register<MoiraiModuleConfig>({
+	commands: [ProjectionRebuildCommand],
+	services: (config) => definitions(config, true)
+})
 export class MoiraiModule extends Module.configurable<MoiraiModuleConfig>() {}

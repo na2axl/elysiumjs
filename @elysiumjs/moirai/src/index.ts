@@ -30,8 +30,17 @@ export {
 	Query
 } from './action';
 export {
+	type AggregateClass,
+	type AggregateOptions,
+	type StateOf,
+	Aggregate,
+	AggregateScenario
+} from './aggregate';
+export {
 	isTransientError,
 	MOIRAI_ACTION_LOCK,
+	MOIRAI_EVENT_STORE,
+	MOIRAI_PROJECTION_STORAGE,
 	MOIRAI_IDEMPOTENCY_STORE,
 	MOIRAI_INBOX_STORE,
 	MOIRAI_MODULE_OPTIONS,
@@ -41,14 +50,18 @@ export {
 } from './config';
 export {
 	CallForbiddenError,
+	ConcurrencyConflictError,
 	DuplicateEventConsumerError,
+	DuplicateStreamNameError,
 	IdempotencyConflictError,
 	IdempotencyKeyRequiredError,
 	IdempotencyKeyReusedError,
 	InvalidInputError,
 	MissingStoreError,
 	UnknownEventConsumerError,
-	UnknownEffectError
+	UnknownEffectError,
+	UnknownStoredEventError,
+	UnregisteredStreamClassError
 } from './errors';
 export {
 	type EventCatalogue,
@@ -73,10 +86,14 @@ export {
 } from './outbox';
 export {
 	type ActionLock,
+	type EventReadFilter,
+	type EventStore,
 	type IdempotencyRecord,
 	type IdempotencyStore,
 	type InboxStore,
 	MemoryActionLock,
+	MemoryEventStore,
+	MemoryProjectionStorage,
 	MemoryIdempotencyStore,
 	MemoryInboxStore,
 	MemoryOutboxStore,
@@ -84,5 +101,18 @@ export {
 	type OutboxClaimFilter,
 	type OutboxEffect,
 	type OutboxRow,
-	type OutboxStore
+	type OutboxStore,
+	type ProjectionStorage,
+	type StoredEventRecord
 } from './stores';
+export { ProjectionRebuildCommand } from './commands/projection-rebuild.command';
+export { type ProjectionOptions, Projection } from './projection';
+export { type ReactorOptions, Reactor } from './reactor';
+export {
+	type DataOf,
+	type StoredEventClass,
+	type StoredEventMeta,
+	type StoredEventOptions,
+	StoredEvent
+} from './stored-event';
+export { type Acted, type ActOptions, type ActOutcome, Streams } from './streams';

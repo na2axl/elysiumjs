@@ -12,7 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ActionLock, IdempotencyStore, InboxStore, OutboxStore } from './stores';
+import type {
+	ActionLock,
+	EventStore,
+	IdempotencyStore,
+	InboxStore,
+	OutboxStore,
+	ProjectionStorage
+} from './stores';
 
 import { ModuleContext, Service } from '@elysiumjs/core';
 
@@ -23,6 +30,8 @@ export const MOIRAI_IDEMPOTENCY_STORE = 'moirai.idempotency';
 export const MOIRAI_OUTBOX_STORE = 'moirai.outbox';
 export const MOIRAI_INBOX_STORE = 'moirai.inbox';
 export const MOIRAI_ACTION_LOCK = 'moirai.lock';
+export const MOIRAI_EVENT_STORE = 'moirai.events';
+export const MOIRAI_PROJECTION_STORAGE = 'moirai.projections';
 export const MOIRAI_OPTIONS = 'moirai.options';
 
 /** The service name of the options a module overrides with `Moirai.stores()`. */
@@ -58,6 +67,11 @@ export type MoiraiOptions = {
 	relayLease: number;
 	/** Called when an outbox row is dead, such as to raise an alert. */
 	onDead?: (row: import('./stores').OutboxRow, error: Error) => void;
+	/**
+	 * The metadata of every stored event, such as the current actor and correlation id. The
+	 * `metadata` given to `Streams.act()` is added to it.
+	 */
+	eventMetadata?: () => Record<string, unknown>;
 };
 
 const TRANSIENT_CODES = new Set(['40001', '40P01']);
@@ -112,6 +126,8 @@ export const idempotencyStore = store<IdempotencyStore>(MOIRAI_IDEMPOTENCY_STORE
 export const outboxStore = store<OutboxStore>(MOIRAI_OUTBOX_STORE, 'outbox');
 export const inboxStore = store<InboxStore>(MOIRAI_INBOX_STORE, 'inbox');
 export const actionLock = store<ActionLock>(MOIRAI_ACTION_LOCK, 'lock');
+export const eventStore = store<EventStore>(MOIRAI_EVENT_STORE, 'events');
+export const projectionStorage = store<ProjectionStorage>(MOIRAI_PROJECTION_STORAGE, 'projections');
 
 /**
  * Runs work in the context of the module that declares a service, such as the module of an

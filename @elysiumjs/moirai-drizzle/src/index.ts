@@ -14,33 +14,44 @@
 
 import type {
 	ActionLock,
+	EventReadFilter,
+	EventStore,
 	IdempotencyRecord,
 	IdempotencyStore,
 	InboxStore,
 	OutboxClaim,
 	OutboxRow,
-	OutboxStore
+	OutboxStore,
+	ProjectionStorage,
+	StoredEventRecord
 } from '@elysiumjs/moirai';
 
 import { Database } from '@elysiumjs/mnemosyne-drizzle';
-import { IdempotencyConflictError } from '@elysiumjs/moirai';
-import { and, asc, eq, inArray, isNull, lt, lte, sql } from 'drizzle-orm';
+import { ConcurrencyConflictError, IdempotencyConflictError } from '@elysiumjs/moirai';
+import { and, asc, eq, gt, inArray, is, isNull, lt, lte, max, sql } from 'drizzle-orm';
 import {
+	bigserial,
+	customType,
 	index,
 	integer,
 	jsonb,
 	pgSchema,
+	PgTable,
 	pgTable,
 	primaryKey,
 	text,
 	timestamp,
+	unique,
 	uuid
 } from 'drizzle-orm/pg-core';
 
 const at = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' });
 
+/** Postgres `xid8`, the id of the transaction that wrote a row, read as its decimal string. */
+const xid8 = customType<{ data: string }>({ dataType: () => 'xid8' });
+
 /**
- * Builds the tables of the moirai stores: `idempotency_keys`, `outbox` and `inbox`, in a schema
+ * Builds the tables of the moirai stores: `idempotency_keys`, `outbox`, `inbox` and `events`, in a schema
  * when one is given (one set of tables per domain schema, for example). Export them from the
  * Drizzle schema so that `migration:generate` creates them.
  * @author Axel Nana <axel.nana@workbud.com>
@@ -83,7 +94,30 @@ export const moiraiTables = (schema?: string) => {
 				recordedAt: at('recorded_at').notNull().defaultNow()
 			},
 			(t) => [primaryKey({ columns: [t.messageId, t.consumer] })]
-		)
+		),
+		events: table(
+			'events',
+			{
+				position: bigserial('position', { mode: 'bigint' }).primaryKey(),
+				transactionId: xid8('transaction_id')
+					.notNull()
+					.default(sql`pg_current_xact_id()`),
+				aggregateId: text('aggregate_id').notNull(),
+				aggregateType: text('aggregate_type').notNull(),
+				version: integer('version').notNull(),
+				type: text('type').notNull(),
+				schemaVersion: integer('schema_version').notNull().default(1),
+				data: jsonb('data').notNull(),
+				metadata: jsonb('metadata').notNull(),
+				occurredAt: at('occurred_at').notNull()
+			},
+			(t) => [unique('events_aggregate_version_uq').on(t.aggregateId, t.version)]
+		),
+		projections: table('projections', {
+			name: text('name').primaryKey(),
+			version: integer('version').notNull(),
+			builtAt: at('built_at').notNull().defaultNow()
+		})
 	};
 };
 
@@ -251,5 +285,149 @@ export class PgAdvisoryLock implements ActionLock {
 		await Database.getConnection(this.options.connection).execute(
 			sql`select pg_advisory_xact_lock(hashtextextended(${key}, 0))`
 		);
+	}
+}
+
+const toRecord = (row: MoiraiTables['events']['$inferSelect']): StoredEventRecord => ({
+	position: row.position,
+	aggregateId: row.aggregateId,
+	aggregateType: row.aggregateType,
+	version: row.version,
+	type: row.type,
+	schemaVersion: row.schemaVersion,
+	data: row.data,
+	metadata: row.metadata as Record<string, unknown>,
+	occurredAt: row.occurredAt
+});
+
+/**
+ * Keeps event streams in a Postgres table, in the open transaction. An append locks each stream
+ * it writes with an advisory lock held until the transaction ends, and checks that the stream
+ * ends right before the first appended version, so a stale writer gets a
+ * `ConcurrencyConflictError` even when the unique key of the table spans more columns, such as a
+ * partition key. `position` and `transaction_id` are given by Postgres.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class DrizzleEventStore implements EventStore {
+	constructor(private readonly options: DrizzleStoreOptions<MoiraiTables['events']>) {}
+
+	private get db() {
+		return Database.getConnection(this.options.connection);
+	}
+
+	public async load(aggregateId: string, afterVersion = 0): Promise<readonly StoredEventRecord[]> {
+		const t = this.options.table;
+		const rows = await this.db
+			.select()
+			.from(t)
+			.where(and(eq(t.aggregateId, aggregateId), gt(t.version, afterVersion)))
+			.orderBy(asc(t.version));
+		return rows.map(toRecord);
+	}
+
+	public async readAll(filter: EventReadFilter): Promise<readonly StoredEventRecord[]> {
+		const { types, afterPosition, limit } = filter;
+		if (types?.length === 0) return [];
+		const t = this.options.table;
+		const rows = await this.db
+			.select()
+			.from(t)
+			.where(
+				and(
+					afterPosition === undefined ? undefined : gt(t.position, afterPosition),
+					types ? inArray(t.type, [...types]) : undefined
+				)
+			)
+			.orderBy(asc(t.position))
+			.limit(limit);
+		return rows.map(toRecord);
+	}
+
+	public async append(records: readonly StoredEventRecord[]): Promise<void> {
+		if (records.length === 0) return;
+		const t = this.options.table;
+		const first = new Map<string, StoredEventRecord>();
+		for (const record of records) {
+			const known = first.get(record.aggregateId);
+			if (!known || record.version < known.version) first.set(record.aggregateId, record);
+		}
+		try {
+			// In a stable order, so that two appends to the same streams lock them alike.
+			for (const [aggregateId, record] of [...first].sort(([a], [b]) => a.localeCompare(b))) {
+				await this.db.execute(
+					sql`select pg_advisory_xact_lock(hashtextextended(${aggregateId}::text, 0))`
+				);
+				const [head] = await this.db
+					.select({ version: max(t.version) })
+					.from(t)
+					.where(eq(t.aggregateId, aggregateId));
+				if ((head?.version ?? 0) !== record.version - 1)
+					throw new ConcurrencyConflictError(record.aggregateType, aggregateId);
+			}
+			await this.db.insert(t).values(
+				records.map((record) => ({
+					aggregateId: record.aggregateId,
+					aggregateType: record.aggregateType,
+					version: record.version,
+					type: record.type,
+					schemaVersion: record.schemaVersion,
+					data: record.data,
+					metadata: record.metadata,
+					occurredAt: record.occurredAt
+				}))
+			);
+		} catch (error) {
+			if (isUniqueViolation(error))
+				throw new ConcurrencyConflictError(records[0]!.aggregateType, records[0]!.aggregateId);
+			throw error;
+		}
+	}
+}
+
+/** The Drizzle table of a model, or of a Drizzle table itself. */
+const tableOf = (model: object): PgTable => {
+	if (is(model, PgTable)) return model;
+	const table = (model as { table?: unknown }).table;
+	if (table && is(table, PgTable)) return table;
+	throw new TypeError(
+		`${(model as { name?: string }).name ?? 'This model'} has no Drizzle table to reset. ` +
+			'Pass a DrizzleModel or a Drizzle table in the models of the projection.'
+	);
+};
+
+/**
+ * Resets the tables of Drizzle models for projection rebuilds, and keeps the version each
+ * projection was built with in a Postgres table. The reset deletes the rows in the open
+ * transaction, so readers see them until the rebuild commits.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class DrizzleProjectionStorage implements ProjectionStorage {
+	constructor(private readonly options: DrizzleStoreOptions<MoiraiTables['projections']>) {}
+
+	private get db() {
+		return Database.getConnection(this.options.connection);
+	}
+
+	public async reset(models: readonly object[]): Promise<void> {
+		for (const model of models) await this.db.delete(tableOf(model));
+	}
+
+	public async version(name: string): Promise<number | undefined> {
+		const t = this.options.table;
+		const [row] = await this.db
+			.select({ version: t.version })
+			.from(t)
+			.where(eq(t.name, name))
+			.limit(1);
+		return row?.version;
+	}
+
+	public async built(name: string, version: number): Promise<void> {
+		const t = this.options.table;
+		const builtAt = new Date();
+		await this.db
+			.insert(t)
+			.values({ name, version, builtAt })
+			.onConflictDoUpdate({ target: t.name, set: { version, builtAt } });
 	}
 }

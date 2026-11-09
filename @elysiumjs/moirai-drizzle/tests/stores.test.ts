@@ -13,14 +13,16 @@
 // limitations under the License.
 
 import { Service } from '@elysiumjs/core';
-import { IdempotencyConflictError } from '@elysiumjs/moirai';
+import { ConcurrencyConflictError, IdempotencyConflictError } from '@elysiumjs/moirai';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { getTableConfig } from 'drizzle-orm/pg-core';
+import { getTableConfig, pgTable, text } from 'drizzle-orm/pg-core';
 
 import {
+	DrizzleEventStore,
 	DrizzleIdempotencyStore,
 	DrizzleInboxStore,
 	DrizzleOutboxStore,
+	DrizzleProjectionStorage,
 	moiraiTables,
 	PgAdvisoryLock
 } from '../src';
@@ -180,5 +182,96 @@ describe('moirai stores', () => {
 			query: 'select pg_advisory_xact_lock(hashtextextended($1, 0))',
 			params: ['wallet:1']
 		});
+	});
+
+	const event = {
+		aggregateId: 'u-1',
+		aggregateType: 'wallet',
+		version: 3,
+		type: 'KlapsSpent',
+		schemaVersion: 2,
+		data: { klaps: '5' },
+		metadata: { actor: 'user:1' },
+		occurredAt: new Date(0)
+	};
+	const row = {
+		position: '7',
+		transaction_id: '99',
+		aggregate_id: 'u-1',
+		aggregate_type: 'wallet',
+		version: 3,
+		type: 'KlapsSpent',
+		schema_version: 2,
+		data: { klaps: '5' },
+		metadata: { actor: 'user:1' },
+		occurred_at: new Date(0)
+	};
+
+	it('builds the events table with its unique stream version, and the projections table', () => {
+		const events = getTableConfig(tables.events);
+		expect(events.schema).toBe('billing');
+		expect(events.uniqueConstraints.map((u) => u.name)).toEqual(['events_aggregate_version_uq']);
+		expect(getTableConfig(tables.projections).name).toBe('projections');
+	});
+
+	it('loads a stream in version order, and reads the log by position', async () => {
+		const store = new DrizzleEventStore({ table: tables.events });
+		answer = () => [row];
+		expect(await store.load('u-1', 2)).toEqual([{ ...event, position: 7n }]);
+		expect(queries()[0]).toContain(
+			'where (("billing"."events"."aggregate_id" = $1) and ("billing"."events"."version" > $2)) order by "billing"."events"."version" asc'
+		);
+
+		await store.readAll({ types: ['KlapsSpent'], afterPosition: 6n, limit: 10 });
+		expect(queries()[1]).toContain(
+			'where (("billing"."events"."position" > $1) and ("billing"."events"."type" in ($2))) order by "billing"."events"."position" asc limit $3'
+		);
+		await store.readAll({ limit: 5 });
+		expect(queries()[2]).not.toContain('where');
+		expect(await store.readAll({ types: [], limit: 5 })).toEqual([]);
+	});
+
+	it('locks each stream, checks its head, then appends', async () => {
+		const store = new DrizzleEventStore({ table: tables.events });
+		answer = (query) => (query.startsWith('select max') ? [{ version: 2 }] : []);
+		await store.append([event, { ...event, version: 4 }]);
+		expect(fake.log[0]).toMatchObject({
+			query: 'select pg_advisory_xact_lock(hashtextextended($1::text, 0))',
+			params: ['u-1']
+		});
+		expect(queries()[1]).toStartWith('select max("version") from "billing"."events"');
+		expect(queries()[2]).toStartWith('insert into "billing"."events"');
+		await store.append([]);
+		expect(queries()).toHaveLength(3);
+	});
+
+	it('reports a stale head or a taken version as a concurrency conflict', async () => {
+		const store = new DrizzleEventStore({ table: tables.events });
+		answer = (query) => (query.startsWith('select max') ? [{ version: 3 }] : []);
+		expect(store.append([event])).rejects.toBeInstanceOf(ConcurrencyConflictError);
+
+		answer = (query) => {
+			if (query.startsWith('select max')) return [{ version: 2 }];
+			if (query.startsWith('insert')) throw Object.assign(new Error('dup'), { code: '23505' });
+			return [];
+		};
+		expect(store.append([event])).rejects.toBeInstanceOf(ConcurrencyConflictError);
+	});
+
+	it('resets the tables of models, and keeps projection versions', async () => {
+		const movements = pgTable('movements', { id: text('id') });
+		const storage = new DrizzleProjectionStorage({ table: tables.projections });
+		await storage.reset([{ table: movements }, movements]);
+		expect(queries()).toEqual(['delete from "movements"', 'delete from "movements"']);
+		expect(storage.reset([class NoTable {}])).rejects.toThrow('NoTable has no Drizzle table');
+
+		answer = () => [{ version: 2 }];
+		expect(await storage.version('wallet-movements')).toBe(2);
+		answer = () => [];
+		expect(await storage.version('other')).toBeUndefined();
+		await storage.built('wallet-movements', 3);
+		expect(queries().at(-1)).toContain(
+			'on conflict ("name") do update set "version" = $4, "built_at" = $5'
+		);
 	});
 });
