@@ -33,6 +33,7 @@ import { assign, isEmpty, objectify } from 'radash';
 import { Application } from './app';
 import { Container } from './container';
 import { Environments } from './environments';
+import { ElysiumError } from './errors';
 import { FILTER_LEVELS, routeFilterLevels } from './filter';
 import { interceptedSchema, runInterceptors } from './interceptor';
 import { Lifecycle } from './lifecycle';
@@ -210,7 +211,17 @@ type HttpRequestHandlerMetadata = {
 
 	/** The interceptors around the handler. */
 	interceptors?: InterceptorClass[];
+
+	/** How the request body is parsed before the handler runs. */
+	parse?: HttpBodyParser;
 };
+
+/**
+ * How a route parses the request body before its handler runs. `none` leaves the body unread, so
+ * the handler reads the request itself (a webhook checking a signature over the exact bytes).
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type HttpBodyParser = 'none' | 'text' | 'json' | 'formdata' | 'urlencoded' | 'arrayBuffer';
 
 /**
  * Parameters for registering an HTTP request handler.
@@ -230,6 +241,7 @@ type HttpRequestHandlerRegistrationProps = Pick<
 	| 'filters'
 	| 'interceptors'
 	| 'headers'
+	| 'parse'
 > & {
 	target: Object;
 	propertyKey: string | symbol;
@@ -462,7 +474,8 @@ const registerHttpRequestHandler = (props: HttpRequestHandlerRegistrationProps) 
 		serialize,
 		filters,
 		interceptors,
-		headers
+		headers,
+		parse
 	} = props;
 
 	const metadata: HttpRequestHandlerMetadata[] =
@@ -489,7 +502,8 @@ const registerHttpRequestHandler = (props: HttpRequestHandlerRegistrationProps) 
 		transactional,
 		serialize,
 		filters,
-		interceptors
+		interceptors,
+		parse
 	});
 
 	Metadata.define(Symbols.http, metadata, target.constructor);
@@ -626,6 +640,20 @@ export type HttpRouteOptions = {
 	 * ```
 	 */
 	headers?: TObject;
+
+	/**
+	 * How the request body is parsed before the handler runs. By default it follows the request's
+	 * `Content-Type`. `none` leaves the body unread for the handler, which reads it from the request,
+	 * such as to check a signature over the exact bytes. It cannot be combined with `@Http.body()`.
+	 * @example
+	 * ```ts
+	 * @Http.post('/webhooks/:provider', { parse: 'none' })
+	 * public async receive(@Http.context() ctx: Context) {
+	 * 	const raw = await ctx.request.text();
+	 * }
+	 * ```
+	 */
+	parse?: HttpBodyParser;
 };
 
 /**
@@ -928,6 +956,11 @@ export namespace Http {
 				const metadata: HttpRequestHandlerMetadata[] = Metadata.get(Symbols.http, target) ?? [];
 
 				for (const route of metadata) {
+					if (route.parse === 'none' && route.body)
+						throw new ElysiumError(
+							`${target.name}.${route.name}: a route that does not parse its body cannot take @Http.body()`
+						);
+
 					/** The object the request scope of a request belongs to, shared by its hooks. */
 					const scopeKey = (c: Context): object => c.request ?? c;
 
@@ -1228,6 +1261,7 @@ export namespace Http {
 								description: route.description,
 								operationId: route.operationId
 							},
+							...(route.parse && { parse: route.parse }),
 							body: isValidator ? route.body?.validator?.schema : route.body?.schema,
 							query: route.query?.schema,
 							headers,

@@ -32,6 +32,7 @@ export { type LifecycleEvent, type LifecycleHandler, Lifecycle } from './lifecyc
 export { type LoggerInterface, ConsoleLogger, getLogger, LOGGER_SERVICE } from './logger';
 export {
 	type Context,
+	type HttpBodyParser,
 	type HttpControllerDescription,
 	type HttpControllerOptions,
 	type HttpControllerProps,
