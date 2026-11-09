@@ -318,18 +318,21 @@ describe('problem details over HTTP', () => {
 		expect(reported).toEqual([]);
 	});
 
-	it('reports an unexpected error once and hides its detail outside development', async () => {
+	it('reports an unexpected error once and shows its detail in test', async () => {
 		const http = await start();
 		const response = await http.get('/p/boom');
 
 		expect(response.status).toBe(500);
-		expect(await response.json()).toMatchObject({
+		const body = await response.json();
+		expect(body).toMatchObject({
 			type: 'internal-error',
 			title: 'Internal Server Error',
 			status: 500,
 			code: 'INTERNAL_ERROR',
+			detail: 'boom',
 			instance: '/p/boom'
 		});
+		expect(Array.isArray(body.stack)).toBe(true);
 		expect(reported.filter((r) => r instanceof Error)).toHaveLength(1);
 	});
 

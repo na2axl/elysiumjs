@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import type { Elysia } from 'elysia';
+import type { Environment } from './environments';
 import type { ModuleNode } from './module-graph';
 
 import { isObject } from 'radash';
@@ -59,7 +60,7 @@ export namespace Symbols {
  *
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export function currentEnvironment(): string {
+export function currentEnvironment(): Environment {
 	// portability-allow: fallback before a runtime is set
 	return Runtime.find()?.env().NODE_ENV ?? globalThis.process?.env?.NODE_ENV ?? 'development';
 }

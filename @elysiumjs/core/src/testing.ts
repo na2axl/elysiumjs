@@ -14,6 +14,7 @@
 
 import type { Class } from 'type-fest';
 import type { Application } from './app';
+import type { Environment } from './environments';
 import type { HttpTestClient } from './http-client';
 import type { ConfiguredModule, ModuleClass } from './module';
 import type { ServiceToken } from './token';
@@ -41,7 +42,7 @@ export type TestingOptions = {
 	overrides?: Record<string, unknown> | Map<ServiceToken, unknown>;
 
 	/** The environment to build the graph for. Defaults to `test`. */
-	environment?: string;
+	environment?: Environment;
 
 	/** `eager` initialises every module and builds every service. Defaults to `lazy`. */
 	boot?: 'lazy' | 'eager';

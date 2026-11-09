@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import type { Class } from 'type-fest';
+import type { Environment } from './environments';
 
 import { isArray, trim } from 'radash';
 
@@ -140,7 +141,7 @@ export type CommandRegisterOptions = {
 	 * The environments (`NODE_ENV` values) in which the command is available. In any other, it is
 	 * not listed in the CLI.
 	 */
-	env?: readonly string[];
+	env?: readonly Environment[];
 };
 
 /**

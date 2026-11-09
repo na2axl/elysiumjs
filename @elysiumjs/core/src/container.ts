@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import type { Class } from 'type-fest';
+import type { Environment } from './environments';
 import type { ModuleNode } from './module-graph';
 import type { ServiceDefinition, ServiceFactoryDefinition } from './service';
 import type { Injection, ServiceTag, ServiceToken } from './token';
@@ -142,8 +143,8 @@ let visibility: VisibilityResolver | null = null;
 let moduleInitHook: ((owner: ModuleNode) => Promise<void> | void) | null = null;
 /** Why a service is not registered: its module is skipped, or the service itself is. */
 type SkippedService =
-	| { readonly module: string; readonly environment: string }
-	| { readonly env: readonly string[]; readonly environment: string };
+	| { readonly module: string; readonly environment: Environment }
+	| { readonly env: readonly Environment[]; readonly environment: Environment };
 
 let skippedLookup: ((token: ServiceToken) => SkippedService | null) | null = null;
 

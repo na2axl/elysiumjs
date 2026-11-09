@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import type { Class } from 'type-fest';
+import type { Environment } from './environments';
 import type { ConfiguredModule, ModuleClass, ModuleProps } from './module';
 import type { ServiceToken } from './token';
 
@@ -71,7 +72,7 @@ export type ModuleGraph = {
 	readonly skipped: readonly ModuleClass[];
 
 	/** The environment the graph was built for. */
-	readonly environment: string;
+	readonly environment: Environment;
 
 	node(cls: ModuleClass): ModuleNode | undefined;
 
@@ -99,11 +100,11 @@ type Record_ = {
 
 const unwrap = (entry: Entry): ModuleClass => (isConfiguredModule(entry) ? entry.module : entry);
 
-const isActive = (props: ModuleProps, environment: string) =>
+const isActive = (props: ModuleProps, environment: Environment) =>
 	Environments.includes(props.env, environment);
 
 /** Walks the import tree depth-first, producing records in topological order. */
-function discover(roots: Entry[], environment: string) {
+function discover(roots: Entry[], environment: Environment) {
 	const records = new Map<ModuleClass, Record_>();
 	const skipped: ModuleClass[] = [];
 	const done = new Set<ModuleClass>();
@@ -162,7 +163,7 @@ function computeDepths(roots: ModuleClass[], records: Map<ModuleClass, Record_>)
 }
 
 /** The items of `key` a module lists that are active in `environment`. */
-function itemsOf(props: ModuleProps, key: Collectable, environment: string): Class<any>[] {
+function itemsOf(props: ModuleProps, key: Collectable, environment: Environment): Class<any>[] {
 	const items = (props[key] ?? []) as Class<any>[];
 	return items.filter((item) => Environments.isActive(item, environment));
 }
@@ -176,7 +177,7 @@ function assertUniqueNames(classes: readonly ModuleClass[]) {
 	}
 }
 
-function assertUniqueCommands(nodes: readonly ModuleNode[], environment: string) {
+function assertUniqueCommands(nodes: readonly ModuleNode[], environment: Environment) {
 	const seen = new Map<string, string>();
 	for (const node of nodes) {
 		for (const command of itemsOf(node.props, 'commands', environment)) {
@@ -205,7 +206,7 @@ const isModuleClass = (value: unknown): value is ModuleClass =>
  */
 export function buildModuleGraph(
 	rootModules: Entry[],
-	environment: string = currentEnvironment()
+	environment: Environment = currentEnvironment()
 ): ModuleGraph {
 	const { records, skipped } = discover(rootModules, environment);
 	assertUniqueNames([...records.keys()]);

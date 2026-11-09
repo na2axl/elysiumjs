@@ -16,6 +16,7 @@ import type { Elysia } from 'elysia';
 import type { Class } from 'type-fest';
 import type { TSchema } from 'typebox';
 import type { CommandClass } from './command';
+import type { Environment } from './environments';
 import type { FilterClass } from './filter';
 import type { Route } from './http';
 import type { InterceptorClass } from './interceptor';
@@ -68,7 +69,7 @@ export type ModuleProps<TConfig = unknown> = {
 	prefix?: Route;
 
 	/** Environments (`NODE_ENV` values) in which the module is active. */
-	env?: string[];
+	env?: readonly Environment[];
 
 	/**
 	 * The environment variables the module needs, as a TypeBox object. Merged with the schemas of

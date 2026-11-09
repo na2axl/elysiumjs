@@ -16,6 +16,7 @@ import type { Context as ElysiaContext, SSEPayload } from 'elysia';
 import type { Class, MergeDeep } from 'type-fest';
 import type { Static, TObject, TSchema } from 'typebox';
 import type { AppHttpContext } from '.';
+import type { Environment } from './environments';
 import type { FilterClass, FilterLevel } from './filter';
 import type { InterceptorClass, InterceptorContext, InterceptorLevel } from './interceptor';
 import type { Middleware } from './middleware';
@@ -548,7 +549,7 @@ export type HttpControllerOptions = {
 	 * The environments (`NODE_ENV` values) in which the controller is active. In any other, its
 	 * routes are not mounted.
 	 */
-	env?: readonly string[];
+	env?: readonly Environment[];
 };
 
 /**

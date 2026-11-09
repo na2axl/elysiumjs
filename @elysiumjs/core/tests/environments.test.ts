@@ -23,7 +23,9 @@ import { Kernel } from '../src/kernel';
 import { Module } from '../src/module';
 import { ModuleContext } from '../src/module-context';
 import { buildModuleGraph } from '../src/module-graph';
+import { Runtime } from '../src/runtime';
 import { Service } from '../src/service';
+import { testRuntime } from './test-runtime';
 
 const reset = () => {
 	Container.reset();
@@ -32,7 +34,7 @@ const reset = () => {
 	Container.setSkippedLookup(null);
 };
 
-const DEV = ['local', 'test'];
+const DEV = Environments.local;
 
 /** Whether a module registered the service. */
 const registered = (token: Parameters<typeof Service.ownersOf>[0]) =>
@@ -51,6 +53,29 @@ describe('Environments', () => {
 		expect(Environments.of(Local)).toEqual(DEV);
 		expect(Environments.isActive(Local, 'test')).toBe(true);
 		expect(Environments.isActive(Local, 'production')).toBe(false);
+	});
+
+	it('names development and test as the local environments', () => {
+		expect(Environments.local).toEqual(['development', 'test']);
+		expect(Environments.includes(Environments.local, 'development')).toBe(true);
+		expect(Environments.includes(Environments.local, 'test')).toBe(true);
+		expect(Environments.includes(Environments.local, 'production')).toBe(false);
+	});
+
+	it('tells which environment is current', () => {
+		const original = Runtime.find();
+		try {
+			const check = (environment: string) => {
+				Runtime.use({ ...testRuntime, env: () => ({ NODE_ENV: environment }) });
+				return [Environments.isDevelopment(), Environments.isTest(), Environments.isProduction()];
+			};
+			expect(check('development')).toEqual([true, false, false]);
+			expect(check('test')).toEqual([false, true, false]);
+			expect(check('production')).toEqual([false, false, true]);
+			expect(check('staging')).toEqual([false, false, false]);
+		} finally {
+			if (original) Runtime.use(original);
+		}
 	});
 });
 
@@ -156,14 +181,14 @@ describe('controllers, commands and jobs with env', () => {
 
 		expect(buildModuleGraph([App], 'staging').collect('commands')).toEqual([]);
 		expect(
-			buildModuleGraph([App], 'local')
+			buildModuleGraph([App], 'development')
 				.collect('commands')
 				.map((c) => c.item)
 		).toEqual([Seed as any]);
 	});
 
 	it('does not count an inactive command as a duplicate', () => {
-		@Command.register({ name: 'reset', env: ['local'] })
+		@Command.register({ name: 'reset', env: ['development'] })
 		class LocalReset {
 			static command = 'reset';
 		}
@@ -176,7 +201,7 @@ describe('controllers, commands and jobs with env', () => {
 		@Module.register({ commands: [ProductionReset as any] })
 		class M2 extends Module {}
 
-		expect(() => buildModuleGraph([M1, M2], 'local')).not.toThrow();
+		expect(() => buildModuleGraph([M1, M2], 'development')).not.toThrow();
 	});
 
 	it('leaves out an inactive job', () => {

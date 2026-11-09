@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { Environment } from '@elysiumjs/core';
 import type { Class } from 'type-fest';
 
 import { Environments, InteractsWithConsole, Metadata } from '@elysiumjs/core';
@@ -134,7 +135,7 @@ export type JobProps = {
 	 * The environments (`NODE_ENV` values) in which the job is active. In any other, it is not
 	 * registered: it is neither dispatched nor scheduled.
 	 */
-	env?: readonly string[];
+	env?: readonly Environment[];
 };
 
 /**

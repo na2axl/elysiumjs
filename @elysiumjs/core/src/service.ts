@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import type { Class } from 'type-fest';
+import type { Environment } from './environments';
 import type { ModuleNode } from './module-graph';
 import type { ServiceTag, ServiceToken } from './token';
 
@@ -116,7 +117,7 @@ export type ServiceProps = Partial<{
 	 * The environments (`NODE_ENV` values) in which the service is active. In any other, the
 	 * service is not registered: it is not injected, and `injectAll` does not return it.
 	 */
-	env: readonly string[];
+	env: readonly Environment[];
 }>;
 
 /**
@@ -140,7 +141,7 @@ export type ServiceFactoryDefinition = {
 	tags?: readonly ServiceTag<any>[];
 
 	/** The environments (`NODE_ENV` values) in which the service is active. */
-	env?: readonly string[];
+	env?: readonly Environment[];
 };
 
 /**
