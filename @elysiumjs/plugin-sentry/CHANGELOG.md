@@ -1,5 +1,16 @@
 # @elysiumjs/plugin-sentry
 
+## 0.4.0
+
+### Minor Changes
+
+- [#54](https://github.com/na2axl/elysiumjs/pull/54) [`ec07c41`](https://github.com/na2axl/elysiumjs/commit/ec07c410c417053df4e284d8ddc6d2c4da4e42ec) Thanks [@na2axl](https://github.com/na2axl)! - `SentryModule` declares `SENTRY_DSN` and `SENTRY_ENVIRONMENT` in its environment schema (`SentryEnv`), so they are validated at boot and typed in `Env.get()`.
+
+### Patch Changes
+
+- Updated dependencies [[`ec07c41`](https://github.com/na2axl/elysiumjs/commit/ec07c410c417053df4e284d8ddc6d2c4da4e42ec)]:
+  - @elysiumjs/core@0.17.1
+
 ## 0.3.6
 
 ### Patch Changes

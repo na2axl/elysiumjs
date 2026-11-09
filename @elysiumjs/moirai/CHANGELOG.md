@@ -1,5 +1,15 @@
 # @elysiumjs/moirai
 
+## 0.3.2
+
+### Patch Changes
+
+- [#55](https://github.com/na2axl/elysiumjs/pull/55) [`1e6a310`](https://github.com/na2axl/elysiumjs/commit/1e6a310c0ee5baed60fee971aa1980021ffbf30b) Thanks [@na2axl](https://github.com/na2axl)! - `Moirai.ask()` runs the query in the module that registers it, like `Moirai.execute()` does for actions, so the query can inject the private services of its module when it is asked from another module.
+- Updated dependencies [[`ec07c41`](https://github.com/na2axl/elysiumjs/commit/ec07c410c417053df4e284d8ddc6d2c4da4e42ec)]:
+  - @elysiumjs/core@0.17.1
+  - @elysiumjs/heracles@0.8.6
+  - @elysiumjs/mnemosyne@0.6.1
+
 ## 0.3.1
 
 ### Patch Changes

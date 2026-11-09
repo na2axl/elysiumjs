@@ -1,5 +1,16 @@
 # @elysiumjs/styx
 
+## 0.11.0
+
+### Minor Changes
+
+- [#54](https://github.com/na2axl/elysiumjs/pull/54) [`ec07c41`](https://github.com/na2axl/elysiumjs/commit/ec07c410c417053df4e284d8ddc6d2c4da4e42ec) Thanks [@na2axl](https://github.com/na2axl)! - New projects declare the variables they read in `src/env.ts` (`PORT`, and `DATABASE_URL`, `REDIS_URL` or the Upstash variables depending on the chosen parts), and the generated app reads them with `Env.get()` instead of `process.env`.
+
+### Patch Changes
+
+- Updated dependencies [[`ec07c41`](https://github.com/na2axl/elysiumjs/commit/ec07c410c417053df4e284d8ddc6d2c4da4e42ec)]:
+  - @elysiumjs/core@0.17.1
+
 ## 0.10.0
 
 ### Minor Changes
