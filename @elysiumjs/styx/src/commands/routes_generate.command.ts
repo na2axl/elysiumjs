@@ -50,7 +50,7 @@ export class RoutesGenerateCommand extends BaseCommand {
 
 		for (const name of missing) {
 			this.warning(
-				`${name} is not declared in the project sources, so its routes are not in AppRoutes.`
+				`${name} is not exported by a file of the project and no contributor types all its routes, so its routes are not in AppRoutes.`
 			);
 		}
 

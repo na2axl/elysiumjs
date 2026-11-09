@@ -12,24 +12,38 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { HttpRouteDescription } from '@elysiumjs/core';
+import type { HttpRouteDescription, HttpRouteTypes } from '@elysiumjs/core';
 
 /**
  * A controller whose routes go in the generated types.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export type ControllerRoutes = {
-	/** The exported name of the controller class, `default` for a default export. */
-	exportName: string;
-	/** The name of the controller class. Names a default export, which has no name of its own. */
+	/**
+	 * The exported name of the controller class, `default` for a default export. Left out for a
+	 * controller that is not imported, whose route types all come from contributors.
+	 */
+	exportName?: string;
+	/**
+	 * The name of the controller class. Names a default export, which has no name of its own, and
+	 * a controller that is not imported.
+	 */
 	className?: string;
-	/** The module specifier the generated file imports the class from. */
-	specifier: string;
+	/** The module specifier the generated file imports the class from, unless it is not imported. */
+	specifier?: string;
 	/** The path of the controller. */
 	path: string;
 	/** The routes of the controller. */
 	routes: HttpRouteDescription[];
+	/** The route types given by contributors, by route name. */
+	types?: Record<string, HttpRouteTypes>;
 };
+
+/**
+ * Stands for the local name of the controller class in the type text of contributors, such as
+ * `__Controller__['email']`; the rendered file names the class instead.
+ */
+export const CONTROLLER = '__Controller__';
 
 /**
  * A module whose controllers go in the generated types.
@@ -47,7 +61,9 @@ export type ModuleRoutes = {
 /** Methods Elysia has a dedicated route function for. */
 const METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']);
 
-const quote = (value: string) => `'${value.replaceAll('\\', '\\\\').replaceAll("'", "\\'")}'`;
+/** A string literal in single quotes. */
+export const quote = (value: string) =>
+	`'${value.replaceAll('\\', '\\\\').replaceAll("'", "\\'")}'`;
 
 const identifier = (value: string) => value.replace(/[^A-Za-z0-9_$]/g, '_').replace(/^(\d)/, '_$1');
 
@@ -56,23 +72,35 @@ const pathSlugs = (path: string): string[] =>
 	Array.from(path.matchAll(/:([A-Za-z0-9_]+)\??/g), (match) => match[1]!);
 
 /** Renders a route of a controller: its path, hook and handler. */
-const renderRoute = (controller: string, route: HttpRouteDescription): string => {
+const renderRoute = (
+	controller: string | undefined,
+	route: HttpRouteDescription,
+	types: HttpRouteTypes = {}
+): string => {
 	const method = `${controller}[${quote(route.name)}]`;
 	const parameter = (index: number) => `Parameters<${method}>[${index}]`;
+	const named = (text: string) => (controller ? text.replaceAll(CONTROLLER, controller) : text);
 	const hook: string[] = [];
 
-	const params = new Map<string, string>();
-	for (const slug of pathSlugs(route.path)) params.set(slug, 'string');
-	for (const { slug, index } of route.params) params.set(slug, parameter(index));
-	if (params.size > 0) {
-		const fields = Array.from(params, ([slug, type]) => `${quote(slug)}: ${type}`).join('; ');
-		hook.push(`params: schema<{ ${fields} }>()`);
+	if (types.params !== undefined) {
+		hook.push(`params: schema<${named(types.params)}>()`);
+	} else {
+		const params = new Map<string, string>();
+		for (const slug of pathSlugs(route.path)) params.set(slug, 'string');
+		for (const { slug, index } of route.params) params.set(slug, parameter(index));
+		if (params.size > 0) {
+			const fields = Array.from(params, ([slug, type]) => `${quote(slug)}: ${type}`).join('; ');
+			hook.push(`params: schema<{ ${fields} }>()`);
+		}
 	}
-	if (route.query !== undefined) hook.push(`query: schema<${parameter(route.query)}>()`);
-	if (route.body !== undefined) hook.push(`body: schema<${parameter(route.body)}>()`);
+	if (types.query !== undefined) hook.push(`query: schema<${named(types.query)}>()`);
+	else if (route.query !== undefined) hook.push(`query: schema<${parameter(route.query)}>()`);
+	if (types.body !== undefined) hook.push(`body: schema<${named(types.body)}>()`);
+	else if (route.body !== undefined) hook.push(`body: schema<${parameter(route.body)}>()`);
 
+	const response = types.response !== undefined ? named(types.response) : `ReturnType<${method}>`;
 	const hookObject = hook.length > 0 ? `{ ${hook.join(', ')} }` : '{}';
-	const args = `${quote(route.path)}, ${hookObject}, returns<ReturnType<${method}>>()`;
+	const args = `${quote(route.path)}, ${hookObject}, returns<${response}>()`;
 	return METHODS.has(route.method)
 		? `.${route.method.toLowerCase()}(${args})`
 		: `.route(${quote(route.method)}, ${args})`;
@@ -92,8 +120,20 @@ export const renderRoutes = (modules: ModuleRoutes[]): string => {
 	const names = new Set<string>();
 	const local = new Map<ControllerRoutes, string>();
 
+	const use = (specifier: string, name: string, exported: string) => {
+		const specifiers = imports.get(specifier) ?? new Map<string, string>();
+		specifiers.set(name, exported);
+		imports.set(specifier, specifiers);
+	};
+
 	for (const module of modules) {
 		for (const controller of module.controllers) {
+			for (const types of Object.values(controller.types ?? {})) {
+				for (const { from, names: imported } of types.imports ?? []) {
+					for (const name of imported) use(from, name, name);
+				}
+			}
+			if (controller.specifier === undefined || controller.exportName === undefined) continue;
 			const preferred =
 				controller.exportName === 'default' && controller.className
 					? controller.className
@@ -102,9 +142,7 @@ export const renderRoutes = (modules: ModuleRoutes[]): string => {
 			for (let i = 2; names.has(name); i++) name = `${preferred}$${i}`;
 			names.add(name);
 			local.set(controller, name);
-			const specifiers = imports.get(controller.specifier) ?? new Map<string, string>();
-			specifiers.set(name, controller.exportName);
-			imports.set(controller.specifier, specifiers);
+			use(controller.specifier, name, controller.exportName);
 		}
 	}
 
@@ -138,7 +176,10 @@ export const renderRoutes = (modules: ModuleRoutes[]): string => {
 
 		const controllers = module.controllers.map((controller) => {
 			const chain = controller.routes
-				.map((route) => `\n\t\t\t\t${renderRoute(local.get(controller)!, route)}`)
+				.map(
+					(route) =>
+						`\n\t\t\t\t${renderRoute(local.get(controller), route, controller.types?.[route.name])}`
+				)
 				.join('');
 			return `\n\t\t.use(\n\t\t\troutes(${quote(controller.path)})${chain}\n\t\t)`;
 		});

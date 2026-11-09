@@ -14,13 +14,15 @@
 
 import type { ModuleRoutes } from '../src/routes/render';
 
+import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { Application, Http, Module } from '@elysiumjs/core';
-import { describe, expect, it } from 'bun:test';
+import { afterAll, describe, expect, it } from 'bun:test';
 
 import { collectRoutes } from '../src/routes/collect';
 import { renderRoutes } from '../src/routes/render';
+import { ContribApp } from './fixtures/contrib-app/src/app';
 import { DefaultApp } from './fixtures/default-app/src/app';
 import { RoutesApp } from './fixtures/routes-app/src/app';
 
@@ -184,5 +186,70 @@ describe('renderRoutes', () => {
 		expect(output).toContain(
 			'const app = () => routes().use(a_moduleRoutes()).use(b_moduleRoutes());'
 		);
+	});
+});
+
+describe('route types contributors', () => {
+	const fixtureDir = join(import.meta.dir, 'fixtures', 'contrib-app');
+	const out = join(fixtureDir, 'src', 'routes.gen.ts');
+	const check = join(fixtureDir, 'src', 'check.ts');
+
+	afterAll(async () => {
+		await rm(out, { force: true });
+		await rm(check, { force: true });
+	});
+
+	it('finds controllers in the files the app loaded, whatever declares them', async () => {
+		const { modules, missing } = await collectRoutes(fixtureDir, ContribApp, out);
+		const [greeting, health] = modules[0]!.controllers;
+
+		expect(missing).toEqual([]);
+		expect(greeting).toMatchObject({
+			exportName: 'GreetingController',
+			specifier: './greeting',
+			path: '/greetings',
+			types: {
+				'ping:route': { response: 'Pong', imports: [{ from: './pong', names: ['Pong'] }] },
+				hello: { response: "{ reply: ReturnType<__Controller__['hello']> }" }
+			}
+		});
+		// The factory-built controller is not imported: the contributor types all its routes.
+		expect(health).toMatchObject({ className: 'HealthController', path: '/health' });
+		expect(health!.specifier).toBeUndefined();
+	});
+
+	it('renders the types of contributors, which compile', async () => {
+		const { modules } = await collectRoutes(fixtureDir, ContribApp, out);
+		const output = renderRoutes(modules);
+
+		expect(output).toContain("import type { Pong } from './pong';");
+		expect(output).toContain("import type { GreetingController } from './greeting';");
+		expect(output).not.toContain('HealthController');
+		expect(output).toContain(".get('/ping', {}, returns<Pong>())");
+		expect(output).toContain(
+			".get('/hello', {}, returns<{ reply: ReturnType<GreetingController['hello']> }>())"
+		);
+
+		await Bun.write(out, output);
+		await Bun.write(
+			check,
+			[
+				"import type { AppRoutes } from './routes.gen';",
+				'',
+				"type Routes = AppRoutes['~Routes'];",
+				"export const pong: Routes['health']['ping']['get']['response'][200] = { pong: true };",
+				"export const reply: Routes['greetings']['hello']['get']['response'][200] = { reply: 'hi' };",
+				'// @ts-expect-error The reply of /hello is a string.',
+				"export const wrong: Routes['greetings']['hello']['get']['response'][200] = { reply: 1 };",
+				''
+			].join('\n')
+		);
+		const result = Bun.spawnSync([process.execPath, 'x', 'tsc', '-p', 'tsconfig.json'], {
+			cwd: fixtureDir
+		});
+		expect({ output: result.stdout.toString(), code: result.exitCode }).toEqual({
+			output: '',
+			code: 0
+		});
 	});
 });

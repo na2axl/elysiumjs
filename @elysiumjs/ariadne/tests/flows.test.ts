@@ -13,11 +13,20 @@
 // limitations under the License.
 
 import type { Static, TestingHttpApp } from '@elysiumjs/core';
-import type { FlowContext, FlowStore } from '../src';
+import type { FlowAnswer, FlowContext, FlowStore } from '../src';
 
-import { Application, BadRequestError, ConflictError, Http, Module, t } from '@elysiumjs/core';
+import {
+	Application,
+	BadRequestError,
+	ConflictError,
+	Environments,
+	Http,
+	Module,
+	Service,
+	t
+} from '@elysiumjs/core';
 import { Auth, Jwt, jwtGuard, ThemisModule } from '@elysiumjs/themis';
-import { afterEach, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, expectTypeOf, it } from 'bun:test';
 
 import {
 	AriadneModule,
@@ -25,6 +34,7 @@ import {
 	FLOW_KEY_HEADER,
 	FLOW_OWNER_HEADER,
 	FLOW_STEP_HEADER,
+	FlowRouteTypes,
 	InvalidFlowError,
 	MemoryFlowStore
 } from '../src';
@@ -546,5 +556,53 @@ describe('AriadneModule', () => {
 		@Application.register({ modules: [AriadneModule.with({})], openapi: false })
 		class App extends Application {}
 		await expect(Application.testing({ app: App })).rejects.toThrow('store');
+	});
+});
+
+describe('FlowRouteTypes', () => {
+	const types = new FlowRouteTypes();
+	const routes = () => Http.describe(SignUpFlow)!.routes;
+	const route = (name: string) => routes().find((r) => r.name === name)!;
+	const ref = { method: "C['email']", parameter: (i: number) => `Parameters<C['email']>[${i}]` };
+
+	it('types the routes of flow controllers only', () => {
+		expect(types.supports(SignUpFlow)).toBe(true);
+		expect(types.supports(class Other {})).toBe(false);
+	});
+
+	it('types the start and state routes, and the replies of the steps', () => {
+		const from = (name: string) => [{ from: '@elysiumjs/ariadne', names: [name] }];
+		expect(types.route(SignUpFlow, route('ariadne:start'), {})).toEqual({
+			response: 'FlowStart',
+			imports: from('FlowStart')
+		});
+		expect(types.route(SignUpFlow, route('ariadne:state'), {})).toEqual({
+			response: 'FlowStatus',
+			imports: from('FlowStatus')
+		});
+		expect(types.route(SignUpFlow, route('email'), ref)).toEqual({
+			response: "FlowStepReply<ReturnType<C['email']>>",
+			imports: from('FlowStepReply')
+		});
+		// Without a way to refer to the step method, its types stay unknown.
+		expect(types.route(SignUpFlow, route('email'), {})).toBeUndefined();
+	});
+
+	it('answers what a step advances with or returns, without refusals and errors', () => {
+		expectTypeOf<FlowAnswer<ReturnType<SignUpFlow['email']>>>().toEqualTypeOf<{
+			sentTo: string;
+		}>();
+		expectTypeOf<FlowAnswer<ReturnType<SignUpFlow['code']>>>().toEqualTypeOf<{
+			welcome: string | undefined;
+			attempts: number;
+			rewound: number;
+		}>();
+		expectTypeOf<FlowAnswer<Promise<void>>>().toEqualTypeOf<null>();
+	});
+
+	it('is a route types contributor active in development only', () => {
+		expect(Service.tagsOf(FlowRouteTypes)).toContain(Http.RouteTypes);
+		expect(Environments.isActive(FlowRouteTypes, 'development')).toBe(true);
+		expect(Environments.isActive(FlowRouteTypes, 'production')).toBe(false);
 	});
 });

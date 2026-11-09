@@ -35,6 +35,13 @@ export {
 	type FlowStepDescription,
 	type FlowStepOptions
 } from './flow';
+export {
+	type FlowAnswer,
+	FlowRouteTypes,
+	type FlowStart,
+	type FlowStatus,
+	type FlowStepReply
+} from './route-types';
 export { type FlowLease, FlowRules, type FlowSlot } from './rules';
 export {
 	FLOW_KEY_HEADER,

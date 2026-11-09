@@ -671,6 +671,59 @@ export type HttpControllerDescription = {
 	routes: HttpRouteDescription[];
 };
 
+/**
+ * The types of a route in the generated route types, as TypeScript type text. A part left out
+ * keeps the type the route type generator reads from the controller method.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type HttpRouteTypes = {
+	/** The type of the URL parameters, an object type such as `{ id: string }`. */
+	params?: string;
+	/** The type of the query. */
+	query?: string;
+	/** The type of the request body. */
+	body?: string;
+	/** The type of the response. */
+	response?: string;
+	/** The named type imports the type text needs. */
+	imports?: Array<{ from: string; names: string[] }>;
+};
+
+/**
+ * How the generated route types can refer to a controller method. Both are `undefined` when the
+ * controller class cannot be imported (it is not exported by a file of the project), and then
+ * the contributor gives every type of the route.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type HttpRouteTypeRef = {
+	/** The method type, such as `SignUpFlow['email']`. */
+	method?: string;
+	/** The type of a method parameter, such as `Parameters<SignUpFlow['email']>[1]`. */
+	parameter?: (index: number) => string;
+};
+
+/**
+ * Types the routes of the controllers it supports in the generated route types, when the
+ * controller method signature does not give them, such as routes a decorator adds. Register it
+ * with the {@link Http.RouteTypes} tag.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export interface HttpRouteTypesContributor {
+	/** Whether it types routes of `controller`. */
+	supports(controller: Function): boolean;
+	/**
+	 * The types of a route of `controller`, or `undefined` to keep the types read from the method.
+	 * @param controller The controller class.
+	 * @param route The route, as `Http.describe()` reports it.
+	 * @param ref How to refer to the method in type text.
+	 */
+	route(
+		controller: Function,
+		route: HttpRouteDescription,
+		ref: HttpRouteTypeRef
+	): HttpRouteTypes | undefined;
+}
+
 /** The module level of interceptors, shared by every controller of a module. */
 const moduleInterceptorLevels = new WeakMap<ModuleNode, InterceptorLevel>();
 
@@ -817,6 +870,28 @@ const moduleFilterLevel = (node: ModuleNode): FilterLevel => {
 };
 
 export namespace Http {
+	/**
+	 * The tag of the route types contributors, read by `styx routes:generate`. Register a
+	 * contributor as a global service active in development only:
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @example
+	 * ```ts
+	 * @Service.register({ tags: [Http.RouteTypes], global: true, env: Environments.local })
+	 * export class FlowRouteTypes implements HttpRouteTypesContributor {
+	 * 	public supports(controller: Function) {
+	 * 		return Flow.describe(controller) !== undefined;
+	 * 	}
+	 *
+	 * 	public route(controller: Function, route: HttpRouteDescription) {
+	 * 		return route.name === 'ariadne:start'
+	 * 			? { response: 'FlowStart', imports: [{ from: '@elysiumjs/ariadne', names: ['FlowStart'] }] }
+	 * 			: undefined;
+	 * 	}
+	 * }
+	 * ```
+	 */
+	export const RouteTypes = Service.tag<HttpRouteTypesContributor>('http.route-types');
+
 	/**
 	 * Describes the routes of an HTTP controller, for tools such as the route type generator.
 	 * Route decorators register their routes on the next tick, so call it after importing the

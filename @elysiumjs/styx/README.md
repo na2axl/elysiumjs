@@ -62,6 +62,29 @@ const { data } = await api.users({ id }).get();
 
 The types come from the controller methods: the parameters decorated with `@Http.param`, `@Http.query` and `@Http.body` give the request types, and the return type gives the response type, so annotate the return type of methods that return different shapes. The file holds types only and is written again by `typecheck` in new projects, so keep it out of git.
 
+Every controller the modules of the app list is included, whatever declares it, as long as a file of the project exports it. When a decorator adds routes that are not methods of the class, or answers something else than the method returns, a route types contributor types them: a global service tagged `Http.RouteTypes`, active in development. Flow controllers are typed this way by `AriadneModule`.
+
+```ts
+@Service.register({ tags: [Http.RouteTypes], global: true, env: Environments.local })
+export class PingRouteTypes implements HttpRouteTypesContributor {
+	public supports(controller: Function) {
+		return isPingable(controller);
+	}
+
+	public route(controller: Function, route: HttpRouteDescription, ref: HttpRouteTypeRef) {
+		if (route.name === 'ping') return { response: '{ pong: true }' };
+		return ref.method
+			? {
+					response: `Reply<ReturnType<${ref.method}>>`,
+					imports: [{ from: './reply', names: ['Reply'] }]
+				}
+			: undefined;
+	}
+}
+```
+
+A contributor gives the type text of `params`, `query`, `body` and `response`, and leaves out the parts the method gives. A controller that no file exports, such as one a factory builds, is included when a contributor gives every type of its routes.
+
 ## Running the app
 
 Every other command loads the project's app (`src/app.ts` or `index.ts`) and runs there:

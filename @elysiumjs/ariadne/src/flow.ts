@@ -73,10 +73,10 @@ export type FlowContext = {
  * A step that moves the flow forward, built with {@link Flow.advance}.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export type FlowAdvance<S> = {
+export type FlowAdvance<S, A = unknown> = {
 	readonly '~flow': 'advance';
 	readonly state: S;
-	readonly answer: unknown;
+	readonly answer: A;
 };
 
 /**
@@ -339,7 +339,7 @@ export namespace Flow {
 	 * step for `state`.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 */
-	export const advance = <S>(state: S, answer: unknown = null): FlowAdvance<S> => ({
+	export const advance = <S, A = null>(state: S, answer: A = null as A): FlowAdvance<S, A> => ({
 		'~flow': 'advance',
 		state,
 		answer
