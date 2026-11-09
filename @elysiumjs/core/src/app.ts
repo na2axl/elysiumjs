@@ -599,11 +599,23 @@ export abstract class Application extends InteractsWithConsole {
 		await this.buildServer(false);
 
 		const runtime = Runtime.get();
-		this.#serving =
-			runtime.serve(
-				this.#elysia,
-				server?.port ?? (parseInt(runtime.env().PORT ?? '', 10) || 3000)
-			) ?? undefined;
+		this.#serving = runtime.serve(this.#elysia, server?.port ?? this.port()) ?? undefined;
+	}
+
+	/**
+	 * The port to listen on without `server.port`: the validated `PORT` variable when the app or a
+	 * module declares it, else the raw one, else 3000.
+	 */
+	private port(): number {
+		const valid = (value: unknown) => {
+			const port = typeof value === 'number' ? value : parseInt(String(value ?? ''), 10);
+			return Number.isInteger(port) && port > 0 ? port : undefined;
+		};
+		return (
+			(Env.exists('PORT') ? valid(Env.get('PORT')) : undefined) ??
+			valid(Runtime.get().env().PORT) ??
+			3000
+		);
 	}
 
 	/**

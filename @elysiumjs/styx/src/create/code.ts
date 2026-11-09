@@ -168,7 +168,7 @@ const partCode = (runtime: keyof typeof RUNTIMES, parts: AppParts) => {
 			imports.push("import { RedisModule } from '@elysiumjs/redis';");
 			modules.push(`RedisModule.with(() => ({
 			default: 'cache',
-			connections: { cache: { url: process.env.REDIS_URL! } }
+			connections: { cache: { url: Env.get('REDIS_URL').reveal() } }
 		}))`);
 		} else if (runtime === 'node') {
 			imports.push("import { ioredis, RedisModule } from '@elysiumjs/redis';");
@@ -176,14 +176,14 @@ const partCode = (runtime: keyof typeof RUNTIMES, parts: AppParts) => {
 			modules.push(`RedisModule.with(() => ({
 			default: 'cache',
 			client: ioredis((url, options) => new IORedis(url, { ...options, lazyConnect: true })),
-			connections: { cache: { url: process.env.REDIS_URL! } }
+			connections: { cache: { url: Env.get('REDIS_URL').reveal() } }
 		}))`);
 		} else {
 			imports.push("import { RedisModule, upstash } from '@elysiumjs/redis';");
 			modules.push(`RedisModule.with(() => ({
 			default: 'cache',
-			client: upstash({ token: process.env.UPSTASH_REDIS_REST_TOKEN! }),
-			connections: { cache: { url: process.env.UPSTASH_REDIS_REST_URL! } }
+			client: upstash({ token: Env.get('UPSTASH_REDIS_REST_TOKEN').reveal() }),
+			connections: { cache: { url: Env.get('UPSTASH_REDIS_REST_URL') } }
 		}))`);
 		}
 	}
@@ -192,13 +192,13 @@ const partCode = (runtime: keyof typeof RUNTIMES, parts: AppParts) => {
 		if (runtime === 'bun') {
 			modules.push(`DrizzleModule.with(() => ({
 			default: 'main',
-			connections: { main: { connection: process.env.DATABASE_URL! } }
+			connections: { main: { connection: Env.get('DATABASE_URL').reveal() } }
 		}))`);
 		} else if (runtime === 'node') {
 			imports.push("import { postgresJs } from '@elysiumjs/mnemosyne-drizzle/postgres-js';");
 			modules.push(`DrizzleModule.with(() => ({
 			default: 'main',
-			connections: { main: { driver: postgresJs({ connection: process.env.DATABASE_URL! }) } }
+			connections: { main: { driver: postgresJs({ connection: Env.get('DATABASE_URL').reveal() }) } }
 		}))`);
 		} else {
 			imports.push("import { hyperdrive } from '@elysiumjs/mnemosyne-drizzle/hyperdrive';");
@@ -240,7 +240,7 @@ export const getAppCode = (
 	];
 	return /* js */ `import type { ServerError } from '@elysiumjs/core';
 
-import { Application, getLogger } from '@elysiumjs/core';
+import { Application, ${parts.database || parts.cache ? 'Env, ' : ''}getLogger } from '@elysiumjs/core';
 import { HermesModule } from '@elysiumjs/hermes';
 import { runtime as ${choice.alias} } from '${choice.package}';
 ${[...part.imports, ...enabledModules.map((module) => `import { ${module.import} } from '${module.name}';`)].join('\n')}
@@ -256,8 +256,7 @@ import { env } from './env';
 		${entries.join(',\n\t\t')}
 	],
 	server: {
-		name: '${projectName}',
-		port: parseInt(process.env.PORT!, 10) || 3000
+		name: '${projectName}'
 	},
 	debug: false,
 	openapi: {
@@ -286,20 +285,41 @@ export class App extends Application {
  * `.ts` file, so that the compiler checks it even with `skipLibCheck`.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export const getEnvCode = () => /* js */ `import type { Env } from '@elysiumjs/core';
+export const getEnvCode = (
+	runtime: keyof typeof RUNTIMES = 'bun',
+	parts: AppParts = { database: true, cache: true }
+) => {
+	const variables: string[] = [];
+	// A Worker does not listen on a port.
+	if (runtime !== 'workers') variables.push('PORT: t.Number({ default: 3000 })');
+	// On Workers, the database goes through the Hyperdrive binding.
+	if (parts.database && runtime !== 'workers') variables.push('DATABASE_URL: Secret.schema()');
+	if (parts.cache) {
+		if (runtime === 'workers') {
+			variables.push(
+				'UPSTASH_REDIS_REST_URL: t.String()',
+				'UPSTASH_REDIS_REST_TOKEN: Secret.schema()'
+			);
+		} else {
+			variables.push('REDIS_URL: Secret.schema()');
+		}
+	}
+	const secret = variables.some((variable) => variable.includes('Secret.schema()'));
+	return /* js */ `import type { Env } from '@elysiumjs/core';
 
-import { t } from '@elysiumjs/core';
+import { ${secret ? 'Secret, ' : ''}t } from '@elysiumjs/core';
 
 /**
  * The environment variables of the app, validated at boot and read with \`Env.get()\`. Modules
  * declare theirs in their own \`envSchema\` the same way.
  */
-export const env = t.Object({});
+export const env = t.Object({${variables.length ? `\n\t${variables.join(',\n\t')}\n` : ''}});
 
 declare module '@elysiumjs/core' {
 	interface AppEnv extends Env.Infer<typeof env> {}
 }
 `;
+};
 
 /**
  * The scripts of a project, per runtime and package manager.

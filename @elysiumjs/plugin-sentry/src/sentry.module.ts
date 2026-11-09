@@ -16,14 +16,16 @@ import type * as Sentry from '@sentry/bun';
 
 import { Application, Env, MissingModuleConfigError, Module } from '@elysiumjs/core';
 
+import { SentryEnv } from './env';
 import { plugin } from './plugin';
 
 /**
  * Configurable module that installs the Sentry plugin on the root app when serving.
- * `dsn` may come from the config or from `SENTRY_DSN`; boot fails when neither is set.
+ * `dsn` may come from the config or from `SENTRY_DSN`; boot fails when neither is set. The module
+ * declares `SENTRY_DSN` and `SENTRY_ENVIRONMENT` in its environment schema.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-@Module.register({})
+@Module.register({ envSchema: SentryEnv })
 export class SentryModule extends Module.configurable<Sentry.BunOptions>() {
 	public override onInit(): void {
 		if (!this.config.dsn && !Env.get('SENTRY_DSN')) {

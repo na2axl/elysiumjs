@@ -30,6 +30,8 @@ class MyApp extends Application {}
 
 The `dsn` can also come from the `SENTRY_DSN` environment variable. Boot fails when neither is set.
 
+The module declares `SENTRY_DSN` and `SENTRY_ENVIRONMENT` in its environment schema, so both are validated at boot and typed in `Env.get()`.
+
 ## Configuration
 
 The module forwards all options to the Sentry initialization method. You can find the full list of options [here](https://docs.sentry.io/platforms/javascript/guides/bun/configuration/options/).

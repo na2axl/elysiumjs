@@ -736,6 +736,21 @@ describe('Application class', () => {
 			serveSpy.mockRestore();
 		});
 
+		it('should listen on the validated PORT when server.port is not set', async () => {
+			const runtime = Runtime.get();
+			const env = spyOn(runtime, 'env').mockImplementation(() => ({ PORT: '4321' }));
+			const serveSpy = spyOn(runtime, 'serve').mockImplementation(() => undefined);
+
+			@Application.register({ env: t.Object({ PORT: t.Number({ default: 3000 }) }) })
+			class TestApp extends Application {}
+
+			await new TestApp().run(['serve']);
+
+			expect(serveSpy.mock.calls[0]![1]).toBe(4321);
+			serveSpy.mockRestore();
+			env.mockRestore();
+		});
+
 		it('should print an ElysiumError raised in the graph phase and exit 1', async () => {
 			@Module.register({})
 			class BrokenModule extends Module {}
