@@ -1,5 +1,13 @@
 # @elysiumjs/moirai
 
+## 0.4.1
+
+### Patch Changes
+
+- [#64](https://github.com/na2axl/elysiumjs/pull/64) [`fb56b18`](https://github.com/na2axl/elysiumjs/commit/fb56b1836cc89d6975e390a45fc46f251db78eb6) Thanks [@na2axl](https://github.com/na2axl)! - `@Projection.on()` and `@Reactor.on()` accept handlers with any return type, such as `async` methods returning `Promise<void>`.
+- Updated dependencies [[`fb56b18`](https://github.com/na2axl/elysiumjs/commit/fb56b1836cc89d6975e390a45fc46f251db78eb6)]:
+  - @elysiumjs/heracles@0.9.2
+
 ## 0.4.0
 
 ### Minor Changes
