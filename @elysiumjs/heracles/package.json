@@ -1,6 +1,6 @@
 {
   "name": "@elysiumjs/heracles",
-  "version": "0.8.6",
+  "version": "0.9.0",
   "description": "Background job processing system for Elysium.js apps.",
   "module": "dist/index.js",
   "type": "module",
