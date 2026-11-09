@@ -1,5 +1,12 @@
 # @elysiumjs/plugin-sentry
 
+## 0.4.1
+
+### Patch Changes
+
+- Updated dependencies [[`d471a6e`](https://github.com/na2axl/elysiumjs/commit/d471a6e69736e016eb972a0715987df1d7b62438)]:
+  - @elysiumjs/core@0.18.0
+
 ## 0.4.0
 
 ### Minor Changes
