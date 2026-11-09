@@ -1,5 +1,12 @@
 # create-elysium
 
+## 0.3.2
+
+### Patch Changes
+
+- Updated dependencies [[`ec07c41`](https://github.com/na2axl/elysiumjs/commit/ec07c410c417053df4e284d8ddc6d2c4da4e42ec)]:
+  - @elysiumjs/styx@0.11.0
+
 ## 0.3.1
 
 ### Patch Changes

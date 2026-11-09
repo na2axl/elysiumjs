@@ -1,5 +1,11 @@
 # @elysiumjs/core
 
+## 0.17.1
+
+### Patch Changes
+
+- [#54](https://github.com/na2axl/elysiumjs/pull/54) [`ec07c41`](https://github.com/na2axl/elysiumjs/commit/ec07c410c417053df4e284d8ddc6d2c4da4e42ec) Thanks [@na2axl](https://github.com/na2axl)! - When `server.port` is not set, the app listens on the validated `PORT` variable from its environment schema, then the raw `PORT` variable, then `3000`.
+
 ## 0.17.0
 
 ### Minor Changes

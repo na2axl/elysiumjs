@@ -96,7 +96,7 @@
     },
     "@elysiumjs/core": {
       "name": "@elysiumjs/core",
-      "version": "0.17.0",
+      "version": "0.17.1",
       "dependencies": {
         "@elysia/openapi": "^2.0.0-rc.0",
         "elysia": "^2.0.0-rc.1",
@@ -222,7 +222,7 @@
     },
     "@elysiumjs/moirai": {
       "name": "@elysiumjs/moirai",
-      "version": "0.3.1",
+      "version": "0.3.2",
       "dependencies": {
         "typebox": "^1.3.0",
       },
@@ -262,7 +262,7 @@
     },
     "@elysiumjs/plugin-sentry": {
       "name": "@elysiumjs/plugin-sentry",
-      "version": "0.3.6",
+      "version": "0.4.0",
       "dependencies": {
         "@elysia/opentelemetry": "^2.0.0-rc.0",
         "@sentry/bun": "^11.9.0",
@@ -324,7 +324,7 @@
     },
     "@elysiumjs/styx": {
       "name": "@elysiumjs/styx",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "bin": {
         "styx": "dist/cli.js",
       },
@@ -407,7 +407,7 @@
     },
     "create-elysium": {
       "name": "create-elysium",
-      "version": "0.3.1",
+      "version": "0.3.2",
       "bin": {
         "create-elysium": "./index.js",
       },
