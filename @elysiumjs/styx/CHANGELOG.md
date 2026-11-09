@@ -1,5 +1,18 @@
 # @elysiumjs/styx
 
+## 0.12.0
+
+### Minor Changes
+
+- [#59](https://github.com/na2axl/elysiumjs/pull/59) [`af05b49`](https://github.com/na2axl/elysiumjs/commit/af05b498a2c4d4dafda44f361fe68c490f49a8c7) Thanks [@na2axl](https://github.com/na2axl)! - `routes:generate` includes every controller of the app that a file of the project exports, whatever decorator declares it, instead of only files mentioning `Http.controller`. Route types contributors registered with `Http.RouteTypes` type the routes the method signature does not give, and fully typed controllers are included even when no file exports them.
+
+### Patch Changes
+
+- [#59](https://github.com/na2axl/elysiumjs/pull/59) [`af05b49`](https://github.com/na2axl/elysiumjs/commit/af05b498a2c4d4dafda44f361fe68c490f49a8c7) Thanks [@na2axl](https://github.com/na2axl)! - `routes:generate --out` (and `routes` in `.elysiumrc`) accepts an absolute path, and new projects ignore every `*.gen.ts` file instead of only `src/routes.gen.ts`.
+- Updated dependencies [[`af05b49`](https://github.com/na2axl/elysiumjs/commit/af05b498a2c4d4dafda44f361fe68c490f49a8c7), [`7ffe5eb`](https://github.com/na2axl/elysiumjs/commit/7ffe5eb3926d8a428c6cb14fdc9437758d4c99b5)]:
+  - @elysiumjs/core@0.19.0
+  - @elysiumjs/runtime-bun@0.1.8
+
 ## 0.11.1
 
 ### Patch Changes

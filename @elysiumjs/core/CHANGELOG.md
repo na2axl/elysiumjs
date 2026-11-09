@@ -1,5 +1,13 @@
 # @elysiumjs/core
 
+## 0.19.0
+
+### Minor Changes
+
+- [#59](https://github.com/na2axl/elysiumjs/pull/59) [`af05b49`](https://github.com/na2axl/elysiumjs/commit/af05b498a2c4d4dafda44f361fe68c490f49a8c7) Thanks [@na2axl](https://github.com/na2axl)! - `Http.RouteTypes` is the tag of route types contributors (`HttpRouteTypesContributor`), which type routes in `styx routes:generate` when the controller method signature does not, such as routes a decorator adds. `Service.tagsOf()` gives the tags of a service class.
+
+- [#61](https://github.com/na2axl/elysiumjs/pull/61) [`7ffe5eb`](https://github.com/na2axl/elysiumjs/commit/7ffe5eb3926d8a428c6cb14fdc9437758d4c99b5) Thanks [@na2axl](https://github.com/na2axl)! - Routes take a `parse` option: how the request body is parsed before the handler runs (`none`, `text`, `json`, `formdata`, `urlencoded` or `arrayBuffer`). By default it follows the request's `Content-Type`. `parse: 'none'` leaves the body unread, so the handler reads it from the request, such as to check a webhook signature over the exact bytes. A route with `parse: 'none'` cannot take `@Http.body()`: mounting it throws.
+
 ## 0.18.0
 
 ### Minor Changes

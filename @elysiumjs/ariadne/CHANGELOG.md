@@ -1,5 +1,16 @@
 # @elysiumjs/ariadne
 
+## 0.3.0
+
+### Minor Changes
+
+- [#59](https://github.com/na2axl/elysiumjs/pull/59) [`af05b49`](https://github.com/na2axl/elysiumjs/commit/af05b498a2c4d4dafda44f361fe68c490f49a8c7) Thanks [@na2axl](https://github.com/na2axl)! - `AriadneModule` registers `FlowRouteTypes` in development, so `styx routes:generate` types flow controllers: the start route answers `FlowStart`, the state route `FlowStatus`, and each step `FlowStepReply` with the answer it advances with or returns. `Flow.advance()` keeps the type of its answer.
+
+### Patch Changes
+
+- Updated dependencies [[`af05b49`](https://github.com/na2axl/elysiumjs/commit/af05b498a2c4d4dafda44f361fe68c490f49a8c7), [`7ffe5eb`](https://github.com/na2axl/elysiumjs/commit/7ffe5eb3926d8a428c6cb14fdc9437758d4c99b5)]:
+  - @elysiumjs/core@0.19.0
+
 ## 0.2.3
 
 ### Patch Changes

@@ -1,5 +1,13 @@
 # @elysiumjs/ariadne-redis
 
+## 0.1.2
+
+### Patch Changes
+
+- Updated dependencies [[`af05b49`](https://github.com/na2axl/elysiumjs/commit/af05b498a2c4d4dafda44f361fe68c490f49a8c7)]:
+  - @elysiumjs/ariadne@0.3.0
+  - @elysiumjs/redis@0.1.8
+
 ## 0.1.1
 
 ### Patch Changes
