@@ -52,6 +52,7 @@ export { Metadata } from './metadata';
 export { currentUserId, userIdOf } from './user';
 export { currentEnvironment } from './utils';
 export { Clock, ClockAdjustmentRefusedError, SystemClock } from './clock';
+export { AsyncResult, Failed, Passed, Result } from './result';
 export type { ClockSource } from './clock';
 export { Environments } from './environments';
 export type { Environment } from './environments';

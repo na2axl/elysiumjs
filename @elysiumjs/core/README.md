@@ -170,6 +170,31 @@ const Envelope = TransformInterceptor.with(
 );
 ```
 
+### Results
+
+A check or a call that may fail returns a `Result`: the value it passed with, or the `DomainError` it failed with. A handler may return one: a passed result answers its value, a failed one its problem. `AsyncResult` is the result to come of a promise, with the same methods, and a handler may return it too.
+
+```typescript
+import { AsyncResult, ForbiddenError, Result } from '@elysiumjs/core';
+
+const mayBuy = (account: Account): Result<Buyer, ForbiddenError> =>
+	account.adult ? Result.pass({ id: account.id }) : Result.fail(new ForbiddenError('Adults only.'));
+
+const buyer = mayBuy(account);
+if (!buyer.check()) return buyer.error;
+buyer.result.id;
+
+return mayBuy(account).errorOr((buyer) => view.render(buyer));
+
+const wallet = await AsyncResult.from(wallets.open(userId)).orThrow();
+```
+
+- `check()` narrows the result: `result` is the value on the passed side, `error` the problem on the failed side.
+- `orThrow()` gives the value or throws the error, `orError()` gives the value or the error, and `errorOr(transform)` gives the error or the transformed value, as a handler returns it.
+- `map(transform)` transforms the value and `andThen(next)` chains the next result; a failure skips both.
+- `Result.of(value)` and `AsyncResult.from(promise)` make a result of a `T | DomainError` union, and keep a result as it is. `Result.is(value)` tells a result from other values.
+- `Result` is not a thenable, so awaiting one gives the result itself. Awaiting an `AsyncResult` gives its `Result`.
+
 ## Environment
 
 The app and its modules declare the environment variables they read as TypeBox objects. They are validated when the app runs or is built, with every missing or invalid variable listed, and read with `Env.get()`. A file that declares a schema also augments `AppEnv`, so that `Env.get()` knows each name and its type:
