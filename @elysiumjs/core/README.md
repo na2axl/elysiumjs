@@ -158,6 +158,8 @@ export class WalletController {
 - The problems of one status are documented as a union. A schema the route gives for that status in `response` wins over them.
 - The framework adds its own: 422 `VALIDATION_FAILED` when the body or the query is validated (400 with `problems.validationStatus`), 400 `BAD_REQUEST` for a body to parse or declared headers, 413 `PAYLOAD_TOO_LARGE` under the body limit, 429 `RATE_LIMITED` with a rate limit, and 500 `INTERNAL_ERROR` on every route.
 - A middleware, an interceptor or a validator that answers with problems lists their classes in a static `errors`, and the routes they apply to document them.
+- `status` sets the status of a successful response: `@Http.post('/', { status: 201, response: Wallet })` answers 201 and documents `Wallet` under it, and `@Http.del('/:id', { status: 204 })` answers without a body. A handler that sets `ctx.set.status` keeps its own.
+- `Http.currentContext()` gives the context of the request being handled to code outside the handler, such as a service, and `undefined` outside a request.
 
 An interceptor that changes the shape of results describes it, so that routes declare the result of their handler. `TransformInterceptor.with(transform, { schema })` passes the success schemas of the routes it wraps through `schema`, in the order results go through the interceptors (route, controller, module, then application). The new schema is the one documented, validated and serialized, and `schema` must leave alone what `transform` leaves alone:
 
@@ -271,6 +273,29 @@ export class Health {
 ```
 
 `@Service.injectAll(tag)` and `Service.getAll(tag)` give the tagged services in registration order, and an empty array when there is none; `Service.resolveAll(tag)` also waits for their `onInit`. A module receives the tagged services of every module of the application, including the ones it does not import, while getting one of them by its class still follows the module's imports and exports. Scopes apply to each tagged service as they do to `@Service.inject()`.
+
+### Extension points
+
+When each service of a tag carries options of its own, such as a name and a channel, `Service.extension()` makes the tag, the decorator that registers a service with its options, and the lookups. Names must be unique among the active services: `all()` throws `DuplicateExtensionError` otherwise.
+
+```typescript
+type TransportOptions = { name: string; channel: 'email' | 'sms'; devOnly?: boolean };
+
+export const Transports = Service.extension<Transport, TransportOptions>('notifications.transports', {
+	env: (options) => (options.devOnly ? Environments.local : undefined)
+});
+
+@Transports.register({ name: 'resend', channel: 'email' })
+export class ResendTransport implements Transport {}
+
+Transports.all(); // [{ service, options }], in registration order
+Transports.find('resend'); // the service, or undefined
+Transports.optionsOf(ResendTransport); // { name: 'resend', channel: 'email' }
+```
+
+`Transports.tag` is the tag, for `@Service.injectAll()`. `settings.scope` and `settings.global` apply to every service of the extension point.
+
+`Service.get()` answers `null` for a service that is not visible: keep it for optional services, and use `Service.resolve()` for a service the code needs, which throws a precise error when it is missing.
 
 ## Lazy boot
 

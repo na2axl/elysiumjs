@@ -18,6 +18,7 @@ export {
 	Auth,
 	AuthMiddleware,
 	type AuthOptions,
+	type AuthUser,
 	type Guard,
 	type GuardClass,
 	jwtGuard,

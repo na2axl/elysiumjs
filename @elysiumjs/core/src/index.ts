@@ -60,6 +60,7 @@ export {
 	CircularDependencyError,
 	ConflictingModuleConfigError,
 	DuplicateCommandError,
+	DuplicateExtensionError,
 	DuplicateGlobalServiceError,
 	DuplicateModuleNameError,
 	ElysiumError,
@@ -70,6 +71,7 @@ export {
 	InvalidModuleConfigError,
 	MissingModuleConfigError,
 	ModuleCycleError,
+	NotAnExtensionError,
 	OutsideRequestScopeError,
 	ScopeMismatchError,
 	InterceptorNextCalledTwiceError,
@@ -106,6 +108,9 @@ export {
 	RuntimeNotSupportedError
 } from './runtime';
 export {
+	type Extension,
+	type ExtensionOptions,
+	type ExtensionSettings,
 	type ServiceDefinition,
 	type ServiceFactoryDefinition,
 	ServiceScope,

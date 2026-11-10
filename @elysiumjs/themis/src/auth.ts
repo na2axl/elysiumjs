@@ -16,7 +16,7 @@ import type { ProblemClass } from '@elysiumjs/core';
 import type { HttpContext } from './context';
 import type { JwtVerifyOptions } from './jwt';
 
-import { Metadata, Middleware, Service } from '@elysiumjs/core';
+import { Http, Metadata, Middleware, Service } from '@elysiumjs/core';
 
 import { ApiKeys } from './api-keys';
 import { currentContext, themisConfig } from './context';
@@ -132,6 +132,23 @@ export const apiKeyGuard = (options: {
 });
 
 /**
+ * The user that the guards put in a request, as `Auth.user()` and `@Auth.currentUser()` give it.
+ * It is empty until the app declares it, once, for all its guards.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @example
+ * ```ts
+ * declare module '@elysiumjs/themis' {
+ * 	interface AuthUser {
+ * 		id: string;
+ * 		roles: string[];
+ * 	}
+ * }
+ * ```
+ */
+// biome-ignore lint/suspicious/noEmptyInterface: augmented by applications.
+export interface AuthUser {}
+
+/**
  * The options of `@Auth()`.
  * @author Axel Nana <axel.nana@workbud.com>
  */
@@ -197,7 +214,26 @@ export function Auth(options: AuthOptions = {}): ClassDecorator & MethodDecorato
 
 export namespace Auth {
 	/** The user of the current request, if any. */
-	export const user = <T = unknown>(): T | undefined => currentContext()?.[USER] as T | undefined;
+	export const user = <T = AuthUser>(): T | undefined => currentContext()?.[USER] as T | undefined;
+
+	/**
+	 * Sets a handler parameter to the user of the request. Behind `@Auth()` the request always has
+	 * one, so the parameter is typed `AuthUser`; behind `@Auth({ optional: true })`, type it
+	 * `AuthUser | undefined`.
+	 * @example
+	 * ```ts
+	 * @Http.controller('/me')
+	 * @Auth()
+	 * class MeController {
+	 * 	@Http.get('/')
+	 * 	public show(@Auth.currentUser() user: AuthUser) {
+	 * 		return { id: user.id };
+	 * 	}
+	 * }
+	 * ```
+	 */
+	export const currentUser = (): ParameterDecorator =>
+		Http.decorate((context) => (context as unknown as HttpContext)[USER])();
 
 	/** The name of the guard that found the user of the current request. */
 	export const guard = (): string | undefined => currentContext()?.[GUARD] as string | undefined;

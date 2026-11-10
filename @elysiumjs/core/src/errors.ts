@@ -64,6 +64,37 @@ export class DuplicateGlobalServiceError extends ElysiumError {
 }
 
 /**
+ * Thrown when two services of an extension point (`Service.extension()`) have the same name.
+ *
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class DuplicateExtensionError extends ElysiumError {
+	constructor(
+		public readonly extension: string,
+		public readonly extensionName: string,
+		public readonly services: [string, string]
+	) {
+		super(
+			`Two services of ${extension} are named "${extensionName}": ${services[0]} and ${services[1]}.`
+		);
+	}
+}
+
+/**
+ * Thrown when a class has no options of an extension point (`Service.extension()`).
+ *
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class NotAnExtensionError extends ElysiumError {
+	constructor(
+		public readonly extension: string,
+		public readonly className: string
+	) {
+		super(`${className} is not registered as a service of ${extension}.`);
+	}
+}
+
+/**
  * Thrown when two modules register the same command.
  *
  * @author Axel Nana <axel.nana@workbud.com>

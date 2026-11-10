@@ -21,7 +21,7 @@ import { isString } from 'radash';
 
 import { Container } from './container';
 import { Environments } from './environments';
-import { ElysiumError } from './errors';
+import { DuplicateExtensionError, ElysiumError, NotAnExtensionError } from './errors';
 import { Metadata } from './metadata';
 import { isServiceTag, serviceTag, tokenLabel, tokenOf } from './token';
 import { Symbols } from './utils';
@@ -152,6 +152,53 @@ export type ServiceDefinition = Class<any> | ServiceFactoryDefinition;
 
 const nameOf = (service: ServiceToken): ServiceToken => tokenOf(service);
 
+/**
+ * What a service of an extension point is registered with: its name, unique in the extension
+ * point, and what the extension point itself needs.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type ExtensionOptions = { name: string };
+
+/**
+ * How an extension point registers its services.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type ExtensionSettings<O extends ExtensionOptions> = {
+	/** The environments in which a service is active, from its options. Defaults to all. */
+	env?: (options: O) => readonly Environment[] | undefined;
+	/** The scope of the services. Defaults to `ServiceScope.SINGLETON`. */
+	scope?: ServiceScope;
+	/** Whether the services are visible from every module. Defaults to `false`. */
+	global?: boolean;
+};
+
+/**
+ * An extension point: a tag, the decorator that registers a service with it and keeps its
+ * options, and the lookups of those options.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type Extension<T, O extends ExtensionOptions> = {
+	/** The tag of the services, for `@Service.injectAll()`. */
+	readonly tag: ServiceTag<T>;
+	/**
+	 * Registers a class as a service of the extension point, with its options.
+	 * @param options The options of the service.
+	 */
+	register(options: O): <C extends Class<T>>(target: C) => C;
+	/**
+	 * The options a service (its class or an instance) was registered with.
+	 * @throws {NotAnExtensionError} When it was not registered with this extension point.
+	 */
+	optionsOf(service: object): O;
+	/**
+	 * Every active service of the extension point with its options, in registration order.
+	 * @throws {DuplicateExtensionError} When two of them have the same name.
+	 */
+	all(): Array<{ service: T; options: O }>;
+	/** The active service with a name, if any. */
+	find(name: string): T | undefined;
+};
+
 export namespace Service {
 	/**
 	 * Marks a class as a service. This only records metadata: the service is registered
@@ -223,6 +270,77 @@ export namespace Service {
 	export const tag = <T>(name: string): ServiceTag<T> => serviceTag<T>(name);
 
 	/**
+	 * Creates an extension point: a group of services (a tag) where each one is registered by a
+	 * decorator with its own options, such as a notification transport with its name and channel.
+	 * The extension point checks that names are unique among the active services.
+	 * @example
+	 * ```ts
+	 * type TransportOptions = { name: string; channel: 'email' | 'sms'; devOnly?: boolean };
+	 *
+	 * export const Transports = Service.extension<Transport, TransportOptions>('notifications.transports', {
+	 * 	env: (options) => (options.devOnly ? Environments.local : undefined)
+	 * });
+	 *
+	 * @Transports.register({ name: 'resend', channel: 'email' })
+	 * export class ResendTransport implements Transport {}
+	 *
+	 * // Elsewhere:
+	 * const email = Transports.all().filter(({ options }) => options.channel === 'email');
+	 * ```
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @template T The type every service implements.
+	 * @template O The options of a service.
+	 * @param name The name of the tag, unique in the application.
+	 * @param settings How the services are registered.
+	 */
+	export const extension = <T, O extends ExtensionOptions = ExtensionOptions>(
+		name: string,
+		settings: ExtensionSettings<O> = {}
+	): Extension<T, O> => {
+		const extensionTag = serviceTag<T>(name);
+		const OPTIONS = Symbol.for(`elysium:extension:${name}`);
+
+		const optionsOf = (service: object): O => {
+			const target = typeof service === 'function' ? service : service.constructor;
+			const options = Metadata.get(OPTIONS, target) as O | undefined;
+			if (!options) throw new NotAnExtensionError(name, (target as Function).name);
+			return options;
+		};
+
+		const all = (): Array<{ service: T; options: O }> => {
+			const seen = new Map<string, string>();
+			return getAll(extensionTag).map((service) => {
+				const options = optionsOf(service as object);
+				const className = (service as object).constructor.name;
+				const other = seen.get(options.name);
+				if (other !== undefined)
+					throw new DuplicateExtensionError(name, options.name, [other, className]);
+				seen.set(options.name, className);
+				return { service, options };
+			});
+		};
+
+		return {
+			tag: extensionTag,
+			register:
+				(options: O) =>
+				<C extends Class<T>>(target: C): C => {
+					Metadata.define(OPTIONS, options, target);
+					register({
+						tags: [extensionTag],
+						env: settings.env?.(options),
+						...(settings.scope !== undefined && { scope: settings.scope }),
+						...(settings.global !== undefined && { global: settings.global })
+					})(target as unknown as ServiceClass);
+					return target;
+				},
+			optionsOf,
+			all,
+			find: (serviceName) => all().find(({ options }) => options.name === serviceName)?.service
+		};
+	};
+
+	/**
 	 * Sets a parameter to every service registered with a tag, in registration order (an empty
 	 * array when there is none). The same scope rules as `inject` apply to each of them: a
 	 * singleton that receives a request-scoped service throws `ScopeMismatchError`.
@@ -267,7 +385,11 @@ export namespace Service {
 
 	/**
 	 * Retrieves a service visible from the current module context (global services only
-	 * when there is none). Lazy services are built on first access.
+	 * when there is none), or `null`. Lazy services are built on first access.
+	 *
+	 * Use it for a service that may be missing, such as an optional integration. For a service
+	 * the code needs, use `Service.resolve()`, which throws a precise error when it is missing,
+	 * instead of checking for `null` and throwing.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param service The name of the service, or its class.
 	 * @returns The service, or `null` if none with that name/type is visible.

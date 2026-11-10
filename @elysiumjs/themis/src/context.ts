@@ -14,7 +14,7 @@
 
 import type { ThemisConfig } from './config';
 
-import { Application, Service } from '@elysiumjs/core';
+import { Http, Service } from '@elysiumjs/core';
 
 import { THEMIS_CONFIG } from './config';
 import { MissingThemisConfigError } from './errors';
@@ -31,8 +31,7 @@ export type HttpContext = {
  * The context of the current request.
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export const currentContext = (): HttpContext | undefined =>
-	Application.context.getStore()?.get('http:context') as HttpContext | undefined;
+export const currentContext = (): HttpContext | undefined => Http.currentContext<HttpContext>();
 
 /**
  * The configuration of ThemisModule.

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import type { TestingHttpApp, TestResponse } from '@elysiumjs/core';
-import type { Guard, Secret, SessionStore } from '../src';
+import type { AuthUser, Guard, Secret, SessionStore } from '../src';
 
 import { Application, ConflictError, Http, Middleware, Module, Service, t } from '@elysiumjs/core';
 import { afterEach, describe, expect, it } from 'bun:test';
@@ -94,6 +94,11 @@ class MeController {
 		return { user: Auth.user(), guard: Auth.guard() };
 	}
 
+	@Http.get('/param')
+	public param(@Auth.currentUser() user: AuthUser) {
+		return { user, context: Http.currentContext()?.request.url.endsWith('/me/param') };
+	}
+
 	@Http.get('/jwt-only')
 	@Auth({ guards: ['jwt'] })
 	public jwtOnly() {
@@ -136,8 +141,8 @@ class DeviceController {
 class PublicController {
 	@Http.get()
 	@Auth({ optional: true })
-	public show() {
-		return { signedIn: Auth.check() };
+	public show(@Auth.currentUser() user: AuthUser | undefined) {
+		return { signedIn: Auth.check(), user: user ?? null };
 	}
 }
 
@@ -316,7 +321,10 @@ describe('sessions, auth and CSRF', () => {
 			(await http.get('/me/api-key-only').header('authorization', `Bearer ${token}`)).status
 		).toBe(401);
 		expect((await http.get('/me').header('authorization', 'Bearer a.b.c')).status).toBe(401);
-		expect((await (await http.get('/public')).json()).signedIn).toBe(false);
+		expect(await (await http.get('/public')).json()).toEqual({ signedIn: false, user: null });
+		expect(
+			await (await http.get('/me/param').header('authorization', `Bearer ${token}`)).json()
+		).toEqual({ user: users.u1, context: true });
 	});
 });
 
@@ -378,7 +386,7 @@ describe('session edges, guard classes and secrets', () => {
 		});
 		testing = await Application.testing({ app });
 		const jar = new Jar();
-		const first = await (jar.keep(await testing.http.get('/session/read'))).json();
+		const first = await jar.keep(await testing.http.get('/session/read')).json();
 		const second = await (
 			await testing.http.get('/session/read').header('cookie', jar.header)
 		).json();
