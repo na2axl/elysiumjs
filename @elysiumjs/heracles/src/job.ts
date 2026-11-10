@@ -15,10 +15,13 @@
 import type { Environment } from '@elysiumjs/core';
 import type { Class } from 'type-fest';
 
-import { Environments, InteractsWithConsole, Metadata } from '@elysiumjs/core';
+import { Background, Environments, InteractsWithConsole, Metadata, Service } from '@elysiumjs/core';
 import { assign, uid } from 'radash';
 
-import { Symbols } from './utils';
+import { getJobMetadata, Symbols } from './utils';
+
+/** The prefix of the service names of jobs. */
+const JOB_NAME_PREFIX = 'elysium.heracles.job.';
 
 /**
  * Defines how a job should behave when multiple instances with the same ID are dispatched.
@@ -151,10 +154,21 @@ export type JobClass<T extends Job = Job, TClass extends Class<T> = Class<T>> = 
 	/**
 	 * Generates the ID for instances of this Job.
 	 */
-	generateJobId(...args: ConstructorParameters<TClass>): string;
+	generateJobId(...args: JobArgs<TClass>): string;
 
-	new (...args: ConstructorParameters<TClass>): T;
+	new (...args: JobArgs<TClass>): T;
 };
+
+/**
+ * The constructor arguments of a job class; any arguments for `JobClass<any, any>`, so that
+ * every job class fits it whatever its constructor takes.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+type JobArgs<TClass> = 0 extends 1 & TClass
+	? any[]
+	: TClass extends abstract new (...args: infer A) => any
+		? A
+		: never;
 
 /**
  * Base class for background jobs.
@@ -190,7 +204,7 @@ export abstract class Job extends InteractsWithConsole {
 				options
 			);
 
-			const name = `elysium.heracles.job.${options.name}`;
+			const name = `${JOB_NAME_PREFIX}${options.name}`;
 
 			// Store metadata for queue assignment and configuration
 			const metadata: JobMetadata = {
@@ -326,8 +340,10 @@ export abstract class Job extends InteractsWithConsole {
 			const queueInfo = this.#queueName ? ` in queue '${this.#queueName}'` : '';
 			this.debug(`Job ${this.id}${queueInfo} started at ${this.#startedAt.toISOString()}`);
 
-			// Execute the job implementation
-			await this.execute();
+			// Execute the job implementation, inside the background scopes of the application
+			const metadata = getJobMetadata(this.constructor as JobClass);
+			const name = metadata?.name.slice(JOB_NAME_PREFIX.length) ?? this.constructor.name;
+			await Background.run({ kind: 'job', name }, () => Service.invoke(this, 'execute'));
 
 			if (this.#status === JobStatus.RUNNING) {
 				this.#status = JobStatus.COMPLETED;
@@ -381,9 +397,16 @@ export abstract class Job extends InteractsWithConsole {
 
 	/**
 	 * The main execution method for the job.
-	 * This must be implemented by all job classes.
+	 * This must be implemented by all job classes. Its parameters take services with
+	 * `@Service.inject()` or `@Service.injectAll()`, resolved in the module that declares the job.
+	 * @example
+	 * ```ts
+	 * protected async execute(@Service.inject() invoices: InvoiceRepository) {
+	 * 	await invoices.billDue();
+	 * }
+	 * ```
 	 */
-	protected abstract execute(): Promise<void>;
+	protected abstract execute(...services: any[]): Promise<void>;
 }
 
 /**

@@ -197,6 +197,30 @@ export abstract class Scheduler<TJob extends JobClass<any, any> = JobClass<any, 
 	}
 
 	/**
+	 * The distinct cron expressions of the scheduled jobs, sorted: the cron triggers a Cloudflare
+	 * Worker needs, since a trigger runs the jobs whose expression is exactly its own.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 */
+	public static crons(): string[] {
+		return [...new Set(Scheduler.jobs().map(({ schedule }) => schedule.cron.expression))].sort();
+	}
+
+	/**
+	 * Compares declared cron triggers, such as the `triggers.crons` of a `wrangler.jsonc`, with
+	 * the cron expressions of the scheduled jobs.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param declared The declared cron triggers.
+	 * @returns The expressions no trigger runs (`missing`) and the triggers no job uses (`extra`).
+	 */
+	public static compareCrons(declared: readonly string[]): { missing: string[]; extra: string[] } {
+		const crons = Scheduler.crons();
+		return {
+			missing: crons.filter((cron) => !declared.includes(cron)),
+			extra: [...new Set(declared)].filter((cron) => !crons.includes(cron)).sort()
+		};
+	}
+
+	/**
 	 * The scheduled jobs whose expression is exactly the given one, such as the cron of a
 	 * Cloudflare cron trigger.
 	 * @author Axel Nana <axel.nana@workbud.com>

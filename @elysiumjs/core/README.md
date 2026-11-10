@@ -281,9 +281,12 @@ When each service of a tag carries options of its own, such as a name and a chan
 ```typescript
 type TransportOptions = { name: string; channel: 'email' | 'sms'; devOnly?: boolean };
 
-export const Transports = Service.extension<Transport, TransportOptions>('notifications.transports', {
-	env: (options) => (options.devOnly ? Environments.local : undefined)
-});
+export const Transports = Service.extension<Transport, TransportOptions>(
+	'notifications.transports',
+	{
+		env: (options) => (options.devOnly ? Environments.local : undefined)
+	}
+);
 
 @Transports.register({ name: 'resend', channel: 'email' })
 export class ResendTransport implements Transport {}
@@ -295,7 +298,28 @@ Transports.optionsOf(ResendTransport); // { name: 'resend', channel: 'email' }
 
 `Transports.tag` is the tag, for `@Service.injectAll()`. `settings.scope` and `settings.global` apply to every service of the extension point.
 
+`Service.invoke(target, method, args)` calls a method whose parameters take services with `@Service.inject()` or `@Service.injectAll()`: each of them receives its service, resolved in the current module context, and the other parameters receive `args` in order.
+
 `Service.get()` answers `null` for a service that is not visible: keep it for optional services, and use `Service.resolve()` for a service the code needs, which throws a precise error when it is missing.
+
+## Background work
+
+Background scopes wrap every unit of background work (a job, an event handler, an outbox handler), the way interceptors wrap requests: they set what the work needs once, such as a config or an actor scope. A scope is a service registered with `@Background.scope()`; scopes nest in the order the modules register them, the first one outermost.
+
+```typescript
+import type { BackgroundScope, BackgroundWork } from '@elysiumjs/core';
+
+import { Background } from '@elysiumjs/core';
+
+@Background.scope()
+export class SystemActorScope implements BackgroundScope {
+	public run<T>(work: BackgroundWork, next: () => Promise<T>): Promise<T> {
+		return Actor.run(Actor.system(work.name), next);
+	}
+}
+```
+
+`work.kind` says what runs (`job`, `event` or `outbox`), and `work.name` names it. `Background.run(work, fn)` runs other work in the scopes.
 
 ## Lazy boot
 

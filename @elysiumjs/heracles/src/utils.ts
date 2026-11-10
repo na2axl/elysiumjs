@@ -61,3 +61,37 @@ export const getJobMetadata = <T extends Job>(jobClass: JobClass<T>): JobMetadat
 
 	return Metadata.get(Symbols.job, jobClass) as JobMetadata;
 };
+
+/** Leading comments and blanks, skipped when looking past a comma. */
+const COMMENTS = /^(?:\s|\/\/[^\n]*|\/\*[\s\S]*?\*\/)*/;
+
+/**
+ * Parses JSON with comments and trailing commas, such as a `wrangler.jsonc` file.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param text The text.
+ * @returns The parsed value.
+ * @throws {SyntaxError} When the text is not valid JSON once comments are removed.
+ */
+export const parseJsonc = (text: string): unknown => {
+	// Removes the comments, then the commas before a closing bracket, outside strings.
+	let stripped = '';
+	for (let i = 0; i < text.length; i++) {
+		const char = text[i]!;
+		if (char === '"') {
+			const start = i;
+			for (i++; i < text.length && text[i] !== '"'; i++) if (text[i] === '\\') i++;
+			stripped += text.slice(start, i + 1);
+		} else if (char === '/' && text[i + 1] === '/') {
+			while (i < text.length && text[i] !== '\n') i++;
+			stripped += '\n';
+		} else if (char === '/' && text[i + 1] === '*') {
+			const end = text.indexOf('*/', i + 2);
+			i = end === -1 ? text.length : end + 1;
+		} else if (char === ',' && /^\s*[}\]]/.test(text.slice(i + 1).replace(COMMENTS, ''))) {
+			continue;
+		} else {
+			stripped += char;
+		}
+	}
+	return JSON.parse(stripped);
+};
