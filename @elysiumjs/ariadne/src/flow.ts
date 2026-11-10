@@ -44,6 +44,23 @@ const STATE_HEADERS = t.Object({
 	...ownerHeader
 });
 
+/** What the start route answers: the shape of `FlowStart`. */
+const START_RESPONSE = t.Object({
+	flowKey: t.String(),
+	owner: t.Optional(t.String({ description: 'The owner token of a guest flow.' })),
+	nextSteps: t.Array(t.String()),
+	backSteps: t.Array(t.String())
+});
+
+/** What the state route answers: the shape of `FlowStatus`. */
+const STATE_RESPONSE = t.Object({
+	flowKey: t.String(),
+	step: t.Union([t.String(), t.Null()]),
+	nextSteps: t.Array(t.String()),
+	backSteps: t.Array(t.String()),
+	answer: t.Unknown()
+});
+
 /** The headers of a step route. */
 const STEP_HEADERS = t.Object({
 	[FLOW_KEY_HEADER]: t.String({ description: 'The key of the flow, from the start response.' }),
@@ -233,11 +250,17 @@ export namespace Flow {
 				Http.context()(proto, key, 0);
 				decorator(proto, key, Object.getOwnPropertyDescriptor(proto, key)!);
 			};
-			route('ariadne:start', Http.post('/'), function (this: object, http: any) {
-				return engine.start(http, this);
-			});
-			route('ariadne:state', Http.get('/', { headers: STATE_HEADERS }), (http: any) =>
-				engine.state(http)
+			route(
+				'ariadne:start',
+				Http.post('/', { status: 201, response: { 201: START_RESPONSE } }),
+				function (this: object, http: any) {
+					return engine.start(http, this);
+				}
+			);
+			route(
+				'ariadne:state',
+				Http.get('/', { headers: STATE_HEADERS, response: STATE_RESPONSE }),
+				(http: any) => engine.state(http)
 			);
 
 			Http.controller((path ?? `/flows/${name}`) as `/${string}`, http)(target as any);

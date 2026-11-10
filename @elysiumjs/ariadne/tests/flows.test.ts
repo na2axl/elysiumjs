@@ -206,6 +206,14 @@ describe('Flow.controller', () => {
 		expect(Flow.describe(class {})).toBeUndefined();
 	});
 
+	it('declares the response schemas of the start and state routes', () => {
+		const routes = Http.describe(SignUpFlow)!.routes;
+		const start = routes.find((route) => route.name === 'ariadne:start')!;
+		const state = routes.find((route) => route.name === 'ariadne:state')!;
+		expect(start).toMatchObject({ method: 'POST', status: 201, responds: true });
+		expect(state).toMatchObject({ method: 'GET', responds: true });
+	});
+
 	it('refuses a flow without steps, with a bad name, a bad ttl or unknown steps', () => {
 		const declare = (
 			{ name, ...options }: { name: string } & Parameters<typeof Flow.controller>[1],
