@@ -12,20 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { mkdtemp, mkdir, readdir, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+
+import { MakeModelCommand } from '../src/commands/make_model.command';
+import { MakeServiceCommand } from '../src/commands/make_service.command';
+import { MakeValidatorCommand } from '../src/commands/make_validator.command';
 import { addToModuleHint, getModulePath } from '../src/config';
-import { createModule } from '../src/utils';
+import { createModule, fileName } from '../src/utils';
 
 const stubsDir = join(import.meta.dir, '..', 'stubs');
 const importPattern = /^import \{([^}]+)\} from '(@elysiumjs\/[^']+)';$/gm;
 
 describe('stub imports', () => {
 	it('has stubs to check', async () => {
-		expect((await readdir(stubsDir)).filter((f) => f.endsWith('.stub'))).toHaveLength(10);
+		expect((await readdir(stubsDir)).filter((f) => f.endsWith('.stub'))).toHaveLength(12);
 	});
 
 	for (const file of [
@@ -37,6 +41,8 @@ describe('stub imports', () => {
 		'repository',
 		'service',
 		'validator',
+		'validator.authorize',
+		'validator.validate',
 		'wamp.controller',
 		'ws.controller'
 	]) {
@@ -99,7 +105,9 @@ describe('generator output', () => {
 
 		it('refuses a module missing from .elysiumrc, instead of writing under undefined/', async () => {
 			await rc({ projectName: 'x', mono: false, modules: { billing: './src/modules/billing' } });
-			await expect(getModulePath('iam')).rejects.toThrow('Module iam is not in the modules of .elysiumrc');
+			await expect(getModulePath('iam')).rejects.toThrow(
+				'Module iam is not in the modules of .elysiumrc'
+			);
 		});
 	});
 
@@ -126,6 +134,76 @@ describe('generator output', () => {
 			expect(text).toContain('controllers: []');
 			expect(text).toContain('commands: []');
 			expect(text).toContain('export class BillingModule extends Module {}');
+		});
+	});
+
+	describe('makers', () => {
+		const make = async (
+			command: { init(...argv: string[]): Promise<boolean>; run(): Promise<void> },
+			...argv: string[]
+		) => {
+			expect(await command.init(...argv)).toBe(true);
+			await command.run();
+		};
+
+		beforeEach(async () => {
+			await rc({ projectName: 'x', mono: true });
+			await mkdir(join(dir, 'src'), { recursive: true });
+		});
+
+		it('names files in kebab-case', async () => {
+			expect(fileName('UserProfile')).toBe('user-profile');
+			expect(fileName('user_profile')).toBe('user-profile');
+			await make(new MakeServiceCommand(), '--name', 'UserProfileService');
+			expect(await Bun.file(join(dir, 'src/services/user-profile.service.ts')).exists()).toBe(true);
+		});
+
+		it('writes a schema-only validator by default', async () => {
+			await make(new MakeValidatorCommand(), '--name', 'SignInValidator');
+			const text = await Bun.file(join(dir, 'src/validators/sign-in.validator.ts')).text();
+			expect(text).toContain("import type { Static } from '@elysiumjs/core';");
+			expect(text).toContain('public static readonly schema = t.Object({});');
+			expect(text).not.toContain('authorize(');
+			expect(text).not.toContain('validate(');
+			expect(text).toContain('export type SignInRequest = Static<typeof SignInValidator.schema>;');
+		});
+
+		it('adds authorize() and validate() when asked for', async () => {
+			await make(
+				new MakeValidatorCommand(),
+				'--name',
+				'SignInValidator',
+				'--authorize',
+				'--validate'
+			);
+			const text = await Bun.file(join(dir, 'src/validators/sign-in.validator.ts')).text();
+			expect(text).toContain(
+				"import type { Context, DomainError, Static } from '@elysiumjs/core';"
+			);
+			expect(text).toContain('public static authorize(ctx: Context<SignInRequest>)');
+			expect(text).toContain('public static validate(ctx: Context<SignInRequest>)');
+		});
+
+		it('leaves supportTenancy out of a model that is not tenant-scoped', async () => {
+			await make(new MakeModelCommand(), '--name', 'UserProfile', '--table', 'user_profiles');
+			const text = await Bun.file(join(dir, 'src/models/user-profile.model.ts')).text();
+			expect(text).toContain(
+				'export class UserProfileModel extends DrizzleModel(UserProfileTable) {}'
+			);
+			expect(text).not.toContain('supportTenancy');
+		});
+
+		it('writes supportTenancy for a tenant-scoped model', async () => {
+			await make(
+				new MakeModelCommand(),
+				'--name',
+				'UserProfile',
+				'--table',
+				'user_profiles',
+				'--support-tenancy'
+			);
+			const text = await Bun.file(join(dir, 'src/models/user-profile.model.ts')).text();
+			expect(text).toContain('public static readonly supportTenancy = true;');
 		});
 	});
 });

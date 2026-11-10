@@ -16,11 +16,11 @@ import type { PromptObject } from 'prompts';
 
 import { Command, CommandArgumentType } from '@elysiumjs/core';
 import prompts from 'prompts';
-import { snake } from 'radash';
 import formatter from 'string-template';
 
 import { readAsset } from '../assets';
 import { getModulePath, parseProjectConfig } from '../config';
+import { fileName } from '../utils';
 import { BaseCommand } from './base.command';
 
 /**
@@ -210,13 +210,13 @@ export class MakeRepositoryCommand extends BaseCommand {
 		const stub = formatter(stubText, {
 			...answers,
 			module: answers.module ?? 'root',
-			model_name: snake(answers.model.replace('Model', ''))
+			model_name: fileName(answers.model.replace('Model', ''))
 		});
 
 		const path = answers.module ? await getModulePath(answers.module) : './src';
 
 		// Write to file
-		const name = snake(answers.name.replace('Repository', ''));
+		const name = fileName(answers.name.replace('Repository', ''));
 		const file = Bun.file(`${path}/repositories/${name}.repository.ts`);
 		await file.write(stub);
 

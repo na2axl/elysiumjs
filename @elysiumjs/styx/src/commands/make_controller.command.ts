@@ -16,11 +16,11 @@ import type { PromptObject } from 'prompts';
 
 import { Command, CommandArgumentType } from '@elysiumjs/core';
 import prompts from 'prompts';
-import { snake } from 'radash';
 import formatter from 'string-template';
 
 import { readAsset } from '../assets';
 import { addToModuleHint, getModulePath, parseProjectConfig } from '../config';
+import { fileName } from '../utils';
 import { BaseCommand } from './base.command';
 
 /**
@@ -268,7 +268,7 @@ export class MakeControllerCommand extends BaseCommand {
 		const path = answers.module ? await getModulePath(answers.module) : './src';
 
 		// Write to file
-		const name = snake(answers.name.replace('Controller', ''));
+		const name = fileName(answers.name.replace('Controller', ''));
 		const file = Bun.file(`${path}/controllers/${answers.type}/${name}.controller.ts`);
 		await file.write(stub);
 

@@ -47,6 +47,8 @@ styx module:rename --module billing --name payments
 
 In a multi module project, pass `--module <name>`. Run `styx help <command>` for every option.
 
+Files and module folders are named in kebab-case: `styx make:service --name UserProfileService` writes `services/user-profile.service.ts`. A validator holds only its schema unless you ask for its methods with `--authorize` and `--validate`, and a model declares `supportTenancy` only with `--support-tenancy`.
+
 ## Typed clients
 
 `styx routes:generate` writes the route types of the app to `src/routes.gen.ts` (set `routes` in `.elysiumrc` or pass `--out`, absolute or relative to the project, to change it). The file exports `AppRoutes`, for Eden:

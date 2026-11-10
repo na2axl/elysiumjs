@@ -17,7 +17,15 @@ import { mkdir, readdir, rename } from 'node:fs/promises';
 import { dirname, extname, join } from 'node:path';
 
 import { Application, ElysiumError } from '@elysiumjs/core';
-import { pascal } from 'radash';
+import { dash, pascal } from 'radash';
+
+/**
+ * The kebab-case form of a name, used for every file and module folder that Styx creates, such as
+ * `user-profile.service.ts` for `UserProfileService`.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param name The name, in any case.
+ */
+export const fileName = (name: string): string => dash(name);
 
 /**
  * Thrown when the project entry point exports no `Application` subclass.

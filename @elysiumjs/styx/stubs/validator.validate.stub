@@ -1,0 +1,17 @@
+
+    /**
+     * Processes custom validation logic.
+     *
+     * This method is called after the validation schema is checked against the input data.
+     * So it's safe to assume that the schema is valid.
+     *
+     * You can use this method to perform any custom validation logic on the request body or
+     * query parameters. Return `false` to answer a generic 400, or a `DomainError` to answer it
+     * instead, with its own status, code and extensions.
+     *
+     * @param ctx The request context.
+     * @returns Whether the input data is valid, or the error to answer.
+     */
+    public static validate(ctx: Context<{request_name}>): Promise<boolean | DomainError> {
+        return Promise.resolve(true);
+    }
