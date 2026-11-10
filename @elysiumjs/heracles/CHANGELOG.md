@@ -1,5 +1,17 @@
 # @elysiumjs/heracles
 
+## 0.11.0
+
+### Minor Changes
+
+- [#76](https://github.com/na2axl/elysiumjs/pull/76) [`31f5d30`](https://github.com/na2axl/elysiumjs/commit/31f5d30c3e5a9a72cc3f104415a64d7f19d33672) Thanks [@na2axl](https://github.com/na2axl)! - `Scheduler` fan-outs run in the background scopes, with `kind: 'schedule'` and the name of the scheduler. The new `heracles:crons` command prints the cron triggers the scheduled jobs need, reading them from the module graph without booting the application, and `--check <wrangler.jsonc>` checks the cron triggers of the top level and of each environment (`--env <name>` for one); it replaces the `--list` and `--check` options of `heracles:schedule`. `JobRegistry.collect()` reads the jobs of the modules without initialising them.
+
+### Patch Changes
+
+- Updated dependencies [[`5b79d5a`](https://github.com/na2axl/elysiumjs/commit/5b79d5a4b634347ce18766ef08aec12916328ff6), [`9bd29cb`](https://github.com/na2axl/elysiumjs/commit/9bd29cbd10131e4465505de91c78e7f39d242e71)]:
+  - @elysiumjs/core@0.21.0
+  - @elysiumjs/redis@0.1.10
+
 ## 0.10.0
 
 ### Minor Changes

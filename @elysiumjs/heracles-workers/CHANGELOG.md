@@ -1,5 +1,14 @@
 # @elysiumjs/heracles-workers
 
+## 0.2.8
+
+### Patch Changes
+
+- Updated dependencies [[`5b79d5a`](https://github.com/na2axl/elysiumjs/commit/5b79d5a4b634347ce18766ef08aec12916328ff6), [`31f5d30`](https://github.com/na2axl/elysiumjs/commit/31f5d30c3e5a9a72cc3f104415a64d7f19d33672), [`9bd29cb`](https://github.com/na2axl/elysiumjs/commit/9bd29cbd10131e4465505de91c78e7f39d242e71)]:
+  - @elysiumjs/core@0.21.0
+  - @elysiumjs/heracles@0.11.0
+  - @elysiumjs/runtime-workers@0.1.10
+
 ## 0.2.7
 
 ### Patch Changes

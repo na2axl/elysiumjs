@@ -1,5 +1,13 @@
 # @elysiumjs/core
 
+## 0.21.0
+
+### Minor Changes
+
+- [#74](https://github.com/na2axl/elysiumjs/pull/74) [`5b79d5a`](https://github.com/na2axl/elysiumjs/commit/5b79d5a4b634347ce18766ef08aec12916328ff6) Thanks [@na2axl](https://github.com/na2axl)! - `Service.require()` returns a service the code needs, visible from the current module context, at once, and throws a precise error when it is missing: `ServiceNotFoundError`, `ServiceNotVisibleError` or the environment errors, like `Service.resolve()`, which waits for the service's initialisation.
+
+- [#77](https://github.com/na2axl/elysiumjs/pull/77) [`9bd29cb`](https://github.com/na2axl/elysiumjs/commit/9bd29cbd10131e4465505de91c78e7f39d242e71) Thanks [@na2axl](https://github.com/na2axl)! - Add `styx routes:check`, which fails when a route declares no schema for its success response. `Http.describe()` now gives the `status` of each route and whether it `responds` with a declared success schema.
+
 ## 0.20.0
 
 ### Minor Changes

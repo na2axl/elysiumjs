@@ -1,5 +1,17 @@
 # @elysiumjs/styx
 
+## 0.14.0
+
+### Minor Changes
+
+- [#77](https://github.com/na2axl/elysiumjs/pull/77) [`9bd29cb`](https://github.com/na2axl/elysiumjs/commit/9bd29cbd10131e4465505de91c78e7f39d242e71) Thanks [@na2axl](https://github.com/na2axl)! - Add `styx routes:check`, which fails when a route declares no schema for its success response. `Http.describe()` now gives the `status` of each route and whether it `responds` with a declared success schema.
+
+### Patch Changes
+
+- Updated dependencies [[`5b79d5a`](https://github.com/na2axl/elysiumjs/commit/5b79d5a4b634347ce18766ef08aec12916328ff6), [`9bd29cb`](https://github.com/na2axl/elysiumjs/commit/9bd29cbd10131e4465505de91c78e7f39d242e71)]:
+  - @elysiumjs/core@0.21.0
+  - @elysiumjs/runtime-bun@0.1.10
+
 ## 0.13.0
 
 ### Minor Changes
