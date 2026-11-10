@@ -1,5 +1,12 @@
 # @elysiumjs/cerberus
 
+## 0.3.14
+
+### Patch Changes
+
+- Updated dependencies [[`791048c`](https://github.com/na2axl/elysiumjs/commit/791048ca9eca4c69a8cb199482541fe95327c786)]:
+  - @elysiumjs/core@0.22.0
+
 ## 0.3.13
 
 ### Patch Changes

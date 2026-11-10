@@ -1,5 +1,14 @@
 # @elysiumjs/moirai-drizzle
 
+## 0.3.2
+
+### Patch Changes
+
+- Updated dependencies [[`791048c`](https://github.com/na2axl/elysiumjs/commit/791048ca9eca4c69a8cb199482541fe95327c786), [`f2eba2d`](https://github.com/na2axl/elysiumjs/commit/f2eba2d01400fb76a3b4f49642f45a4b692ccf03)]:
+  - @elysiumjs/core@0.22.0
+  - @elysiumjs/moirai@0.7.0
+  - @elysiumjs/mnemosyne-drizzle@0.6.2
+
 ## 0.3.1
 
 ### Patch Changes
