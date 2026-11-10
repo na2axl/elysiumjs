@@ -28,12 +28,13 @@ import {
 	MakeValidatorCommand,
 	ModuleNewCommand,
 	ModuleRenameCommand,
+	RoutesCheckCommand,
 	RoutesGenerateCommand
 } from '../commands';
 import { CreateCommand } from '../create/create.command';
 
 /**
- * The commands Styx runs itself: `create`, the code generators and `routes:generate`.
+ * The commands Styx runs itself: `create`, the code generators, `routes:check` and `routes:generate`.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 @Module.register({
@@ -49,6 +50,7 @@ import { CreateCommand } from '../create/create.command';
 		MakeValidatorCommand,
 		ModuleNewCommand,
 		ModuleRenameCommand,
+		RoutesCheckCommand,
 		RoutesGenerateCommand
 	]
 })

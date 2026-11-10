@@ -17,6 +17,7 @@ import type { ElysiaPlugin } from '../src/utils';
 
 import { afterAll, afterEach, describe, expect, it, mock, spyOn } from 'bun:test';
 import * as Elysia from 'elysia';
+import { t } from 'elysia';
 
 import * as pkg from '../src';
 import { Application } from '../src/app';
@@ -857,12 +858,12 @@ describe('Http namespace', () => {
 		it('describes the routes and their decorated parameters', async () => {
 			@Http.controller('/posts')
 			class PostController {
-				@Http.get('/:id')
+				@Http.get('/:id', { response: t.Object({ id: t.String() }) })
 				show(@Http.param('id') id: string, @Http.query() query: unknown) {
 					return { id, query };
 				}
 
-				@Http.post()
+				@Http.post('/', { status: 201, response: { 201: t.Object({}), 409: t.Object({}) } })
 				create(@Http.context() c: unknown, @Http.body() body: unknown) {
 					return { c, body };
 				}
@@ -890,7 +891,9 @@ describe('Http namespace', () => {
 						sse: false,
 						body: undefined,
 						query: 1,
-						params: [{ slug: 'id', index: 0 }]
+						params: [{ slug: 'id', index: 0 }],
+						status: undefined,
+						responds: true
 					},
 					{
 						name: 'create',
@@ -899,7 +902,9 @@ describe('Http namespace', () => {
 						sse: false,
 						body: 1,
 						query: undefined,
-						params: []
+						params: [],
+						status: 201,
+						responds: true
 					},
 					{
 						name: 'feed',
@@ -908,7 +913,9 @@ describe('Http namespace', () => {
 						sse: true,
 						body: undefined,
 						query: undefined,
-						params: []
+						params: [],
+						status: undefined,
+						responds: false
 					},
 					{
 						name: 'trace',
@@ -917,7 +924,9 @@ describe('Http namespace', () => {
 						sse: false,
 						body: undefined,
 						query: undefined,
-						params: []
+						params: [],
+						status: undefined,
+						responds: false
 					}
 				]
 			});

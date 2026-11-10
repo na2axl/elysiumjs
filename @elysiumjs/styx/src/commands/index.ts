@@ -26,4 +26,5 @@ export * from './make_validator.command';
 export * from './module_new.command';
 export * from './module_rename.command';
 
+export * from './routes_check.command';
 export * from './routes_generate.command';
