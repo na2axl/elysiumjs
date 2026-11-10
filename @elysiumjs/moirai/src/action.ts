@@ -33,7 +33,8 @@ import {
 	IdempotencyKeyRequiredError,
 	IdempotencyKeyReusedError,
 	InvalidInputError,
-	LockOutsideUnitOfWorkError
+	LockOutsideUnitOfWorkError,
+	NestedCallRefusedError
 } from './errors';
 import { requestHash } from './hash';
 import { moduleStores } from './moirai.module';
@@ -157,15 +158,46 @@ export type QueryOutcome<C extends QueryClass> =
 export interface Outcome<TOutcome> extends Promise<TOutcome> {
 	/** Resolves to the result, and rejects with the DomainError that refused the call. */
 	orThrow(): Promise<Exclude<TOutcome, DomainError>>;
+
+	/**
+	 * Resolves to the result or to a DomainError of the called handler, for a handler that calls
+	 * another one and passes its refusals on. A refusal of moirai itself (invalid input, refused
+	 * call, idempotency key) rejects with {@link NestedCallRefusedError}: the calling handler built
+	 * that call, so it is a bug, not a refusal to pass on.
+	 * @example
+	 * ```ts
+	 * const opened = await Moirai.execute(OpenSession, input).orPass();
+	 * if (isDomainError(opened)) return opened; // a DomainError of OpenSession
+	 * ```
+	 */
+	orPass(): Promise<Exclude<TOutcome, MoiraiRefusal>>;
 }
 
-/** Adds `orThrow()` to the promise of a call. */
-const outcome = <T>(promise: Promise<T>): Outcome<T> =>
+/** The refusals moirai itself gives a call, apart from those of its handler. */
+type MoiraiRefusal =
+	InvalidInputError | CallForbiddenError | IdempotencyKeyRequiredError | IdempotencyKeyReusedError;
+
+const MOIRAI_REFUSALS = [
+	InvalidInputError,
+	CallForbiddenError,
+	IdempotencyKeyRequiredError,
+	IdempotencyKeyReusedError
+] as const;
+
+/** Adds `orThrow()` and `orPass()` to the promise of a call. */
+const outcome = <T>(promise: Promise<T>, name: string): Outcome<T> =>
 	Object.assign(promise, {
 		orThrow: () =>
 			promise.then((value) => {
 				if (value instanceof DomainError) throw value;
 				return value as Exclude<T, DomainError>;
+			}),
+		orPass: () =>
+			promise.then((value) => {
+				if (MOIRAI_REFUSALS.some((refusal) => value instanceof refusal)) {
+					throw new NestedCallRefusedError(name, value as DomainError);
+				}
+				return value as Exclude<T, MoiraiRefusal>;
 			})
 	});
 
@@ -452,7 +484,8 @@ export namespace Moirai {
 				if (!props) throw new TypeError(`${action.name} is not marked with @Action.register().`);
 				// The action runs in its module, so that it uses the stores of that module.
 				return inOwnerModule(action, () => run(action, props, input, call));
-			}) as Promise<ActionOutcome<C>>
+			}) as Promise<ActionOutcome<C>>,
+			action.name
 		);
 
 	/**
@@ -599,7 +632,8 @@ export namespace Moirai {
 						throw new CallForbiddenError(props.name);
 					return instanceOf(query).handle(value, { name: props.name, attempt: 1 });
 				});
-			}) as Promise<QueryOutcome<C>>
+			}) as Promise<QueryOutcome<C>>,
+			query.name
 		);
 
 	/**

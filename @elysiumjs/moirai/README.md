@@ -74,7 +74,7 @@ return Moirai.ask(WalletBalance, { walletId });
 - `serializeBy` makes calls that share a key run one after the other, so a double tap waits for the first call and replays its response.
 - `errors` is required: it lists every DomainError `handle()` gives, `[]` when it gives none, or the registration does not compile.
 - `Moirai.lock(key)` takes the same lock from inside a handler, for a key known only once the handler has read something. It holds the key until the unit of work ends, and throws `LockOutsideUnitOfWorkError` outside one. Take the locks of a unit of work in the same order everywhere.
-- Where a refusal is a bug, such as in a job or an event handler, `orThrow()` gives the result alone and throws the DomainError: `const wallet = await Moirai.execute(OpenWallet, input).orThrow()`. `Moirai.ErrorsOf<typeof Action>` names the DomainErrors of the handler, without those of moirai, for a caller that passes them on.
+- Where a refusal is a bug, such as in a job or an event handler, `orThrow()` gives the result alone and throws the DomainError: `const wallet = await Moirai.execute(OpenWallet, input).orThrow()`. A handler that calls another one and passes its refusals on uses `orPass()`: it gives the result or a DomainError of the called handler, and throws `NestedCallRefusedError` for a refusal of moirai itself (an invalid input, a refused `authorize`, an idempotency key), since the calling handler built that call. `Moirai.ErrorsOf<typeof Action>` names the DomainErrors of the handler, without those of moirai.
 
 ### Routes
 
