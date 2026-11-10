@@ -15,7 +15,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { Job } from '../src/job';
-import { Symbols, getJobMetadata } from '../src/utils';
+import { getJobMetadata, parseJsonc, Symbols } from '../src/utils';
 
 describe('Symbols', () => {
 	it('should expose distinct symbol values', () => {
@@ -72,5 +72,21 @@ describe('getJobMetadata', () => {
 		expect(metadata).not.toBeNull();
 		expect(metadata!.queue).toBe('default');
 		expect(metadata!.priority).toBe(0);
+	});
+});
+
+describe('parseJsonc', () => {
+	it('reads JSON with comments and trailing commas, and leaves strings alone', () => {
+		const text = `{
+			// the worker
+			"name": "a,}b", /* block */
+			"url": "http://x//y",
+			"triggers": { "crons": ["0 6 * * *", "*/5 * * * *", /* last */ ], },
+		}`;
+		expect(parseJsonc(text)).toEqual({
+			name: 'a,}b',
+			url: 'http://x//y',
+			triggers: { crons: ['0 6 * * *', '*/5 * * * *'] }
+		});
 	});
 });

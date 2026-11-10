@@ -86,6 +86,19 @@ describe('Scheduler', () => {
 		]);
 	});
 
+	it('gives the cron triggers the schedules need, and compares them with declared ones', () => {
+		register();
+		expect(Scheduler.crons()).toEqual(['*/5 * * * *', '0 0 * * *']);
+		expect(Scheduler.compareCrons(['0 0 * * *', '*/5 * * * *'])).toEqual({
+			missing: [],
+			extra: []
+		});
+		expect(Scheduler.compareCrons(['0 0 * * *', '0 6 * * *', '0 6 * * *'])).toEqual({
+			missing: ['*/5 * * * *'],
+			extra: ['0 6 * * *']
+		});
+	});
+
 	it('dispatches a job at its time, once per tick across schedulers holding the lock', async () => {
 		register();
 		const dispatched: unknown[][] = [];

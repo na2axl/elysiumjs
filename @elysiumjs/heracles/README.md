@@ -78,6 +78,23 @@ export class SendEmailJob extends Job {
 }
 ```
 
+The constructor takes the arguments of the dispatch, typed in `Heracles.dispatch()` and in scheduler cases. The parameters of `execute()` take services with `@Service.inject()`, resolved in the module that declares the job:
+
+```typescript
+@Job.register({ queue: 'billing' })
+export class SettlePaymentJob extends Job {
+	constructor(private readonly paymentId: string) {
+		super();
+	}
+
+	protected async execute(@Service.inject() settlement: SettlementService): Promise<void> {
+		await settlement.settle(this.paymentId);
+	}
+}
+```
+
+Each job runs in the background scopes of the application (`@Background.scope()` of `@elysiumjs/core`), with `kind: 'job'` and the name of the job.
+
 List the job in the `jobs` of the module that owns it. Heracles collects the jobs of every loaded module:
 
 ```typescript
@@ -276,6 +293,8 @@ class DailyBilling extends Scheduler<typeof BillInvoice> {
 ```
 
 A scheduler fans out one job; another job gets its own scheduler.
+
+`styx heracles:schedule --list` prints the scheduled jobs and the cron triggers they need. On Cloudflare Workers, a trigger runs the jobs whose expression is exactly its own, so `styx heracles:schedule --check wrangler.jsonc` fails when the `triggers.crons` of the file differ from the expressions of the scheduled jobs, which fits a CI step.
 
 ### Job Cancellation
 

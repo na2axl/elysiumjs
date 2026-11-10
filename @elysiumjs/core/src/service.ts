@@ -15,7 +15,7 @@
 import type { Class } from 'type-fest';
 import type { Environment } from './environments';
 import type { ModuleNode } from './module-graph';
-import type { ServiceTag, ServiceToken } from './token';
+import type { Injection, ServiceTag, ServiceToken } from './token';
 
 import { isString } from 'radash';
 
@@ -240,6 +240,48 @@ export namespace Service {
 
 			Metadata.define(Symbols.services, services, target, propertyKey!);
 		};
+	};
+
+	/**
+	 * Calls a method whose parameters take services with `@Service.inject()` or
+	 * `@Service.injectAll()`: each of those parameters receives its service, resolved in the
+	 * current module context, and the other parameters receive `args` in order of position.
+	 * @example
+	 * ```ts
+	 * class SendDigest {
+	 * 	public async execute(@Service.inject() mailer: Mailer) {}
+	 * }
+	 *
+	 * await Service.invoke(new SendDigest(), 'execute');
+	 * ```
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param target The object that has the method.
+	 * @param method The name of the method.
+	 * @param args The values of the parameters that do not take a service.
+	 * @returns What the method returns.
+	 */
+	export const invoke = async <R = unknown>(
+		target: object,
+		method: string | symbol,
+		args: readonly unknown[] = []
+	): Promise<R> => {
+		const fn = (target as Record<string | symbol, unknown>)[method];
+		if (typeof fn !== 'function') {
+			throw new ElysiumError(`${String(method)} is not a method of ${target.constructor.name}.`);
+		}
+		const injections: Injection[] = Metadata.get(Symbols.services, target, method) ?? [];
+		const byIndex = new Map(injections.map((injection) => [injection.index, injection]));
+		const count = Math.max(
+			args.length + injections.length,
+			...[...byIndex.keys()].map((i) => i + 1)
+		);
+		const values: unknown[] = [];
+		let next = 0;
+		for (let index = 0; index < count; index++) {
+			const injection = byIndex.get(index);
+			values.push(injection ? await Container.resolveInjection(injection) : args[next++]);
+		}
+		return (await fn.apply(target, values)) as R;
 	};
 
 	/**

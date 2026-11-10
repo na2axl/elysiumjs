@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Application, Module, Service } from '@elysiumjs/core';
+import type { BackgroundScope, BackgroundWork } from '@elysiumjs/core';
+
+import { Application, Background, Module, Service } from '@elysiumjs/core';
 import { afterEach, describe, expect, it, spyOn } from 'bun:test';
 
 import { HeraclesWorkCommand } from '../src/commands';
@@ -50,6 +52,30 @@ const makeDuplicate = () => {
 
 @Module.register({ services: [Secret], jobs: [SendInvoiceJob] })
 class BillingModule extends Module {}
+
+const scoped: string[] = [];
+
+@Background.scope()
+class TraceScope implements BackgroundScope {
+	public async run<T>(work: BackgroundWork, next: () => Promise<T>): Promise<T> {
+		scoped.push(`${work.kind}:${work.name}`);
+		return next();
+	}
+}
+
+@Job.register({ name: 'ChargeJob' })
+class ChargeJob extends Job {
+	constructor(public readonly amount: number) {
+		super();
+	}
+
+	protected async execute(@Service.inject(Secret) secret: Secret): Promise<void> {
+		seen = `${secret.value}:${this.amount}`;
+	}
+}
+
+@Module.register({ services: [Secret, TraceScope], jobs: [ChargeJob] })
+class ChargesModule extends Module {}
 
 @Job.register({ name: 'RemindJob' })
 class RemindJob extends Job {
@@ -333,6 +359,33 @@ describe('HeraclesModule', () => {
 		await worker.handleProcessJob('job_1', 'dispatch_1', JOB, [], 'default', {});
 		await worker.processJobInternal(queued, 'default');
 		expect(seen).toBe('module-private');
+	});
+
+	it('injects services in execute() and runs the job in the background scopes', async () => {
+		app = await Application.testing({
+			modules: [HeraclesModule, ChargesModule],
+			boot: 'eager'
+		});
+		seen = undefined;
+		scoped.length = 0;
+		const worker = new RedisWorker('default', { id: 'w3' }) as any;
+		let queued: unknown;
+		worker.sendJobStatusUpdate = async () => {};
+		worker.addJob = async (job: Job) => {
+			queued = { job, retries: 0 };
+		};
+		worker.queues.set('default', { activeJobs: new Map(), jobs: [] });
+		await worker.handleProcessJob(
+			'job_2',
+			'dispatch_2',
+			'elysium.heracles.job.ChargeJob',
+			[42],
+			'default',
+			{}
+		);
+		await worker.processJobInternal(queued, 'default');
+		expect(seen).toBe('module-private:42');
+		expect(scoped).toEqual(['job:ChargeJob']);
 	});
 
 	it('reports an unknown job as failed', async () => {

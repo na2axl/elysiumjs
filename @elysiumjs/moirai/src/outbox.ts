@@ -16,6 +16,7 @@ import type { ModuleNode } from '@elysiumjs/core';
 import type { OutboxEffect, OutboxRow } from './stores';
 
 import {
+	Background,
 	Clock,
 	DATABASE_TRANSACTION_SERVICE,
 	getLogger,
@@ -148,7 +149,9 @@ export namespace Outbox {
 					string | symbol,
 					EffectHandler
 				>;
-				return instance[method]!(payload, row, context);
+				return Background.run({ kind: 'outbox', name: kind }, async () =>
+					instance[method]!(payload, row, context)
+				);
 			});
 		};
 

@@ -14,7 +14,7 @@
 
 import type { OutboxRow } from './stores';
 
-import { Clock, Service } from '@elysiumjs/core';
+import { Background, Clock, Service } from '@elysiumjs/core';
 
 import { inOwnerModule } from './config';
 import { DuplicateEventConsumerError, UnknownEventConsumerError } from './errors';
@@ -105,14 +105,16 @@ registerEffect(
 		if (!handler) throw new UnknownEventConsumerError(delivery.consumer, delivery.event);
 		// The handler runs in its module: the inbox and outbox of that module record its work.
 		await inOwnerModule(handler.owner, () =>
-			Inbox.once({ messageId: delivery.id, consumer: delivery.consumer }, async () => {
-				await handler.run(delivery.payload, {
-					id: delivery.id,
-					event: delivery.event,
-					publishedAt: new Date(delivery.publishedAt),
-					attempt: row.attempts + 1
-				});
-			})
+			Background.run({ kind: 'event', name: delivery.consumer }, () =>
+				Inbox.once({ messageId: delivery.id, consumer: delivery.consumer }, async () => {
+					await handler.run(delivery.payload, {
+						id: delivery.id,
+						event: delivery.event,
+						publishedAt: new Date(delivery.publishedAt),
+						attempt: row.attempts + 1
+					});
+				})
+			)
 		);
 	},
 	{

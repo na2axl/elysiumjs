@@ -28,6 +28,7 @@ export {
 	InteractsWithConsole
 } from './console';
 export { type AppEnv, type EnvName, type EnvValue, Env, EnvironmentNotReadyError } from './env';
+export { type BackgroundScope, type BackgroundWork, Background } from './background';
 export { type LifecycleEvent, type LifecycleHandler, Lifecycle } from './lifecycle';
 export { type LoggerInterface, ConsoleLogger, getLogger, LOGGER_SERVICE } from './logger';
 export {

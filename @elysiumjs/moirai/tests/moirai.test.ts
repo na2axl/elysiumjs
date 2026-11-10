@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Static, TestingApp } from '@elysiumjs/core';
+import type { BackgroundScope, BackgroundWork, Static, TestingApp } from '@elysiumjs/core';
 import type { MoiraiOptions } from '../src';
 
 import {
 	Application,
+	Background,
 	Clock,
 	ConflictError,
 	DomainError,
@@ -787,7 +788,20 @@ describe('module stores', () => {
 	@Module.register({})
 	class EmptyModule extends Module {}
 
-	const boot = async () => {
+	const scoped: string[] = [];
+
+	@Background.scope()
+	class TraceScope implements BackgroundScope {
+		public async run<T>(work: BackgroundWork, next: () => Promise<T>): Promise<T> {
+			scoped.push(`${work.kind}:${work.name}`);
+			return next();
+		}
+	}
+
+	@Module.register({ services: [TraceScope] })
+	class ScopeModule extends Module {}
+
+	const boot = async (extra: (typeof Module)[] = []) => {
 		app = await Application.testing({
 			modules: [
 				MoiraiModule.with({
@@ -797,7 +811,8 @@ describe('module stores', () => {
 				}),
 				BillingModule,
 				LedgerModule,
-				EmptyModule
+				EmptyModule,
+				...extra
 			],
 			overrides: { 'db.transaction': withUnitOfWork((callback) => callback()) },
 			boot: 'eager'
@@ -835,6 +850,13 @@ describe('module stores', () => {
 		expect(billing.outbox.rows.every((row) => row.dispatchedAt !== null)).toBe(true);
 		expect(sent).toEqual([{ to: 'o1' }]);
 		expect(handled.sort()).toEqual(['ledger:o1', 'notify:o1']);
+	});
+
+	it('runs event and outbox handlers in the background scopes', async () => {
+		scoped.length = 0;
+		await boot([ScopeModule]);
+		await Moirai.execute(Charge, { order: 'o3' });
+		expect(scoped.sort()).toEqual(['event:ledger.record', 'event:notify', 'outbox:mail.send']);
 	});
 
 	it('runs a query with the services of its module', async () => {

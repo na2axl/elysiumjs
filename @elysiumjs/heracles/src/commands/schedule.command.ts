@@ -15,7 +15,8 @@
 import { Command, CommandArgumentType, Runtime } from '@elysiumjs/core';
 import { Redis } from '@elysiumjs/redis';
 
-import { ScheduleRunner } from '../schedule';
+import { Scheduler, ScheduleRunner } from '../schedule';
+import { parseJsonc } from '../utils';
 
 /**
  * Runs the scheduler: dispatches the scheduled jobs at their times.
@@ -24,7 +25,8 @@ import { ScheduleRunner } from '../schedule';
 @Command.register()
 export class HeraclesScheduleCommand extends Command {
 	public static readonly command: string = 'heracles:schedule';
-	public static readonly description: string = 'Dispatch the scheduled jobs at their times.';
+	public static readonly description: string =
+		'Dispatch the scheduled jobs at their times, or list or check their cron expressions.';
 	public static readonly boot = true;
 
 	@Command.arg({
@@ -36,7 +38,27 @@ export class HeraclesScheduleCommand extends Command {
 	})
 	private redis?: string;
 
+	@Command.arg({
+		name: 'list',
+		required: false,
+		description: 'Print the scheduled jobs and the cron triggers they need, then exit',
+		type: CommandArgumentType.BOOLEAN
+	})
+	private list?: boolean;
+
+	@Command.arg({
+		name: 'check',
+		required: false,
+		description:
+			'The path of a wrangler.jsonc whose triggers.crons must match the cron expressions of the scheduled jobs',
+		type: CommandArgumentType.STRING
+	})
+	private check?: string;
+
 	public async run(): Promise<void> {
+		if (this.list) return this.printList();
+		if (this.check !== undefined) return this.checkWrangler(this.check);
+
 		if (this.redis !== undefined && !Redis.connectionExists(this.redis)) {
 			this.error(`Redis connection "${this.redis}" does not exist`);
 			Runtime.get().exit(1);
@@ -55,5 +77,45 @@ export class HeraclesScheduleCommand extends Command {
 		});
 
 		await new Promise<void>(() => {});
+	}
+
+	private printList(): void {
+		const jobs = Scheduler.jobs();
+		if (jobs.length === 0) this.warning('No job is scheduled.');
+		for (const { name, schedule } of jobs) {
+			this.write(`${schedule.cron.expression.padEnd(20)} ${name}`);
+		}
+		const crons = Scheduler.crons();
+		if (crons.length > 0) this.write(`\nCron triggers: ${JSON.stringify(crons)}`);
+		Runtime.get().exit(0);
+	}
+
+	private async checkWrangler(path: string): Promise<void> {
+		let declared: unknown;
+		try {
+			// portability-allow: a CLI command, run on the host where the wrangler file lives
+			const { readFile } = await import('node:fs/promises');
+			declared = (parseJsonc(await readFile(path, 'utf8')) as { triggers?: { crons?: unknown } })
+				.triggers?.crons;
+		} catch (error) {
+			this.error(`Cannot read ${path}: ${error instanceof Error ? error.message : String(error)}`);
+			return Runtime.get().exit(1);
+		}
+
+		const crons = Array.isArray(declared)
+			? declared.filter((cron) => typeof cron === 'string')
+			: [];
+		const { missing, extra } = Scheduler.compareCrons(crons);
+		for (const cron of missing) {
+			const names = Scheduler.jobsFor(cron).map(({ name }) => name);
+			this.error(`No trigger runs ${cron}, the schedule of ${names.join(', ')}.`);
+		}
+		for (const cron of extra) this.error(`The trigger ${cron} runs no scheduled job.`);
+		if (missing.length > 0 || extra.length > 0) {
+			this.write(`Set triggers.crons to ${JSON.stringify(Scheduler.crons())}.`);
+			return Runtime.get().exit(1);
+		}
+		this.success(`The cron triggers of ${path} match the scheduled jobs.`);
+		Runtime.get().exit(0);
 	}
 }
