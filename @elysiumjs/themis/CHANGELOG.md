@@ -1,5 +1,18 @@
 # @elysiumjs/themis
 
+## 0.4.0
+
+### Minor Changes
+
+- [#67](https://github.com/na2axl/elysiumjs/pull/67) [`9901020`](https://github.com/na2axl/elysiumjs/commit/99010200522c56bb37cbc44c7ffa311d69972599) Thanks [@na2axl](https://github.com/na2axl)! - `Clock` in core: `Clock.now()` and `Clock.epochMs()` give the application time, which `Clock.freeze()` and `Clock.travel()` stop or move in development and test, and `Clock.use()` takes from another source. Moirai (event, stream, projection and outbox instants, idempotency records), the projection store of moirai-drizzle, Heracles scheduler ticks and Themis (JWT issue and expiry checks, sessions, signed URLs, TOTP) read the time from it.
+
+- [#68](https://github.com/na2axl/elysiumjs/pull/68) [`7dc7c59`](https://github.com/na2axl/elysiumjs/commit/7dc7c59f67b9f62159064f7958f529f4e6e27e65) Thanks [@na2axl](https://github.com/na2axl)! - Routes take a success `status` (`@Http.post('/', { status: 201 })`, `@Http.del('/:id', { status: 204 })` without a body), documented with the response schema. `Http.currentContext()` gives the context of the request being handled outside its handler. `Service.extension()` makes an extension point: a tag, a decorator that registers a service with its options, and `all()`, `find()` and `optionsOf()`, which refuse two services with the same name. Themis adds `@Auth.user()` for handler parameters, `Auth.currentUser()` returns the user of the request, and an `AuthUser` interface that apps augment to type the user everywhere.
+
+### Patch Changes
+
+- Updated dependencies [[`920b941`](https://github.com/na2axl/elysiumjs/commit/920b941a9c070c9006fe277abc7a187b9d140af7), [`9901020`](https://github.com/na2axl/elysiumjs/commit/99010200522c56bb37cbc44c7ffa311d69972599), [`7dc7c59`](https://github.com/na2axl/elysiumjs/commit/7dc7c59f67b9f62159064f7958f529f4e6e27e65)]:
+  - @elysiumjs/core@0.20.0
+
 ## 0.3.6
 
 ### Patch Changes

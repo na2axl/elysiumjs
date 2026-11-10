@@ -1,6 +1,6 @@
 {
   "name": "@elysiumjs/themis-workers",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "license": "Apache-2.0",
   "description": "A Cloudflare Workers KV session store for @elysiumjs/themis.",
   "private": false,
