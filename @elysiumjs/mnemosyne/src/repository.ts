@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import type { AbstractDatabase } from './database';
-import type { IdType, ModelClass, RepositoryInterface } from './interfaces';
+import type { ModelClass, RepositoryInterface, RowKey } from './interfaces';
 
 /**
  * Mixin used to create a new abstract repository class over a model.
@@ -79,7 +79,7 @@ export const AbstractRepository = <TModel extends ModelClass, TConnection>(
 		 * @param id The id of the record to retrieve.
 		 * @returns The record with the given id, or `null` if not found.
 		 */
-		public abstract find(id: IdType): Promise<TSelect | null>;
+		public abstract find(id: RowKey): Promise<TSelect | null>;
 
 		/**
 		 * Finds the first record with a column matching the given value.
@@ -105,7 +105,7 @@ export const AbstractRepository = <TModel extends ModelClass, TConnection>(
 		 * @param data The data to update.
 		 * @returns The updated record, or `null` if no record has that id.
 		 */
-		public abstract update(id: IdType, data: TUpdate): Promise<TSelect | null>;
+		public abstract update(id: RowKey, data: TUpdate): Promise<TSelect | null>;
 
 		/**
 		 * Updates all the records in the database.
@@ -119,7 +119,7 @@ export const AbstractRepository = <TModel extends ModelClass, TConnection>(
 		 * @param id The ID of the record to delete.
 		 * @returns The deleted record, or `null` if no record has that id.
 		 */
-		public abstract delete(id: IdType): Promise<TSelect | null>;
+		public abstract delete(id: RowKey): Promise<TSelect | null>;
 
 		/**
 		 * Deletes all the records from the database.
@@ -132,7 +132,7 @@ export const AbstractRepository = <TModel extends ModelClass, TConnection>(
 		 * @param id The ID of the record to check.
 		 * @returns True if the record exists, false otherwise.
 		 */
-		public abstract exists(id: IdType): Promise<boolean>;
+		public abstract exists(id: RowKey): Promise<boolean>;
 	}
 
 	return R;

@@ -35,7 +35,7 @@ export {
 } from './model';
 export { DrizzleModule, type DrizzleModuleConfig } from './drizzle.module';
 export { compileAfter, compileFilter, compileQuery } from './query';
-export { DrizzleRepository } from './repository';
+export { DrizzleRepository, type DrizzleRepositoryOptions, RepositoryKeyError } from './repository';
 export {
 	DrizzleSchemaTenancy,
 	DrizzleRLSTenancy,

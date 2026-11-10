@@ -14,23 +14,26 @@
 
 import type {
 	CursorPage,
-	IdType,
 	ModelClass,
 	OffsetPage,
 	Page,
-	ParsedQuery
+	ParsedQuery,
+	RowKey
 } from '@elysiumjs/mnemosyne';
+import type { SQL } from 'drizzle-orm';
 import type { PgColumn, PgTable, PgTableWithColumns } from 'drizzle-orm/pg-core';
 import type { DrizzleConnection } from './database';
 
+import { ElysiumError } from '@elysiumjs/core';
 import {
 	AbstractRepository,
 	getCurrentTenant,
 	getTenancyConfig,
 	getTenancyStrategy,
-	Query
+	Listing
 } from '@elysiumjs/mnemosyne';
-import { eq } from 'drizzle-orm';
+import { and, eq, getTableColumns } from 'drizzle-orm';
+import { getTableConfig } from 'drizzle-orm/pg-core';
 
 import { Database } from './database';
 import { compileQuery } from './query';
@@ -41,31 +44,111 @@ import { DrizzleRLSTenancy } from './tenancy';
 // ============================================================================
 
 /**
+ * Raised when a repository cannot tell the primary key of its table, or gets a key that does not
+ * match it.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class RepositoryKeyError extends ElysiumError {}
+
+/**
+ * Options of {@link DrizzleRepository}.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type DrizzleRepositoryOptions<TSelect> = {
+	/**
+	 * The columns of the primary key, by their property names. Defaults to the primary key of the
+	 * table: its `primaryKey({ columns })`, else its `.primaryKey()` columns.
+	 */
+	key?: readonly (keyof TSelect & string)[];
+};
+
+/** The property names of the primary key columns of a table, matched by their database names. */
+const primaryKeyOf = (table: PgTable): string[] => {
+	const names = new Map(
+		Object.entries(getTableColumns(table)).map(([name, column]) => [
+			(column as PgColumn).name,
+			name
+		])
+	);
+	const config = getTableConfig(table);
+	const composite = config.primaryKeys[0]?.columns;
+	const columns = composite ?? config.columns.filter((column) => column.primary);
+	return columns.map((column) => names.get(column.name)).filter((name) => name !== undefined);
+};
+
+/**
  * Drizzle-specific repository mixin with concrete CRUD operations.
  *
- * Extends the abstract repository with Drizzle query builder calls
- * for all standard CRUD methods. The model table must have an `id` column, used as the
- * primary key by `find`, `update`, `delete` and `exists`.
+ * Extends the abstract repository with Drizzle query builder calls for all standard CRUD methods.
+ * `find`, `update`, `delete` and `exists` take the primary key of the table: its value, or an
+ * object of the values of its columns when it spans several, such as
+ * `{ userId, creatorId }`.
  *
  * @author Axel Nana <axel.nana@workbud.com>
  * @template TModel The model class type.
  * @param model The model class to create the repository for.
+ * @param options The columns of the primary key, when they differ from the table's.
  * @returns A concrete repository class with CRUD methods.
+ * @example
+ * ```ts
+ * export const follows = pgTable(
+ * 	'follows',
+ * 	{ userId: uuid().notNull(), creatorId: uuid().notNull() },
+ * 	(t) => [primaryKey({ columns: [t.userId, t.creatorId] })]
+ * );
+ *
+ * class FollowRepository extends DrizzleRepository(FollowModel) {}
+ *
+ * await repository.find({ userId, creatorId });
+ * ```
  */
-export const DrizzleRepository = <
-	TModel extends ModelClass<any, any, any, PgTable & { id: PgColumn }>
->(
-	model: TModel
+export const DrizzleRepository = <TModel extends ModelClass<any, any, any, PgTable>>(
+	model: TModel,
+	options: DrizzleRepositoryOptions<TModel['$inferSelect']> = {}
 ) => {
 	type TSelect = TModel['$inferSelect'];
+	type TKey = RowKey | Partial<TSelect>;
 	type TInsert = TModel['$inferInsert'];
 	type TUpdate = TModel['$inferUpdate'];
 
 	/**
 	 * Gets the model table, resolved for the current tenant on each call. Typed loosely for the
-	 * query builders; the `id` column is guaranteed by the `TModel` constraint.
+	 * query builders.
 	 */
 	const table = () => model.table as unknown as PgTableWithColumns<any>;
+
+	let keyColumns: readonly string[] | undefined;
+	/** The property names of the primary key columns, read from the table once. */
+	const key = (): readonly string[] => {
+		keyColumns ??= options.key ?? primaryKeyOf(table());
+		if (keyColumns.length === 0)
+			throw new RepositoryKeyError(
+				`The table of ${model.name} has no primary key: declare one, or pass \`key\` to DrizzleRepository().`
+			);
+		return keyColumns;
+	};
+
+	/** The condition that selects the row of a key. */
+	const whereKey = (id: TKey): SQL => {
+		const columns = key();
+		const t = table();
+		if (typeof id !== 'object' || id === null) {
+			if (columns.length > 1)
+				throw new RepositoryKeyError(
+					`The primary key of ${model.name} spans ${columns.join(', ')}: pass an object of their values.`
+				);
+			return eq(t[columns[0]!], id);
+		}
+		const values = id as Record<string, unknown>;
+		const missing = columns.filter((column) => values[column] === undefined);
+		if (missing.length > 0)
+			throw new RepositoryKeyError(`The key of ${model.name} misses ${missing.join(', ')}.`);
+		return and(...columns.map((column) => eq(t[column], values[column])))!;
+	};
+
+	/** Two conditions together, either of which may be left out. */
+	const both = (a: SQL | undefined, b: SQL | undefined): SQL | undefined =>
+		a && b ? and(a, b) : (a ?? b);
 
 	class R extends AbstractRepository<TModel, DrizzleConnection>(model, Database) {
 		/**
@@ -111,9 +194,9 @@ export const DrizzleRepository = <
 			}));
 		}
 
-		public async find(id: IdType): Promise<TSelect | null> {
+		public async find(id: TKey): Promise<TSelect | null> {
 			const [row] = await this.withConnection((db) =>
-				db.select().from(table()).where(eq(table().id, id))
+				db.select().from(table()).where(whereKey(id))
 			);
 			return (row ?? null) as TSelect | null;
 		}
@@ -133,9 +216,9 @@ export const DrizzleRepository = <
 			return row as TSelect;
 		}
 
-		public async update(id: IdType, data: TUpdate): Promise<TSelect | null> {
+		public async update(id: TKey, data: TUpdate): Promise<TSelect | null> {
 			const [row] = await this.withConnection((db) =>
-				db.update(table()).set(data).where(eq(table().id, id)).returning()
+				db.update(table()).set(data).where(whereKey(id)).returning()
 			);
 			return (row ?? null) as TSelect | null;
 		}
@@ -144,9 +227,9 @@ export const DrizzleRepository = <
 			return this.withConnection((db) => db.update(table()).set(data).returning());
 		}
 
-		public async delete(id: IdType): Promise<TSelect | null> {
+		public async delete(id: TKey): Promise<TSelect | null> {
 			const [row] = await this.withConnection((db) =>
-				db.delete(table()).where(eq(table().id, id)).returning()
+				db.delete(table()).where(whereKey(id)).returning()
 			);
 			return (row ?? null) as TSelect | null;
 		}
@@ -156,17 +239,25 @@ export const DrizzleRepository = <
 		}
 
 		/**
-		 * Lists a page of rows matching a parsed query (see `Query.parse`): its filters, its sort and
+		 * Lists a page of rows matching a parsed query (see `Listing.parse`): its filters, its sort and
 		 * its page. With cursor pagination, one row more than the limit is fetched to tell whether a
 		 * next page exists. With offset pagination, the rows matching the filters are counted.
 		 * @param query The parsed query.
+		 * @param scope A condition the rows must also meet, such as their owner, ANDed with the
+		 * filters of the query.
 		 * @returns The rows of the page and the cursor of the next one, or the page and the total.
+		 * @example
+		 * ```ts
+		 * return this.list(query, eq(posts.authorId, userId));
+		 * ```
 		 */
-		public async list(query: ParsedQuery<'offset'>): Promise<OffsetPage<TSelect>>;
-		public async list(query: ParsedQuery<'cursor'>): Promise<CursorPage<TSelect>>;
-		public async list(query: ParsedQuery): Promise<Page<TSelect>>;
-		public async list(query: ParsedQuery): Promise<Page<TSelect>> {
-			const { where, orderBy } = compileQuery(table(), query);
+		public async list(query: ParsedQuery<'offset'>, scope?: SQL): Promise<OffsetPage<TSelect>>;
+		public async list(query: ParsedQuery<'cursor'>, scope?: SQL): Promise<CursorPage<TSelect>>;
+		public async list(query: ParsedQuery, scope?: SQL): Promise<Page<TSelect>>;
+		public async list(query: ParsedQuery, scope?: SQL): Promise<Page<TSelect>> {
+			const compiled = compileQuery(table(), query);
+			const where = both(compiled.where, scope);
+			const { orderBy } = compiled;
 			if (query.page !== undefined) {
 				const offsetQuery = query as ParsedQuery<'offset'>;
 				return this.withConnection(async (db) => {
@@ -178,7 +269,7 @@ export const DrizzleRepository = <
 						.offset((offsetQuery.page - 1) * offsetQuery.limit)
 						.limit(offsetQuery.limit);
 					const total = await db.$count(table(), where);
-					return Query.offsetPage(offsetQuery, rows as TSelect[], total);
+					return Listing.offsetPage(offsetQuery, rows as TSelect[], total);
 				});
 			}
 			const rows = await this.withConnection((db) =>
@@ -189,20 +280,23 @@ export const DrizzleRepository = <
 					.orderBy(...orderBy)
 					.limit(query.limit + 1)
 			);
-			return Query.page(query, rows as Record<string, unknown>[]) as CursorPage<TSelect>;
+			return Listing.page(query, rows as Record<string, unknown>[]) as CursorPage<TSelect>;
 		}
 
 		/**
 		 * Counts the rows matching the filters of a parsed query, ignoring its cursor.
 		 * @param query The parsed query.
+		 * @param scope A condition the rows must also meet, as for `list()`.
 		 */
-		public async count(query?: ParsedQuery): Promise<number> {
-			const where = query ? compileQuery(table(), { ...query, after: undefined }).where : undefined;
-			return this.withConnection((db) => db.$count(table(), where));
+		public async count(query?: ParsedQuery, scope?: SQL): Promise<number> {
+			const filters = query
+				? compileQuery(table(), { ...query, after: undefined }).where
+				: undefined;
+			return this.withConnection((db) => db.$count(table(), both(filters, scope)));
 		}
 
-		public async exists(id: IdType): Promise<boolean> {
-			const count = await this.withConnection((db) => db.$count(table(), eq(table().id, id)));
+		public async exists(id: TKey): Promise<boolean> {
+			const count = await this.withConnection((db) => db.$count(table(), whereKey(id)));
 			return count > 0;
 		}
 	}

@@ -15,7 +15,17 @@
 import { Service } from '@elysiumjs/core';
 import { ConcurrencyConflictError, IdempotencyConflictError } from '@elysiumjs/moirai';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { getTableConfig, pgTable, text } from 'drizzle-orm/pg-core';
+import {
+	getTableConfig,
+	integer,
+	jsonb,
+	pgSchema,
+	pgTable,
+	primaryKey,
+	text,
+	timestamp,
+	uuid
+} from 'drizzle-orm/pg-core';
 
 import {
 	DrizzleEventStore,
@@ -157,6 +167,34 @@ describe('moirai stores', () => {
 			),
 			expect.stringMatching(
 				/^update "billing"."outbox" set "attempts" = \$1, "last_error" = \$2, "dead_at" = \$3/
+			)
+		]);
+	});
+
+	it('works over a table of a domain schema whose key spans more columns', async () => {
+		const iam = pgSchema('iam');
+		const at = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' });
+		const outbox = iam.table(
+			'outbox',
+			{
+				id: uuid('id').notNull(),
+				kind: text('kind').notNull(),
+				payload: jsonb('payload').notNull(),
+				createdAt: at('created_at').notNull().defaultNow(),
+				availableAt: at('available_at').notNull().defaultNow(),
+				attempts: integer('attempts').notNull().default(0),
+				lastError: text('last_error'),
+				dispatchedAt: at('dispatched_at'),
+				deadAt: at('dead_at')
+			},
+			(t) => [primaryKey({ columns: [t.id, t.createdAt] })]
+		);
+		const store = new DrizzleOutboxStore({ table: outbox });
+
+		await store.markDispatched('0190', new Date(0));
+		expect(queries()).toEqual([
+			expect.stringMatching(
+				/^update "iam"."outbox" set "dispatched_at" = \$1 where "iam"."outbox"."id" = \$2/
 			)
 		]);
 	});

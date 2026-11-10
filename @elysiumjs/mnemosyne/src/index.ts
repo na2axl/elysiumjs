@@ -18,6 +18,7 @@ export type {
 	DatabaseCacheStrategy,
 	DatabaseDriver,
 	IdType,
+	RowKey,
 	ModelAdapter,
 	ModelClass,
 	RepositoryClass,
@@ -47,6 +48,7 @@ export {
 	type QueryParams,
 	type QuerySchemaProperties,
 	type QuerySpec,
+	Listing,
 	Query
 } from './query';
 
