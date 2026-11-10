@@ -15,7 +15,7 @@
 import type { FlowAdvance, FlowContext, FlowDescription, FlowRefusal, FlowStepRun } from './flow';
 import type { FlowRecord, FlowStore } from './store';
 
-import { Application, DomainError, Service, userIdOf } from '@elysiumjs/core';
+import { DomainError, Http, Service, userIdOf } from '@elysiumjs/core';
 
 import {
 	FlowCompletedError,
@@ -204,7 +204,7 @@ export class FlowEngine {
 		controller: object,
 		run: (input: FlowStepRun) => unknown
 	): Promise<{ answer: unknown; nextSteps: string[]; backSteps: string[] }> {
-		const http = Application.context.getStore()?.get('http:context') as FlowHttpContext;
+		const http = Http.currentContext<FlowHttpContext>()!;
 		const target = this.flow.steps.get(stepName)!;
 		const flowKey = http.request.headers.get(FLOW_KEY_HEADER) ?? '';
 		const stepId = http.request.headers.get(FLOW_STEP_HEADER) ?? '';

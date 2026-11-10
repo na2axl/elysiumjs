@@ -135,6 +135,9 @@ type HttpRequestHandlerMetadata = {
 	 */
 	response?: TSchema | Record<number, TSchema>;
 
+	/** The status of a successful response. */
+	status?: number;
+
 	/**
 	 * The problems the route answers with.
 	 */
@@ -242,6 +245,7 @@ type HttpRequestHandlerRegistrationProps = Pick<
 	| 'interceptors'
 	| 'headers'
 	| 'parse'
+	| 'status'
 > & {
 	target: Object;
 	propertyKey: string | symbol;
@@ -475,7 +479,8 @@ const registerHttpRequestHandler = (props: HttpRequestHandlerRegistrationProps) 
 		filters,
 		interceptors,
 		headers,
-		parse
+		parse,
+		status
 	} = props;
 
 	const metadata: HttpRequestHandlerMetadata[] =
@@ -503,7 +508,8 @@ const registerHttpRequestHandler = (props: HttpRequestHandlerRegistrationProps) 
 		serialize,
 		filters,
 		interceptors,
-		parse
+		parse,
+		status
 	});
 
 	Metadata.define(Symbols.http, metadata, target.constructor);
@@ -586,6 +592,19 @@ export type HttpRouteOptions = {
 	 * the client receives from it.
 	 */
 	response?: TSchema | Record<number, TSchema>;
+
+	/**
+	 * The status of a successful response, such as `201` for a creation or `204` for a route that
+	 * answers without a body. Defaults to `200`. A single `response` schema is documented under it,
+	 * and a `204` route sends no body whatever the handler returns. A handler that sets
+	 * `ctx.set.status` itself keeps its own.
+	 * @example
+	 * ```ts
+	 * @Http.post('/', { status: 201, response: Wallet })
+	 * @Http.del('/:id', { status: 204 })
+	 * ```
+	 */
+	status?: number;
 
 	/**
 	 * The problems the route answers with, by their classes (made with `DomainError.for()`). They
@@ -832,11 +851,12 @@ type RouteProblems = {
 const routeResponses = (
 	response: ResponseSchemas | undefined,
 	levels: InterceptorLevel[],
-	problems: RouteProblems
+	problems: RouteProblems,
+	success = 200
 ): Record<number, TSchema> => {
 	const responses: Record<number, TSchema> = {};
 	const declared =
-		response === undefined ? {} : isStatusMap(response) ? response : { 200: response };
+		response === undefined ? {} : isStatusMap(response) ? response : { [success]: response };
 	for (const [key, schema] of Object.entries(declared)) {
 		const status = Number(key);
 		responses[status] = status >= 200 && status < 300 ? interceptedSchema(levels, schema) : schema;
@@ -919,6 +939,19 @@ export namespace Http {
 	 * ```
 	 */
 	export const RouteTypes = Service.tag<HttpRouteTypesContributor>('http.route-types');
+
+	/**
+	 * The context of the HTTP request being handled, for code outside the handler such as a
+	 * service or a repository: its request, its `set`, and what middlewares put in it (such as
+	 * `currentUser`). `undefined` outside a request.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @example
+	 * ```ts
+	 * const ip = Http.currentContext()?.request.headers.get('cf-connecting-ip');
+	 * ```
+	 */
+	export const currentContext = <TContext extends object = Context>(): TContext | undefined =>
+		Application.context.getStore()?.get('http:context') as TContext | undefined;
 
 	/**
 	 * Describes the routes of an HTTP controller, for tools such as the route type generator.
@@ -1202,6 +1235,20 @@ export namespace Http {
 							return Response.json(body, { status });
 						};
 
+						/**
+						 * Answers a successful call: with the route's `status`, unless the handler set its own,
+						 * and without a body for a 204.
+						 */
+						const answer = async (c: Context): Promise<unknown> => {
+							const before = c.set.status;
+							const handler = initInterceptedHandler(c);
+							const result = await handler(...(await getParameters(c)));
+							if (route.status !== undefined && c.set.status === before)
+								c.set.status = route.status;
+							if (c.set.status === 204) return undefined;
+							return toBody(c, result);
+						};
+
 						if (isValidator) {
 							return async function (c: Context) {
 								const valid = await ModuleContext.run(node, () =>
@@ -1210,14 +1257,12 @@ export namespace Http {
 								if (valid instanceof DomainError) throw valid;
 								if (!valid) throw new BadRequestError('The request body is invalid.');
 
-								const handler = initInterceptedHandler(c);
-								return toBody(c, await handler(...(await getParameters(c))));
+								return answer(c);
 							};
 						}
 
 						return async function (c: Context) {
-							const handler = initInterceptedHandler(c);
-							return toBody(c, await handler(...(await getParameters(c))));
+							return answer(c);
 						};
 					};
 
@@ -1239,23 +1284,28 @@ export namespace Http {
 						{ interceptors: props.interceptors ?? [], node },
 						{ interceptors: route.interceptors ?? [], node }
 					];
-					const responses = routeResponses(route.response, interceptorLevels, {
-						declared: [
-							...(route.errors ?? []),
-							...[
-								...route.middlewares,
-								...middlewares,
-								...(Metadata.get(Symbols.middlewares, node.moduleClass) ?? []),
-								...appMiddlewares
-							].flatMap(declaredErrors),
-							...interceptorLevels.flatMap((level) => level.interceptors).flatMap(declaredErrors),
-							...declaredErrors(route.body?.validator)
-						],
-						validated: Boolean(route.body || route.query),
-						malformed: Boolean(route.body || headers),
-						body: Boolean(route.body),
-						rateLimited: Boolean(rateLimitOf(target, route.name) ?? appDefaultRateLimit())
-					});
+					const responses = routeResponses(
+						route.response,
+						interceptorLevels,
+						{
+							declared: [
+								...(route.errors ?? []),
+								...[
+									...route.middlewares,
+									...middlewares,
+									...(Metadata.get(Symbols.middlewares, node.moduleClass) ?? []),
+									...appMiddlewares
+								].flatMap(declaredErrors),
+								...interceptorLevels.flatMap((level) => level.interceptors).flatMap(declaredErrors),
+								...declaredErrors(route.body?.validator)
+							],
+							validated: Boolean(route.body || route.query),
+							malformed: Boolean(route.body || headers),
+							body: Boolean(route.body),
+							rateLimited: Boolean(rateLimitOf(target, route.name) ?? appDefaultRateLimit())
+						},
+						route.status
+					);
 
 					const mi = makeMiddlewares(route.middlewares, node);
 

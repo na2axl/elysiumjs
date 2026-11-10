@@ -219,3 +219,85 @@ describe('route responses', () => {
 		expect(responses['409'].content['text/plain'].schema.type).toBe('string');
 	});
 });
+
+@Http.controller('/receipts')
+class ReceiptController {
+	@Http.post('/', { status: 201, response: Wallet })
+	public create() {
+		return { id: 'r1', balance: 1, secret: 'stripped' };
+	}
+
+	@Http.del('/:id', { status: 204 })
+	public remove() {
+		return { ignored: true };
+	}
+
+	@Http.post('/:id/accept', { status: 201 })
+	public accept(@Http.context() ctx: Context) {
+		ctx.set.status = 202;
+		return 'accepted';
+	}
+
+	@Http.post('/conflict', { status: 201, errors: [ConflictError] })
+	public conflict() {
+		return new ConflictError('Taken.');
+	}
+}
+
+@Module.register({ controllers: [ReceiptController] })
+class ReceiptModule extends Module {}
+
+@Application.register({ modules: [ReceiptModule], openapi: {} })
+class ReceiptApp extends Application {}
+
+describe('route success status', () => {
+	let testing: Awaited<ReturnType<typeof createTestingHttpApp>> | undefined;
+
+	afterEach(async () => {
+		await testing?.shutdown();
+		testing = undefined;
+	});
+
+	it('answers with the status of the route and serializes the body', async () => {
+		testing = await createTestingHttpApp({ app: ReceiptApp });
+		const response = await testing.http.post('/receipts').send();
+
+		expect(response.status).toBe(201);
+		expect(await response.json()).toEqual({ id: 'r1', balance: 1 });
+	});
+
+	it('sends no body with a 204, whatever the handler returns', async () => {
+		testing = await createTestingHttpApp({ app: ReceiptApp });
+		const response = await testing.http.delete('/receipts/r1').send();
+
+		expect(response.status).toBe(204);
+		expect(await response.text()).toBe('');
+	});
+
+	it('keeps the status a handler sets itself', async () => {
+		testing = await createTestingHttpApp({ app: ReceiptApp });
+		const response = await testing.http.post('/receipts/r1/accept').send();
+
+		expect(response.status).toBe(202);
+	});
+
+	it('answers a problem with its own status', async () => {
+		testing = await createTestingHttpApp({ app: ReceiptApp });
+		const response = await testing.http.post('/receipts/conflict').send();
+
+		expect(response.status).toBe(409);
+	});
+
+	it('documents the response under the status of the route', async () => {
+		testing = await createTestingHttpApp({ app: ReceiptApp });
+		const paths = ((await (await testing.http.get('/openapi/json').send()).json()) as any).paths;
+		const responses = (paths['/receipts'] ?? paths['/receipts/']).post.responses;
+
+		expect(Object.keys(responses)).toContain('201');
+		expect(Object.keys(responses)).not.toContain('200');
+		expect(Object.keys(responses['201'].content['application/json'].schema.properties)).toEqual([
+			'id',
+			'balance'
+		]);
+	});
+});
