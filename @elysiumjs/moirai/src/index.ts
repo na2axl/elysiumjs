@@ -59,6 +59,7 @@ export {
 	IdempotencyKeyReusedError,
 	InvalidInputError,
 	LockOutsideUnitOfWorkError,
+	NestedCallRefusedError,
 	MissingStoreError,
 	PayloadReplacementUnsupportedError,
 	UnknownEventConsumerError,

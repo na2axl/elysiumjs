@@ -60,6 +60,7 @@ import {
 	MOIRAI_OPTIONS,
 	MOIRAI_OUTBOX_STORE,
 	MoiraiModule,
+	NestedCallRefusedError,
 	Outbox,
 	PayloadReplacementUnsupportedError,
 	Query,
@@ -1008,6 +1009,20 @@ describe('outcomes', () => {
 		await expect(Moirai.ask(Find, { id: 1 } as never).orThrow()).rejects.toBeInstanceOf(
 			InvalidInputError
 		);
+	});
+
+	it('pass the refusals of the handler on, and throw those of moirai, with orPass()', async () => {
+		const renamed = await Moirai.execute(Rename, { id: 'a' }).orPass();
+		expectTypeOf(renamed).toEqualTypeOf<{ id: string } | Missing>();
+		expect(renamed).toEqual({ id: 'a' });
+		expect(await Moirai.execute(Rename, { id: 'none' }).orPass()).toBeInstanceOf(Missing);
+		expect(await Moirai.ask(Find, { id: 'none' }).orPass()).toBeInstanceOf(Missing);
+		const refused = await Moirai.ask(Find, { id: 1 } as never)
+			.orPass()
+			.catch((error: unknown) => error);
+		expect(refused).toBeInstanceOf(NestedCallRefusedError);
+		expect((refused as NestedCallRefusedError).refusal).toBeInstanceOf(InvalidInputError);
+		expect((refused as Error).message).toContain('Find');
 	});
 
 	it('name the errors of the handler alone', () => {

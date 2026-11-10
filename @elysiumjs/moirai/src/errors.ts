@@ -227,3 +227,19 @@ export class PayloadReplacementUnsupportedError extends ElysiumError {
 		);
 	}
 }
+
+/**
+ * Moirai refused a call that a handler made (an invalid input, a refused `authorize`, a missing or
+ * reused idempotency key): the calling handler built the call, so it is a bug, thrown by
+ * `orPass()`. The refusal is the `cause`.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class NestedCallRefusedError extends ElysiumError {
+	constructor(
+		public readonly call: string,
+		public readonly refusal: DomainError
+	) {
+		super(`Moirai refused the nested call to ${call}: ${refusal.message}`);
+		this.cause = refusal;
+	}
+}
