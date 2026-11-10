@@ -43,6 +43,7 @@ import {
 	Inbox,
 	InvalidInputError,
 	isTransientError,
+	LockOutsideUnitOfWorkError,
 	MemoryActionLock,
 	MemoryIdempotencyStore,
 	MemoryInboxStore,
@@ -58,7 +59,9 @@ import {
 	MOIRAI_OUTBOX_STORE,
 	MoiraiModule,
 	Outbox,
+	PayloadReplacementUnsupportedError,
 	Query,
+	registerEffect,
 	requestHash,
 	uuidv7
 } from './exports';
@@ -129,6 +132,7 @@ class Mailer {
 let runs = 0;
 
 @Action.register({
+	errors: [ConflictError],
 	input: t.Object({ amount: t.Integer({ minimum: 1 }), note: t.Optional(t.String()) }),
 	idempotent: true
 })
@@ -142,7 +146,7 @@ class TopUp extends Action {
 	}
 }
 
-@Action.register({ name: 'rename', input: t.Object({ name: t.String() }) })
+@Action.register({ errors: [], name: 'rename', input: t.Object({ name: t.String() }) })
 class Rename extends Action {
 	public handle(input: { name: string }) {
 		log.push(`rename ${input.name}`);
@@ -167,6 +171,7 @@ describe('actions', () => {
 
 	it('refuses a call that authorize declines with a 403 problem', async () => {
 		@Action.register({
+			errors: [],
 			input: t.Object({ id: t.String() }),
 			authorize: (input) => input.id === 'mine'
 		})
@@ -260,7 +265,7 @@ describe('actions', () => {
 
 	it('retries transient failures up to maxAttempts, and not the others', async () => {
 		let attempts = 0;
-		@Action.register({ input: t.Object({ mode: t.String() }) })
+		@Action.register({ errors: [], input: t.Object({ mode: t.String() }) })
 		class Flaky extends Action {
 			public handle(input: { mode: string }, context: { attempt: number }) {
 				attempts++;
@@ -293,6 +298,7 @@ describe('actions', () => {
 		class ConcurrencyConflict extends DomainError.for('CONCURRENCY_CONFLICT', 409) {}
 		let calls = 0;
 		@Action.register({
+			errors: [ConcurrencyConflict],
 			input: t.Object({ wins: t.Integer() }),
 			retry: { attempts: 4, isTransient: (error) => error instanceof ConcurrencyConflict }
 		})
@@ -316,6 +322,7 @@ describe('actions', () => {
 	it('serializes the calls that share a serializeBy key', async () => {
 		const order: string[] = [];
 		@Action.register({
+			errors: [],
 			input: t.Object({ wallet: t.String(), id: t.Integer() }),
 			serializeBy: (i) => i.wallet
 		})
@@ -357,7 +364,7 @@ describe('actions', () => {
 });
 
 describe('queries', () => {
-	@Query.register({ input: t.Object({ id: t.String({ minLength: 2 }) }) })
+	@Query.register({ errors: [NotFoundError], input: t.Object({ id: t.String({ minLength: 2 }) }) })
 	class FindUser extends Query {
 		public handle(input: { id: string }) {
 			if (input.id === 'gone') return new NotFoundError();
@@ -380,21 +387,21 @@ describe('typed handlers', () => {
 	type CitiesResult = string[];
 	class CountryClosed extends DomainError.for('NOT_FOUND', 404) {}
 
-	@Query.register({ name: 'cities', input: CitiesInput })
+	@Query.register({ errors: [CountryClosed], name: 'cities', input: CitiesInput })
 	class Cities extends Query<CitiesInput, CitiesResult, CountryClosed> {
 		public override handle({ country }: CitiesInput): CitiesResult | CountryClosed {
 			return country === 'FR' ? new CountryClosed('closed') : ['Douala', 'Yaoundé'];
 		}
 	}
 
-	@Query.register({ name: 'categories' })
+	@Query.register({ errors: [], name: 'categories' })
 	class Categories extends Query<void, string[]> {
 		public override handle(): string[] {
 			return ['music', 'comedy'];
 		}
 	}
 
-	@Action.register({ name: 'ping' })
+	@Action.register({ errors: [], name: 'ping' })
 	class Ping extends Action<void, { pong: true }> {
 		public override async handle() {
 			log.push('ping');
@@ -402,7 +409,7 @@ describe('typed handlers', () => {
 		}
 	}
 
-	@Action.register({ name: 'idempotent-ping', idempotent: true })
+	@Action.register({ errors: [], name: 'idempotent-ping', idempotent: true })
 	class IdempotentPing extends Action<void, number> {
 		private static calls = 0;
 		public override handle() {
@@ -691,7 +698,7 @@ describe('module stores', () => {
 	let ledger: { outbox: MemoryOutboxStore; inbox: MemoryInboxStore };
 	let billingOptions: Partial<MoiraiOptions> = {};
 
-	@Action.register({ input: t.Object({ order: t.String() }) })
+	@Action.register({ errors: [], input: t.Object({ order: t.String() }) })
 	class Charge extends Action {
 		public async handle(input: { order: string }) {
 			await Outbox.enqueue({ kind: 'mail.send', payload: { to: input.order } });
@@ -700,7 +707,7 @@ describe('module stores', () => {
 		}
 	}
 
-	@Action.register({ input: t.Object({ n: t.Integer() }), idempotent: true })
+	@Action.register({ errors: [], input: t.Object({ n: t.Integer() }), idempotent: true })
 	class Pay extends Action {
 		public handle(input: { n: number }) {
 			return { paid: input.n };
@@ -720,7 +727,7 @@ describe('module stores', () => {
 		}
 	}
 
-	@Query.register({ input: t.Object({ order: t.String() }) })
+	@Query.register({ errors: [], input: t.Object({ order: t.String() }) })
 	class Quote extends Query {
 		public constructor(@Service.inject(Prices) private readonly prices: Prices) {
 			super();
@@ -882,5 +889,123 @@ describe('helpers', () => {
 		const b = uuidv7(2_000);
 		expect(a).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
 		expect(a < b).toBe(true);
+	});
+});
+
+describe('Moirai.lock', () => {
+	it('needs a unit of work', async () => {
+		await expect(Moirai.lock('wallet:1')).rejects.toBeInstanceOf(LockOutsideUnitOfWorkError);
+	});
+
+	it('serializes the units of work that take the same key, until each one ends', async () => {
+		const order: string[] = [];
+		const hold = (name: string, key: string, wait: number, fail = false) =>
+			UnitOfWork.run(async () => {
+				await Moirai.lock(key);
+				order.push(`${name} in`);
+				await new Promise((resolve) => setTimeout(resolve, wait));
+				order.push(`${name} out`);
+				if (fail) throw new Error('rolled back');
+			}).catch(() => undefined);
+
+		await Promise.all([
+			hold('a', 'wallet:1', 20, true),
+			hold('b', 'wallet:1', 0),
+			hold('c', 'wallet:2', 0)
+		]);
+		expect(order.indexOf('a out')).toBeLessThan(order.indexOf('b in'));
+		expect(order.indexOf('c in')).toBeLessThan(order.indexOf('a out'));
+	});
+
+	it('locks from an action handler, on a key read in the handler', async () => {
+		const seen: string[] = [];
+		@Action.register({ errors: [], input: t.Object({ id: t.String() }) })
+		class Settle extends Action {
+			public async handle(input: { id: string }) {
+				await Moirai.lock(`top-up-wallet:${input.id.slice(0, 1)}`);
+				seen.push(`${input.id} in`);
+				await new Promise((resolve) => setTimeout(resolve, 5));
+				seen.push(`${input.id} out`);
+				return input.id;
+			}
+		}
+
+		await Promise.all([Moirai.execute(Settle, { id: 'w1' }), Moirai.execute(Settle, { id: 'w2' })]);
+		expect(seen).toEqual(['w1 in', 'w1 out', 'w2 in', 'w2 out']);
+	});
+});
+
+describe('outcomes', () => {
+	class Missing extends DomainError.for('MISSING', 404) {}
+
+	@Action.register({ errors: [Missing], input: t.Object({ id: t.String() }) })
+	class Rename extends Action {
+		public handle(input: { id: string }) {
+			return input.id === 'none' ? new Missing('No such thing.') : { id: input.id };
+		}
+	}
+
+	@Query.register({ errors: [Missing], input: t.Object({ id: t.String() }) })
+	class Find extends Query {
+		public handle(input: { id: string }) {
+			return input.id === 'none' ? new Missing('No such thing.') : { id: input.id };
+		}
+	}
+
+	it('give the result or the refusal as a value', async () => {
+		expect(await Moirai.execute(Rename, { id: 'a' })).toEqual({ id: 'a' });
+		expect(await Moirai.execute(Rename, { id: 'none' })).toBeInstanceOf(Missing);
+	});
+
+	it('give the result, or throw the refusal, with orThrow()', async () => {
+		const renamed = await Moirai.execute(Rename, { id: 'a' }).orThrow();
+		expectTypeOf(renamed).toEqualTypeOf<{ id: string }>();
+		expect(renamed).toEqual({ id: 'a' });
+		await expect(Moirai.execute(Rename, { id: 'none' }).orThrow()).rejects.toBeInstanceOf(Missing);
+		await expect(Moirai.ask(Find, { id: 'b' }).orThrow()).resolves.toEqual({ id: 'b' });
+		await expect(Moirai.ask(Find, { id: 'none' }).orThrow()).rejects.toBeInstanceOf(Missing);
+		await expect(Moirai.ask(Find, { id: 1 } as never).orThrow()).rejects.toBeInstanceOf(
+			InvalidInputError
+		);
+	});
+
+	it('name the errors of the handler alone', () => {
+		expectTypeOf<Moirai.ErrorsOf<typeof Rename>>().toEqualTypeOf<Missing>();
+	});
+});
+
+describe('outbox payload replacement', () => {
+	it('replaces the payload of a row once its handler succeeds', async () => {
+		setOptions({ relayOnCommit: false });
+		registerEffect('otp.send', (payload, _row, context) => {
+			const otp = payload as { to: string; code: string | null; fail?: boolean };
+			if (otp.fail) {
+				context.replacePayload({ ...otp, code: null });
+				throw new Error('sms down');
+			}
+			context.replacePayload({ ...otp, code: null });
+		});
+		await Outbox.enqueue({ kind: 'otp.send', payload: { to: '+237', code: '123456' } });
+		await Outbox.enqueue({ kind: 'otp.send', payload: { to: '+225', code: '654321', fail: true } });
+
+		expect(await Outbox.relay()).toEqual({ dispatched: 1, retried: 1, dead: 0 });
+		const [sent, failed] = outbox.rows;
+		expect(sent!.payload).toEqual({ to: '+237', code: null });
+		expect(failed!.payload).toEqual({ to: '+225', code: '654321', fail: true });
+	});
+
+	it('refuses a replacement the store cannot make, and retries the row', async () => {
+		setOptions({ relayOnCommit: false });
+		const store = new MemoryOutboxStore();
+		Object.defineProperty(store, 'replacePayload', { value: undefined });
+		Service.remove(MOIRAI_OUTBOX_STORE);
+		Service.instance(MOIRAI_OUTBOX_STORE, store);
+		registerEffect('otp.plain', (payload, _row, context) => context.replacePayload(payload));
+		await Outbox.enqueue({ kind: 'otp.plain', payload: { to: 'x' } });
+
+		expect(await Outbox.relay()).toEqual({ dispatched: 0, retried: 1, dead: 0 });
+		expect(store.rows[0]!.lastError).toBe(
+			new PayloadReplacementUnsupportedError('MemoryOutboxStore').message
+		);
 	});
 });

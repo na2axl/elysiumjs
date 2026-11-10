@@ -31,7 +31,8 @@ import {
 	CallForbiddenError,
 	IdempotencyKeyRequiredError,
 	IdempotencyKeyReusedError,
-	InvalidInputError
+	InvalidInputError,
+	LockOutsideUnitOfWorkError
 } from './errors';
 import { requestHash } from './hash';
 import { moduleStores } from './moirai.module';
@@ -111,10 +112,7 @@ type OutcomeOf<C extends HandlerClass> = Awaited<ReturnType<InstanceType<C>['han
 type ResultOf<C extends HandlerClass> = Exclude<OutcomeOf<C>, DomainError>;
 type ErrorsOf<C extends HandlerClass> = Extract<OutcomeOf<C>, DomainError>;
 
-/**
- * Checks that the `errors` of a registration list every DomainError `handle()` gives. Without
- * `errors`, any class passes.
- */
+/** Checks that the `errors` of a registration list every DomainError `handle()` gives. */
 type ListsErrorsOf<C extends HandlerClass, E extends readonly ProblemClass[]> = [
 	Exclude<ErrorsOf<C>, InstanceType<E[number]>>
 ] extends [never]
@@ -144,6 +142,31 @@ export type ActionOutcome<C extends ActionClass> =
  */
 export type QueryOutcome<C extends QueryClass> =
 	OutcomeOf<C> | InvalidInputError | CallForbiddenError;
+
+/**
+ * The promise `Moirai.execute()` and `Moirai.ask()` give: it resolves to the result or to the
+ * DomainError that refused the call, and `orThrow()` resolves to the result only, throwing the
+ * DomainError instead, for callers where a refusal is a bug, such as a job or an event handler.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @example
+ * ```ts
+ * const wallet = await Moirai.execute(OpenWallet, { userId }).orThrow();
+ * ```
+ */
+export interface Outcome<TOutcome> extends Promise<TOutcome> {
+	/** Resolves to the result, and rejects with the DomainError that refused the call. */
+	orThrow(): Promise<Exclude<TOutcome, DomainError>>;
+}
+
+/** Adds `orThrow()` to the promise of a call. */
+const outcome = <T>(promise: Promise<T>): Outcome<T> =>
+	Object.assign(promise, {
+		orThrow: () =>
+			promise.then((value) => {
+				if (value instanceof DomainError) throw value;
+				return value as Exclude<T, DomainError>;
+			})
+	});
 
 /**
  * How an action retries a transient failure.
@@ -177,11 +200,11 @@ export type ActionOptions<
 	 */
 	result?: TSchema;
 	/**
-	 * The DomainError classes `handle()` gives, checked against the errors of the class. The static
-	 * `errors` of the class lists them, with those moirai answers with, for the `errors` of the
-	 * routes that run it.
+	 * The DomainError classes `handle()` gives, checked against the errors of the class: `[]` when
+	 * it gives none. The static `errors` of the class lists them, with those moirai answers with,
+	 * for the `errors` of the routes that run it.
 	 */
-	errors?: E;
+	errors: E;
 	/**
 	 * Whether a call needs an idempotency key. A repeat with the same key and input replays the
 	 * stored response; with another input, it is refused with a 422 problem. Defaults to `false`.
@@ -231,11 +254,11 @@ export type QueryOptions<
 	 */
 	result?: TSchema;
 	/**
-	 * The DomainError classes `handle()` gives, checked against the errors of the class. The static
-	 * `errors` of the class lists them, with those moirai answers with, for the `errors` of the
-	 * routes that run it.
+	 * The DomainError classes `handle()` gives, checked against the errors of the class: `[]` when
+	 * it gives none. The static `errors` of the class lists them, with those moirai answers with,
+	 * for the `errors` of the routes that run it.
 	 */
-	errors?: E;
+	errors: E;
 	/** Decides whether the call may run. */
 	authorize?: (input: Static<S>) => boolean | Promise<boolean>;
 };
@@ -420,13 +443,41 @@ export namespace Moirai {
 	export const execute = <C extends ActionClass>(
 		action: C,
 		...[input, call = {}]: ExecuteArgs<C>
-	): Promise<ActionOutcome<C>> =>
-		settle(() => {
-			const props = Metadata.get(ACTION, action) as (ActionOptions & { name: string }) | undefined;
-			if (!props) throw new TypeError(`${action.name} is not marked with @Action.register().`);
-			// The action runs in its module, so that it uses the stores of that module.
-			return inOwnerModule(action, () => run(action, props, input, call));
-		}) as Promise<ActionOutcome<C>>;
+	): Outcome<ActionOutcome<C>> =>
+		outcome(
+			settle(() => {
+				const props = Metadata.get(ACTION, action) as
+					(ActionOptions & { name: string }) | undefined;
+				if (!props) throw new TypeError(`${action.name} is not marked with @Action.register().`);
+				// The action runs in its module, so that it uses the stores of that module.
+				return inOwnerModule(action, () => run(action, props, input, call));
+			}) as Promise<ActionOutcome<C>>
+		);
+
+	/**
+	 * Serializes the work that shares a key, from inside a handler, for a key known only once the
+	 * handler has read something (`serializeBy` takes it from the input). It waits for the other
+	 * holders of the key and holds it until the unit of work ends, with the action lock of the
+	 * module (`PgAdvisoryLock` takes a transaction-scoped advisory lock).
+	 *
+	 * Take the locks of one unit of work in the same order everywhere, and do not take a key twice
+	 * in one unit of work with `MemoryActionLock`, which is not reentrant.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param key The key, such as `wallet:${walletId}`.
+	 * @throws {LockOutsideUnitOfWorkError} Outside a unit of work.
+	 * @example
+	 * ```ts
+	 * const topUp = await this.topUps.find(input.topUpId);
+	 * await Moirai.lock(`wallet:${topUp.walletId}`);
+	 * ```
+	 */
+	export const lock = async (key: string): Promise<void> => {
+		if (!UnitOfWork.active()) throw new LockOutsideUnitOfWorkError(key);
+		const release = await actionLock().lock(key);
+		if (!release) return;
+		await UnitOfWork.afterCommit(release);
+		UnitOfWork.afterRollback(release);
+	};
 
 	/**
 	 * The stores and options of a module, as private services to list in its `services`. The
@@ -535,16 +586,29 @@ export namespace Moirai {
 	export const ask = <C extends QueryClass>(
 		query: C,
 		...[input]: AskArgs<C>
-	): Promise<QueryOutcome<C>> =>
-		settle(async () => {
-			const props = Metadata.get(QUERY, query) as (QueryOptions & { name: string }) | undefined;
-			if (!props) throw new TypeError(`${query.name} is not marked with @Query.register().`);
-			// The query runs in its module, so that it uses the services of that module.
-			return inOwnerModule(query, async () => {
-				const value = validate(props.input, input, props.name);
-				if (props.authorize && !(await props.authorize(value)))
-					throw new CallForbiddenError(props.name);
-				return instanceOf(query).handle(value, { name: props.name, attempt: 1 });
-			});
-		}) as Promise<QueryOutcome<C>>;
+	): Outcome<QueryOutcome<C>> =>
+		outcome(
+			settle(async () => {
+				const props = Metadata.get(QUERY, query) as (QueryOptions & { name: string }) | undefined;
+				if (!props) throw new TypeError(`${query.name} is not marked with @Query.register().`);
+				// The query runs in its module, so that it uses the services of that module.
+				return inOwnerModule(query, async () => {
+					const value = validate(props.input, input, props.name);
+					if (props.authorize && !(await props.authorize(value)))
+						throw new CallForbiddenError(props.name);
+					return instanceOf(query).handle(value, { name: props.name, attempt: 1 });
+				});
+			}) as Promise<QueryOutcome<C>>
+		);
+
+	/**
+	 * The DomainErrors the handler of an action or a query gives, without those of moirai itself
+	 * (invalid input, refused call, idempotency keys), for a caller that passes them on.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @example
+	 * ```ts
+	 * type ProfileEffectError = Moirai.ErrorsOf<typeof UnblockCreatorProfile>;
+	 * ```
+	 */
+	export type ErrorsOf<C extends HandlerClass> = Extract<OutcomeOf<C>, DomainError>;
 }

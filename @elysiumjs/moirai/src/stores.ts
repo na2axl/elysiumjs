@@ -120,6 +120,12 @@ export interface OutboxStore {
 		id: string,
 		update: { attempts: number; lastError: string; deadAt: Date }
 	): Promise<void>;
+	/**
+	 * Replaces the payload of a row, such as to drop a secret once it was sent. Called in the unit
+	 * of work that marks the row dispatched. Optional: a store without it refuses
+	 * `context.replacePayload()` in a handler.
+	 */
+	replacePayload?(id: string, payload: unknown): Promise<void>;
 }
 
 /**
@@ -224,6 +230,10 @@ export class MemoryOutboxStore implements OutboxStore {
 		update: { attempts: number; lastError: string; deadAt: Date }
 	): Promise<void> {
 		this.#update(id, update);
+	}
+
+	public async replacePayload(id: string, payload: unknown): Promise<void> {
+		this.#update(id, { payload });
 	}
 
 	#update(id: string, update: Partial<OutboxRow>): void {

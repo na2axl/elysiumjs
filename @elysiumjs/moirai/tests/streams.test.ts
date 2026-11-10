@@ -437,7 +437,7 @@ describe('Streams.act', () => {
 		};
 		let attempts = 0;
 
-		@Action.register({ name: 'wallet.spend' })
+		@Action.register({ errors: [InsufficientKlaps], name: 'wallet.spend' })
 		class SpendAction extends Action<undefined, bigint> {
 			override async handle() {
 				attempts++;
