@@ -683,18 +683,3 @@ export namespace Listing {
 	export const itemSchemaOf = (schema: TSchema): TSchema | undefined =>
 		(schema as { properties?: { data?: { items?: TSchema } } }).properties?.data?.items;
 }
-
-/**
- * An alias of {@link Listing}.
- * @deprecated Use `Listing`: `Query` is also the name of the queries of `@elysiumjs/moirai`.
- */
-export const Query = Listing;
-
-/**
- * An alias of {@link Listing}.
- * @deprecated Use `Listing`.
- */
-export namespace Query {
-	/** @deprecated Use `Listing.Params`. */
-	export type Params<TSpec> = Listing.Params<TSpec>;
-}

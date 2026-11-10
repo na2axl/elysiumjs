@@ -19,7 +19,7 @@ import { DomainError } from '@elysiumjs/core';
 import { describe, expect, expectTypeOf, it } from 'bun:test';
 
 import { createSchemaFromModel } from '../src/model';
-import { Listing, Query } from '../src/query';
+import { Listing } from '../src/query';
 
 const columns: ColumnMetadata[] = [
 	{ name: 'id', dataType: 'number', nullable: false, hasDefault: true, isPrimaryKey: true },
@@ -358,10 +358,6 @@ describe('pages', () => {
 			(row): row is string => typeof row === 'string'
 		);
 		expectTypeOf(typed.data).toEqualTypeOf<string[]>();
-	});
-
-	it('keeps Query as an alias of Listing', () => {
-		expect(Query).toBe(Listing);
 	});
 
 	it('tags the schemas of pages with their pagination, and gives the schema of a row', () => {

@@ -48,8 +48,7 @@ export {
 	type QueryParams,
 	type QuerySchemaProperties,
 	type QuerySpec,
-	Listing,
-	Query
+	Listing
 } from './query';
 
 export * from './tenancy';
