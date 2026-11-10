@@ -1,0 +1,14 @@
+
+    /**
+     * Whether the request should be authorized before validation.
+     *
+     * If the request is not authorized, the validation will be skipped.
+     *
+     * Return a `DomainError` to answer it instead of a 401.
+     *
+     * @param ctx The request context.
+     * @returns Whether the request is authorized, or the error to answer.
+     */
+    public static authorize(ctx: Context<{request_name}>): Promise<boolean | DomainError> {
+        return Promise.resolve(true);
+    }

@@ -16,11 +16,11 @@ import type { PromptObject } from 'prompts';
 
 import { Command, CommandArgumentType } from '@elysiumjs/core';
 import prompts from 'prompts';
-import { snake } from 'radash';
 import formatter from 'string-template';
 
 import { readAsset } from '../assets';
 import { getModulePath, parseProjectConfig } from '../config';
+import { fileName } from '../utils';
 import { BaseCommand } from './base.command';
 
 /**
@@ -44,6 +44,20 @@ export class MakeValidatorCommand extends BaseCommand {
 	})
 	private module?: string;
 
+	@Command.arg({
+		description: 'Adds an authorize() method, checked before the schema',
+		type: CommandArgumentType.BOOLEAN,
+		default: false
+	})
+	private authorize: boolean = false;
+
+	@Command.arg({
+		description: 'Adds a validate() method, for checks the schema cannot express',
+		type: CommandArgumentType.BOOLEAN,
+		default: false
+	})
+	private validate: boolean = false;
+
 	public async run(): Promise<void> {
 		if (!this.name) {
 			return this.setup();
@@ -53,7 +67,8 @@ export class MakeValidatorCommand extends BaseCommand {
 
 		const answers: Record<string, any> = {
 			module: this.module,
-			name: this.name
+			name: this.name,
+			methods: [...(this.authorize ? ['authorize'] : []), ...(this.validate ? ['validate'] : [])]
 		};
 
 		if (!answers.module && !config.mono) {
@@ -102,6 +117,24 @@ export class MakeValidatorCommand extends BaseCommand {
 
 					return true;
 				}
+			},
+			{
+				type: 'multiselect',
+				name: 'methods',
+				message: 'Methods besides the schema:',
+				instructions: false,
+				choices: [
+					{
+						title: 'authorize',
+						value: 'authorize',
+						description: 'Whether the request may be handled, checked before the schema.'
+					},
+					{
+						title: 'validate',
+						value: 'validate',
+						description: 'Checks that the schema cannot express.'
+					}
+				]
 			}
 		];
 
@@ -129,16 +162,24 @@ export class MakeValidatorCommand extends BaseCommand {
 			answers.request_name = answers.name.replace('Validator', 'Request');
 		}
 
-		// Get stub file
-		const stubText = await readAsset('stubs/validator.stub');
+		// The schema is all most validators need: the methods are added only when asked for.
+		const methods: string[] = answers.methods ?? [];
+		let body = '';
+		for (const method of ['authorize', 'validate']) {
+			if (methods.includes(method)) body += await readAsset(`stubs/validator.${method}.stub`);
+		}
 
-		// Format the stub content
-		const stub = formatter(stubText, answers);
+		const stubText = await readAsset('stubs/validator.stub');
+		const stub = formatter(stubText, {
+			...answers,
+			core_types: methods.length > 0 ? 'Context, DomainError, Static' : 'Static',
+			methods: formatter(body, answers)
+		});
 
 		const path = answers.module ? await getModulePath(answers.module) : './src';
 
 		// Write to file
-		const name = snake(answers.name.replace('Validator', ''));
+		const name = fileName(answers.name.replace('Validator', ''));
 		const file = Bun.file(`${path}/validators/${name}.validator.ts`);
 		await file.write(stub);
 

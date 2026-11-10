@@ -16,11 +16,12 @@ import type { PromptObject } from 'prompts';
 
 import { Command, CommandArgumentType } from '@elysiumjs/core';
 import prompts from 'prompts';
-import { pascal, snake, trim } from 'radash';
+import { pascal, trim } from 'radash';
 import formatter from 'string-template';
 
 import { readAsset } from '../assets';
 import { getModulePath, parseProjectConfig } from '../config';
+import { fileName } from '../utils';
 import { BaseCommand } from './base.command';
 
 /**
@@ -150,6 +151,7 @@ export class MakeModelCommand extends BaseCommand {
 				type: 'select',
 				name: 'supportTenancy',
 				message: 'Support Tenancy:',
+				initial: 1,
 				choices: [
 					{
 						title: 'Yes',
@@ -186,6 +188,10 @@ export class MakeModelCommand extends BaseCommand {
 		}
 
 		answers.canonicalName = answers.name.replace('Model', '');
+		// A model is not tenant-scoped by default, so the line is written only when it is.
+		answers.class_body = answers.supportTenancy
+			? '{\n\tpublic static readonly supportTenancy = true;\n}'
+			: '{}';
 
 		// Get stub file
 		const stubText = await readAsset('stubs/model.stub');
@@ -196,7 +202,7 @@ export class MakeModelCommand extends BaseCommand {
 		const path = answers.module ? await getModulePath(answers.module) : './src';
 
 		// Write to file
-		const name = snake(answers.name.replace('Model', ''));
+		const name = fileName(answers.name.replace('Model', ''));
 		const file = Bun.file(`${path}/models/${name}.model.ts`);
 		await file.write(stub);
 

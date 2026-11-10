@@ -5,9 +5,7 @@ export const {canonicalName}Table = pgTable('{table}', {
 	id: uuid().primaryKey().defaultRandom(),
 });
 
-export class {name} extends DrizzleModel({canonicalName}Table) {
-	public static readonly supportTenancy = {supportTenancy};
-}
+export class {name} extends DrizzleModel({canonicalName}Table) {class_body}
 
 export type {canonicalName} = typeof {name}.$inferSelect;
 export type {canonicalName}Insert = typeof {name}.$inferInsert;

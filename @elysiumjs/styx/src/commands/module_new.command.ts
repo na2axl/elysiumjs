@@ -17,10 +17,9 @@ import { join } from 'node:path';
 
 import { Command, CommandArgumentType } from '@elysiumjs/core';
 import prompts from 'prompts';
-import { snake } from 'radash';
 
 import { parseProjectConfig } from '../config';
-import { createModule, getProjectPath } from '../utils';
+import { createModule, fileName, getProjectPath } from '../utils';
 import { BaseCommand } from './base.command';
 
 /**
@@ -61,7 +60,7 @@ export class ModuleNewCommand extends BaseCommand {
 				}
 			);
 
-			this.name = snake(name.name);
+			this.name = fileName(name.name);
 		}
 
 		// 2. If mono-module, prompt for conversion and current module name
@@ -92,7 +91,7 @@ export class ModuleNewCommand extends BaseCommand {
 
 			if (!convert) return this.error('Operation cancelled. The project is left unchanged.');
 
-			this.module = snake(module as string);
+			this.module = fileName(module as string);
 			this.convert = convert;
 		}
 
