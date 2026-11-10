@@ -14,10 +14,12 @@
 
 import type {
 	DomainError,
+	Failed,
 	HttpRouteDescription,
 	HttpRouteTypeRef,
 	HttpRouteTypes,
-	HttpRouteTypesContributor
+	HttpRouteTypesContributor,
+	Passed
 } from '@elysiumjs/core';
 import type { FlowAdvance, FlowRefusal } from './flow';
 
@@ -49,13 +51,17 @@ export type FlowStatus = {
 	answer: unknown;
 };
 
+/** What a step gives: the value of a passed `Result`, nothing for a failed one. */
+type Given<R> = R extends Passed<infer T> ? T : R extends Failed<any> ? never : R;
+
 /**
  * The answer of a step, from what its method returns: the `answer` of {@link Flow.advance}, or
- * the value it returns that keeps the state. A refusal and a returned error are problems.
+ * the value it returns that keeps the state, or the value of a passed `Result`. A refusal, a
+ * returned error and a failed `Result` are problems.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export type FlowAnswer<R> =
-	Exclude<Awaited<R>, FlowRefusal<any> | DomainError> extends infer V
+	Exclude<Given<Awaited<R>>, FlowRefusal<any> | DomainError> extends infer V
 		? V extends FlowAdvance<any, infer A>
 			? A
 			: V extends undefined | void

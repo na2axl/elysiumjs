@@ -17,11 +17,13 @@ import type { FlowAnswer, FlowContext, FlowStore } from '../src';
 
 import {
 	Application,
+	AsyncResult,
 	BadRequestError,
 	ConflictError,
 	Environments,
 	Http,
 	Module,
+	Result,
 	Service,
 	t
 } from '@elysiumjs/core';
@@ -151,7 +153,26 @@ class ClaimsFlow {
 	}
 }
 
-@Module.register({ controllers: [SignUpFlow, ProfileFlow, PlanFlow, PinFlow, ClaimsFlow] })
+let quoteTtl = 120;
+
+@Flow.controller('quote', { ttl: () => quoteTtl, owner: 'guest' })
+class QuoteFlow {
+	@Flow.step({ next: ['confirm'] })
+	public price(@Http.body(t.Object({ amount: t.Number() })) { amount }: { amount: number }) {
+		return amount > 0
+			? Result.pass(Flow.advance({ amount }, { amount }))
+			: Result.fail(new ConflictError('The amount must be positive.'));
+	}
+
+	@Flow.step()
+	public async confirm(@Flow.state() state: { amount: number }) {
+		return AsyncResult.from(Promise.resolve(Result.pass({ confirmed: state.amount })));
+	}
+}
+
+@Module.register({
+	controllers: [SignUpFlow, ProfileFlow, PlanFlow, PinFlow, ClaimsFlow, QuoteFlow]
+})
 class FlowsModule extends Module {}
 
 const makeApp = (store: FlowStore, openapi: false | object = false) => {
@@ -206,6 +227,8 @@ describe('Flow.controller', () => {
 		expect(() => declare(base, false)).toThrow(InvalidFlowError);
 		expect(() => declare({ ...base, name: 'Bad Name' })).toThrow('kebab-case');
 		expect(() => declare({ ...base, ttl: 0 })).toThrow('positive ttl');
+		// A ttl given as a function is read when the flow runs.
+		expect(() => declare({ ...base, ttl: () => 0 })).toThrow('unknown steps: y');
 		expect(() => declare({ ...base, start: ['x'] })).toThrow('unknown steps: x, y');
 	});
 });
@@ -450,6 +473,80 @@ describe('flows over HTTP', () => {
 			flow: 'profile',
 			step: 'name'
 		});
+	});
+});
+
+describe('steps giving a Result, and a ttl read at run time', () => {
+	let testing: TestingHttpApp | undefined;
+
+	afterEach(async () => {
+		await testing?.shutdown();
+		testing = undefined;
+		quoteTtl = 120;
+	});
+
+	class TtlStore extends MemoryFlowStore {
+		public readonly ttls: number[] = [];
+		public override init(key: string, owner: string, ttlSeconds: number) {
+			this.ttls.push(ttlSeconds);
+			return super.init(key, owner, ttlSeconds);
+		}
+	}
+
+	const quote = async (store: FlowStore) => {
+		testing = await Application.testing({ app: makeApp(store) });
+		const http = testing.http;
+		const started = await http.post('/flows/quote');
+		const { flowKey, owner } = await started.json();
+		const step = (name: string, stepId: string, body: object = {}) =>
+			http
+				.post(`/flows/quote/${name}`)
+				.header(FLOW_OWNER_HEADER, owner)
+				.header(FLOW_KEY_HEADER, flowKey)
+				.header(FLOW_STEP_HEADER, stepId)
+				.json(body);
+		return { http, started, step };
+	};
+
+	it('answers the value of a passed Result, and refuses the step on a failed one', async () => {
+		const { step } = await quote(new MemoryFlowStore());
+
+		const refused = await step('price', 's1', { amount: 0 });
+		expect(refused.status).toBe(409);
+		expect((await refused.json()).detail).toBe('The amount must be positive.');
+
+		const priced = await step('price', 's2', { amount: 5 });
+		expect(await priced.json()).toEqual({
+			answer: { amount: 5 },
+			nextSteps: ['confirm'],
+			backSteps: []
+		});
+		expect(await (await step('confirm', 's3')).json()).toEqual({
+			answer: { confirmed: 5 },
+			nextSteps: [],
+			backSteps: []
+		});
+	});
+
+	it('reads a ttl given as a function each time a flow starts, and refuses a bad one', async () => {
+		const store = new TtlStore();
+		const { http } = await quote(store);
+		quoteTtl = 30;
+		expect((await http.post('/flows/quote')).status).toBe(201);
+		expect(store.ttls).toEqual([120, 30]);
+
+		quoteTtl = 0;
+		expect((await http.post('/flows/quote')).status).toBe(500);
+		expect(store.ttls).toEqual([120, 30]);
+	});
+
+	it('types the answer of a step that gives a Result', () => {
+		expectTypeOf<FlowAnswer<ReturnType<QuoteFlow['price']>>>().toEqualTypeOf<{
+			amount: number;
+		}>();
+		expectTypeOf<FlowAnswer<ReturnType<QuoteFlow['confirm']>>>().toEqualTypeOf<{
+			confirmed: number;
+		}>();
 	});
 });
 

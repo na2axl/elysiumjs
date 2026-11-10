@@ -98,8 +98,11 @@ export type FlowRefusal<S> = {
 export type FlowControllerOptions = Omit<HttpControllerProps, 'path'> & {
 	/** The path of the flow's routes. Defaults to `/flows/{name}`. */
 	path?: string;
-	/** How long the flow lives after its last step, in seconds. */
-	ttl: number;
+	/**
+	 * How long the flow lives after its last step, in seconds, or a function that gives it, read
+	 * each time a flow starts or a step is committed (for example from the configuration).
+	 */
+	ttl: number | (() => number);
 	/** `user`: owned by the signed-in user. `guest`: owned by a token answered at start. */
 	owner: 'guest' | 'user';
 	/** The steps accepted first. Defaults to the first declared step. */
@@ -147,7 +150,7 @@ export type FlowStepDescription = {
  */
 export type FlowDescription = {
 	name: string;
-	ttl: number;
+	ttl: number | (() => number);
 	owner: 'guest' | 'user';
 	start: string[];
 	steps: Map<string, FlowStepDescription>;
@@ -199,7 +202,9 @@ export namespace Flow {
 			if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(name)) {
 				throw new InvalidFlowError(name, 'needs a kebab-case name');
 			}
-			if (!(ttl > 0)) throw new InvalidFlowError(name, 'needs a positive ttl');
+			if (typeof ttl !== 'function' && !(ttl > 0)) {
+				throw new InvalidFlowError(name, 'needs a positive ttl');
+			}
 			const steps: Map<string, FlowStepDescription> =
 				Metadata.get(STEPS, target.prototype) ?? new Map();
 			if (steps.size === 0) throw new InvalidFlowError(name, 'has no steps');
