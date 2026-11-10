@@ -17,6 +17,7 @@ import type { Static, TSchema } from 'typebox';
 import type { MoiraiStores } from './moirai.module';
 
 import {
+	Clock,
 	currentUserId,
 	DATABASE_TRANSACTION_SERVICE,
 	DomainError,
@@ -497,7 +498,7 @@ export namespace Moirai {
 					requestHash: hash,
 					// Kept as JSON, which is what a replay answers.
 					response: response === undefined ? null : JSON.parse(JSON.stringify(response)),
-					createdAt: new Date()
+					createdAt: Clock.now()
 				});
 				return response;
 			} finally {

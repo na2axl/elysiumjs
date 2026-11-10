@@ -14,6 +14,8 @@
 
 import type { Secret } from './secret';
 
+import { Clock } from '@elysiumjs/core';
+
 import { hmac, randomBytes, safeEqual, sha256 } from './crypto';
 import { resolveSecret } from './secret';
 
@@ -137,7 +139,11 @@ export namespace Totp {
 		options: TotpOptions & { time?: number } = {}
 	): Promise<string> => {
 		const config = defaults(options);
-		return hotp(secret, Math.floor((options.time ?? Date.now()) / 1000 / config.period), config);
+		return hotp(
+			secret,
+			Math.floor((options.time ?? Clock.epochMs()) / 1000 / config.period),
+			config
+		);
 	};
 
 	/**
@@ -157,7 +163,7 @@ export namespace Totp {
 		const config = defaults(options);
 		const typed = code.replace(/\s/g, '');
 		if (!/^\d+$/.test(typed) || typed.length !== config.digits) return null;
-		const current = Math.floor((options.time ?? Date.now()) / 1000 / config.period);
+		const current = Math.floor((options.time ?? Clock.epochMs()) / 1000 / config.period);
 		const window = options.window ?? 1;
 		let found: number | null = null;
 		for (let step = -window; step <= window; step++) {
