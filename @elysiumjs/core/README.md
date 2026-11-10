@@ -201,6 +201,23 @@ Env.get('PROT'); // compile error: not declared
 - In an app with a schema, reading `Env` before the environment is validated throws `EnvironmentNotReadyError`. Read it in `onInit`, a service, or a `with()` factory.
 - The runtime's `env()` stays the raw environment, before validation.
 
+## Time
+
+Code that decides on time, such as expiries, schedules and the instants it records, reads it from `Clock` instead of `new Date()`. Moirai, Heracles schedules and Themis tokens, sessions and signed URLs do. Tests and development can then freeze it or move it:
+
+```ts
+import { Clock } from '@elysiumjs/core';
+
+Clock.now(); // a Date
+Clock.epochMs(); // milliseconds since the epoch
+
+Clock.freeze('2026-01-01T00:00:00Z');
+Clock.travel(14 * 24 * 3600 * 1000); // 14 days later, frozen or running
+Clock.reset();
+```
+
+`freeze()` and `travel()` throw `ClockAdjustmentRefusedError` outside `development` and `test`. `Clock.use(source)` takes the time from another `ClockSource`. Durations that only measure the machine, such as request timings and locks, keep the real time.
+
 ## Services
 
 A service is identified by its class. Give it a name with `@Service.register({ name })` to look it up by that string instead. Class names are never used as identifiers, so services resolve the same way after a bundler renames classes (`bun run check:minified` builds a minified app and checks it).

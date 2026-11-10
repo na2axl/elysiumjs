@@ -15,7 +15,7 @@
 import type { CryptoKey, JWTPayload, KeyObject } from 'jose';
 import type { Secret } from './secret';
 
-import { DomainError } from '@elysiumjs/core';
+import { Clock, DomainError } from '@elysiumjs/core';
 import { jwtVerify, SignJWT } from 'jose';
 
 import { utf8 } from './crypto';
@@ -42,8 +42,9 @@ export type JwtSignOptions = JwtKey & {
 	/** The subject, usually the user id. */
 	subject?: string;
 	/**
-	 * When the token is issued, which `expiresIn` counts from. Defaults to now. With it, a string
-	 * `expiresIn` takes the units s, m, h, d and w, such as `15m`.
+	 * When the token is issued, which `expiresIn` counts from. Defaults to `Clock.now()`. With it, or
+	 * with a frozen or moved clock, a string `expiresIn` takes the units s, m, h, d and w, such as
+	 * `15m`.
 	 */
 	issuedAt?: Date;
 };
@@ -62,7 +63,7 @@ export type JwtVerifyOptions = (JwtKey | { keys: readonly JwtKey[] }) & {
 	 * which would never expire, is refused; pass `[]` to accept one.
 	 */
 	requiredClaims?: readonly string[];
-	/** The time the token's expiry and not-before are checked against. Defaults to now. */
+	/** The time the token's expiry and not-before are checked against. Defaults to `Clock.now()`. */
 	currentDate?: Date;
 };
 
@@ -128,17 +129,18 @@ export namespace Jwt {
 	 */
 	export const sign = async (claims: JWTPayload, options: JwtSignOptions): Promise<string> => {
 		const { key, algorithm } = await keyOf(options);
-		const issuedAt = Math.floor((options.issuedAt?.getTime() ?? Date.now()) / 1000);
+		const issuedAt = Math.floor((options.issuedAt?.getTime() ?? Clock.epochMs()) / 1000);
 		let jwt = new SignJWT(claims)
 			.setProtectedHeader({ alg: algorithm, typ: 'JWT' })
 			.setIssuedAt(issuedAt);
 		if (options.expiresIn !== undefined) {
 			const { expiresIn } = options;
-			// jose counts a string lifetime from now; from another issue time, it is converted here.
+			// jose counts a string lifetime from the machine's time; from another issue time, or with a
+			// frozen or moved clock, it is converted here.
 			jwt = jwt.setExpirationTime(
 				typeof expiresIn === 'number'
 					? issuedAt + expiresIn
-					: options.issuedAt
+					: options.issuedAt || Clock.isAdjusted()
 						? issuedAt + secondsOf(expiresIn)
 						: expiresIn
 			);
@@ -182,7 +184,7 @@ export namespace Jwt {
 					audience: options.audience,
 					clockTolerance: options.clockTolerance ?? 5,
 					requiredClaims: [...(options.requiredClaims ?? ['exp'])],
-					currentDate: options.currentDate
+					currentDate: options.currentDate ?? Clock.now()
 				});
 				return payload as T;
 			} catch (error) {

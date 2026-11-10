@@ -14,7 +14,7 @@
 
 import type { StoredEvent, StoredEventClass, StoredEventMeta } from './stored-event';
 
-import { DATABASE_TRANSACTION_SERVICE, Service } from '@elysiumjs/core';
+import { Clock, DATABASE_TRANSACTION_SERVICE, Service } from '@elysiumjs/core';
 import { UnitOfWork } from '@elysiumjs/mnemosyne';
 
 import { eventStore, inOwnerModule, projectionStorage } from './config';
@@ -197,7 +197,7 @@ export namespace Projection {
 				aggregateId: 'aggregate',
 				aggregateType: 'aggregate',
 				version: 1,
-				occurredAt: new Date(),
+				occurredAt: Clock.now(),
 				metadata: {},
 				replay: false,
 				...meta

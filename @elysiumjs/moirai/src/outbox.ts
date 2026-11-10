@@ -15,7 +15,13 @@
 import type { ModuleNode } from '@elysiumjs/core';
 import type { OutboxEffect, OutboxRow } from './stores';
 
-import { DATABASE_TRANSACTION_SERVICE, getLogger, ModuleContext, Service } from '@elysiumjs/core';
+import {
+	Clock,
+	DATABASE_TRANSACTION_SERVICE,
+	getLogger,
+	ModuleContext,
+	Service
+} from '@elysiumjs/core';
 import { UnitOfWork } from '@elysiumjs/mnemosyne';
 
 import { inboxStore, MOIRAI_OUTBOX_STORE, options, outboxStore } from './config';
@@ -129,9 +135,10 @@ export namespace Outbox {
 	 */
 	export const enqueue = async (...effects: OutboxEffect[]): Promise<string[]> => {
 		if (effects.length === 0) return [];
-		const now = new Date();
+		const now = Clock.now();
 		const rows: OutboxRow[] = effects.map((effect) => ({
-			id: uuidv7(now.getTime()),
+			// Ids keep the real time, so that they stay ordered when the clock is moved.
+			id: uuidv7(),
 			kind: effect.kind,
 			payload: structuredClone(effect.payload),
 			createdAt: now,
@@ -179,7 +186,7 @@ export namespace Outbox {
 		const config = options();
 		const store = outboxStore();
 		const summary: RelaySummary = { dispatched: 0, retried: 0, dead: 0 };
-		const now = new Date();
+		const now = Clock.now();
 		const rows = await inUnitOfWork(() =>
 			store.claimDue({
 				now,
@@ -195,13 +202,13 @@ export namespace Outbox {
 					const handler = effectHandler(row.kind);
 					if (!handler) throw new UnknownEffectError(row.kind);
 					await handler(row.payload, row);
-					await store.markDispatched(row.id, new Date());
+					await store.markDispatched(row.id, Clock.now());
 				});
 				summary.dispatched++;
 			} catch (cause) {
 				const error = asError(cause);
 				const attempts = row.attempts + 1;
-				const failedAt = new Date();
+				const failedAt = Clock.now();
 				const maxAttempts = ATTEMPTS.get(row.kind)?.(row) ?? config.maxRelayAttempts;
 				if (attempts >= maxAttempts) {
 					await inUnitOfWork(() =>

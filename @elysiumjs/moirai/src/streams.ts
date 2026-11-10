@@ -16,7 +16,7 @@ import type { Aggregate, AggregateClass } from './aggregate';
 import type { StoredEvent, StoredEventClass, StoredEventMeta } from './stored-event';
 import type { StoredEventRecord } from './stores';
 
-import { DATABASE_TRANSACTION_SERVICE, DomainError, Service } from '@elysiumjs/core';
+import { Clock, DATABASE_TRANSACTION_SERVICE, DomainError, Service } from '@elysiumjs/core';
 import { UnitOfWork } from '@elysiumjs/mnemosyne';
 
 import { Aggregates } from './aggregate';
@@ -116,7 +116,7 @@ export namespace Streams {
 			if (recorded.length > 0) {
 				const type = Aggregates.nameOf(aggregate);
 				const from = Aggregates.loadedVersion(loaded);
-				const occurredAt = new Date();
+				const occurredAt = Clock.now();
 				const metadata = { ...options().eventMetadata?.(), ...options_.metadata };
 				const records: StoredEventRecord[] = recorded.map((event, i) => ({
 					...StoredEvents.encode(event),

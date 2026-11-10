@@ -50,6 +50,8 @@ export {
 export { Metadata } from './metadata';
 export { currentUserId, userIdOf } from './user';
 export { currentEnvironment } from './utils';
+export { Clock, ClockAdjustmentRefusedError, SystemClock } from './clock';
+export type { ClockSource } from './clock';
 export { Environments } from './environments';
 export type { Environment } from './environments';
 export { Middleware } from './middleware';
