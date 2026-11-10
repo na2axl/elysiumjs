@@ -705,6 +705,10 @@ export type HttpRouteDescription = {
 	query?: number;
 	/** The method parameters receiving URL parameters. */
 	params: Array<{ slug: string; index: number }>;
+	/** The success status of the route, when it sets one. */
+	status?: number;
+	/** Whether the route declares the schema of its success response. */
+	responds: boolean;
 };
 
 /**
@@ -917,6 +921,13 @@ const moduleFilterLevel = (node: ModuleNode): FilterLevel => {
 	return level;
 };
 
+/** Whether a route response declares a success (2xx) schema. */
+const declaresSuccess = (response: ResponseSchemas | undefined): boolean => {
+	if (response === undefined) return false;
+	if (!isStatusMap(response)) return true;
+	return Object.keys(response).some((status) => Number(status) >= 200 && Number(status) < 300);
+};
+
 export namespace Http {
 	/**
 	 * The tag of the route types contributors, read by `styx routes:generate`. Register a
@@ -976,7 +987,9 @@ export namespace Http {
 					sse,
 					body: route.body?.index,
 					query: route.query?.index,
-					params: route.params.map(({ slug, index }) => ({ slug, index }))
+					params: route.params.map(({ slug, index }) => ({ slug, index })),
+					status: route.status,
+					responds: declaresSuccess(route.response)
 				};
 			})
 		};

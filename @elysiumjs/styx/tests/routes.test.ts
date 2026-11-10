@@ -17,9 +17,10 @@ import type { ModuleRoutes } from '../src/routes/render';
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { Application, Http, Module } from '@elysiumjs/core';
+import { Application, Http, Module, t } from '@elysiumjs/core';
 import { afterAll, describe, expect, it } from 'bun:test';
 
+import { routesWithoutResponse } from '../src/routes/check';
 import { collectRoutes } from '../src/routes/collect';
 import { renderRoutes } from '../src/routes/render';
 import { ContribApp } from './fixtures/contrib-app/src/app';
@@ -49,6 +50,8 @@ describe('collectRoutes', () => {
 								method: 'GET',
 								path: '/:id',
 								sse: false,
+								status: undefined,
+								responds: false,
 								body: undefined,
 								query: undefined,
 								params: [{ slug: 'id', index: 0 }]
@@ -58,6 +61,8 @@ describe('collectRoutes', () => {
 								method: 'POST',
 								path: '/',
 								sse: false,
+								status: undefined,
+								responds: false,
 								body: 0,
 								query: 1,
 								params: []
@@ -251,5 +256,70 @@ describe('route types contributors', () => {
 			output: '',
 			code: 0
 		});
+	});
+});
+
+describe('routesWithoutResponse', () => {
+	it('lists the routes without a success response schema, with their full path', async () => {
+		expect(await routesWithoutResponse(RoutesApp)).toEqual([
+			{
+				module: 'BlogModule',
+				controller: 'PostController',
+				handler: 'show',
+				method: 'GET',
+				path: '/api/posts/:id'
+			},
+			{
+				module: 'BlogModule',
+				controller: 'PostController',
+				handler: 'create',
+				method: 'POST',
+				path: '/api/posts'
+			}
+		]);
+	});
+
+	it('accepts declared responses, and leaves out 204 and server-sent events routes', async () => {
+		@Http.controller('/checked')
+		class CheckedController {
+			@Http.get('/', { response: t.Object({ ok: t.Boolean() }) })
+			public index() {
+				return { ok: true };
+			}
+
+			@Http.post('/', { status: 201, response: { 201: t.Object({ id: t.String() }) } })
+			public create() {
+				return { id: '1' };
+			}
+
+			@Http.put('/', { response: { 409: t.Object({ code: t.String() }) } })
+			public update() {
+				return { code: 'conflict' };
+			}
+
+			@Http.del('/', { status: 204 })
+			public remove() {}
+
+			@Http.sse('/events')
+			public async *events() {
+				yield 'ping';
+			}
+		}
+
+		@Module.register({ controllers: [CheckedController] })
+		class CheckedModule extends Module {}
+
+		@Application.register({ modules: [CheckedModule], openapi: false })
+		class CheckedApp extends Application {}
+
+		expect(await routesWithoutResponse(CheckedApp)).toEqual([
+			{
+				module: 'CheckedModule',
+				controller: 'CheckedController',
+				handler: 'update',
+				method: 'PUT',
+				path: '/checked'
+			}
+		]);
 	});
 });

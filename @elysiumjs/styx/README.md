@@ -64,6 +64,8 @@ const { data } = await api.users({ id }).get();
 
 The types come from the controller methods: the parameters decorated with `@Http.param`, `@Http.query` and `@Http.body` give the request types, and the return type gives the response type, so annotate the return type of methods that return different shapes. The file holds types only and is written again by `typecheck` in new projects, so keep it out of git.
 
+`styx routes:check` fails when a route declares no schema for its success response, so that clients and the OpenAPI document know what it returns. Set the `response` option of the route, either one schema or a map of statuses with at least one 2xx status. Server-sent events routes and routes answering 204 are left out. Run it in CI next to `typecheck`.
+
 Every controller the modules of the app list is included, whatever declares it, as long as a file of the project exports it. When a decorator adds routes that are not methods of the class, or answers something else than the method returns, a route types contributor types them: a global service tagged `Http.RouteTypes`, active in development. Flow controllers are typed this way by `AriadneModule`.
 
 ```ts
