@@ -1,5 +1,11 @@
 # @elysiumjs/core
 
+## 0.22.0
+
+### Minor Changes
+
+- [#79](https://github.com/na2axl/elysiumjs/pull/79) [`791048c`](https://github.com/na2axl/elysiumjs/commit/791048ca9eca4c69a8cb199482541fe95327c786) Thanks [@na2axl](https://github.com/na2axl)! - Add `Result` and `AsyncResult`: the outcome of a check or a call, passed with a value or failed with a `DomainError`. They narrow with `check()`, and offer `orThrow()`, `orError()`, `errorOr(transform)`, `map(transform)` and `andThen(next)`. A handler that returns a `Result` or an `AsyncResult` answers its value, or its problem.
+
 ## 0.21.0
 
 ### Minor Changes

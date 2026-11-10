@@ -1,5 +1,18 @@
 # @elysiumjs/moirai
 
+## 0.7.0
+
+### Minor Changes
+
+- [#81](https://github.com/na2axl/elysiumjs/pull/81) [`f2eba2d`](https://github.com/na2axl/elysiumjs/commit/f2eba2d01400fb76a3b4f49642f45a4b692ccf03) Thanks [@na2axl](https://github.com/na2axl)! - `Moirai.execute()` and `Moirai.ask()` give an `Outcome`, the `AsyncResult` of the call: awaited, it is a `Result` that passed with the value of the handler or failed with the DomainError that refused the call. `orThrow()`, `orError()`, `errorOr()`, `map()` and `andThen()` come from `AsyncResult`; `orPass()` gives the result with the DomainErrors of the called handler only. `handle()` may return a `Result`, and `Streams.act()` gives the `AsyncResult` of its command, which may return a `Result` too. `ActionOutcome`, `QueryOutcome` and `ActOutcome` are now `Result` types; `ActionErrors`, `QueryErrors`, `ValueOf` and `ErrorOf` are new.
+
+### Patch Changes
+
+- Updated dependencies [[`791048c`](https://github.com/na2axl/elysiumjs/commit/791048ca9eca4c69a8cb199482541fe95327c786)]:
+  - @elysiumjs/core@0.22.0
+  - @elysiumjs/heracles@0.11.1
+  - @elysiumjs/mnemosyne@0.7.2
+
 ## 0.6.0
 
 ### Minor Changes

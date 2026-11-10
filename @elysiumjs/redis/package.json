@@ -1,6 +1,6 @@
 {
   "name": "@elysiumjs/redis",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "license": "Apache-2.0",
   "description": "Redis connections for the Elysium.js framework.",
   "private": false,

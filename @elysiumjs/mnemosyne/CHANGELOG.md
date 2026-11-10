@@ -1,5 +1,13 @@
 # @elysiumjs/mnemosyne
 
+## 0.7.2
+
+### Patch Changes
+
+- Updated dependencies [[`791048c`](https://github.com/na2axl/elysiumjs/commit/791048ca9eca4c69a8cb199482541fe95327c786)]:
+  - @elysiumjs/core@0.22.0
+  - @elysiumjs/redis@0.1.11
+
 ## 0.7.1
 
 ### Patch Changes
