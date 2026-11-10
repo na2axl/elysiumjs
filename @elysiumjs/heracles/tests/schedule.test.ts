@@ -17,6 +17,7 @@ import type { RedisConnection } from '@elysiumjs/redis';
 import { Redis } from '@elysiumjs/redis';
 import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test';
 
+import { wranglerTriggers } from '../src/commands/crons.command';
 import { Cron, InvalidCronError } from '../src/cron';
 import { Heracles } from '../src/heracles';
 import { Job } from '../src/job';
@@ -196,5 +197,30 @@ describe('Scheduler', () => {
 		};
 		declare();
 		expect(declare).toThrow(DuplicateSchedulerError);
+	});
+});
+
+describe('wranglerTriggers', () => {
+	const config = {
+		triggers: { crons: ['0 0 * * *'] },
+		env: {
+			staging: { vars: {} },
+			production: { triggers: { crons: ['0 0 * * *', '*/5 * * * *'] } }
+		}
+	};
+
+	it('reads the top level and each environment that sets its own triggers', () => {
+		expect(wranglerTriggers(config)).toEqual([
+			{ environment: null, crons: ['0 0 * * *'] },
+			{ environment: 'production', crons: ['0 0 * * *', '*/5 * * * *'] }
+		]);
+	});
+
+	it('reads one environment, which inherits the top level when it sets no triggers', () => {
+		expect(wranglerTriggers(config, 'staging')).toEqual([
+			{ environment: 'staging', crons: ['0 0 * * *'] }
+		]);
+		expect(wranglerTriggers(config, 'production')[0]?.crons).toHaveLength(2);
+		expect(() => wranglerTriggers(config, 'preview')).toThrow('no environment "preview"');
 	});
 });

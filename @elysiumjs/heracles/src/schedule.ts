@@ -15,7 +15,15 @@
 import type { CronSchedule } from './cron';
 import type { JobClass } from './job';
 
-import { Clock, ElysiumError, getLogger, Metadata, ModuleContext, Service } from '@elysiumjs/core';
+import {
+	Background,
+	Clock,
+	ElysiumError,
+	getLogger,
+	Metadata,
+	ModuleContext,
+	Service
+} from '@elysiumjs/core';
 import { Redis } from '@elysiumjs/redis';
 
 import { Cron } from './cron';
@@ -248,10 +256,13 @@ export abstract class Scheduler<TJob extends JobClass<any, any> = JobClass<any, 
 		// The scheduler is a service of the module that declares its job: it is made and fans out
 		// there, so that it sees that module's services, whoever dispatches the tick.
 		const module = JobRegistry.all().find((entry) => entry.jobClass === jobClass)?.module;
-		const fanOut = async () => {
-			const scheduler = (Service.exists(owner) ? Service.get(owner) : null) ?? Service.make(owner);
-			return scheduler.fanOut(tick);
-		};
+		// It runs in the background scopes of the application, like the jobs it dispatches.
+		const fanOut = () =>
+			Background.run({ kind: 'schedule', name }, async () => {
+				const scheduler =
+					(Service.exists(owner) ? Service.get(owner) : null) ?? Service.make(owner);
+				return scheduler.fanOut(tick);
+			});
 		const cases =
 			module && module !== ModuleContext.current()
 				? await ModuleContext.run(module, fanOut)

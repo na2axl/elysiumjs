@@ -149,7 +149,15 @@ describe('HeraclesModule', () => {
 		expect(JobRegistry.all().map((e) => e.jobClass)).toContain(SendInvoiceJob);
 	});
 
-	it('fans a scheduler out in the module of its job, whoever dispatches the tick', async () => {
+	it('reads the jobs from the module graph without initialising the modules', async () => {
+		app = await Application.testing({ modules: [HeraclesModule, BillingModule], boot: 'lazy' });
+		expect(JobRegistry.all()).toEqual([]);
+		const entry = JobRegistry.collect().get(JOB);
+		expect(entry?.jobClass).toBe(SendInvoiceJob);
+		expect(entry?.module.moduleClass).toBe(BillingModule);
+	});
+
+	it('fans a scheduler out in the module of its job and the background scopes, whoever dispatches the tick', async () => {
 		@Scheduler.register({ cron: '0 7 * * *', job: RemindJob, name: 'daily-reminders' })
 		class DailyReminders extends Scheduler<typeof RemindJob> {
 			constructor(@Service.inject(Secret) private readonly secret: Secret) {
@@ -161,13 +169,14 @@ describe('HeraclesModule', () => {
 			}
 		}
 
-		@Module.register({ services: [Secret, DailyReminders], jobs: [RemindJob] })
+		@Module.register({ services: [Secret, DailyReminders, TraceScope], jobs: [RemindJob] })
 		class RemindersModule extends Module {}
 
 		app = await Application.testing({
 			modules: [HeraclesModule, RemindersModule],
 			boot: 'eager'
 		});
+		scoped.length = 0;
 		const calls: unknown[][] = [];
 		const dispatch = spyOn(Heracles, 'dispatch').mockImplementation(async (...args: unknown[]) => {
 			calls.push(args);
@@ -177,6 +186,7 @@ describe('HeraclesModule', () => {
 		expect(await Scheduler.dispatch(job!, new Date('2026-11-09T07:00:00.000Z'))).toBe(1);
 		dispatch.mockRestore();
 		expect(calls[0]?.[1]).toEqual(['module-private']);
+		expect(scoped).toEqual(['schedule:daily-reminders']);
 		clearSchedulers();
 	});
 

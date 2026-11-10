@@ -12,22 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Kernel } from '@elysiumjs/core';
-import type { Job, JobClass } from './job';
 import type { QueueOptions } from './queue';
-import type { JobRegistryEntry } from './registry';
 
-import { ElysiumError, KERNEL_SERVICE, Module, runAll, Service } from '@elysiumjs/core';
+import { Module, runAll } from '@elysiumjs/core';
 
 import {
 	HeraclesCleanCommand,
+	HeraclesCronsCommand,
 	HeraclesListCommand,
 	HeraclesScheduleCommand,
 	HeraclesWorkCommand
 } from './commands';
 import { Queue } from './queue';
-import { DuplicateJobError, JobRegistry, QUEUES_SERVICE } from './registry';
-import { getJobMetadata } from './utils';
+import { JobRegistry, QUEUES_SERVICE } from './registry';
 
 /**
  * Configuration of the {@link HeraclesModule}.
@@ -71,6 +68,7 @@ export class ConfiguredQueues {
 @Module.register<HeraclesModuleConfig>({
 	commands: [
 		HeraclesCleanCommand,
+		HeraclesCronsCommand,
 		HeraclesListCommand,
 		HeraclesScheduleCommand,
 		HeraclesWorkCommand
@@ -84,26 +82,7 @@ export class HeraclesModule extends Module.configurable<HeraclesModuleConfig>({
 }) {
 	/** Builds the job registry. Queues are created by the {@link ConfiguredQueues} service. */
 	public override onInit(): void {
-		const entries = new Map<string, JobRegistryEntry>();
-		const kernel = Service.get<Kernel>(KERNEL_SERVICE);
-		if (!kernel) {
-			throw new ElysiumError(
-				`HeraclesModule needs the "${KERNEL_SERVICE}" service, which the kernel registers when it boots.`
-			);
-		}
-
-		for (const { item, module } of kernel.graph.collect('jobs')) {
-			const jobClass = item as JobClass<Job>;
-			const metadata = getJobMetadata(jobClass);
-			if (!metadata) continue;
-			const existing = entries.get(metadata.name);
-			if (existing) {
-				throw new DuplicateJobError(metadata.name, [existing.module.id, module.id]);
-			}
-			entries.set(metadata.name, { jobClass, module });
-		}
-
-		JobRegistry.set(entries);
+		JobRegistry.set(JobRegistry.collect());
 	}
 
 	/** Clears the module-level job registry. */
