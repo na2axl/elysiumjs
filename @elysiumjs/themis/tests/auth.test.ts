@@ -91,11 +91,11 @@ class SessionController {
 class MeController {
 	@Http.get()
 	public me() {
-		return { user: Auth.user(), guard: Auth.guard() };
+		return { user: Auth.currentUser(), guard: Auth.guard() };
 	}
 
 	@Http.get('/param')
-	public param(@Auth.currentUser() user: AuthUser) {
+	public param(@Auth.user() user: AuthUser) {
 		return { user, context: Http.currentContext()?.request.url.endsWith('/me/param') };
 	}
 
@@ -133,7 +133,7 @@ class DeviceController {
 	@Http.get()
 	@Auth({ guards: ['device'] })
 	public show() {
-		return { user: Auth.user(), guard: Auth.guard() };
+		return { user: Auth.currentUser(), guard: Auth.guard() };
 	}
 }
 
@@ -141,7 +141,7 @@ class DeviceController {
 class PublicController {
 	@Http.get()
 	@Auth({ optional: true })
-	public show(@Auth.currentUser() user: AuthUser | undefined) {
+	public show(@Auth.user() user: AuthUser | undefined) {
 		return { signedIn: Auth.check(), user: user ?? null };
 	}
 }

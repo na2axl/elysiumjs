@@ -34,7 +34,11 @@ const make = async (): Promise<Application> => {
 	class MeController {
 		@Http.get('/')
 		public me(@Http.context() c: { currentUser: unknown }) {
-			return { user: Auth.user(), same: c.currentUser === Auth.user(), guard: Auth.guard() };
+			return {
+				user: Auth.currentUser(),
+				same: c.currentUser === Auth.currentUser(),
+				guard: Auth.guard()
+			};
 		}
 	}
 

@@ -51,8 +51,10 @@ class App extends Application {}
 ## Auth
 
 ```ts
+import type { AuthUser } from '@elysiumjs/themis';
+
 import { Http } from '@elysiumjs/core';
-import { Auth, type AuthUser } from '@elysiumjs/themis';
+import { Auth } from '@elysiumjs/themis';
 
 declare module '@elysiumjs/themis' {
 	interface AuthUser {
@@ -64,7 +66,7 @@ declare module '@elysiumjs/themis' {
 @Auth()
 class MeController {
 	@Http.get()
-	public me(@Auth.currentUser() user: AuthUser) {
+	public me(@Auth.user() user: AuthUser) {
 		return { id: user.id };
 	}
 
@@ -78,7 +80,7 @@ class MeController {
 
 - `@Auth()` tries the configured guards in order, and `@Auth({ guards })` only the named ones. A guard is an object that implements `Guard`, or a guard class, which is built once through the service container so that its constructor gets services injected. It registers `AuthMiddleware`, so `@Middleware.register(AuthMiddleware.guards(['jwt']))` does the same as `@Auth({ guards: ['jwt'] })`.
 - A request no guard accepts answers a 401 problem. `@Auth({ optional: true })` lets it through, and `Auth.check()` tells whether a user is signed in.
-- The user is available through `@Auth.currentUser()` on a handler parameter, `Auth.user()` and `ctx.currentUser`, so cerberus can read it with `getSubject: (ctx) => ctx.currentUser`. Declare its type once by augmenting the `AuthUser` interface. Behind `@Auth({ optional: true })`, type the parameter `AuthUser | undefined`.
+- The user is available through `@Auth.user()` on a handler parameter, `Auth.currentUser()` and `ctx.currentUser`, so cerberus can read it with `getSubject: (ctx) => ctx.currentUser`. Declare its type once by augmenting the `AuthUser` interface. Behind `@Auth({ optional: true })`, type the parameter `AuthUser | undefined`.
 - `Auth.login(id)` signs a user in on the session (and regenerates it), and `Auth.logout()` signs them out.
 
 ## Sessions

@@ -132,7 +132,7 @@ export const apiKeyGuard = (options: {
 });
 
 /**
- * The user that the guards put in a request, as `Auth.user()` and `@Auth.currentUser()` give it.
+ * The user that the guards put in a request, as `Auth.currentUser()` and `@Auth.user()` give it.
  * It is empty until the app declares it, once, for all its guards.
  * @author Axel Nana <axel.nana@workbud.com>
  * @example
@@ -155,7 +155,7 @@ export interface AuthUser {}
 export type AuthOptions = {
 	/** The guards to try, in order, by their names in ThemisModule. Defaults to all of them. */
 	guards?: string[];
-	/** Lets requests without a user through; `Auth.user()` is then `undefined`. */
+	/** Lets requests without a user through; `Auth.currentUser()` is then `undefined`. */
 	optional?: boolean;
 };
 
@@ -163,7 +163,7 @@ const OPTIONAL = Symbol.for('elysium:themis:auth-optional');
 
 /**
  * Authenticates the requests of a route or a controller with the guards of ThemisModule, and puts
- * the user in the request (`Auth.user()`, and `currentUser` in the context, which cerberus can
+ * the user in the request (`Auth.currentUser()`, and `currentUser` in the context, which cerberus can
  * read with `getSubject: (ctx) => ctx.currentUser`).
  *
  * It tries the guards named with `AuthMiddleware.guards([...])`, in order, or all of them.
@@ -213,9 +213,6 @@ export function Auth(options: AuthOptions = {}): ClassDecorator & MethodDecorato
 }
 
 export namespace Auth {
-	/** The user of the current request, if any. */
-	export const user = <T = AuthUser>(): T | undefined => currentContext()?.[USER] as T | undefined;
-
 	/**
 	 * Sets a handler parameter to the user of the request. Behind `@Auth()` the request always has
 	 * one, so the parameter is typed `AuthUser`; behind `@Auth({ optional: true })`, type it
@@ -226,20 +223,24 @@ export namespace Auth {
 	 * @Auth()
 	 * class MeController {
 	 * 	@Http.get('/')
-	 * 	public show(@Auth.currentUser() user: AuthUser) {
+	 * 	public show(@Auth.user() user: AuthUser) {
 	 * 		return { id: user.id };
 	 * 	}
 	 * }
 	 * ```
 	 */
-	export const currentUser = (): ParameterDecorator =>
+	export const user = (): ParameterDecorator =>
 		Http.decorate((context) => (context as unknown as HttpContext)[USER])();
+
+	/** The user of the current request, if any. */
+	export const currentUser = <T = AuthUser>(): T | undefined =>
+		currentContext()?.[USER] as T | undefined;
 
 	/** The name of the guard that found the user of the current request. */
 	export const guard = (): string | undefined => currentContext()?.[GUARD] as string | undefined;
 
 	/** Whether the current request has a user. */
-	export const check = (): boolean => user() !== undefined;
+	export const check = (): boolean => currentUser() !== undefined;
 
 	/**
 	 * Logs a user in for the session guard: gives the session a new id, against session fixation,
