@@ -430,8 +430,9 @@ export namespace Service {
 	 * when there is none), or `null`. Lazy services are built on first access.
 	 *
 	 * Use it for a service that may be missing, such as an optional integration. For a service
-	 * the code needs, use `Service.resolve()`, which throws a precise error when it is missing,
-	 * instead of checking for `null` and throwing.
+	 * the code needs, use `Service.require()`, or `Service.resolve()` to wait for its
+	 * initialisation: both throw a precise error when it is missing, instead of checking for
+	 * `null` and throwing.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param service The name of the service, or its class.
 	 * @returns The service, or `null` if none with that name/type is visible.
@@ -439,6 +440,24 @@ export namespace Service {
 	 */
 	export const get = <T>(service: ServiceToken | TypedServiceClass<T>): T | null => {
 		return Container.get(nameOf(service)) as T | null;
+	};
+
+	/**
+	 * Retrieves a service the code needs, visible from the current module context, and throws a
+	 * precise error when it is missing. Unlike `Service.resolve()`, it does not wait: the service
+	 * and its module must be initialised, as they are once the application has booted.
+	 * @example
+	 * ```ts
+	 * const settlement = Service.require(SettlementService);
+	 * ```
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param service The name of the service, or its class.
+	 * @returns The service.
+	 * @throws {ServiceNotFoundError | ServiceNotVisibleError | EnvironmentSkippedModuleError}
+	 * @throws {ServiceNotReadyError} If the service, or its module, is still initialising.
+	 */
+	export const require = <T>(service: ServiceToken | TypedServiceClass<T>): T => {
+		return Container.require(nameOf(service), 'Service.require') as T;
 	};
 
 	/**

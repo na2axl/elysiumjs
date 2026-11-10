@@ -300,7 +300,7 @@ Transports.optionsOf(ResendTransport); // { name: 'resend', channel: 'email' }
 
 `Service.invoke(target, method, args)` calls a method whose parameters take services with `@Service.inject()` or `@Service.injectAll()`: each of them receives its service, resolved in the current module context, and the other parameters receive `args` in order.
 
-`Service.get()` answers `null` for a service that is not visible: keep it for optional services, and use `Service.resolve()` for a service the code needs, which throws a precise error when it is missing.
+`Service.get()` answers `null` for a service that is not visible: keep it for optional services. For a service the code needs, use `Service.require()`, which returns it at once, or `Service.resolve()`, which waits for its initialisation: both throw a precise error when it is missing.
 
 ## Background work
 

@@ -641,8 +641,12 @@ export namespace Container {
 		}
 	}
 
-	/** Gets a visible service, throwing rather than returning `null`. */
-	function require(service: ServiceToken, requester: string): any {
+	/**
+	 * Gets a visible service, throwing rather than returning `null`.
+	 * @throws {ServiceNotFoundError | ServiceNotVisibleError | EnvironmentSkippedModuleError | EnvironmentSkippedServiceError}
+	 * @throws {ServiceNotReadyError} If the service or its module is still initialising.
+	 */
+	export function require(service: ServiceToken, requester: string): any {
 		const found = lookup(service, ModuleContext.current());
 		if (!found) throw notFound(service, requester);
 		return entryValue(found.entry);
