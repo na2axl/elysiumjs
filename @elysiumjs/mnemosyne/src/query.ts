@@ -43,7 +43,7 @@ export type QueryFieldType = 'string' | 'number' | 'boolean' | 'date' | 'uuid';
 export type QueryFilterSpec<TOperator extends FilterOperator = FilterOperator> = {
 	/** The operators the field accepts. The first one is used by `filter[field]=value`. */
 	operators: readonly TOperator[];
-	/** The type of the values. Read from the model by {@link Query.define}; `string` otherwise. */
+	/** The type of the values. Read from the model by {@link Listing.define}; `string` otherwise. */
 	type?: QueryFieldType;
 	/** The model property behind the field, when it has another name. */
 	column?: string;
@@ -70,7 +70,7 @@ export type QueryPagination = 'cursor' | 'offset';
  * What clients may filter and sort by, how a page is found, and how many rows it holds.
  *
  * The type parameters keep the names of the filters and the sortable fields and the pagination,
- * so that {@link Query.Params} and {@link Query.schema} can type the query string.
+ * so that {@link Listing.Params} and {@link Listing.schema} can type the query string.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export type QuerySpec<
@@ -90,7 +90,7 @@ export type QuerySpec<
 	limit?: { default?: number; max?: number };
 	/** The model property that identifies rows, the tiebreaker of every sort. Defaults to `id`. */
 	key?: string;
-	/** The types of the model's properties, set by {@link Query.define}. */
+	/** The types of the model's properties, set by {@link Listing.define}. */
 	types?: Record<string, QueryFieldType>;
 	/** The property names of the model, for sortable fields that map to another column. */
 	columns?: Record<string, string>;
@@ -219,7 +219,7 @@ const DEFAULT_MAX_LIMIT = 100;
 /** The JSON Schema keyword that marks the schema of a page, with its pagination. */
 const PAGE_KEYWORD = 'x-elysium-page';
 
-/** The symbol that marks a page built by {@link Query.page} or {@link Query.offsetPage}. */
+/** The symbol that marks a page built by {@link Listing.page} or {@link Listing.offsetPage}. */
 const PAGE = Symbol.for('elysium:mnemosyne:page');
 
 /** Marks a page with its pagination, without adding an enumerable member. */
@@ -284,7 +284,7 @@ const typeOfSchema = (schema: {
 const normalizeFilter = (spec: QueryFilterSpec | readonly FilterOperator[]): QueryFilterSpec =>
 	'operators' in spec ? spec : { operators: spec };
 
-export namespace Query {
+export namespace Listing {
 	/**
 	 * Builds a query spec for a model: the types of the filtered and sorted fields are read from
 	 * the model's select schema.
@@ -293,7 +293,7 @@ export namespace Query {
 	 * @param spec The filters, sorts and page size.
 	 * @example
 	 * ```ts
-	 * const PostQuery = Query.define(Post, {
+	 * const PostQuery = Listing.define(Post, {
 	 *   filters: { status: ['eq', 'in'], createdAt: ['gte', 'lte'], title: ['contains'] },
 	 *   sort: ['createdAt', 'title'],
 	 *   defaultSort: '-createdAt'
@@ -338,8 +338,8 @@ export namespace Query {
 	 * @example
 	 * ```ts
 	 * @Http.get('/posts')
-	 * list(@Http.query(Query.schema(PostQuery)) query: Query.Params<typeof PostQuery>) {
-	 *   return this.posts.list(Query.parse(PostQuery, query));
+	 * list(@Http.query(Listing.schema(PostQuery)) query: Listing.Params<typeof PostQuery>) {
+	 *   return this.posts.list(Listing.parse(PostQuery, query));
 	 * }
 	 * ```
 	 */
@@ -347,7 +347,7 @@ export namespace Query {
 
 	/**
 	 * The query schema of a spec, for `@Http.query()`: it documents the filters, `sort`, `cursor`
-	 * (or `page` for offset pagination), `limit` and `fields` parameters in OpenAPI. Its static type is {@link Query.Params}, and other
+	 * (or `page` for offset pagination), `limit` and `fields` parameters in OpenAPI. Its static type is {@link Listing.Params}, and other
 	 * parameters are let through.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param spec The query spec.
@@ -603,6 +603,29 @@ export namespace Query {
 	export function mapPage<T, U>(page: Page<T>, map: (row: T) => U): Page<U>;
 	export function mapPage<T, U>(page: Page<T>, map: (row: T) => U): Page<U> {
 		return brand({ ...page, data: page.data.map(map) }, paginationOf(page));
+	}
+
+	/**
+	 * Keeps the rows of a page that pass a predicate, such as the rows the caller may see. The
+	 * cursor, or the page and the total, stay those of the page as listed.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param page The page.
+	 * @param keep Whether a row stays.
+	 */
+	export function filterPage<T, S extends T>(
+		page: CursorPage<T>,
+		keep: (row: T) => row is S
+	): CursorPage<S>;
+	export function filterPage<T, S extends T>(
+		page: OffsetPage<T>,
+		keep: (row: T) => row is S
+	): OffsetPage<S>;
+	export function filterPage<T, S extends T>(page: Page<T>, keep: (row: T) => row is S): Page<S>;
+	export function filterPage<T>(page: CursorPage<T>, keep: (row: T) => boolean): CursorPage<T>;
+	export function filterPage<T>(page: OffsetPage<T>, keep: (row: T) => boolean): OffsetPage<T>;
+	export function filterPage<T>(page: Page<T>, keep: (row: T) => boolean): Page<T>;
+	export function filterPage<T>(page: Page<T>, keep: (row: T) => boolean): Page<T> {
+		return brand({ ...page, data: page.data.filter(keep) }, paginationOf(page));
 	}
 
 	/**

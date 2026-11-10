@@ -46,6 +46,24 @@ export class UserModel extends DrizzleModel(users, { supportTenancy: true }) {}
 export class UserRepository extends DrizzleRepository(UserModel) {}
 ```
 
+The repository finds rows by the table's primary key. A table without an `id` column, or with a composite primary key, takes the key as an object; `key` names other columns to use instead:
+
+```ts
+export class MembershipRepository extends DrizzleRepository(MembershipModel) {}
+await memberships.find({ teamId, userId });
+
+export class SessionRepository extends DrizzleRepository(SessionModel, { key: ['token'] }) {}
+await sessions.find('abc123');
+```
+
+`list(query, scope)` and `count(query, scope)` take a condition the rows must also meet, on top of the filters of the query:
+
+```ts
+public listFor(userId: string, query: ParsedQuery<'cursor'>) {
+	return this.list(query, eq(posts.authorId, userId));
+}
+```
+
 ## License
 
 This project is licensed under the Apache License, Version 2.0. See the [LICENSE](../../LICENSE) file for more info.

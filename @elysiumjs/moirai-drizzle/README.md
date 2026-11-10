@@ -49,4 +49,4 @@ MoiraiModule.with({
 - `DrizzleProjectionStorage` resets the tables of the `models` of a projection (`DrizzleModel`s or Drizzle tables) with `DELETE` in the rebuild's transaction, so readers see the rows until it commits, and keeps the version each projection was built with.
 - `PgAdvisoryLock` serializes the actions that share a `serializeBy` key with a transaction advisory lock.
 
-Each store takes `connection`, the name of a mnemosyne-drizzle connection, which defaults to `default`.
+Each store takes `connection`, the name of a mnemosyne-drizzle connection, which defaults to `default`. A store's `table` needs the columns of the matching table in `moiraiTables`, and may add others: it can live in a domain's own `pgSchema` and have another primary key, such as a composite one. `StoreTable<T>` is the type it accepts.

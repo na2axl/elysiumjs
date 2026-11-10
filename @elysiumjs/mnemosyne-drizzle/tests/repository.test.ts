@@ -19,7 +19,7 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import * as d from 'drizzle-orm/pg-core';
 
 import { DrizzleModel } from '../src/model';
-import { DrizzleRepository } from '../src/repository';
+import { DrizzleRepository, RepositoryKeyError } from '../src/repository';
 import { pgTable } from '../src/table';
 import { fakeConnection } from './fake-sql';
 
@@ -180,5 +180,76 @@ describe('DrizzleRepository', () => {
 
 		expect(await new ArchiveRepository().all()).toEqual([dune]);
 		expect(fake.log).toHaveLength(1);
+	});
+});
+
+const follows = pgTable(
+	'repo_follows',
+	{ userId: d.uuid('user_id').notNull(), creatorId: d.uuid('creator_id').notNull(), at: d.text() },
+	(t) => [d.primaryKey({ columns: [t.userId, t.creatorId] })]
+);
+class Follow extends DrizzleModel(follows) {}
+class FollowRepository extends DrizzleRepository(Follow) {}
+
+const handles = pgTable('repo_handles', { handle: d.text().primaryKey(), owner: d.text() });
+class Handle extends DrizzleModel(handles) {}
+class HandleRepository extends DrizzleRepository(Handle) {}
+
+const slugs = pgTable('repo_slugs', { slug: d.text().notNull(), title: d.text() });
+class Slug extends DrizzleModel(slugs) {}
+class SlugRepository extends DrizzleRepository(Slug, { key: ['slug'] }) {}
+class KeylessRepository extends DrizzleRepository(Slug) {}
+
+describe('DrizzleRepository keys', () => {
+	let fake: ReturnType<typeof fakeConnection>;
+
+	const use = (respond: Responder) => {
+		fake = fakeConnection(respond);
+		Service.instance('db.connection.default', fake.connection);
+	};
+
+	afterEach(() => Service.remove('db.connection.default'));
+
+	it('uses a primary key column that is not id', async () => {
+		use(() => [{ handle: 'ada', owner: 'u1' }]);
+		expect(await new HandleRepository().find('ada')).toEqual({ handle: 'ada', owner: 'u1' });
+		expect(fake.log[0]!.query).toBe(
+			'select "handle", "owner" from "repo_handles" where "repo_handles"."handle" = $1'
+		);
+	});
+
+	it('takes an object of the columns of a composite key', async () => {
+		use(() => [{ count: 1 }]);
+		const repository = new FollowRepository();
+		const key = { userId: 'u1', creatorId: 'c1' };
+
+		expect(await repository.exists(key)).toBe(true);
+		await repository.update(key, { at: 'now' });
+		await repository.delete(key);
+		expect(fake.log.map(({ query }) => query)).toEqual([
+			'select count(*) from "repo_follows" where (("repo_follows"."user_id" = $1) and ("repo_follows"."creator_id" = $2))',
+			'update "repo_follows" set "at" = $1 where (("repo_follows"."user_id" = $2) and ("repo_follows"."creator_id" = $3)) returning "user_id", "creator_id", "at"',
+			'delete from "repo_follows" where (("repo_follows"."user_id" = $1) and ("repo_follows"."creator_id" = $2)) returning "user_id", "creator_id", "at"'
+		]);
+	});
+
+	it('refuses a single value or a partial key for a composite key', async () => {
+		use(() => []);
+		const repository = new FollowRepository();
+		await expect(repository.find('u1')).rejects.toBeInstanceOf(RepositoryKeyError);
+		await expect(repository.find({ userId: 'u1' })).rejects.toThrow('misses creatorId');
+	});
+
+	it('takes the key columns it is given', async () => {
+		use(() => []);
+		await new SlugRepository().find('dune');
+		expect(fake.log[0]!.query).toBe(
+			'select "slug", "title" from "repo_slugs" where "repo_slugs"."slug" = $1'
+		);
+	});
+
+	it('says when the table has no primary key', async () => {
+		use(() => []);
+		await expect(new KeylessRepository().find('dune')).rejects.toThrow('has no primary key');
 	});
 });

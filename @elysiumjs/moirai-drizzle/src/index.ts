@@ -36,6 +36,7 @@ import {
 	index,
 	integer,
 	jsonb,
+	PgColumn,
 	pgSchema,
 	PgTable,
 	pgTable,
@@ -130,6 +131,14 @@ export type MoiraiTables = ReturnType<typeof moiraiTables>;
  */
 export type DrizzleStoreOptions<T> = { table: T; connection?: string };
 
+/**
+ * A table a store accepts: any Postgres table, in any schema, with the columns of the moirai table
+ * `T` under the same property names, such as a table of a domain schema whose key also spans the
+ * partition column.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type StoreTable<T extends PgTable> = PgTable & { [K in keyof T['_']['columns']]: PgColumn };
+
 /** Whether an error is a Postgres unique violation, from any driver. */
 const isUniqueViolation = (error: unknown): boolean => {
 	for (
@@ -149,10 +158,17 @@ const isUniqueViolation = (error: unknown): boolean => {
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export class DrizzleIdempotencyStore implements IdempotencyStore {
-	constructor(private readonly options: DrizzleStoreOptions<MoiraiTables['idempotencyKeys']>) {}
+	constructor(
+		private readonly options: DrizzleStoreOptions<StoreTable<MoiraiTables['idempotencyKeys']>>
+	) {}
+
+	/** The table, read through the columns of the moirai table, which it has. */
+	private get table(): MoiraiTables['idempotencyKeys'] {
+		return this.options.table as unknown as MoiraiTables['idempotencyKeys'];
+	}
 
 	public async get(key: string): Promise<IdempotencyRecord | undefined> {
-		const t = this.options.table;
+		const t = this.table;
 		const [row] = await Database.getConnection(this.options.connection)
 			.select()
 			.from(t)
@@ -163,9 +179,7 @@ export class DrizzleIdempotencyStore implements IdempotencyStore {
 
 	public async put(record: IdempotencyRecord): Promise<void> {
 		try {
-			await Database.getConnection(this.options.connection)
-				.insert(this.options.table)
-				.values(record);
+			await Database.getConnection(this.options.connection).insert(this.table).values(record);
 		} catch (error) {
 			if (isUniqueViolation(error)) throw new IdempotencyConflictError(record.key);
 			throw error;
@@ -179,7 +193,12 @@ export class DrizzleIdempotencyStore implements IdempotencyStore {
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export class DrizzleOutboxStore implements OutboxStore {
-	constructor(private readonly options: DrizzleStoreOptions<MoiraiTables['outbox']>) {}
+	constructor(private readonly options: DrizzleStoreOptions<StoreTable<MoiraiTables['outbox']>>) {}
+
+	/** The table, read through the columns of the moirai table, which it has. */
+	private get table(): MoiraiTables['outbox'] {
+		return this.options.table as unknown as MoiraiTables['outbox'];
+	}
 
 	private get db() {
 		return Database.getConnection(this.options.connection);
@@ -187,13 +206,13 @@ export class DrizzleOutboxStore implements OutboxStore {
 
 	public async insert(rows: readonly OutboxRow[]): Promise<void> {
 		if (rows.length === 0) return;
-		await this.db.insert(this.options.table).values(rows.map((row) => ({ ...row })));
+		await this.db.insert(this.table).values(rows.map((row) => ({ ...row })));
 	}
 
 	public async claimDue(claim: OutboxClaim): Promise<readonly OutboxRow[]> {
 		const { now, leaseUntil, limit, kinds, ids } = claim;
 		if (kinds?.length === 0 || ids?.length === 0) return [];
-		const t = this.options.table;
+		const t = this.table;
 		const due = this.db
 			.select({ id: t.id })
 			.from(t)
@@ -241,7 +260,7 @@ export class DrizzleOutboxStore implements OutboxStore {
 	}
 
 	async #update(id: string, values: Partial<OutboxRow>): Promise<void> {
-		const t = this.options.table;
+		const t = this.table;
 		await this.db.update(t).set(values).where(eq(t.id, id));
 	}
 }
@@ -251,10 +270,15 @@ export class DrizzleOutboxStore implements OutboxStore {
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export class DrizzleInboxStore implements InboxStore {
-	constructor(private readonly options: DrizzleStoreOptions<MoiraiTables['inbox']>) {}
+	constructor(private readonly options: DrizzleStoreOptions<StoreTable<MoiraiTables['inbox']>>) {}
+
+	/** The table, read through the columns of the moirai table, which it has. */
+	private get table(): MoiraiTables['inbox'] {
+		return this.options.table as unknown as MoiraiTables['inbox'];
+	}
 
 	public async record(messageId: string, consumer: string): Promise<boolean> {
-		const t = this.options.table;
+		const t = this.table;
 		const written = await Database.getConnection(this.options.connection)
 			.insert(t)
 			.values({ messageId, consumer })
@@ -269,7 +293,7 @@ export class DrizzleInboxStore implements InboxStore {
 	 * @returns The number of records deleted.
 	 */
 	public async pruneBefore(cutoff: Date): Promise<number> {
-		const t = this.options.table;
+		const t = this.table;
 		const removed = await Database.getConnection(this.options.connection)
 			.delete(t)
 			.where(lt(t.recordedAt, cutoff))
@@ -314,14 +338,19 @@ const toRecord = (row: MoiraiTables['events']['$inferSelect']): StoredEventRecor
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export class DrizzleEventStore implements EventStore {
-	constructor(private readonly options: DrizzleStoreOptions<MoiraiTables['events']>) {}
+	constructor(private readonly options: DrizzleStoreOptions<StoreTable<MoiraiTables['events']>>) {}
+
+	/** The table, read through the columns of the moirai table, which it has. */
+	private get table(): MoiraiTables['events'] {
+		return this.options.table as unknown as MoiraiTables['events'];
+	}
 
 	private get db() {
 		return Database.getConnection(this.options.connection);
 	}
 
 	public async load(aggregateId: string, afterVersion = 0): Promise<readonly StoredEventRecord[]> {
-		const t = this.options.table;
+		const t = this.table;
 		const rows = await this.db
 			.select()
 			.from(t)
@@ -333,7 +362,7 @@ export class DrizzleEventStore implements EventStore {
 	public async readAll(filter: EventReadFilter): Promise<readonly StoredEventRecord[]> {
 		const { types, afterPosition, limit } = filter;
 		if (types?.length === 0) return [];
-		const t = this.options.table;
+		const t = this.table;
 		const rows = await this.db
 			.select()
 			.from(t)
@@ -350,7 +379,7 @@ export class DrizzleEventStore implements EventStore {
 
 	public async append(records: readonly StoredEventRecord[]): Promise<void> {
 		if (records.length === 0) return;
-		const t = this.options.table;
+		const t = this.table;
 		const first = new Map<string, StoredEventRecord>();
 		for (const record of records) {
 			const known = first.get(record.aggregateId);
@@ -407,7 +436,14 @@ const tableOf = (model: object): PgTable => {
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export class DrizzleProjectionStorage implements ProjectionStorage {
-	constructor(private readonly options: DrizzleStoreOptions<MoiraiTables['projections']>) {}
+	constructor(
+		private readonly options: DrizzleStoreOptions<StoreTable<MoiraiTables['projections']>>
+	) {}
+
+	/** The table, read through the columns of the moirai table, which it has. */
+	private get table(): MoiraiTables['projections'] {
+		return this.options.table as unknown as MoiraiTables['projections'];
+	}
 
 	private get db() {
 		return Database.getConnection(this.options.connection);
@@ -418,7 +454,7 @@ export class DrizzleProjectionStorage implements ProjectionStorage {
 	}
 
 	public async version(name: string): Promise<number | undefined> {
-		const t = this.options.table;
+		const t = this.table;
 		const [row] = await this.db
 			.select({ version: t.version })
 			.from(t)
@@ -428,7 +464,7 @@ export class DrizzleProjectionStorage implements ProjectionStorage {
 	}
 
 	public async built(name: string, version: number): Promise<void> {
-		const t = this.options.table;
+		const t = this.table;
 		const builtAt = Clock.now();
 		await this.db
 			.insert(t)

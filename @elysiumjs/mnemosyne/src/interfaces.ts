@@ -261,6 +261,13 @@ export interface DatabaseCacheConfig {
 export type IdType = number | string;
 
 /**
+ * What identifies a row: the value of its primary key, or an object of the values of its key
+ * columns when the key spans several columns.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type RowKey = IdType | Readonly<Record<string, unknown>>;
+
+/**
  * ORM-agnostic CRUD repository contract.
  *
  * Provides a standard interface for common database operations
@@ -270,9 +277,9 @@ export type IdType = number | string;
  * @template TSelect The type returned by select queries.
  * @template TInsert The type needed by insert queries.
  * @template TUpdate The type needed by update queries.
- * @template TId The primary key type.
+ * @template TId The primary key type: a value, or an object of the key columns.
  */
-export interface RepositoryInterface<TSelect, TInsert, TUpdate, TId extends IdType = string> {
+export interface RepositoryInterface<TSelect, TInsert, TUpdate, TId extends RowKey = string> {
 	/**
 	 * Retrieves all the records in the database.
 	 * @returns All the records in the database.
