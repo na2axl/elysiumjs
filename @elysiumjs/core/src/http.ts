@@ -43,6 +43,7 @@ import { ModuleContext } from './module-context';
 import { BadRequestError, DomainError, InternalError, validationProblemSchema } from './problem';
 import { enforceRateLimit, rateLimitOf, TooManyRequestsError } from './rate-limit';
 import { isSerializable, isStatusMap, readFields, Resource } from './resource';
+import { Result } from './result';
 import { Runtime } from './runtime';
 import { PayloadTooLargeError } from './security';
 import { Service } from './service';
@@ -1168,12 +1169,14 @@ export namespace Http {
 
 						/**
 						 * Calls the handler, and throws the DomainError it returns: a returned error rolls back
-						 * the transaction and reaches the interceptors and the error hooks like a thrown one.
+						 * the transaction and reaches the interceptors and the error hooks like a thrown one. A
+						 * returned `Result` answers its value, or throws its error.
 						 */
 						const callForValue = async <TResult>(c: Context, args: unknown[]): Promise<TResult> => {
-							const result = await callHandler<Promise<TResult>>(c, args);
+							const returned = await callHandler<Promise<unknown>>(c, args);
+							const result = Result.is(returned) ? returned.orThrow() : returned;
 							if (result instanceof DomainError) throw result;
-							return result;
+							return result as TResult;
 						};
 
 						const initTransactedHandler = <TResult = unknown>(c: Context) => {
