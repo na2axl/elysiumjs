@@ -294,7 +294,9 @@ class DailyBilling extends Scheduler<typeof BillInvoice> {
 
 A scheduler fans out one job; another job gets its own scheduler.
 
-`styx heracles:schedule --list` prints the scheduled jobs and the cron triggers they need. On Cloudflare Workers, a trigger runs the jobs whose expression is exactly its own, so `styx heracles:schedule --check wrangler.jsonc` fails when the `triggers.crons` of the file differ from the expressions of the scheduled jobs, which fits a CI step.
+`fanOut()` runs in the background scopes of the application too, with `kind: 'schedule'` and the name of the scheduler.
+
+`styx heracles:crons` prints the scheduled jobs and the cron triggers they need. It reads the jobs from the module graph without booting the application, so it runs for a Cloudflare Worker whose services need bindings. On Workers, a trigger runs the jobs whose expression is exactly its own, so `styx heracles:crons --check wrangler.jsonc` fails when the cron triggers of the file differ from the expressions of the scheduled jobs, which fits a CI step. It checks `triggers.crons` and the `triggers` of each environment that sets its own; `--env production` checks one environment, with the triggers it sets or inherits.
 
 ### Job Cancellation
 

@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ModuleNode } from '@elysiumjs/core';
+import type { Kernel, ModuleNode } from '@elysiumjs/core';
 import type { Job, JobClass } from './job';
 
-import { ElysiumError } from '@elysiumjs/core';
+import { ElysiumError, KERNEL_SERVICE, Service } from '@elysiumjs/core';
+
+import { getJobMetadata } from './utils';
 
 /**
  * Thrown when two modules declare jobs with the same name.
@@ -58,6 +60,34 @@ export namespace JobRegistry {
 	/** Lists every registered job with its name. */
 	export const all = (): readonly (JobRegistryEntry & { name: string })[] =>
 		[...entries].map(([name, entry]) => ({ name, ...entry }));
+
+	/**
+	 * Reads the jobs the modules of the application declare, from its module graph, without
+	 * initialising the modules.
+	 * @throws {ElysiumError} When the kernel is not registered.
+	 * @throws {DuplicateJobError} When two modules declare jobs with the same name.
+	 */
+	export const collect = (): Map<string, JobRegistryEntry> => {
+		const kernel = Service.get<Kernel>(KERNEL_SERVICE);
+		if (!kernel) {
+			throw new ElysiumError(
+				`Heracles needs the "${KERNEL_SERVICE}" service, which the kernel registers when it boots.`
+			);
+		}
+
+		const found = new Map<string, JobRegistryEntry>();
+		for (const { item, module } of kernel.graph.collect('jobs')) {
+			const jobClass = item as JobClass<Job>;
+			const metadata = getJobMetadata(jobClass);
+			if (!metadata) continue;
+			const existing = found.get(metadata.name);
+			if (existing) {
+				throw new DuplicateJobError(metadata.name, [existing.module.id, module.id]);
+			}
+			found.set(metadata.name, { jobClass, module });
+		}
+		return found;
+	};
 
 	/** Empties the registry. */
 	export const clear = (): void => {
