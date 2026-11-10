@@ -24,6 +24,7 @@ import {
 	isDomainError,
 	Module,
 	NotFoundError,
+	Result,
 	Service,
 	t
 } from '@elysiumjs/core';
@@ -164,7 +165,7 @@ describe('actions', () => {
 	});
 
 	it('validates the input and answers a 422 problem listing the mistakes', async () => {
-		const error = await Moirai.execute(TopUp, { amount: 0 }, { idempotencyKey: 'k' });
+		const error = await Moirai.execute(TopUp, { amount: 0 }, { idempotencyKey: 'k' }).orError();
 		expect(error).toBeInstanceOf(InvalidInputError);
 		if (!(error instanceof InvalidInputError)) return;
 		expect(error.status).toBe(422);
@@ -183,12 +184,14 @@ describe('actions', () => {
 				return { deleted: true };
 			}
 		}
-		expect(await Moirai.execute(Delete, { id: 'mine' })).toEqual({ deleted: true });
-		expect(await Moirai.execute(Delete, { id: 'yours' })).toBeInstanceOf(CallForbiddenError);
+		expect(await Moirai.execute(Delete, { id: 'mine' }).orError()).toEqual({ deleted: true });
+		expect(await Moirai.execute(Delete, { id: 'yours' }).orError()).toBeInstanceOf(
+			CallForbiddenError
+		);
 	});
 
 	it('runs in a unit of work, and joins the open one', async () => {
-		expect(await Moirai.execute(Rename, { name: 'ada' })).toEqual({ name: 'ada' });
+		expect(await Moirai.execute(Rename, { name: 'ada' }).orError()).toEqual({ name: 'ada' });
 		expect(log).toEqual(['BEGIN', 'rename ada', 'COMMIT']);
 
 		log.length = 0;
@@ -200,28 +203,34 @@ describe('actions', () => {
 	});
 
 	it('needs an idempotency key for an idempotent action', async () => {
-		const error = await Moirai.execute(TopUp, { amount: 1 }).catch((e) => e);
+		const { error } = await Moirai.execute(TopUp, { amount: 1 });
 		expect(error).toBeInstanceOf(IdempotencyKeyRequiredError);
-		expect(error.status).toBe(400);
+		expect(error?.status).toBe(400);
 	});
 
 	it('replays the stored response of a repeated key, and refuses it with another input', async () => {
-		const first = await Moirai.execute(TopUp, { amount: 2 }, { idempotencyKey: 'tap-1' });
-		const again = await Moirai.execute(TopUp, { amount: 2 }, { idempotencyKey: 'tap-1' });
+		const first = await Moirai.execute(TopUp, { amount: 2 }, { idempotencyKey: 'tap-1' }).orError();
+		const again = await Moirai.execute(TopUp, { amount: 2 }, { idempotencyKey: 'tap-1' }).orError();
 		expect(first).toEqual({ balance: 20 });
 		expect(again).toEqual(first);
 		expect(runs).toBe(1);
 
-		const reused = await Moirai.execute(TopUp, { amount: 3 }, { idempotencyKey: 'tap-1' }).catch(
-			(e) => e
-		);
-		expect(reused).toBeInstanceOf(IdempotencyKeyReusedError);
-		expect(reused.status).toBe(422);
+		const reused = await Moirai.execute(TopUp, { amount: 3 }, { idempotencyKey: 'tap-1' });
+		expect(reused.error).toBeInstanceOf(IdempotencyKeyReusedError);
+		expect(reused.error?.status).toBe(422);
 	});
 
 	it('keeps the keys of two owners apart', async () => {
-		const first = await Moirai.execute(TopUp, { amount: 2 }, { idempotencyKey: 'k', scope: 'ada' });
-		const other = await Moirai.execute(TopUp, { amount: 5 }, { idempotencyKey: 'k', scope: 'bob' });
+		const first = await Moirai.execute(
+			TopUp,
+			{ amount: 2 },
+			{ idempotencyKey: 'k', scope: 'ada' }
+		).orError();
+		const other = await Moirai.execute(
+			TopUp,
+			{ amount: 5 },
+			{ idempotencyKey: 'k', scope: 'bob' }
+		).orError();
 		expect(first).toEqual({ balance: 20 });
 		expect(other).toEqual({ balance: 50 });
 		expect(runs).toBe(2);
@@ -235,7 +244,7 @@ describe('actions', () => {
 			TopUp,
 			{ amount: 1, note: 'refuse' },
 			{ idempotencyKey: 'tap-2' }
-		);
+		).orError();
 		// The refusal is a value: no throw, and its type is part of the outcome.
 		expect(outcome).toBeInstanceOf(DomainError);
 		expect(isDomainError(outcome) && outcome.status).toBe(409);
@@ -260,7 +269,9 @@ describe('actions', () => {
 			}
 		});
 
-		expect(await Moirai.execute(TopUp, { amount: 4 }, { idempotencyKey: 'tap-3' })).toEqual({
+		expect(
+			await Moirai.execute(TopUp, { amount: 4 }, { idempotencyKey: 'tap-3' }).orError()
+		).toEqual({
 			balance: 99
 		});
 		expect(log.filter((entry) => entry === 'BEGIN')).toHaveLength(2);
@@ -280,7 +291,7 @@ describe('actions', () => {
 			}
 		}
 
-		expect(await Moirai.execute(Flaky, { mode: 'deadlock' })).toEqual({ attempt: 3 });
+		expect(await Moirai.execute(Flaky, { mode: 'deadlock' }).orError()).toEqual({ attempt: 3 });
 		expect(attempts).toBe(3);
 		// Bun's SQL driver keeps the SQLSTATE in errno.
 		expect(
@@ -293,7 +304,7 @@ describe('actions', () => {
 		).toBe(true);
 
 		attempts = 0;
-		await expect(Moirai.execute(Flaky, { mode: 'broken' })).rejects.toThrow('broken');
+		await expect(Moirai.execute(Flaky, { mode: 'broken' }).orError()).rejects.toThrow('broken');
 		expect(attempts).toBe(1);
 	});
 
@@ -313,10 +324,10 @@ describe('actions', () => {
 			}
 		}
 
-		expect(await Moirai.execute(Bump, { wins: 4 })).toEqual({ attempt: 4 });
+		expect(await Moirai.execute(Bump, { wins: 4 }).orError()).toEqual({ attempt: 4 });
 		expect(calls).toBe(4);
 		calls = 0;
-		const outcome = await Moirai.execute(Bump, { wins: 9 });
+		const outcome = await Moirai.execute(Bump, { wins: 9 }).orError();
 		expect(outcome).toBeInstanceOf(ConcurrencyConflict);
 		expect(calls).toBe(4);
 		expect(log.filter((entry) => entry === 'ROLLBACK').length).toBeGreaterThanOrEqual(4);
@@ -337,22 +348,22 @@ describe('actions', () => {
 			}
 		}
 		await Promise.all([
-			Moirai.execute(Spend, { wallet: 'w', id: 1 }),
-			Moirai.execute(Spend, { wallet: 'w', id: 2 })
+			Moirai.execute(Spend, { wallet: 'w', id: 1 }).orError(),
+			Moirai.execute(Spend, { wallet: 'w', id: 2 }).orError()
 		]);
 		expect(order).toEqual(['start 1', 'end 1', 'start 2', 'end 2']);
 	});
 
 	it('runs without a unit of work when no database module is loaded', async () => {
 		Service.remove('db.transaction');
-		expect(await Moirai.execute(Rename, { name: 'solo' })).toEqual({ name: 'solo' });
+		expect(await Moirai.execute(Rename, { name: 'solo' }).orError()).toEqual({ name: 'solo' });
 		expect(log).toEqual(['rename solo']);
 	});
 
 	it('explains a missing store', async () => {
 		Service.remove(MOIRAI_IDEMPOTENCY_STORE);
 		await expect(
-			Moirai.execute(TopUp, { amount: 1 }, { idempotencyKey: 'x' })
+			Moirai.execute(TopUp, { amount: 1 }, { idempotencyKey: 'x' }).orError()
 		).rejects.toBeInstanceOf(MissingStoreError);
 	});
 
@@ -360,7 +371,7 @@ describe('actions', () => {
 		class Plain {
 			public handle() {}
 		}
-		await expect(Moirai.execute(Plain, {})).rejects.toThrow(
+		await expect(Moirai.execute(Plain, {}).orError()).rejects.toThrow(
 			'is not marked with @Action.register()'
 		);
 	});
@@ -376,10 +387,10 @@ describe('queries', () => {
 	}
 
 	it('validates and runs a query without a transaction', async () => {
-		expect(await Moirai.ask(FindUser, { id: 'ada' })).toEqual({ id: 'ada' });
+		expect(await Moirai.ask(FindUser, { id: 'ada' }).orError()).toEqual({ id: 'ada' });
 		expect(log).toEqual([]);
-		expect(await Moirai.ask(FindUser, { id: 'a' })).toBeInstanceOf(InvalidInputError);
-		const missing = await Moirai.ask(FindUser, { id: 'gone' });
+		expect(await Moirai.ask(FindUser, { id: 'a' }).orError()).toBeInstanceOf(InvalidInputError);
+		const missing = await Moirai.ask(FindUser, { id: 'gone' }).orError();
 		expect(missing).toBeInstanceOf(NotFoundError);
 	});
 });
@@ -421,22 +432,28 @@ describe('typed handlers', () => {
 	}
 
 	it('types the input and the outcome from the class parameters', async () => {
-		const outcome = await Moirai.ask(Cities, { country: 'CM' });
+		const outcome = await Moirai.ask(Cities, { country: 'CM' }).orError();
 		expectTypeOf(outcome).toEqualTypeOf<
 			CitiesResult | CountryClosed | InvalidInputError | CallForbiddenError
 		>();
 		expect(outcome).toEqual(['Douala', 'Yaoundé']);
-		expect(await Moirai.ask(Cities, { country: 'FR' })).toBeInstanceOf(CountryClosed);
-		expect(await Moirai.ask(Cities, { country: 'cm' })).toBeInstanceOf(InvalidInputError);
+		expect(await Moirai.ask(Cities, { country: 'FR' }).orError()).toBeInstanceOf(CountryClosed);
+		expect(await Moirai.ask(Cities, { country: 'cm' }).orError()).toBeInstanceOf(InvalidInputError);
 	});
 
 	it('runs a query and an action that take no input, without one', async () => {
-		expect(await Moirai.ask(Categories)).toEqual(['music', 'comedy']);
-		expect(await Moirai.execute(Ping)).toEqual({ pong: true });
+		expect(await Moirai.ask(Categories).orError()).toEqual(['music', 'comedy']);
+		expect(await Moirai.execute(Ping).orError()).toEqual({ pong: true });
 		expect(log).toContain('ping');
-		const first = await Moirai.execute(IdempotentPing, undefined, { idempotencyKey: 'once' });
-		expect(await Moirai.execute(IdempotentPing, undefined, { idempotencyKey: 'once' })).toBe(first);
-		expect(await Moirai.execute(IdempotentPing)).toBeInstanceOf(IdempotencyKeyRequiredError);
+		const first = await Moirai.execute(IdempotentPing, undefined, {
+			idempotencyKey: 'once'
+		}).orError();
+		expect(
+			await Moirai.execute(IdempotentPing, undefined, { idempotencyKey: 'once' }).orError()
+		).toBe(first);
+		expect(await Moirai.execute(IdempotentPing).orError()).toBeInstanceOf(
+			IdempotencyKeyRequiredError
+		);
 	});
 
 	it('requires the input of a handler that takes one', () => {
@@ -841,7 +858,7 @@ describe('module stores', () => {
 
 	it('runs an action with the stores of its module', async () => {
 		await boot();
-		expect(await Moirai.execute(Charge, { order: 'o1' })).toEqual({ charged: 'o1' });
+		expect(await Moirai.execute(Charge, { order: 'o1' }).orError()).toEqual({ charged: 'o1' });
 		expect(root.outbox.rows).toEqual([]);
 		expect(billing.outbox.rows.map((row) => row.kind).sort()).toEqual([
 			'mail.send',
@@ -863,7 +880,7 @@ describe('module stores', () => {
 	it('runs a query with the services of its module', async () => {
 		await boot();
 		// Prices is private to BillingModule, and the query is asked from outside it.
-		expect(await Moirai.ask(Quote, { order: 'o1' })).toEqual({ price: 'o1:42' });
+		expect(await Moirai.ask(Quote, { order: 'o1' }).orError()).toEqual({ price: 'o1:42' });
 	});
 
 	it('records each handled event in the inbox of the handler module', async () => {
@@ -879,7 +896,9 @@ describe('module stores', () => {
 
 	it('uses the stores of MoiraiModule that a module leaves out', async () => {
 		await boot();
-		expect(await Moirai.execute(Pay, { n: 1 }, { idempotencyKey: 'p' })).toEqual({ paid: 1 });
+		expect(await Moirai.execute(Pay, { n: 1 }, { idempotencyKey: 'p' }).orError()).toEqual({
+			paid: 1
+		});
 		expect(await root.idempotency.get('anonymous:Pay:p')).toBeDefined();
 	});
 
@@ -972,7 +991,10 @@ describe('Moirai.lock', () => {
 			}
 		}
 
-		await Promise.all([Moirai.execute(Settle, { id: 'w1' }), Moirai.execute(Settle, { id: 'w2' })]);
+		await Promise.all([
+			Moirai.execute(Settle, { id: 'w1' }).orError(),
+			Moirai.execute(Settle, { id: 'w2' }).orError()
+		]);
 		expect(seen).toEqual(['w1 in', 'w1 out', 'w2 in', 'w2 out']);
 	});
 });
@@ -994,9 +1016,72 @@ describe('outcomes', () => {
 		}
 	}
 
-	it('give the result or the refusal as a value', async () => {
-		expect(await Moirai.execute(Rename, { id: 'a' })).toEqual({ id: 'a' });
-		expect(await Moirai.execute(Rename, { id: 'none' })).toBeInstanceOf(Missing);
+	it('await to a Result of the value or the refusal', async () => {
+		const renamed = await Moirai.execute(Rename, { id: 'a' });
+		if (!renamed.check()) throw renamed.error;
+		expectTypeOf(renamed.result).toEqualTypeOf<{ id: string }>();
+		expect(renamed.result).toEqual({ id: 'a' });
+
+		const missing = await Moirai.execute(Rename, { id: 'none' });
+		if (missing.check()) throw new Error('unreachable');
+		expect(missing.error).toBeInstanceOf(Missing);
+	});
+
+	it('give the value or the refusal with orError(), and the error or the transformed value with errorOr()', async () => {
+		expect(await Moirai.execute(Rename, { id: 'a' }).orError()).toEqual({ id: 'a' });
+		expect(await Moirai.execute(Rename, { id: 'none' }).orError()).toBeInstanceOf(Missing);
+		expect(await Moirai.ask(Find, { id: 'b' }).errorOr((found) => found.id)).toBe('b');
+		expect(await Moirai.ask(Find, { id: 'none' }).errorOr((found) => found.id)).toBeInstanceOf(
+			Missing
+		);
+	});
+
+	it('chain map() and andThen() without awaiting first', async () => {
+		const chained = Moirai.ask(Find, { id: 'b' })
+			.map((found) => found.id.toUpperCase())
+			.andThen((id) => Moirai.execute(Rename, { id }));
+		expect(await chained.orThrow()).toEqual({ id: 'B' });
+		expect(
+			(await Moirai.ask(Find, { id: 'none' }).andThen(() => Result.pass(1))).error
+		).toBeInstanceOf(Missing);
+	});
+
+	it('take a Result from the handler, and roll back on a failed one', async () => {
+		@Action.register({ errors: [Missing], input: t.Object({ id: t.String() }) })
+		class Archive extends Action {
+			public handle(input: { id: string }) {
+				log.push(`archive ${input.id}`);
+				return input.id === 'none'
+					? Result.fail(new Missing('No such thing.'))
+					: Result.pass({ archived: input.id });
+			}
+		}
+
+		@Query.register({ errors: [Missing] })
+		class Latest extends Query {
+			public async handle() {
+				return Result.pass({ id: 'z' });
+			}
+		}
+
+		expect(await Moirai.execute(Archive, { id: 'a' }).orThrow()).toEqual({ archived: 'a' });
+		expectTypeOf<Moirai.ErrorsOf<typeof Archive>>().toEqualTypeOf<Missing>();
+		log.length = 0;
+		expect((await Moirai.execute(Archive, { id: 'none' })).error).toBeInstanceOf(Missing);
+		expect(log).toEqual(['BEGIN', 'archive none', 'ROLLBACK']);
+		expect(await Moirai.ask(Latest).orThrow()).toEqual({ id: 'z' });
+	});
+
+	it('let a handler return the outcome of a nested call', async () => {
+		@Action.register({ errors: [Missing], input: t.Object({ id: t.String() }) })
+		class RenameTwice extends Action {
+			public handle(input: { id: string }) {
+				return Moirai.execute(Rename, input).orPass();
+			}
+		}
+
+		expect(await Moirai.execute(RenameTwice, { id: 'a' }).orThrow()).toEqual({ id: 'a' });
+		expect((await Moirai.execute(RenameTwice, { id: 'none' })).error).toBeInstanceOf(Missing);
 	});
 
 	it('give the result, or throw the refusal, with orThrow()', async () => {
@@ -1012,13 +1097,14 @@ describe('outcomes', () => {
 	});
 
 	it('pass the refusals of the handler on, and throw those of moirai, with orPass()', async () => {
-		const renamed = await Moirai.execute(Rename, { id: 'a' }).orPass();
+		const renamed = await Moirai.execute(Rename, { id: 'a' }).orPass().orError();
 		expectTypeOf(renamed).toEqualTypeOf<{ id: string } | Missing>();
 		expect(renamed).toEqual({ id: 'a' });
-		expect(await Moirai.execute(Rename, { id: 'none' }).orPass()).toBeInstanceOf(Missing);
-		expect(await Moirai.ask(Find, { id: 'none' }).orPass()).toBeInstanceOf(Missing);
+		expect(await Moirai.execute(Rename, { id: 'none' }).orPass().orError()).toBeInstanceOf(Missing);
+		expect(await Moirai.ask(Find, { id: 'none' }).orPass().orError()).toBeInstanceOf(Missing);
 		const refused = await Moirai.ask(Find, { id: 1 } as never)
 			.orPass()
+			.orError()
 			.catch((error: unknown) => error);
 		expect(refused).toBeInstanceOf(NestedCallRefusedError);
 		expect((refused as NestedCallRefusedError).refusal).toBeInstanceOf(InvalidInputError);
