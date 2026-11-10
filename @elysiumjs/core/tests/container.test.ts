@@ -85,6 +85,17 @@ describe('Container', () => {
 		expect((thrown as Error).message).toContain("add it to B's exports");
 	});
 
+	it('requires a visible service, and explains a missing or hidden one', () => {
+		class AService {}
+		class Hidden {}
+		Container.register(A, AService, undefined);
+		Container.register(B, Hidden, undefined);
+
+		expect(run(A, () => Service.require(AService))).toBeInstanceOf(AService);
+		expect(() => run(A, () => Service.require(Hidden))).toThrow(ServiceNotVisibleError);
+		expect(() => run(A, () => Service.require('Nope'))).toThrow(ServiceNotFoundError);
+	});
+
 	it('throws ServiceNotFoundError when a dependency exists nowhere', () => {
 		class Consumer {
 			constructor(@Service.inject('Nope') public dep: any) {}
