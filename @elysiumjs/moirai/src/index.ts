@@ -22,6 +22,7 @@ export {
 	type ExecuteArgs,
 	type HandlerContext,
 	type HandlerResult,
+	type Outcome,
 	type QueryClass,
 	type QueryOptions,
 	type QueryOutcome,
@@ -57,7 +58,9 @@ export {
 	IdempotencyKeyRequiredError,
 	IdempotencyKeyReusedError,
 	InvalidInputError,
+	LockOutsideUnitOfWorkError,
 	MissingStoreError,
+	PayloadReplacementUnsupportedError,
 	UnknownEventConsumerError,
 	UnknownEffectError,
 	UnknownStoredEventError,
@@ -76,6 +79,7 @@ export { requestHash } from './hash';
 export { uuidv7 } from './ids';
 export { MoiraiModule, type MoiraiModuleConfig, type MoiraiStores } from './moirai.module';
 export {
+	type OutboxContext,
 	type RelayOptions,
 	type RelaySummary,
 	backoffMs,

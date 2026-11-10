@@ -47,7 +47,7 @@ class Receipts extends Query<void, { balance: number }[], NotFoundError> {
 	}
 }
 
-@Action.register({})
+@Action.register({ errors: [] })
 class Ping extends Action<void, string, never> {
 	public handle() {
 		return 'pong';

@@ -25,6 +25,7 @@ export type TopUpResult = { balance: number };
 class WalletClosed extends DomainError.for('CONFLICT', 409) {}
 
 @Action.register({
+	errors: [WalletClosed],
 	input: TopUpInput,
 	idempotent: true,
 	serializeBy: (input) => `wallet:${input.walletId}`
@@ -46,7 +47,7 @@ class TopUp extends Action<TopUpInput, TopUpResult, WalletClosed> {
 const WalletBalanceInput = t.Object({ walletId: t.String() });
 export type WalletBalanceInput = Static<typeof WalletBalanceInput>;
 
-@Query.register({ input: WalletBalanceInput })
+@Query.register({ errors: [], input: WalletBalanceInput })
 class WalletBalance extends Query<WalletBalanceInput, { balance: number }> {
 	constructor(@Service.inject() private readonly wallets: WalletRepository) {
 		super();
@@ -71,6 +72,9 @@ return Moirai.ask(WalletBalance, { walletId });
 - An idempotent action needs a key, or it is refused with a 400 `IDEMPOTENCY_KEY_REQUIRED` problem. A repeat with the same key and input replays the stored response, as JSON; with another input, it is refused with a 422 `IDEMPOTENCY_KEY_REUSED` problem.
 - A key belongs to its owner: the current user by default (`currentUserId()` of core, else `anonymous`), or what `scope(input)` of the action or `Moirai.execute(..., { scope })` returns, such as a tenant and a user. Another owner presenting the same key runs the action on its own.
 - `serializeBy` makes calls that share a key run one after the other, so a double tap waits for the first call and replays its response.
+- `errors` is required: it lists every DomainError `handle()` gives, `[]` when it gives none, or the registration does not compile.
+- `Moirai.lock(key)` takes the same lock from inside a handler, for a key known only once the handler has read something. It holds the key until the unit of work ends, and throws `LockOutsideUnitOfWorkError` outside one. Take the locks of a unit of work in the same order everywhere.
+- Where a refusal is a bug, such as in a job or an event handler, `orThrow()` gives the result alone and throws the DomainError: `const wallet = await Moirai.execute(OpenWallet, input).orThrow()`. `Moirai.ErrorsOf<typeof Action>` names the DomainErrors of the handler, without those of moirai, for a caller that passes them on.
 
 ### Routes
 
@@ -104,6 +108,8 @@ await Outbox.sweep();
 // In a consumer, inside its unit of work:
 await Inbox.once({ messageId: message.id, consumer: 'billing' }, () => apply(message));
 ```
+
+A handler also gets the row and a context. `context.replacePayload(payload)` replaces the payload of the row once the handler succeeds, in the unit of work that marks it dispatched, such as to drop a one-time code once it was sent. The outbox store must implement `replacePayload()`, as the memory and Drizzle stores do.
 
 Effects relay once the unit of work commits. A row that fails is retried with a backoff from 5 s up to 1 h, and marked dead after 8 attempts (`onDead` is called then). Delivery is at least once, so a handler must tolerate a repeat.
 
@@ -145,7 +151,7 @@ class Receipts {
 }
 ```
 
-- `EventCatalogue` types the names and the payloads of `Event.publish()` and `@Event.on()`. While it is empty, any name and payload are accepted.
+- `EventCatalogue` types the names and the payloads of `Event.publish()` and `@Event.on()`. While it is empty, any name and payload are accepted. Declare it once, in a file that the tsconfig includes, such as `src/events.ts`: the declaration applies to the whole program, so the files that publish or listen need no import of it.
 - Each handler gets its own delivery through the outbox, so it retries and dies on its own (`retry: { attempts }`, `retry: false` for one attempt, else `maxRelayAttempts`). Delivery is at least once.
 - Each handler records the events it handled in the inbox, in the unit of work of its own writes, so a repeated delivery does nothing. `consumer` names that record and defaults to `Class.method`: keep it when the method is renamed. Two handlers with one consumer throw `DuplicateEventConsumerError`.
 - `meta` gives the id of the event, its name, when it was published and the attempt.

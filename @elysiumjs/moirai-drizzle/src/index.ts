@@ -236,6 +236,10 @@ export class DrizzleOutboxStore implements OutboxStore {
 		await this.#update(id, update);
 	}
 
+	public async replacePayload(id: string, payload: unknown): Promise<void> {
+		await this.#update(id, { payload });
+	}
+
 	async #update(id: string, values: Partial<OutboxRow>): Promise<void> {
 		const t = this.options.table;
 		await this.db.update(t).set(values).where(eq(t.id, id));

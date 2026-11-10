@@ -53,6 +53,7 @@ const make = async (): Promise<Application> => {
 	}
 
 	@Action.register({
+		errors: [],
 		name: 'top-up',
 		input: t.Object({ amount: t.Integer({ minimum: 1 }) }),
 		idempotent: true

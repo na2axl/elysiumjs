@@ -25,10 +25,28 @@ import {
 import { UnitOfWork } from '@elysiumjs/mnemosyne';
 
 import { inboxStore, MOIRAI_OUTBOX_STORE, options, outboxStore } from './config';
-import { MissingStoreError, UnknownEffectError } from './errors';
+import {
+	MissingStoreError,
+	PayloadReplacementUnsupportedError,
+	UnknownEffectError
+} from './errors';
 import { uuidv7 } from './ids';
 
-type EffectHandler = (payload: unknown, row: OutboxRow) => unknown;
+/**
+ * What an outbox handler gets besides the payload and the row.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type OutboxContext = {
+	/**
+	 * Replaces the payload of the row once the handler succeeds, in the unit of work that marks it
+	 * dispatched, such as to drop a one-time code once it was sent. Nothing is replaced when the
+	 * handler throws.
+	 * @param payload The new payload, JSON-safe.
+	 */
+	replacePayload(payload: unknown): void;
+};
+
+type EffectHandler = (payload: unknown, row: OutboxRow, context: OutboxContext) => unknown;
 const EFFECTS = new Map<string, EffectHandler>();
 const ATTEMPTS = new Map<string, (row: OutboxRow) => number | undefined>();
 
@@ -109,20 +127,28 @@ const inUnitOfWork = <T>(work: () => Promise<T>): Promise<T> =>
 export namespace Outbox {
 	/**
 	 * Marks a service method as the handler of the outbox rows of a kind. The method gets the
-	 * payload and the row; throwing retries the row later.
+	 * payload, the row and the {@link OutboxContext}; throwing retries the row later.
+	 * @example
+	 * ```ts
+	 * @Outbox.handle('otp.send')
+	 * public async send(payload: OtpPayload, row: OutboxRow, context: OutboxContext) {
+	 * 	await this.sms.send(payload.to, payload.code);
+	 * 	context.replacePayload({ ...payload, code: null });
+	 * }
+	 * ```
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param kind The kind of effect.
 	 */
 	export const handle =
 		(kind: string): MethodDecorator =>
 		(target, method) => {
-			EFFECTS.set(kind, (payload, row) => {
+			EFFECTS.set(kind, (payload, row, context) => {
 				const owner = target.constructor as new (...args: any[]) => unknown;
 				const instance = (Service.get(owner) ?? Service.make(owner)) as Record<
 					string | symbol,
 					EffectHandler
 				>;
-				return instance[method]!(payload, row);
+				return instance[method]!(payload, row, context);
 			});
 		};
 
@@ -201,7 +227,15 @@ export namespace Outbox {
 				await inUnitOfWork(async () => {
 					const handler = effectHandler(row.kind);
 					if (!handler) throw new UnknownEffectError(row.kind);
-					await handler(row.payload, row);
+					let replaced: { payload: unknown } | undefined;
+					await handler(row.payload, row, {
+						replacePayload: (payload) => void (replaced = { payload })
+					});
+					if (replaced) {
+						if (!store.replacePayload)
+							throw new PayloadReplacementUnsupportedError(store.constructor.name);
+						await store.replacePayload(row.id, replaced.payload);
+					}
 					await store.markDispatched(row.id, Clock.now());
 				});
 				summary.dispatched++;

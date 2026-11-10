@@ -203,3 +203,27 @@ export class UnknownStoredEventError extends ElysiumError {
 		);
 	}
 }
+
+/**
+ * Raised when `Moirai.lock()` is called outside a unit of work, which the lock lasts for.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class LockOutsideUnitOfWorkError extends ElysiumError {
+	constructor(key: string) {
+		super(
+			`Moirai.lock("${key}") needs an open unit of work, which the lock lasts for: call it from an action handler or inside UnitOfWork.run().`
+		);
+	}
+}
+
+/**
+ * Raised when an outbox handler replaces the payload of its row and the outbox store cannot.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class PayloadReplacementUnsupportedError extends ElysiumError {
+	constructor(store: string) {
+		super(
+			`The outbox store ${store} cannot replace the payload of a row: it has no replacePayload().`
+		);
+	}
+}
