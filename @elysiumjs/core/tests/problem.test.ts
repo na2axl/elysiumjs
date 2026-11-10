@@ -177,11 +177,12 @@ describe('problem details over HTTP', () => {
 		}
 	}
 
+	class SchemaOnlyBody {
+		static readonly schema = t.Object({ n: t.Number() });
+	}
+
 	class EvenBody {
 		static readonly schema = t.Object({ n: t.Number() });
-		static async authorize() {
-			return true;
-		}
 		static async validate(c: { body: { n: number } }) {
 			return c.body.n % 2 === 0;
 		}
@@ -201,6 +202,11 @@ describe('problem details over HTTP', () => {
 	class ProblemController {
 		@Http.post('/positive')
 		public positive(@Http.body(PositiveBody as never) body: unknown) {
+			return body;
+		}
+
+		@Http.post('/schema-only')
+		public schemaOnly(@Http.body(SchemaOnlyBody as never) body: unknown) {
 			return body;
 		}
 
@@ -385,6 +391,15 @@ describe('problem details over HTTP', () => {
 		expect(refused.headers.get('content-type')).toBe(PROBLEM_CONTENT_TYPE);
 		expect((await refused.json()).detail).toBe('The request body is invalid.');
 		expect((await http.post('/p/even').json({ n: 4 })).status).toBe(200);
+	});
+
+	it('runs a validator with neither authorize() nor validate() on its schema alone', async () => {
+		const http = await start();
+		const accepted = await http.post('/p/schema-only').json({ n: 3 });
+		expect(accepted.status).toBe(200);
+		expect(await accepted.json()).toEqual({ n: 3 });
+		const refused = await http.post('/p/schema-only').json({ n: 'three' });
+		expect(refused.status).toBe(422);
 	});
 
 	it('answers the DomainError a custom validator returns', async () => {
