@@ -377,17 +377,6 @@ class App extends Application {}
 
 Without a runtime, `Runtime.get()` throws `RuntimeNotConfiguredError`; only the environment name falls back to `development`. `bun run check:runtime` bundles core, fails if it touches the `Bun` global, and boots an application from the bundle under Node.js.
 
-## Migrating from the pre-module API
-
-- The `database`, `redis`, `wamp` and `elysium:hermes` keys of `@Application.register()` are gone. Add `DrizzleModule.with()`, `RedisModule.with()`, `WampModule.with()` and `HermesModule.with()` to `modules` instead.
-- `Redis` and `RedisModule` moved to `@elysiumjs/redis`.
-- An application needs a runtime: add `runtime` from `@elysiumjs/runtime-bun` to `@Application.register()`.
-- `plugins` no longer takes package plugins. Add the package's module (for example `SentryModule`) to `modules`.
-- Importing a file no longer registers its commands or services. List commands in a module's `commands`, services in `services`, and jobs in `jobs`.
-- `new App()` is replaced by `await App.start()`. `Application.testing()` boots a module graph for tests.
-- The `beforeRegister` and `afterRegister` module hooks are replaced by `onInit`, `onServe` and `onDestroy`.
-- Jobs and workers moved to `@elysiumjs/heracles`; `WorkerPool` is removed.
-
 ## Documentation
 
 TODO
