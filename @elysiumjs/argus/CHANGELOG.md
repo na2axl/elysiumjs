@@ -1,5 +1,13 @@
 # @elysiumjs/argus
 
+## 0.3.9
+
+### Patch Changes
+
+- Updated dependencies [[`920b941`](https://github.com/na2axl/elysiumjs/commit/920b941a9c070c9006fe277abc7a187b9d140af7), [`9901020`](https://github.com/na2axl/elysiumjs/commit/99010200522c56bb37cbc44c7ffa311d69972599), [`7dc7c59`](https://github.com/na2axl/elysiumjs/commit/7dc7c59f67b9f62159064f7958f529f4e6e27e65)]:
+  - @elysiumjs/core@0.20.0
+  - @elysiumjs/hermes@0.5.9
+
 ## 0.3.8
 
 ### Patch Changes

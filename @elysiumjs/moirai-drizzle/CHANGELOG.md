@@ -1,5 +1,22 @@
 # @elysiumjs/moirai-drizzle
 
+## 0.3.0
+
+### Minor Changes
+
+- [#67](https://github.com/na2axl/elysiumjs/pull/67) [`9901020`](https://github.com/na2axl/elysiumjs/commit/99010200522c56bb37cbc44c7ffa311d69972599) Thanks [@na2axl](https://github.com/na2axl)! - `Clock` in core: `Clock.now()` and `Clock.epochMs()` give the application time, which `Clock.freeze()` and `Clock.travel()` stop or move in development and test, and `Clock.use()` takes from another source. Moirai (event, stream, projection and outbox instants, idempotency records), the projection store of moirai-drizzle, Heracles scheduler ticks and Themis (JWT issue and expiry checks, sessions, signed URLs, TOTP) read the time from it.
+
+- [#72](https://github.com/na2axl/elysiumjs/pull/72) [`a1d976f`](https://github.com/na2axl/elysiumjs/commit/a1d976ff4d52e9e6604c3540444f2981bb81f76a) Thanks [@na2axl](https://github.com/na2axl)! - Mnemosyne's list helpers are named `Listing` (`Listing.define()`, `Listing.parse()`, `Listing.mapPage()` and more), so they no longer share a name with the queries of moirai. `Listing.filterPage(page, keep)` filters the rows of a page and keeps its pagination. Repositories take a `RowKey`, a scalar id or an object: `DrizzleRepository` finds rows by the table's primary key, composite keys included, or by the columns named in `DrizzleRepository(model, { key })`, and throws `RepositoryKeyError` for a key that does not match. `list(query, scope)` and `count(query, scope)` take an extra condition. The moirai-drizzle stores accept tables in a domain's own schema with extra columns and another primary key (`StoreTable<T>`).
+
+- [#70](https://github.com/na2axl/elysiumjs/pull/70) [`14cadae`](https://github.com/na2axl/elysiumjs/commit/14cadae051a805b1c9c2ed16122ac09cf1a69f66) Thanks [@na2axl](https://github.com/na2axl)! - `Moirai.lock(key)` serializes work from inside a handler, for a key known after a read, until the unit of work ends. `Moirai.execute()` and `Moirai.ask()` return an `Outcome` whose `orThrow()` gives the result alone and throws the refusal, and `Moirai.ErrorsOf<C>` names the DomainErrors of a handler without moirai's own. `errors` is now required by `@Action.register()` and `@Query.register()` (`[]` when `handle()` gives none). Outbox handlers get a context whose `replacePayload()` replaces the payload of their row once they succeed; `OutboxStore.replacePayload()` is implemented by the memory and Drizzle stores.
+
+### Patch Changes
+
+- Updated dependencies [[`920b941`](https://github.com/na2axl/elysiumjs/commit/920b941a9c070c9006fe277abc7a187b9d140af7), [`9901020`](https://github.com/na2axl/elysiumjs/commit/99010200522c56bb37cbc44c7ffa311d69972599), [`a1d976f`](https://github.com/na2axl/elysiumjs/commit/a1d976ff4d52e9e6604c3540444f2981bb81f76a), [`7dc7c59`](https://github.com/na2axl/elysiumjs/commit/7dc7c59f67b9f62159064f7958f529f4e6e27e65), [`14cadae`](https://github.com/na2axl/elysiumjs/commit/14cadae051a805b1c9c2ed16122ac09cf1a69f66)]:
+  - @elysiumjs/core@0.20.0
+  - @elysiumjs/moirai@0.5.0
+  - @elysiumjs/mnemosyne-drizzle@0.6.0
+
 ## 0.2.0
 
 ### Minor Changes

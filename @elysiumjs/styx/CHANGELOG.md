@@ -1,5 +1,17 @@
 # @elysiumjs/styx
 
+## 0.13.0
+
+### Minor Changes
+
+- [#66](https://github.com/na2axl/elysiumjs/pull/66) [`1c0372f`](https://github.com/na2axl/elysiumjs/commit/1c0372fed957249bc504b684399e8295514b5075) Thanks [@na2axl](https://github.com/na2axl)! - The generators name files and module folders in kebab-case (`user-profile.service.ts`). `make:validator` writes a schema-only validator and adds `authorize()` and `validate()` only with `--authorize` and `--validate`. `make:model` declares `supportTenancy` only for a tenant-scoped model (`--support-tenancy`).
+
+### Patch Changes
+
+- Updated dependencies [[`920b941`](https://github.com/na2axl/elysiumjs/commit/920b941a9c070c9006fe277abc7a187b9d140af7), [`9901020`](https://github.com/na2axl/elysiumjs/commit/99010200522c56bb37cbc44c7ffa311d69972599), [`7dc7c59`](https://github.com/na2axl/elysiumjs/commit/7dc7c59f67b9f62159064f7958f529f4e6e27e65)]:
+  - @elysiumjs/core@0.20.0
+  - @elysiumjs/runtime-bun@0.1.9
+
 ## 0.12.0
 
 ### Minor Changes
