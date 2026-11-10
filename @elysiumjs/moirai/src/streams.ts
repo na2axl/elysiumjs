@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { ErrorOf, ValueOf } from './action';
 import type { Aggregate, AggregateClass } from './aggregate';
 import type { StoredEvent, StoredEventClass, StoredEventMeta } from './stored-event';
 import type { StoredEventRecord } from './stores';
 
-import { Clock, DATABASE_TRANSACTION_SERVICE, DomainError, Service } from '@elysiumjs/core';
+import { AsyncResult, Clock, DATABASE_TRANSACTION_SERVICE, Result, Service } from '@elysiumjs/core';
 import { UnitOfWork } from '@elysiumjs/mnemosyne';
 
 import { Aggregates } from './aggregate';
@@ -49,9 +50,12 @@ export type Acted<A extends Aggregate, R> = {
 	of: <E extends StoredEvent>(event: StoredEventClass<E>) => E[];
 };
 
-/** What {@link Streams.act} gives: the outcome, or the DomainError the command returned. */
-export type ActOutcome<A extends Aggregate, R> =
-	Acted<A, Exclude<R, DomainError>> | Extract<R, DomainError>;
+/**
+ * The result of a command run by {@link Streams.act}: what it gave, or the DomainError it returned
+ * (or the error of the `Result` it returned).
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type ActOutcome<A extends Aggregate, R> = Result<Acted<A, ValueOf<R>>, ErrorOf<R>>;
 
 const load = async <A extends Aggregate>(target: AggregateClass<A>, id: string): Promise<A> => {
 	const records = await eventStore().load(id);
@@ -66,6 +70,56 @@ const inUnitOfWork = <T>(work: () => Promise<T>): Promise<T> =>
 	Service.exists(DATABASE_TRANSACTION_SERVICE) && !UnitOfWork.active()
 		? UnitOfWork.run(work)
 		: work();
+
+/** Runs a command on the loaded aggregate and appends what it recorded. */
+const apply = async <A extends Aggregate, R>(
+	aggregate: AggregateClass<A>,
+	id: string,
+	command: (aggregate: A) => R | PromiseLike<R>,
+	options_: ActOptions
+): Promise<ActOutcome<A, R>> => {
+	const loaded = await load(aggregate, id);
+	const given = Result.of(await command(loaded));
+	if (!given.check()) return given as Result<never, ErrorOf<R>>;
+	const value = given.result as ValueOf<R>;
+
+	const recorded = Aggregates.recorded(loaded);
+	if (recorded.length > 0) {
+		const type = Aggregates.nameOf(aggregate);
+		const from = Aggregates.loadedVersion(loaded);
+		const occurredAt = Clock.now();
+		const metadata = { ...options().eventMetadata?.(), ...options_.metadata };
+		const records: StoredEventRecord[] = recorded.map((event, i) => ({
+			...StoredEvents.encode(event),
+			aggregateId: id,
+			aggregateType: type,
+			version: from + i + 1,
+			metadata,
+			occurredAt
+		}));
+		await eventStore().append(records);
+		for (const [i, event] of recorded.entries()) {
+			const meta: StoredEventMeta = {
+				aggregateId: id,
+				aggregateType: type,
+				version: records[i]!.version,
+				occurredAt,
+				metadata,
+				replay: false
+			};
+			await runProjections(event, meta);
+			await runReactors(event, meta);
+		}
+		Aggregates.committed(loaded);
+	}
+	return Result.pass({
+		aggregate: loaded,
+		value,
+		recorded,
+		of: <E extends StoredEvent>(event: StoredEventClass<E>) =>
+			recorded.filter((e): e is E => e instanceof event)
+	});
+};
 
 /**
  * Event streams: load an aggregate from its stream and run its commands. The streams are kept by
@@ -87,8 +141,9 @@ export namespace Streams {
 	/**
 	 * Runs a command on an aggregate, in the open unit of work (or a new one): loads the stream,
 	 * runs the command, appends the events it recorded at the next versions, then runs the inline
-	 * projections and the reactors of each event. A command that returns a DomainError appends
-	 * nothing, and the error is returned. When another writer appended to the stream meanwhile,
+	 * projections and the reactors of each event. It gives the {@link AsyncResult} of the command.
+	 * A command that returns a DomainError, or a failed `Result`, appends nothing, and the result
+	 * fails with the error. When another writer appended to the stream meanwhile,
 	 * the append rejects with a `ConcurrencyConflictError`, which an action retries.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param aggregate The aggregate class.
@@ -98,55 +153,15 @@ export namespace Streams {
 	 * @example
 	 * ```ts
 	 * const spent = await Streams.act(Wallet, userId, (wallet) => wallet.spend(spendId, 120n));
-	 * if (isDomainError(spent)) return spent;
+	 * if (!spent.check()) return spent.error;
+	 * spent.result.value;
 	 * ```
 	 */
 	export const act = <A extends Aggregate, R>(
 		aggregate: AggregateClass<A>,
 		id: string,
-		command: (aggregate: A) => R | Promise<R>,
+		command: (aggregate: A) => R | PromiseLike<R>,
 		options_: ActOptions = {}
-	): Promise<ActOutcome<A, R>> =>
-		inUnitOfWork(async () => {
-			const loaded = await load(aggregate, id);
-			const value = await command(loaded);
-			if (value instanceof DomainError) return value as Extract<R, DomainError>;
-
-			const recorded = Aggregates.recorded(loaded);
-			if (recorded.length > 0) {
-				const type = Aggregates.nameOf(aggregate);
-				const from = Aggregates.loadedVersion(loaded);
-				const occurredAt = Clock.now();
-				const metadata = { ...options().eventMetadata?.(), ...options_.metadata };
-				const records: StoredEventRecord[] = recorded.map((event, i) => ({
-					...StoredEvents.encode(event),
-					aggregateId: id,
-					aggregateType: type,
-					version: from + i + 1,
-					metadata,
-					occurredAt
-				}));
-				await eventStore().append(records);
-				for (const [i, event] of recorded.entries()) {
-					const meta: StoredEventMeta = {
-						aggregateId: id,
-						aggregateType: type,
-						version: records[i]!.version,
-						occurredAt,
-						metadata,
-						replay: false
-					};
-					await runProjections(event, meta);
-					await runReactors(event, meta);
-				}
-				Aggregates.committed(loaded);
-			}
-			return {
-				aggregate: loaded,
-				value: value as Exclude<R, DomainError>,
-				recorded,
-				of: <E extends StoredEvent>(event: StoredEventClass<E>) =>
-					recorded.filter((e): e is E => e instanceof event)
-			};
-		});
+	): AsyncResult<Acted<A, ValueOf<R>>, ErrorOf<R>> =>
+		new AsyncResult(inUnitOfWork(() => apply(aggregate, id, command, options_)));
 }

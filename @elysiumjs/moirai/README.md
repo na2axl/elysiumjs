@@ -58,23 +58,33 @@ class WalletBalance extends Query<WalletBalanceInput, { balance: number }> {
 	}
 }
 
-// `Moirai` runs them. In a controller, which returns the outcome: a result, or the DomainError that refused the call.
+// `Moirai` runs them. In a controller, which returns the outcome: it answers the value, or the problem that refused the call.
 return Moirai.execute(TopUp, body, { idempotencyKey: headers['idempotency-key'] });
 return Moirai.ask(WalletBalance, { walletId });
 ```
 
-- `Action<TInput, TResult, TErrors>` and `Query<TInput, TResult, TErrors>` type `handle()`: it takes `TInput` and gives `TResult` or one of `TErrors`, the DomainErrors it returns (any DomainError by default). `Moirai.execute()` and `Moirai.ask()` take their input type and return types from `handle()`.
-- A refusal is a value. `Moirai.execute()` and `Moirai.ask()` return the DomainError that refused the call, and their return type lists it next to the result. A controller that returns it sends it as the problem of its route, and typed clients see it under its status. Check one with `isDomainError(outcome)`.
+- `Action<TInput, TResult, TErrors>` and `Query<TInput, TResult, TErrors>` type `handle()`: it takes `TInput` and gives `TResult` or one of `TErrors`, the DomainErrors it returns (any DomainError by default), or a `Result` of them. `Moirai.execute()` and `Moirai.ask()` take their input type and return types from `handle()`.
+- A refusal is a value. `Moirai.execute()` and `Moirai.ask()` give an `Outcome`, the `AsyncResult` of the call (see `Result` in `@elysiumjs/core`): awaited, it is a `Result` that passed with the value of the handler, or failed with the DomainError that refused the call, and its type lists that error. A controller that returns the outcome answers the value, or sends the error as the problem of its route, and typed clients see it under its status.
+
+```ts
+const balance = await Moirai.ask(WalletBalance, { walletId });
+if (!balance.check()) return balance.error;
+balance.result.balance;
+
+return Moirai.ask(WalletBalance, { walletId }).errorOr((balance) => view.render(balance));
+```
+
 - An input that does not match the schema is refused with a 422 `VALIDATION_FAILED` problem, with one entry per mistake.
 - When `authorize(input)` returns `false`, the call is refused with a 403 `FORBIDDEN` problem.
 - An action runs in a unit of work, or joins the one already open. A transient failure retries in a new unit of work, up to 3 attempts. Transient failures are errors with `transient: true`, and Postgres serialization failures and deadlocks. `retry: { attempts, isTransient }` sets them per action, such as to retry a returned optimistic-concurrency error; `retry: false` never retries. A transient DomainError that outlasts the attempts is returned.
-- A handler refuses a call by returning a `DomainError`, or throwing one. The unit of work then rolls back, nothing is stored for idempotency, and the error is returned to the caller. An action that joined an open unit of work hands it up: the unit rolls back when its opener returns it too.
+- A handler refuses a call by returning a `DomainError` or a failed `Result`, or throwing a `DomainError`. The unit of work then rolls back, nothing is stored for idempotency, and the error is returned to the caller. An action that joined an open unit of work hands it up: the unit rolls back when its opener returns it too.
 - An idempotent action needs a key, or it is refused with a 400 `IDEMPOTENCY_KEY_REQUIRED` problem. A repeat with the same key and input replays the stored response, as JSON; with another input, it is refused with a 422 `IDEMPOTENCY_KEY_REUSED` problem.
 - A key belongs to its owner: the current user by default (`currentUserId()` of core, else `anonymous`), or what `scope(input)` of the action or `Moirai.execute(..., { scope })` returns, such as a tenant and a user. Another owner presenting the same key runs the action on its own.
 - `serializeBy` makes calls that share a key run one after the other, so a double tap waits for the first call and replays its response.
 - `errors` is required: it lists every DomainError `handle()` gives, `[]` when it gives none, or the registration does not compile.
 - `Moirai.lock(key)` takes the same lock from inside a handler, for a key known only once the handler has read something. It holds the key until the unit of work ends, and throws `LockOutsideUnitOfWorkError` outside one. Take the locks of a unit of work in the same order everywhere.
-- Where a refusal is a bug, such as in a job or an event handler, `orThrow()` gives the result alone and throws the DomainError: `const wallet = await Moirai.execute(OpenWallet, input).orThrow()`. A handler that calls another one and passes its refusals on uses `orPass()`: it gives the result or a DomainError of the called handler, and throws `NestedCallRefusedError` for a refusal of moirai itself (an invalid input, a refused `authorize`, an idempotency key), since the calling handler built that call. `Moirai.ErrorsOf<typeof Action>` names the DomainErrors of the handler, without those of moirai.
+- Where a refusal is a bug, such as in a job or an event handler, `orThrow()` gives the value alone and throws the DomainError: `const wallet = await Moirai.execute(OpenWallet, input).orThrow()`. `orError()` gives the value or the DomainError, and `map()` and `andThen()` chain further steps without awaiting first.
+- A handler that calls another one and passes its refusals on uses `orPass()`: it gives the result of the call with the DomainErrors of the called handler only, and throws `NestedCallRefusedError` for a refusal of moirai itself (an invalid input, a refused `authorize`, an idempotency key), since the calling handler built that call. The handler may return it as it is: `return Moirai.execute(OpenSession, input).orPass()`. `Moirai.ErrorsOf<typeof Action>` names the DomainErrors of the handler, without those of moirai.
 
 ### Routes
 
@@ -224,19 +234,18 @@ export class Wallet extends Aggregate<WalletState> {
 - The state is a value: an evolve handler gives a new one. In `development` and `test`, it is frozen, so a mutation throws. An event without an evolve handler leaves the state as it is.
 - `name` is the aggregate type kept with each event, and defaults to the class name.
 
-`Streams.act()` runs a command in the open unit of work, or a new one: it loads the stream, runs the command, appends the events it recorded at the next versions, then runs the inline projections and the reactors of each event.
+`Streams.act()` runs a command in the open unit of work, or a new one: it loads the stream, runs the command, appends the events it recorded at the next versions, then runs the inline projections and the reactors of each event. It gives the `AsyncResult` of the command.
 
 ```ts
-import { isDomainError } from '@elysiumjs/core';
 import { Streams } from '@elysiumjs/moirai';
 
 // In an action:
 const spent = await Streams.act(Wallet, userId, (wallet) => wallet.spend(spendId, sellerId, 120n));
-if (isDomainError(spent)) return spent;
-return { balance: spent.aggregate.balance, spends: spent.of(KlapsSpent).length };
+if (!spent.check()) return spent.error;
+return { balance: spent.result.aggregate.balance, spends: spent.result.of(KlapsSpent).length };
 ```
 
-- A command that returns a DomainError appends nothing, and `act()` returns the error.
+- A command that returns a DomainError or a failed `Result` appends nothing, and the result of `act()` fails with the error.
 - When another writer appended to the stream since it was loaded, the append rejects with `ConcurrencyConflictError`, which is transient: an action retries it in a new unit of work, which loads the stream again.
 - Each event keeps metadata: the `eventMetadata` option of the module (such as the actor and the correlation id), then the `metadata` given to `act()`.
 - `Streams.retrieve(Wallet, id)` loads an aggregate to read its state.

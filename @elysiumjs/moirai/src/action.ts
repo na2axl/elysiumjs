@@ -12,16 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ProblemClass, ServiceDefinition } from '@elysiumjs/core';
+import type { Failed, Passed, ProblemClass, ServiceDefinition } from '@elysiumjs/core';
 import type { Static, TSchema } from 'typebox';
 import type { MoiraiStores } from './moirai.module';
 
 import {
+	AsyncResult,
 	Clock,
 	currentUserId,
 	DATABASE_TRANSACTION_SERVICE,
 	DomainError,
 	Metadata,
+	Result,
 	Service
 } from '@elysiumjs/core';
 import { UnitOfWork } from '@elysiumjs/mnemosyne';
@@ -56,11 +58,45 @@ export type HandlerContext = {
 };
 
 /**
- * What `handle()` gives: the result, or one of the DomainErrors that refuse the call.
+ * What `handle()` gives: the result or one of the DomainErrors that refuse the call, or a
+ * `Result` of them, or a promise of either.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 export type HandlerResult<TResult, TErrors extends DomainError = DomainError> =
-	Promise<TResult | TErrors> | TResult | TErrors;
+	| TResult
+	| TErrors
+	| Result<TResult, TErrors>
+	| PromiseLike<TResult | TErrors | Result<TResult, TErrors>>;
+
+type IsAny<T> = 0 extends 1 & T ? true : false;
+
+/**
+ * The value side of what a handler or a command gives: the value of a `Result`, or the members
+ * of a `T | DomainError` union that are not DomainErrors.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type ValueOf<V> =
+	IsAny<V> extends true
+		? any
+		: V extends Passed<infer T>
+			? T
+			: V extends Failed<DomainError> | DomainError
+				? never
+				: V;
+
+/**
+ * The error side of what a handler or a command gives: the error of a `Result`, or the
+ * DomainErrors of a `T | DomainError` union.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type ErrorOf<V> =
+	IsAny<V> extends true
+		? DomainError
+		: V extends Failed<infer E>
+			? E
+			: V extends DomainError
+				? V
+				: never;
 
 /**
  * An action class.
@@ -111,8 +147,8 @@ export type ExecuteArgs<C extends ActionClass> =
 export type AskArgs<C extends QueryClass> =
 	undefined extends InputOf<C> ? [input?: InputOf<C>] : [input: InputOf<C>];
 type OutcomeOf<C extends HandlerClass> = Awaited<ReturnType<InstanceType<C>['handle']>>;
-type ResultOf<C extends HandlerClass> = Exclude<OutcomeOf<C>, DomainError>;
-type ErrorsOf<C extends HandlerClass> = Extract<OutcomeOf<C>, DomainError>;
+type ResultOf<C extends HandlerClass> = ValueOf<OutcomeOf<C>>;
+type ErrorsOf<C extends HandlerClass> = ErrorOf<OutcomeOf<C>>;
 
 /** Checks that the `errors` of a registration list every DomainError `handle()` gives. */
 type ListsErrorsOf<C extends HandlerClass, E extends readonly ProblemClass[]> = [
@@ -126,56 +162,35 @@ type ListsErrorsOf<C extends HandlerClass, E extends readonly ProblemClass[]> = 
 			>;
 		};
 
-/**
- * What `Moirai.execute()` gives: the result, or the DomainError that refused the call, from the
- * handler or from moirai itself.
- * @author Axel Nana <axel.nana@workbud.com>
- */
-export type ActionOutcome<C extends ActionClass> =
-	| OutcomeOf<C>
-	| InvalidInputError
-	| CallForbiddenError
-	| IdempotencyKeyRequiredError
-	| IdempotencyKeyReusedError;
-
-/**
- * What `Moirai.ask()` gives: the result, or the DomainError that refused the call.
- * @author Axel Nana <axel.nana@workbud.com>
- */
-export type QueryOutcome<C extends QueryClass> =
-	OutcomeOf<C> | InvalidInputError | CallForbiddenError;
-
-/**
- * The promise `Moirai.execute()` and `Moirai.ask()` give: it resolves to the result or to the
- * DomainError that refused the call, and `orThrow()` resolves to the result only, throwing the
- * DomainError instead, for callers where a refusal is a bug, such as a job or an event handler.
- * @author Axel Nana <axel.nana@workbud.com>
- * @example
- * ```ts
- * const wallet = await Moirai.execute(OpenWallet, { userId }).orThrow();
- * ```
- */
-export interface Outcome<TOutcome> extends Promise<TOutcome> {
-	/** Resolves to the result, and rejects with the DomainError that refused the call. */
-	orThrow(): Promise<Exclude<TOutcome, DomainError>>;
-
-	/**
-	 * Resolves to the result or to a DomainError of the called handler, for a handler that calls
-	 * another one and passes its refusals on. A refusal of moirai itself (invalid input, refused
-	 * call, idempotency key) rejects with {@link NestedCallRefusedError}: the calling handler built
-	 * that call, so it is a bug, not a refusal to pass on.
-	 * @example
-	 * ```ts
-	 * const opened = await Moirai.execute(OpenSession, input).orPass();
-	 * if (isDomainError(opened)) return opened; // a DomainError of OpenSession
-	 * ```
-	 */
-	orPass(): Promise<Exclude<TOutcome, MoiraiRefusal>>;
-}
-
 /** The refusals moirai itself gives a call, apart from those of its handler. */
 type MoiraiRefusal =
 	InvalidInputError | CallForbiddenError | IdempotencyKeyRequiredError | IdempotencyKeyReusedError;
+
+/**
+ * The DomainErrors that refuse an action: those of its handler, and those of moirai itself.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type ActionErrors<C extends ActionClass> = ErrorsOf<C> | MoiraiRefusal;
+
+/**
+ * The DomainErrors that refuse a query: those of its handler, an invalid input and a refused call.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type QueryErrors<C extends QueryClass> =
+	ErrorsOf<C> | InvalidInputError | CallForbiddenError;
+
+/**
+ * The result of `Moirai.execute()`: the value of the handler, or the DomainError that refused the
+ * call, from the handler or from moirai itself.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type ActionOutcome<C extends ActionClass> = Result<ResultOf<C>, ActionErrors<C>>;
+
+/**
+ * The result of `Moirai.ask()`: the value of the handler, or the DomainError that refused the call.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type QueryOutcome<C extends QueryClass> = Result<ResultOf<C>, QueryErrors<C>>;
 
 const MOIRAI_REFUSALS = [
 	InvalidInputError,
@@ -184,22 +199,49 @@ const MOIRAI_REFUSALS = [
 	IdempotencyKeyReusedError
 ] as const;
 
-/** Adds `orThrow()` and `orPass()` to the promise of a call. */
-const outcome = <T>(promise: Promise<T>, name: string): Outcome<T> =>
-	Object.assign(promise, {
-		orThrow: () =>
-			promise.then((value) => {
-				if (value instanceof DomainError) throw value;
-				return value as Exclude<T, DomainError>;
-			}),
-		orPass: () =>
-			promise.then((value) => {
-				if (MOIRAI_REFUSALS.some((refusal) => value instanceof refusal)) {
-					throw new NestedCallRefusedError(name, value as DomainError);
+/**
+ * What `Moirai.execute()` and `Moirai.ask()` give: the {@link AsyncResult} of the call, which
+ * awaits to its `Result`. `orThrow()` resolves to the value and throws the DomainError, for
+ * callers where a refusal is a bug, such as a job or an event handler; `errorOr(transform)`
+ * resolves to the error or the transformed value, as a handler returns it.
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @example
+ * ```ts
+ * const wallet = await Moirai.execute(OpenWallet, { userId }).orThrow();
+ * return Moirai.ask(WalletBalance, { walletId }).errorOr((balance) => view.render(balance));
+ * ```
+ */
+export class Outcome<T, E extends DomainError = DomainError> extends AsyncResult<T, E> {
+	readonly #call: string;
+
+	public constructor(promise: PromiseLike<Result<T, E>>, call: string) {
+		super(promise);
+		this.#call = call;
+	}
+
+	/**
+	 * The result to come with the DomainErrors of the called handler only, for a handler that
+	 * calls another one and passes its refusals on. A refusal of moirai itself (invalid input,
+	 * refused call, idempotency key) rejects with {@link NestedCallRefusedError}: the calling
+	 * handler built that call, so it is a bug, not a refusal to pass on.
+	 * @example
+	 * ```ts
+	 * const opened = await Moirai.execute(OpenSession, input).orPass();
+	 * if (!opened.check()) return opened.error; // a DomainError of OpenSession
+	 * ```
+	 */
+	public orPass(): AsyncResult<T, Exclude<E, MoiraiRefusal>> {
+		return new AsyncResult(
+			this.then((result) => {
+				const error = result.error;
+				if (error && MOIRAI_REFUSALS.some((refusal) => error instanceof refusal)) {
+					throw new NestedCallRefusedError(this.#call, error);
 				}
-				return value as Exclude<T, MoiraiRefusal>;
+				return result as Result<T, Exclude<E, MoiraiRefusal>>;
 			})
-	});
+		);
+	}
+}
 
 /**
  * How an action retries a transient failure.
@@ -362,8 +404,8 @@ export abstract class Action<
 	}
 
 	/**
-	 * Runs the action with its validated input. Returning or throwing a DomainError refuses the
-	 * call and rolls its unit of work back.
+	 * Runs the action with its validated input. Returning or throwing a DomainError, or returning
+	 * a failed `Result`, refuses the call and rolls its unit of work back.
 	 */
 	public abstract handle(input: TInput, context: HandlerContext): HandlerResult<TResult, TErrors>;
 }
@@ -412,7 +454,10 @@ export abstract class Query<
 		];
 	}
 
-	/** Runs the query with its validated input. Returning or throwing a DomainError refuses it. */
+	/**
+	 * Runs the query with its validated input. Returning or throwing a DomainError, or returning a
+	 * failed `Result`, refuses it.
+	 */
 	public abstract handle(input: TInput, context: HandlerContext): HandlerResult<TResult, TErrors>;
 }
 
@@ -442,18 +487,18 @@ const validate = <S extends TSchema>(
 	return value;
 };
 
-/** The result, or the DomainError it is thrown as, so that the unit of work rolls back. */
-const unwrap = <T>(result: T | DomainError): T => {
-	if (result instanceof DomainError) throw result;
-	return result;
-};
+/**
+ * The value a handler gives, or the DomainError it is thrown as, so that the unit of work rolls
+ * back. A `Result` gives its value or throws its error.
+ */
+const unwrap = <T>(given: unknown): T => Result.of(given).orThrow() as T;
 
-/** Runs a call, and gives the DomainError that refused it as its value. */
-const settle = async <T>(call: () => Promise<T>): Promise<T | DomainError> => {
+/** Runs a call, and gives its result: failed with the DomainError that refused it. */
+const settle = async <T>(call: () => Promise<T>): Promise<Result<T, DomainError>> => {
 	try {
-		return await call();
+		return Result.pass(await call());
 	} catch (error) {
-		if (error instanceof DomainError) return error;
+		if (error instanceof DomainError) return Result.fail(error);
 		throw error;
 	}
 };
@@ -464,10 +509,11 @@ export namespace Moirai {
 	 * work (or joins the open one), retrying transient failures, and replaying the stored response
 	 * of an idempotent action called again with the same key.
 	 *
-	 * A refusal is a value: the DomainError the handler returns or throws, or one of moirai's own
-	 * (an invalid input, a refused `authorize`, a missing or reused idempotency key). The unit of
-	 * work rolls back, nothing is stored for idempotency, and the error is returned, so a handler
-	 * that returns it sends it as the problem of its route.
+	 * The call gives an {@link Outcome}, which awaits to its `Result`. A refusal fails it: the
+	 * DomainError the handler returns or throws (or the error of the `Result` it returns), or one
+	 * of moirai's own (an invalid input, a refused `authorize`, a missing or reused idempotency
+	 * key). The unit of work rolls back and nothing is stored for idempotency. A route that returns
+	 * the outcome answers its value, or its problem.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param action The action class.
 	 * @param args The raw input, left out when `handle()` takes none, and the idempotency key and
@@ -476,8 +522,8 @@ export namespace Moirai {
 	export const execute = <C extends ActionClass>(
 		action: C,
 		...[input, call = {}]: ExecuteArgs<C>
-	): Outcome<ActionOutcome<C>> =>
-		outcome(
+	): Outcome<ResultOf<C>, ActionErrors<C>> =>
+		new Outcome(
 			settle(() => {
 				const props = Metadata.get(ACTION, action) as
 					(ActionOptions & { name: string }) | undefined;
@@ -565,7 +611,7 @@ export namespace Moirai {
 			try {
 				const handler = instanceOf(action);
 				const context: HandlerContext = { name, idempotencyKey: key, attempt };
-				if (!idempotent) return unwrap(await handler.handle(value, context)) as ResultOf<C>;
+				if (!idempotent) return unwrap<ResultOf<C>>(await handler.handle(value, context));
 
 				const store = idempotencyStore();
 				const hash = await requestHash(value);
@@ -575,7 +621,7 @@ export namespace Moirai {
 						return seen.response as ResultOf<C>;
 					throw new IdempotencyKeyReusedError(key!);
 				}
-				const response = unwrap(await handler.handle(value, context)) as ResultOf<C>;
+				const response = unwrap<ResultOf<C>>(await handler.handle(value, context));
 				await store.put({
 					key: storedKey!,
 					action: name,
@@ -611,8 +657,9 @@ export namespace Moirai {
 
 	/**
 	 * Runs a query in the module that registers it: validates the input, checks `authorize`, and
-	 * runs the handler with the services of that module. A refusal is a value: the DomainError the
-	 * handler returns or throws, an invalid input, or a refused `authorize`.
+	 * runs the handler with the services of that module. The call gives an {@link Outcome}, which
+	 * awaits to its `Result`. A refusal fails it: the DomainError the handler returns or throws
+	 * (or the error of the `Result` it returns), an invalid input, or a refused `authorize`.
 	 * @author Axel Nana <axel.nana@workbud.com>
 	 * @param query The query class.
 	 * @param args The raw input, left out when `handle()` takes none.
@@ -620,8 +667,8 @@ export namespace Moirai {
 	export const ask = <C extends QueryClass>(
 		query: C,
 		...[input]: AskArgs<C>
-	): Outcome<QueryOutcome<C>> =>
-		outcome(
+	): Outcome<ResultOf<C>, QueryErrors<C>> =>
+		new Outcome(
 			settle(async () => {
 				const props = Metadata.get(QUERY, query) as (QueryOptions & { name: string }) | undefined;
 				if (!props) throw new TypeError(`${query.name} is not marked with @Query.register().`);
@@ -630,7 +677,7 @@ export namespace Moirai {
 					const value = validate(props.input, input, props.name);
 					if (props.authorize && !(await props.authorize(value)))
 						throw new CallForbiddenError(props.name);
-					return instanceOf(query).handle(value, { name: props.name, attempt: 1 });
+					return unwrap(await instanceOf(query).handle(value, { name: props.name, attempt: 1 }));
 				});
 			}) as Promise<QueryOutcome<C>>,
 			query.name
@@ -645,5 +692,5 @@ export namespace Moirai {
 	 * type ProfileEffectError = Moirai.ErrorsOf<typeof UnblockCreatorProfile>;
 	 * ```
 	 */
-	export type ErrorsOf<C extends HandlerClass> = Extract<OutcomeOf<C>, DomainError>;
+	export type ErrorsOf<C extends HandlerClass> = ErrorOf<OutcomeOf<C>>;
 }

@@ -15,7 +15,7 @@
 import type { Static } from 'typebox';
 import type { StoredEventMeta } from '../src';
 
-import { DomainError, isDomainError, Service } from '@elysiumjs/core';
+import { DomainError, isDomainError, Result, Service } from '@elysiumjs/core';
 import { withUnitOfWork } from '@elysiumjs/mnemosyne';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { Type as t } from 'typebox';
@@ -263,7 +263,9 @@ describe('StoredEvent', () => {
 	});
 
 	it('refuses data that does not match its schema', async () => {
-		const outcome = Streams.act(Wallet, 'u-1', (wallet) => wallet.topUp('t-1', 'many' as never));
+		const outcome = Streams.act(Wallet, 'u-1', (wallet) =>
+			wallet.topUp('t-1', 'many' as never)
+		).orError();
 		expect(outcome).rejects.toThrow();
 		expect(events.records).toHaveLength(0);
 	});
@@ -380,8 +382,7 @@ describe('Streams.act', () => {
 		await Streams.act(Wallet, 'u-1', (wallet) => wallet.topUp('t-1', 100n));
 		const outcome = await Streams.act(Wallet, 'u-1', (wallet) => wallet.spendTwice(30n), {
 			metadata: { causationId: 'c-1' }
-		});
-		if (isDomainError(outcome)) throw outcome;
+		}).orThrow();
 
 		expect(outcome.aggregate.balance).toBe(40n);
 		expect(outcome.aggregate.version).toBe(3);
@@ -406,17 +407,32 @@ describe('Streams.act', () => {
 		expect(transactions).toEqual(['BEGIN', 'COMMIT', 'BEGIN', 'COMMIT']);
 	});
 
-	it('appends nothing when the command is refused', async () => {
+	it('appends nothing when the command is refused, and fails with its error', async () => {
 		const outcome = await Streams.act(Wallet, 'u-1', (wallet) => wallet.spend('s', 5n));
-		expect(outcome).toBeInstanceOf(InsufficientKlaps);
+		expect(outcome.check()).toBe(false);
+		expect(outcome.error).toBeInstanceOf(InsufficientKlaps);
 		expect(events.records).toHaveLength(0);
 		expect(movements).toHaveLength(0);
+	});
+
+	it('takes a Result from the command', async () => {
+		await Streams.act(Wallet, 'u-1', (wallet) => wallet.topUp('t-1', 100n));
+		const spend = (wallet: Wallet, klaps: bigint) =>
+			Result.of(wallet.spend(`s-${klaps}`, klaps)).map(() => wallet.balance);
+
+		const passed = await Streams.act(Wallet, 'u-1', (wallet) => spend(wallet, 30n));
+		expect(passed.check() && passed.result.value).toBe(70n);
+		expect(events.records).toHaveLength(2);
+
+		const failed = await Streams.act(Wallet, 'u-1', (wallet) => spend(wallet, 500n));
+		expect(failed.error).toBeInstanceOf(InsufficientKlaps);
+		expect(events.records).toHaveLength(2);
 	});
 
 	it('rolls the events back when a projection fails', async () => {
 		await Streams.act(Wallet, 'u-1', (wallet) => wallet.topUp('t-1', 100n));
 		failProjection = true;
-		expect(Streams.act(Wallet, 'u-1', (wallet) => wallet.spend('s', 5n))).rejects.toThrow(
+		expect(Streams.act(Wallet, 'u-1', (wallet) => wallet.spend('s', 5n)).orError()).rejects.toThrow(
 			'projection failed'
 		);
 		await Bun.sleep(0);
@@ -441,13 +457,15 @@ describe('Streams.act', () => {
 		class SpendAction extends Action<undefined, bigint> {
 			override async handle() {
 				attempts++;
-				const outcome = await Streams.act(Wallet, 'u-1', (wallet) => wallet.spend('s', 10n));
+				const outcome = await Streams.act(Wallet, 'u-1', (wallet) =>
+					wallet.spend('s', 10n)
+				).orError();
 				if (isDomainError(outcome)) return outcome;
 				return outcome.aggregate.balance;
 			}
 		}
 
-		expect(await Moirai.execute(SpendAction)).toBe(190n);
+		expect(await Moirai.execute(SpendAction).orError()).toBe(190n);
 		expect(attempts).toBe(2);
 		expect(events.records.map((record) => record.version)).toEqual([1, 2, 3]);
 	});
@@ -458,7 +476,7 @@ describe('Streams.act', () => {
 			Streams.act(Wallet, 'u-1', async (wallet) => {
 				await events.append([{ ...events.records[0]!, version: 2 }]);
 				wallet.topUp('t-2', 1n);
-			})
+			}).orError()
 		).rejects.toThrow(ConcurrencyConflictError);
 	});
 });
