@@ -14,7 +14,7 @@
 
 import type { Secret } from './secret';
 
-import { DomainError } from '@elysiumjs/core';
+import { Clock, DomainError } from '@elysiumjs/core';
 
 import { hmac, verifyHmac } from './crypto';
 import { resolveSecret } from './secret';
@@ -57,7 +57,10 @@ export namespace SignedUrl {
 		const target = new URL(url);
 		target.searchParams.delete('signature');
 		if (options.expiresIn !== undefined) {
-			target.searchParams.set('expires', String(Math.floor(Date.now() / 1000) + options.expiresIn));
+			target.searchParams.set(
+				'expires',
+				String(Math.floor(Clock.epochMs() / 1000) + options.expiresIn)
+			);
 		}
 		const secret = await resolveSecret(options.secret, 'signed URL secret');
 		target.searchParams.set('signature', await hmac(secret, signedPart(target)));
@@ -93,7 +96,7 @@ export namespace SignedUrl {
 			throw new InvalidSignatureError(false);
 		}
 		const expires = target.searchParams.get('expires');
-		if (expires !== null && Number(expires) * 1000 < Date.now())
+		if (expires !== null && Number(expires) * 1000 < Clock.epochMs())
 			throw new InvalidSignatureError(true);
 	};
 }

@@ -21,9 +21,10 @@ import { dirname, join, relative } from 'node:path';
 
 import { Command, CommandArgumentType, ConsoleFormat } from '@elysiumjs/core';
 import prompts from 'prompts';
-import { assign, objectify, pascal, snake } from 'radash';
+import { assign, objectify, pascal } from 'radash';
 
 import { listAssets, readAsset } from '../assets';
+import { fileName } from '../utils';
 import {
 	appPackages,
 	getAppCode,
@@ -157,7 +158,10 @@ export const createProject = async (
 				? join(projectPath, 'src', 'modules', module)
 				: join(projectPath, 'src');
 		await copyAssets('templates/shared-module', modulePath, options.name);
-		await Bun.write(join(modulePath, `${snake(module)}.module.ts`), getModuleCode(pascal(module)));
+		await Bun.write(
+			join(modulePath, `${fileName(module)}.module.ts`),
+			getModuleCode(pascal(module))
+		);
 	}
 
 	const packageFile = join(projectPath, 'package.json');
@@ -210,7 +214,9 @@ export const createProject = async (
 				modules,
 				(m) => m,
 				(m) =>
-					options.template === 'multi' ? `#${m}/${snake(m)}.module` : `#root/${snake(m)}.module`
+					options.template === 'multi'
+						? `#${m}/${fileName(m)}.module`
+						: `#root/${fileName(m)}.module`
 			),
 			enabledModules,
 			options.runtime,

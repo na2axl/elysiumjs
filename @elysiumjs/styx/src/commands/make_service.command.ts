@@ -16,11 +16,11 @@ import type { PromptObject } from 'prompts';
 
 import { Command, CommandArgumentType } from '@elysiumjs/core';
 import prompts from 'prompts';
-import { snake } from 'radash';
 import formatter from 'string-template';
 
 import { readAsset } from '../assets';
 import { addToModuleHint, getModulePath, parseProjectConfig } from '../config';
+import { fileName } from '../utils';
 import { BaseCommand } from './base.command';
 
 /**
@@ -192,7 +192,7 @@ export class MakeServiceCommand extends BaseCommand {
 		const path = answers.module ? await getModulePath(answers.module) : './src';
 
 		// Write to file
-		const name = snake(answers.name.replace('Service', ''));
+		const name = fileName(answers.name.replace('Service', ''));
 		const file = Bun.file(`${path}/services/${name}.service.ts`);
 		await file.write(stub);
 

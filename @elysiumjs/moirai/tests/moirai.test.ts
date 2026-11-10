@@ -17,6 +17,7 @@ import type { MoiraiOptions } from '../src';
 
 import {
 	Application,
+	Clock,
 	ConflictError,
 	DomainError,
 	isDomainError,
@@ -482,6 +483,24 @@ describe('outbox', () => {
 		);
 		expect(sent).toEqual([]);
 		expect(await Outbox.relay()).toEqual({ dispatched: 0, retried: 0, dead: 0 });
+	});
+
+	it('relays a delayed row once the clock reaches it', async () => {
+		try {
+			await UnitOfWork.run(() =>
+				Outbox.enqueue({
+					kind: 'mail.send',
+					payload: { to: 'tomorrow' },
+					availableAt: new Date(Clock.epochMs() + 86_400_000)
+				})
+			);
+			expect(await Outbox.relay()).toEqual({ dispatched: 0, retried: 0, dead: 0 });
+			Clock.travel(86_400_000 + 1000);
+			expect(await Outbox.relay()).toEqual({ dispatched: 1, retried: 0, dead: 0 });
+			expect(sent).toEqual([{ to: 'tomorrow' }]);
+		} finally {
+			Clock.reset();
+		}
 	});
 
 	it('retries a failing row with a backoff, then marks it dead', async () => {

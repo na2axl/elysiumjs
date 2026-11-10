@@ -15,7 +15,7 @@
 import type { CronSchedule } from './cron';
 import type { JobClass } from './job';
 
-import { ElysiumError, getLogger, Metadata, ModuleContext, Service } from '@elysiumjs/core';
+import { Clock, ElysiumError, getLogger, Metadata, ModuleContext, Service } from '@elysiumjs/core';
 import { Redis } from '@elysiumjs/redis';
 
 import { Cron } from './cron';
@@ -213,7 +213,7 @@ export abstract class Scheduler<TJob extends JobClass<any, any> = JobClass<any, 
 	 * @param at The tick. Defaults to now; it is taken to the minute, in UTC.
 	 * @returns The number of jobs dispatched.
 	 */
-	public static async dispatch(job: ScheduledJob, at: Date = new Date()): Promise<number> {
+	public static async dispatch(job: ScheduledJob, at: Date = Clock.now()): Promise<number> {
 		const { schedule, jobClass, name } = job;
 		if (!schedule.scheduler) {
 			await Heracles.dispatch(jobClass, schedule.args as never);

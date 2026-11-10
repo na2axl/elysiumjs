@@ -26,6 +26,7 @@ import type {
 	StoredEventRecord
 } from '@elysiumjs/moirai';
 
+import { Clock } from '@elysiumjs/core';
 import { Database } from '@elysiumjs/mnemosyne-drizzle';
 import { ConcurrencyConflictError, IdempotencyConflictError } from '@elysiumjs/moirai';
 import { and, asc, eq, gt, inArray, is, isNull, lt, lte, max, sql } from 'drizzle-orm';
@@ -428,7 +429,7 @@ export class DrizzleProjectionStorage implements ProjectionStorage {
 
 	public async built(name: string, version: number): Promise<void> {
 		const t = this.options.table;
-		const builtAt = new Date();
+		const builtAt = Clock.now();
 		await this.db
 			.insert(t)
 			.values({ name, version, builtAt })

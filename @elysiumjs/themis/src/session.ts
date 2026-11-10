@@ -14,7 +14,7 @@
 
 import type { HttpContext } from './context';
 
-import { currentEnvironment, getLogger, Middleware } from '@elysiumjs/core';
+import { Clock, currentEnvironment, getLogger, Middleware } from '@elysiumjs/core';
 
 import { currentContext, readCookie, themisConfig, writeCookie } from './context';
 import { decrypt, encrypt, hmac, randomToken, verifyHmac } from './crypto';
@@ -44,7 +44,7 @@ export class MemorySessionStore implements SessionStore {
 	public async load(id: string): Promise<SessionData | null> {
 		const entry = this.#sessions.get(id);
 		if (!entry) return null;
-		if (entry.expiresAt <= Date.now()) {
+		if (entry.expiresAt <= Clock.epochMs()) {
 			this.#sessions.delete(id);
 			return null;
 		}
@@ -54,7 +54,7 @@ export class MemorySessionStore implements SessionStore {
 	public async save(id: string, data: SessionData, ttlSeconds: number): Promise<void> {
 		this.#sessions.set(id, {
 			data: JSON.stringify(data),
-			expiresAt: Date.now() + ttlSeconds * 1000
+			expiresAt: Clock.epochMs() + ttlSeconds * 1000
 		});
 	}
 
@@ -209,7 +209,8 @@ export const loadSession = async (context: HttpContext): Promise<Session> => {
 		const parsed = opened
 			? (JSON.parse(opened) as { id: string; data: SessionData; exp: number })
 			: null;
-		if (parsed && parsed.exp > Date.now()) session = new Session(parsed.id, parsed.data, false);
+		if (parsed && parsed.exp > Clock.epochMs())
+			session = new Session(parsed.id, parsed.data, false);
 	} else if (raw && store !== 'cookie') {
 		const dot = raw.lastIndexOf('.');
 		const id = raw.slice(0, dot);
@@ -251,7 +252,7 @@ export const commitSession = async (context: HttpContext): Promise<void> => {
 		const sealed = await encrypt(
 			secret,
 			COOKIE_PURPOSE,
-			JSON.stringify({ id: session.id, data, exp: Date.now() + ttl * 1000 })
+			JSON.stringify({ id: session.id, data, exp: Clock.epochMs() + ttl * 1000 })
 		);
 		if (sealed.length > MAX_COOKIE_SESSION) throw new SessionTooLargeError(sealed.length);
 		writeCookie(context, name, sealed, { ...cookie, maxAge: ttl });

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { Clock } from '@elysiumjs/core';
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import {
@@ -119,6 +120,25 @@ describe('JWT', () => {
 		expect(Jwt.verify(token, { secret, audience: 'other' })).rejects.toBeInstanceOf(
 			InvalidTokenError
 		);
+	});
+
+	it('signs and checks expiries on the application clock', async () => {
+		const secret = 'k'.repeat(32);
+		try {
+			Clock.freeze('2026-01-01T00:00:00Z');
+			const token = await Jwt.sign({}, { secret, expiresIn: '5m' });
+			expect(await Jwt.verify(token, { secret })).toMatchObject({
+				iat: Date.parse('2026-01-01T00:00:00Z') / 1000,
+				exp: Date.parse('2026-01-01T00:05:00Z') / 1000
+			});
+			const link = await SignedUrl.sign('https://x.test/a', { secret, expiresIn: 60 });
+			expect(await SignedUrl.verify(link, { secret })).toBe(true);
+			Clock.travel(10 * 60 * 1000);
+			expect(Jwt.verify(token, { secret })).rejects.toThrow('has expired');
+			expect(await SignedUrl.verify(link, { secret })).toBe(false);
+		} finally {
+			Clock.reset();
+		}
 	});
 
 	it('signs with asymmetric keys', async () => {

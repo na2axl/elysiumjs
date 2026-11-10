@@ -14,7 +14,7 @@
 
 import type { OutboxRow } from './stores';
 
-import { Service } from '@elysiumjs/core';
+import { Clock, Service } from '@elysiumjs/core';
 
 import { inOwnerModule } from './config';
 import { DuplicateEventConsumerError, UnknownEventConsumerError } from './errors';
@@ -187,8 +187,9 @@ export namespace Event {
 		event: E,
 		payload: EventPayload<E>
 	): Promise<string> => {
-		const publishedAt = new Date();
-		const id = uuidv7(publishedAt.getTime());
+		const publishedAt = Clock.now();
+		// The id keeps the real time, so that ids stay ordered when the clock is moved.
+		const id = uuidv7();
 		const deliveries = [...CONSUMERS]
 			.filter(([, handler]) => handler.event === event)
 			.map(([consumer]) => ({
