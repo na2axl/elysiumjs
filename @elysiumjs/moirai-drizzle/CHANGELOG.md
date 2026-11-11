@@ -1,5 +1,16 @@
 # @elysiumjs/moirai-drizzle
 
+## 0.4.0
+
+### Minor Changes
+
+- [#97](https://github.com/na2axl/elysiumjs/pull/97) [`7eb3d1c`](https://github.com/na2axl/elysiumjs/commit/7eb3d1ccf4c5602fe67b7f3fac0da587047f168a) Thanks [@na2axl](https://github.com/na2axl)! - `moiraiTables(schema, { partitioned: true })` partitions `events` by `occurred_at` and `outbox` by `created_at`, with that column in their primary and unique keys.
+
+### Patch Changes
+
+- Updated dependencies [[`4d5809f`](https://github.com/na2axl/elysiumjs/commit/4d5809f264de7195ad865c2676d12fe3e96da859), [`7eb3d1c`](https://github.com/na2axl/elysiumjs/commit/7eb3d1ccf4c5602fe67b7f3fac0da587047f168a)]:
+  - @elysiumjs/mnemosyne-drizzle@0.8.0
+
 ## 0.3.6
 
 ### Patch Changes
