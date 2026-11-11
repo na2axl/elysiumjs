@@ -68,6 +68,37 @@ describe('Resource.serialize', () => {
 		});
 	});
 
+	it('serializes an object through the union branch it belongs to', () => {
+		const SignIn = t.Union([
+			t.Object({ accessToken: t.String(), refreshToken: t.String(), expiresAt: t.String() }),
+			t.Object({ expiresAt: t.String() }),
+			t.Object({ secondFactor: t.Object({ methods: t.Array(t.String()) }) })
+		]);
+		expect(
+			Resource.serialize(SignIn, { secondFactor: { methods: ['totp'] }, internal: true })
+		).toEqual({ secondFactor: { methods: ['totp'] } });
+		expect(
+			Resource.serialize(SignIn, { accessToken: 'a', refreshToken: 'r', expiresAt: 'e', x: 1 })
+		).toEqual({ accessToken: 'a', refreshToken: 'r', expiresAt: 'e' });
+		expect(Resource.serialize(SignIn, { expiresAt: 'e', x: 1 })).toEqual({ expiresAt: 'e' });
+	});
+
+	it('serializes a discriminated union through the branch of its literal', () => {
+		const Method = t.Union([
+			t.Object({ method: t.Literal('otp'), channel: t.String() }),
+			t.Object({ method: t.Literal('totp'), secret: t.String(), uri: t.String() })
+		]);
+		expect(Resource.serialize(Method, { method: 'totp', secret: 's', uri: 'u' })).toEqual({
+			method: 'totp',
+			secret: 's',
+			uri: 'u'
+		});
+		expect(Resource.serialize(Method, { method: 'otp', channel: 'sms', secret: 's' })).toEqual({
+			method: 'otp',
+			channel: 'sms'
+		});
+	});
+
 	it('keeps null in nullable fields and serializes arrays item by item', () => {
 		expect(Resource.serialize(t.Array(UserResource), [{ ...row, team: null }])).toEqual([
 			{

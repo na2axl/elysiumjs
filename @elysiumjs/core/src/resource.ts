@@ -233,10 +233,47 @@ const projectNode = (schema: SchemaNode): SchemaNode => {
 };
 
 /** Picks the branch of a union that fits a value. */
+/**
+ * Whether an object value fits an object branch: it has every required property, and every
+ * property the branch fixes to one value (a literal, such as a discriminator) has that value.
+ */
+const fitsObject = (branch: SchemaNode, value: Record<string, unknown>): boolean => {
+	if (!(branch.required ?? []).every((key) => value[key] !== undefined)) return false;
+	return Object.entries(branch.properties!).every(([key, property]) => {
+		if (!('const' in property)) return true;
+		return value[key] === undefined || value[key] === (property as { const: unknown }).const;
+	});
+};
+
+/**
+ * The object branch of a union that an object value belongs to: the first that it fits and that
+ * keeps the most of its properties, else the first object branch.
+ */
+const objectBranchFor = (
+	branches: SchemaNode[],
+	value: Record<string, unknown>
+): SchemaNode | undefined => {
+	const objects = branches.filter(isObjectSchema);
+	const keys = Object.keys(value).filter((key) => value[key] !== undefined);
+	let best: SchemaNode | undefined;
+	let kept = -1;
+	for (const branch of objects) {
+		if (!fitsObject(branch, value)) continue;
+		const count = keys.filter((key) => key in branch.properties!).length;
+		if (count > kept) {
+			best = branch;
+			kept = count;
+		}
+	}
+	return best ?? objects[0];
+};
+
 const branchFor = (branches: SchemaNode[], value: unknown): SchemaNode | undefined => {
 	if (value === null) return branches.find((branch) => branch.type === 'null');
 	if (Array.isArray(value)) return branches.find((branch) => branch.type === 'array');
-	if (typeof value === 'object') return branches.find(isObjectSchema);
+	if (typeof value === 'object') {
+		return objectBranchFor(branches, value as Record<string, unknown>);
+	}
 	return branches.find((branch) => branch.type !== 'null');
 };
 
