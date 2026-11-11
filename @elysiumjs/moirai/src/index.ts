@@ -64,6 +64,7 @@ export {
 	InvalidInputError,
 	LockOutsideUnitOfWorkError,
 	NestedCallRefusedError,
+	UndeclaredRefusalError,
 	MissingStoreError,
 	PayloadReplacementUnsupportedError,
 	UnknownEventConsumerError,

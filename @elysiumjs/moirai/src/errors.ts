@@ -243,3 +243,21 @@ export class NestedCallRefusedError extends ElysiumError {
 		this.cause = refusal;
 	}
 }
+
+/**
+ * An action or a query was refused with a DomainError that its `errors` do not list, such as the
+ * refusal of a nested call passed on with `orThrow()`. Its route never declared that problem, so
+ * it is a bug: a 500, logged, not the problem of the refusal. The refusal is the `cause`.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class UndeclaredRefusalError extends ElysiumError {
+	constructor(
+		public readonly call: string,
+		public readonly refusal: DomainError
+	) {
+		super(
+			`${call} was refused with ${refusal.constructor.name} (${refusal.message}), which its errors do not list.`
+		);
+		this.cause = refusal;
+	}
+}

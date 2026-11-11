@@ -36,7 +36,8 @@ import {
 	IdempotencyKeyReusedError,
 	InvalidInputError,
 	LockOutsideUnitOfWorkError,
-	NestedCallRefusedError
+	NestedCallRefusedError,
+	UndeclaredRefusalError
 } from './errors';
 import { requestHash } from './hash';
 import { moduleStores } from './moirai.module';
@@ -202,7 +203,8 @@ const MOIRAI_REFUSALS = [
 /**
  * What `Moirai.execute()` and `Moirai.ask()` give: the {@link AsyncResult} of the call, which
  * awaits to its `Result`. `orThrow()` resolves to the value and throws the DomainError, for
- * callers where a refusal is a bug, such as a job or an event handler; `errorOr(transform)`
+ * callers where a refusal is a bug, such as a job or an event handler (inside a handler, a
+ * refusal the caller's `errors` do not list becomes an `UndeclaredRefusalError`); `errorOr(transform)`
  * resolves to the error or the transformed value, as a handler returns it.
  * @author Axel Nana <axel.nana@workbud.com>
  * @example
@@ -493,13 +495,22 @@ const validate = <S extends TSchema>(
  */
 const unwrap = <T>(given: unknown): T => Result.of(given).orThrow() as T;
 
-/** Runs a call, and gives its result: failed with the DomainError that refused it. */
-const settle = async <T>(call: () => Promise<T>): Promise<Result<T, DomainError>> => {
+/**
+ * Runs a call, and gives its result: failed with the DomainError that refused it, when the
+ * `errors` of the handler class list it. Any other DomainError is a bug, thrown as an
+ * {@link UndeclaredRefusalError}.
+ */
+const settle = async <T>(
+	handler: HandlerClass,
+	call: () => Promise<T>
+): Promise<Result<T, DomainError>> => {
 	try {
 		return Result.pass(await call());
 	} catch (error) {
-		if (error instanceof DomainError) return Result.fail(error);
-		throw error;
+		if (!(error instanceof DomainError)) throw error;
+		const declared = (handler as unknown as { errors?: readonly ProblemClass[] }).errors ?? [];
+		if (declared.some((problem) => error instanceof problem)) return Result.fail(error);
+		throw new UndeclaredRefusalError(handler.name, error);
 	}
 };
 
@@ -524,7 +535,7 @@ export namespace Moirai {
 		...[input, call = {}]: ExecuteArgs<C>
 	): Outcome<ResultOf<C>, ActionErrors<C>> =>
 		new Outcome(
-			settle(() => {
+			settle(action, () => {
 				const props = Metadata.get(ACTION, action) as
 					(ActionOptions & { name: string }) | undefined;
 				if (!props) throw new TypeError(`${action.name} is not marked with @Action.register().`);
@@ -669,7 +680,7 @@ export namespace Moirai {
 		...[input]: AskArgs<C>
 	): Outcome<ResultOf<C>, QueryErrors<C>> =>
 		new Outcome(
-			settle(async () => {
+			settle(query, async () => {
 				const props = Metadata.get(QUERY, query) as (QueryOptions & { name: string }) | undefined;
 				if (!props) throw new TypeError(`${query.name} is not marked with @Query.register().`);
 				// The query runs in its module, so that it uses the services of that module.
