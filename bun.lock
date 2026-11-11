@@ -10,16 +10,16 @@
         "@ianvs/prettier-plugin-sort-imports": "^4.7.1",
         "@types/bun": "^1.4.4",
         "@types/node": "^26.6.6",
-        "prettier": "^3.9.10",
+        "prettier": "^3.10.0",
         "rimraf": "^6.1.4",
-        "turbo": "^2.11.10",
+        "turbo": "^2.11.11",
         "type-fest": "^5.10.0",
         "typescript": "^7.0.2",
       },
     },
     "@elysiumjs/argus": {
       "name": "@elysiumjs/argus",
-      "version": "0.3.12",
+      "version": "0.3.13",
       "dependencies": {
         "@opentelemetry/api": "^1.10.0",
         "@opentelemetry/exporter-trace-otlp-http": "^0.300.0",
@@ -42,7 +42,7 @@
     },
     "@elysiumjs/ariadne": {
       "name": "@elysiumjs/ariadne",
-      "version": "0.4.0",
+      "version": "0.4.1",
       "dependencies": {
         "typebox": "^1.3.0",
       },
@@ -83,7 +83,7 @@
     },
     "@elysiumjs/cerberus": {
       "name": "@elysiumjs/cerberus",
-      "version": "0.3.15",
+      "version": "0.3.16",
       "dependencies": {
         "@casl/ability": "^7.0.2",
       },
@@ -96,7 +96,7 @@
     },
     "@elysiumjs/core": {
       "name": "@elysiumjs/core",
-      "version": "0.23.1",
+      "version": "0.24.0",
       "dependencies": {
         "@elysia/openapi": "^2.0.0-rc.0",
         "elysia": "^2.0.0-rc.1",
@@ -110,7 +110,7 @@
     },
     "@elysiumjs/hephaestus": {
       "name": "@elysiumjs/hephaestus",
-      "version": "0.5.11",
+      "version": "0.5.12",
       "dependencies": {
         "zod": "^4.6.7",
       },
@@ -126,7 +126,7 @@
     },
     "@elysiumjs/heracles": {
       "name": "@elysiumjs/heracles",
-      "version": "0.11.2",
+      "version": "0.11.3",
       "dependencies": {
         "commander": "^15.0.0",
         "radash": "catalog:",
@@ -142,7 +142,7 @@
     },
     "@elysiumjs/heracles-workers": {
       "name": "@elysiumjs/heracles-workers",
-      "version": "0.2.10",
+      "version": "0.2.11",
       "devDependencies": {
         "@elysiumjs/core": "workspace:*",
         "@elysiumjs/heracles": "workspace:*",
@@ -158,7 +158,7 @@
     },
     "@elysiumjs/hermes": {
       "name": "@elysiumjs/hermes",
-      "version": "0.5.12",
+      "version": "0.5.13",
       "dependencies": {
         "pino": "^10.4.0",
         "pino-pretty": "^13.2.0",
@@ -173,7 +173,7 @@
     },
     "@elysiumjs/mnemosyne": {
       "name": "@elysiumjs/mnemosyne",
-      "version": "0.7.3",
+      "version": "0.8.0",
       "dependencies": {
         "cache-manager": "^7.2.9",
         "cacheable": "^2.5.0",
@@ -192,7 +192,7 @@
     },
     "@elysiumjs/mnemosyne-drizzle": {
       "name": "@elysiumjs/mnemosyne-drizzle",
-      "version": "0.7.0",
+      "version": "0.7.1",
       "dependencies": {
         "drizzle-orm": "^1.0.0-rc.5",
         "prompts": "^2.4.2",
@@ -223,7 +223,7 @@
     },
     "@elysiumjs/moirai": {
       "name": "@elysiumjs/moirai",
-      "version": "0.8.0",
+      "version": "0.8.1",
       "dependencies": {
         "typebox": "^1.3.0",
       },
@@ -245,7 +245,7 @@
     },
     "@elysiumjs/moirai-drizzle": {
       "name": "@elysiumjs/moirai-drizzle",
-      "version": "0.3.5",
+      "version": "0.3.6",
       "dependencies": {
         "drizzle-orm": "^1.0.0-rc.5",
       },
@@ -263,7 +263,7 @@
     },
     "@elysiumjs/plugin-sentry": {
       "name": "@elysiumjs/plugin-sentry",
-      "version": "0.4.6",
+      "version": "0.4.7",
       "dependencies": {
         "@elysia/opentelemetry": "^2.0.0-rc.0",
         "@sentry/bun": "^11.9.0",
@@ -277,7 +277,7 @@
     },
     "@elysiumjs/redis": {
       "name": "@elysiumjs/redis",
-      "version": "0.1.12",
+      "version": "0.1.13",
       "dependencies": {
         "radash": "catalog:",
       },
@@ -290,7 +290,7 @@
     },
     "@elysiumjs/runtime-bun": {
       "name": "@elysiumjs/runtime-bun",
-      "version": "0.1.12",
+      "version": "0.1.13",
       "devDependencies": {
         "@elysiumjs/core": "workspace:*",
         "elysia": "^2.0.0-rc.1",
@@ -301,7 +301,7 @@
     },
     "@elysiumjs/runtime-node": {
       "name": "@elysiumjs/runtime-node",
-      "version": "0.1.12",
+      "version": "0.1.13",
       "devDependencies": {
         "@elysiumjs/core": "workspace:*",
         "elysia": "^2.0.0-rc.1",
@@ -312,7 +312,7 @@
     },
     "@elysiumjs/runtime-workers": {
       "name": "@elysiumjs/runtime-workers",
-      "version": "0.1.12",
+      "version": "0.1.13",
       "devDependencies": {
         "@elysiumjs/core": "workspace:*",
         "@elysiumjs/mnemosyne": "workspace:*",
@@ -325,7 +325,7 @@
     },
     "@elysiumjs/styx": {
       "name": "@elysiumjs/styx",
-      "version": "0.14.2",
+      "version": "0.15.0",
       "bin": {
         "styx": "dist/cli.js",
       },
@@ -346,7 +346,7 @@
     },
     "@elysiumjs/themis": {
       "name": "@elysiumjs/themis",
-      "version": "0.4.3",
+      "version": "0.4.4",
       "dependencies": {
         "@simplewebauthn/server": "^14.0.3",
         "jose": "^6.2.15",
@@ -408,7 +408,7 @@
     },
     "create-elysium": {
       "name": "create-elysium",
-      "version": "0.3.5",
+      "version": "0.3.6",
       "bin": {
         "create-elysium": "./index.js",
       },
@@ -992,17 +992,17 @@
 
     "@swc/types": ["@swc/types@0.1.28", "", { "dependencies": { "@swc/counter": "^0.1.3" } }, "sha512-V6Mnml8v09QALx6K0elJ7o9K/MkVDtW3t6L+7Ou/JcWtb3xwId2AH4FeOceySd2JaO87IMw4+6vSZxLm34LPbw=="],
 
-    "@turbo/darwin-64": ["@turbo/darwin-64@2.11.10", "", { "os": "darwin", "cpu": "x64" }, "sha512-By4idRap5+nLnMuRzLB4qkOPRlvNdyY1ne4VJYDyUoUB11H94k7uif9mbe3JT8JSNXs1D68uMcBj6hJ/jMQRvA=="],
+    "@turbo/darwin-64": ["@turbo/darwin-64@2.11.11", "", { "os": "darwin", "cpu": "x64" }, "sha512-HMMeUIEAsmyIbSYn1ySvF/4gGMa0joiTMq4dQDuloIAnOpbtFT3JEiVsYnASdTWDXvplbRbZlqjU1EBeSR9G1A=="],
 
-    "@turbo/darwin-arm64": ["@turbo/darwin-arm64@2.11.10", "", { "os": "darwin", "cpu": "arm64" }, "sha512-pyEYlVcuexOPa92p0Wlwl9YT1Is5D60lxN3ItWm3g30YLvFaUq86TF4BBWg5ZAc0uMTnrOzCvuCsOBTdzUWnRQ=="],
+    "@turbo/darwin-arm64": ["@turbo/darwin-arm64@2.11.11", "", { "os": "darwin", "cpu": "arm64" }, "sha512-+8iySNgqYWY6PZYUQzYu6zn0C04z2OEq1vQ6oMGsJ9sxN6wOpg1gzi1AJ5VKDHviWvMUjhqng51hTEQZOuiqYQ=="],
 
-    "@turbo/linux-64": ["@turbo/linux-64@2.11.10", "", { "os": [ "linux", "android", ], "cpu": "x64" }, "sha512-1tYeR/IDZ5HEdsb0jNq2L2xam5nMQ+g80tlV2BZmv4OFw+pMcUM0mMmUcfc5wXPPNHVNPuDMjh9Y8G8HgXPLZA=="],
+    "@turbo/linux-64": ["@turbo/linux-64@2.11.11", "", { "os": [ "linux", "android", ], "cpu": "x64" }, "sha512-uImTKFYCFKsoFxjaXeJXlMPv4uU3OIIDjyzoIwYVqOtu9LnCZ/5/fzu/WP6+G9YfwGAPRplTHkKFfcI5t97RGw=="],
 
-    "@turbo/linux-arm64": ["@turbo/linux-arm64@2.11.10", "", { "os": [ "linux", "android", ], "cpu": "arm64" }, "sha512-HuekQxvVGhUd46g1Im/DKdOtglHr4/gguZAvzEpPUgtxNkztSa8lWhQEGQ+EmPQ0n7w19qjThFU+OfEEd0uvlw=="],
+    "@turbo/linux-arm64": ["@turbo/linux-arm64@2.11.11", "", { "os": [ "linux", "android", ], "cpu": "arm64" }, "sha512-Y7xffSVfyyYRGzNy6PLdrFL4xXN6iTuR3W0SyJvH/yd3d4defA6dansZwJpPDVnIpD8a2Qn256DwY/Qin4Ip4g=="],
 
-    "@turbo/windows-64": ["@turbo/windows-64@2.11.10", "", { "os": "win32", "cpu": "x64" }, "sha512-UJOP3BkbreY3/JlMgJR6ZiimxYIBn+c+B4tnBIxD0E9c3Estmk+XoVNVBNBottZLNRXe3/ScgOU4+/k8tIWysg=="],
+    "@turbo/windows-64": ["@turbo/windows-64@2.11.11", "", { "os": "win32", "cpu": "x64" }, "sha512-e2WqNtkPGo3QDwNNwwBo89Dx3PtSJ9Wp9QuRNzn80rrRnSHB+1mfBMZTpdHjA8/G/sG9rl76TdWdpgVsimjRdg=="],
 
-    "@turbo/windows-arm64": ["@turbo/windows-arm64@2.11.10", "", { "os": "win32", "cpu": "arm64" }, "sha512-xOkEjF3ws/b/YNlc+bvJHMYBn+vL+QbEISZFVi0qS+ImmhA1X3/gmNmBrjjIG3dg6aeN+n6gQitzSkXQ286qJQ=="],
+    "@turbo/windows-arm64": ["@turbo/windows-arm64@2.11.11", "", { "os": "win32", "cpu": "arm64" }, "sha512-LURivfmgv34Osm8NR1gZGx4vdlux9KAgRM+FoooXNG0838ff0+akWZ76iPSke0NS2rsf7Z4Gw+YSaygzNTZuRA=="],
 
     "@tybys/wasm-util": ["@tybys/wasm-util@0.10.4", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-W3c4gRigFS0T/Ma4qIYF3GDAc5AQdHb1yL5znJT1Zv1YaD9Kitx656wBjvr19qbiosmZT8lWDM5BEMynUqX65A=="],
 
@@ -1094,7 +1094,7 @@
 
     "blake3-wasm": ["blake3-wasm@2.1.5", "", {}, "sha512-F1+K8EbfOZE49dtoPtmxUQrpXaBIl3ICvasLh+nJta0xkz+9kF/7uet9fLnwKqhDrmj6g+6K3Tw9yQPUg2ka5g=="],
 
-    "brace-expansion": ["brace-expansion@5.0.12", "", { "dependencies": { "balanced-match": "^4.0.2" } }, "sha512-YovQ3rzhaLMIrDjNDMkNS01tea93qhEhG5xy8f6+R0l+dw3Ki+5sCoIoI942iuLZTHWogWktgwVDhU09iNEimQ=="],
+    "brace-expansion": ["brace-expansion@5.0.13", "", { "dependencies": { "balanced-match": "^4.0.2" } }, "sha512-Vh3dmFbc4wZeox7M9I/0L9GfFd83Su4+yCck/OF9Gi/P/dAHn0RT7X4K9R7gMNMhDck3DvhR6QXsnQdjjgwNvQ=="],
 
     "bufferutil": ["bufferutil@4.2.0", "", { "dependencies": { "node-gyp-build": "^4.3.0" } }, "sha512-gyy58jET9kst2IGyBKb96a4Y2bPGTHXGyCd0/1eqIV3hr1Sz3VxtA8n7bXh8fLIuE2K6Z0Upax5a5Msx+HU1IQ=="],
 
@@ -1202,7 +1202,7 @@
 
     "get-east-asian-width": ["get-east-asian-width@1.7.0", "", {}, "sha512-XjH1AECxf0giL2V1aU8vKyRR2ppRUb5c0EvT7zuJTokQ74bNo52zOtghqdWIqrhUD79fo3x0WfKZdOqxF6LG1Q=="],
 
-    "glob": ["glob@14.0.4", "", { "dependencies": { "minimatch": "^11.0.5", "minipass": "^7.1.3", "path-scurry": "^3.0.0" } }, "sha512-mMiwNKoJZ4HAIRVJxotO6LsNRReA30gQwP9E2/p94tfLv+jygCNpKDjhhSL6OLY6LE371EZm5EAf7RpYuUqlsw=="],
+    "glob": ["glob@14.0.5", "", { "dependencies": { "minimatch": "^11.0.5", "minipass": "^7.1.3", "path-scurry": "^3.0.0" } }, "sha512-nbKW5Sl53DEM5PkmZ5Jwfeyss1ohuqcgOBjOarSjz1fp8W4ss4EOOvKADQRbApD6JmVBX+HkpZYfBez4wXbeQQ=="],
 
     "has-flag": ["has-flag@4.0.0", "", {}, "sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ=="],
 
@@ -1284,7 +1284,7 @@
 
     "miniflare": ["miniflare@5.20261104.0-beta", "", { "dependencies": { "@cspotcode/source-map-support": "0.8.1", "sharp": "0.35.5", "undici": "7.30.1", "workerd": "1.20261104.1", "ws": "8.21.0", "youch": "4.1.0-beta.10" } }, "sha512-pYZ2n85+FYUb7s0oIVcQxO63/+wgaknm+A/kQjctJqshvHPJs3UtnzaIZ7xrrHMOk8atD7yAfauf6G9VAv7Upg=="],
 
-    "minimatch": ["minimatch@11.0.7", "", { "dependencies": { "@isaacs/nonrecursive-glob-match": "^1.1.0", "brace-expansion": "^5.0.12" } }, "sha512-Tnk+M9mPjqKDZlUd77eMSjPjhnlBIa1mABOwetMryIshUwi1YmOBdGFfQnHgn4Z8A66eLT8ENzJrxwYmKfqrZg=="],
+    "minimatch": ["minimatch@11.0.8", "", { "dependencies": { "@isaacs/nonrecursive-glob-match": "^1.1.0", "brace-expansion": "^5.0.12" } }, "sha512-nFQuYSTVrGvysVBps5Ih+0BdnYFN/Cj3C816r6+p7yK+FHrVLGE4O4N9AFwykrlNlvM2HYt+Rad1Uiro6h88Ig=="],
 
     "minimist": ["minimist@1.2.8", "", {}, "sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA=="],
 
@@ -1370,7 +1370,7 @@
 
     "postgres-interval": ["postgres-interval@1.2.0", "", { "dependencies": { "xtend": "^4.0.0" } }, "sha512-9ZhXKM/rw350N1ovuWHbGxnGh/SNJ4cnxHiM0rxE4VN41wsg8P8zWn9hv/buK00RP4WvlOyr/RBDiptyxVbkZQ=="],
 
-    "prettier": ["prettier@3.9.10", "", { "bin": { "prettier": "bin/prettier.cjs" } }, "sha512-skGHTH1Yb9QvaTC4hWnRTzEYtCpApF0UMBPz+t/0ZPzP8ihefo/btKd+QA7pUE0fEwA1SbS/NmhyEcstdXOIdA=="],
+    "prettier": ["prettier@3.10.0", "", { "bin": { "prettier": "bin/prettier.cjs" } }, "sha512-mBi4765LgjO1PFjlEs7pUeK0nb1bw71c+N4/ItfeUWNdY5cV2pRKaFpbbFRYmDJMO+5ZwzGxHRqHxFZna7iv5w=="],
 
     "process-warning": ["process-warning@5.1.1", "", {}, "sha512-oCkNVj4OKnKEcocVBcDfiIugN1/cE6rgfT3nCtzeqZPA8+rIxMaQ0xXzIkGP8Gj2qUaP1UR7uhJ1VD8lUCpzCg=="],
 
@@ -1454,7 +1454,7 @@
 
     "tsyringe": ["tsyringe@4.10.0", "", { "dependencies": { "tslib": "^1.9.3" } }, "sha512-axr3IdNuVIxnaK5XGEUFTu3YmAQ6lllgrvqfEoR16g/HGnYY/6We4oWENtAnzK6/LpJ2ur9PAb80RBt7/U4ugw=="],
 
-    "turbo": ["turbo@2.11.10", "", { "optionalDependencies": { "@turbo/darwin-64": "2.11.10", "@turbo/darwin-arm64": "2.11.10", "@turbo/linux-64": "2.11.10", "@turbo/linux-arm64": "2.11.10", "@turbo/windows-64": "2.11.10", "@turbo/windows-arm64": "2.11.10" }, "bin": { "turbo": "bin/turbo" } }, "sha512-3GJYwig8ygEI89oaOZdduJX8/aw6O9eRPYHoIt6T3FZl9hkKjiyIspufJoVgqXihPoJu8M5CSV0DlZvzfohBCw=="],
+    "turbo": ["turbo@2.11.11", "", { "optionalDependencies": { "@turbo/darwin-64": "2.11.11", "@turbo/darwin-arm64": "2.11.11", "@turbo/linux-64": "2.11.11", "@turbo/linux-arm64": "2.11.11", "@turbo/windows-64": "2.11.11", "@turbo/windows-arm64": "2.11.11" }, "bin": { "turbo": "bin/turbo" } }, "sha512-AI4UJbUE/2cVZdoXJ4PODc8qvrjhQQX9Fa93eKGOI6Ims/w7+kUIb9T1jhlgSnZcf+gtUruci/ohSwqtNNC5Yw=="],
 
     "tweetnacl": ["tweetnacl@1.0.3", "", {}, "sha512-6rt+RN7aOi1nGMyC4Xa5DdYiukl2UWCbcJft7YhxReBGQD7OAM8Pbxw6YMo4r2diNEA8FEmu32YOn9rhaiE5yw=="],
 

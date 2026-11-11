@@ -1,6 +1,6 @@
 {
   "name": "@elysiumjs/hephaestus",
-  "version": "0.5.11",
+  "version": "0.5.12",
   "license": "Apache-2.0",
   "description": "Compilation and bundling utilities for Elysium.js apps.",
   "private": false,

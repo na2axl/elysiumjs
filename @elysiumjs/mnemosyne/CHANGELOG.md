@@ -1,5 +1,17 @@
 # @elysiumjs/mnemosyne
 
+## 0.8.0
+
+### Minor Changes
+
+- [#91](https://github.com/na2axl/elysiumjs/pull/91) [`94c990e`](https://github.com/na2axl/elysiumjs/commit/94c990e794e91a1b3ed3bc005ebd7e535b862e8d) Thanks [@na2axl](https://github.com/na2axl)! - Seeders: `@Seeder.register()` classes listed in a module's `seeders`, run by `styx db:seed` in their module and in a transaction of their own, ordered by `after` (seeder classes), with default names from the module and class, `manual`, `env`, `connection`, `--only`, `--file`, `--arg` and `--list`. `styx make:seeder` generates one. Packages add their own module lists by augmenting `ModuleCollections`.
+
+### Patch Changes
+
+- Updated dependencies [[`94c990e`](https://github.com/na2axl/elysiumjs/commit/94c990e794e91a1b3ed3bc005ebd7e535b862e8d)]:
+  - @elysiumjs/core@0.24.0
+  - @elysiumjs/redis@0.1.13
+
 ## 0.7.3
 
 ### Patch Changes
