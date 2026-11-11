@@ -1,6 +1,6 @@
 {
   "name": "@elysiumjs/core",
-  "version": "0.23.0",
+  "version": "0.23.1",
   "license": "Apache-2.0",
   "description": "A structured web framework built on ElysiaJS, for Bun, Node.js and Cloudflare Workers.",
   "private": false,
