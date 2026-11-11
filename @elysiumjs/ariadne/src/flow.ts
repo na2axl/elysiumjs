@@ -44,6 +44,23 @@ const STATE_HEADERS = t.Object({
 	...ownerHeader
 });
 
+/** What the start route answers: the shape of `FlowStart`. */
+const START_RESPONSE = t.Object({
+	flowKey: t.String(),
+	owner: t.Optional(t.String({ description: 'The owner token of a guest flow.' })),
+	nextSteps: t.Array(t.String()),
+	backSteps: t.Array(t.String())
+});
+
+/** What the state route answers: the shape of `FlowStatus`. */
+const STATE_RESPONSE = t.Object({
+	flowKey: t.String(),
+	step: t.Union([t.String(), t.Null()]),
+	nextSteps: t.Array(t.String()),
+	backSteps: t.Array(t.String()),
+	answer: t.Unknown()
+});
+
 /** The headers of a step route. */
 const STEP_HEADERS = t.Object({
 	[FLOW_KEY_HEADER]: t.String({ description: 'The key of the flow, from the start response.' }),
@@ -98,8 +115,11 @@ export type FlowRefusal<S> = {
 export type FlowControllerOptions = Omit<HttpControllerProps, 'path'> & {
 	/** The path of the flow's routes. Defaults to `/flows/{name}`. */
 	path?: string;
-	/** How long the flow lives after its last step, in seconds. */
-	ttl: number;
+	/**
+	 * How long the flow lives after its last step, in seconds, or a function that gives it, read
+	 * each time a flow starts or a step is committed (for example from the configuration).
+	 */
+	ttl: number | (() => number);
 	/** `user`: owned by the signed-in user. `guest`: owned by a token answered at start. */
 	owner: 'guest' | 'user';
 	/** The steps accepted first. Defaults to the first declared step. */
@@ -147,7 +167,7 @@ export type FlowStepDescription = {
  */
 export type FlowDescription = {
 	name: string;
-	ttl: number;
+	ttl: number | (() => number);
 	owner: 'guest' | 'user';
 	start: string[];
 	steps: Map<string, FlowStepDescription>;
@@ -199,7 +219,9 @@ export namespace Flow {
 			if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(name)) {
 				throw new InvalidFlowError(name, 'needs a kebab-case name');
 			}
-			if (!(ttl > 0)) throw new InvalidFlowError(name, 'needs a positive ttl');
+			if (typeof ttl !== 'function' && !(ttl > 0)) {
+				throw new InvalidFlowError(name, 'needs a positive ttl');
+			}
 			const steps: Map<string, FlowStepDescription> =
 				Metadata.get(STEPS, target.prototype) ?? new Map();
 			if (steps.size === 0) throw new InvalidFlowError(name, 'has no steps');
@@ -228,11 +250,17 @@ export namespace Flow {
 				Http.context()(proto, key, 0);
 				decorator(proto, key, Object.getOwnPropertyDescriptor(proto, key)!);
 			};
-			route('ariadne:start', Http.post('/'), function (this: object, http: any) {
-				return engine.start(http, this);
-			});
-			route('ariadne:state', Http.get('/', { headers: STATE_HEADERS }), (http: any) =>
-				engine.state(http)
+			route(
+				'ariadne:start',
+				Http.post('/', { status: 201, response: { 201: START_RESPONSE } }),
+				function (this: object, http: any) {
+					return engine.start(http, this);
+				}
+			);
+			route(
+				'ariadne:state',
+				Http.get('/', { headers: STATE_HEADERS, response: STATE_RESPONSE }),
+				(http: any) => engine.state(http)
 			);
 
 			Http.controller((path ?? `/flows/${name}`) as `/${string}`, http)(target as any);

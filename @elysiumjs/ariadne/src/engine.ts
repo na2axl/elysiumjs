@@ -15,7 +15,7 @@
 import type { FlowAdvance, FlowContext, FlowDescription, FlowRefusal, FlowStepRun } from './flow';
 import type { FlowRecord, FlowStore } from './store';
 
-import { DomainError, Http, Service, userIdOf } from '@elysiumjs/core';
+import { DomainError, Http, Result, Service, userIdOf } from '@elysiumjs/core';
 
 import {
 	FlowCompletedError,
@@ -24,6 +24,7 @@ import {
 	FlowStepInProgressError,
 	FlowUnexpectedStepError,
 	FlowUserRequiredError,
+	InvalidFlowError,
 	InvalidFlowRequestError,
 	MissingFlowStoreError
 } from './errors';
@@ -161,11 +162,19 @@ export class FlowEngine {
 		return new FlowUnexpectedStepError(step, this.position(record), record.lastAnswer);
 	}
 
+	/** How long the flow lives after its last step, in seconds. */
+	private ttl(): number {
+		const { ttl, name } = this.flow;
+		const seconds = typeof ttl === 'function' ? ttl() : ttl;
+		if (!(seconds > 0)) throw new InvalidFlowError(name, 'needs a positive ttl');
+		return seconds;
+	}
+
 	/** `POST /flows/{flow}`: starts a flow, and answers its key (and the owner token of a guest flow). */
 	public async start(http: FlowHttpContext, _controller: object) {
 		const owner = this.flow.owner === 'user' ? this.user(http) : randomToken();
 		const flowKey = crypto.randomUUID();
-		await this.store.init(this.key(flowKey), owner, this.flow.ttl);
+		await this.store.init(this.key(flowKey), owner, this.ttl());
 		http.set.status = 201;
 		return {
 			flowKey,
@@ -262,8 +271,10 @@ export class FlowEngine {
 						: {}
 					: claim.state;
 			const state = rewinding && target.onRewind ? await target.onRewind(before, ctx) : before;
-			const result = await run({ state, ctx });
-			// A returned DomainError refuses the step like a thrown one: nothing is committed.
+			const given = await run({ state, ctx });
+			// A returned DomainError, or a failed Result, refuses the step like a thrown one:
+			// nothing is committed. A passed Result gives its value.
+			const result = Result.is(given) ? given.orThrow() : given;
 			if (result instanceof DomainError) throw result;
 			if (isRefusal(result)) {
 				// The claim is given back by amend.
@@ -282,7 +293,7 @@ export class FlowEngine {
 				state: advance.state,
 				answer: advance.answer,
 				terminal,
-				ttlSeconds: this.flow.ttl
+				ttlSeconds: this.ttl()
 			});
 			if (!committed.ok) {
 				throw this.refusal(committed.reason, (await store.load(key)) ?? record, stepName);

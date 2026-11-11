@@ -62,10 +62,12 @@ export class SignUpFlow {
 
 - `next` lists the steps that may follow the step, or is a function of the state the step produced. The flow ends when it gives no step, which is the default.
 - `back` lists the earlier steps the client may submit again from there, and `onRewind(state, ctx)` runs on the state of a step submitted again.
+- `ttl` is how long the flow lives after its last step, in seconds. It may be a function that reads it from the configuration, called each time a flow starts or a step is committed.
 - `start` lists the steps accepted first, and defaults to the first declared step. `name` names a step after something other than its method.
 - `@Flow.initial()` marks the method that builds the state before the first step. Without one, the state starts as `{}`.
 - `@Flow.state()` injects the state, and `@Flow.context()` the flow, its key, the step id and the owner.
 - `Flow.advance(state, answer)` moves the flow forward. A step that returns anything else answers it and keeps the state.
+- A step may return a `Result` (or an `AsyncResult`): a passed one counts as its value, a failed one refuses the step with its error, like a returned or thrown `DomainError`.
 - `Flow.refuse(state, error)` refuses the step but keeps its state, such as a counted attempt. With `{ end: true }`, the flow is deleted.
 - A step that throws commits nothing, and the client may retry the same step id.
 - A submission holds its step for `lease` seconds (30 by default) while it runs, and the step runs on the state the store holds at that moment, so attempts that race see each other's refusals. A retry of a submission that outlives its lease runs the step again, so a step that may run longer sets a longer `lease`.
