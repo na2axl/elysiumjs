@@ -12,13 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { MigrationRun } from '../migration';
+
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { Command, CommandArgumentType } from '@elysiumjs/core';
+import { Command, CommandArgumentType, Service } from '@elysiumjs/core';
 import { isValidTenantId } from '@elysiumjs/mnemosyne';
 
 import { Database } from '../database';
+import { Migration } from '../migration';
 import { getMigrationName, planMigrations } from '../migrations';
 import { getMigrationsPath } from './project';
 
@@ -143,26 +146,44 @@ export class MigrationRunCommand extends Command {
 				this.info(`Migration ${this.bold(from)} is now tracked as ${this.bold(to)}.`);
 			}
 
-			if (sqlFiles.length === 0) {
-				this.success('No new migrations to apply.');
-				return;
-			}
-
-			const s = this.spinner(`Running migrations for tenant ${this.bold(this.tenant)}...`);
+			const hooks = await Service.resolveAll(Migration.Hooks);
 
 			const [{ max }]: [{ max?: number }] =
 				await sql`SELECT MAX(batch) + 1 AS max FROM elysium_migrations;`;
 
-			const batch = max ?? 0;
+			const applied: string[] = [];
+			const run: MigrationRun = {
+				sql,
+				tenant: this.tenant,
+				connection: this.connection,
+				batch: max ?? 0,
+				pending: sqlFiles.map((path) => getMigrationName(path)),
+				applied
+			};
 
-			for (const path of sqlFiles) {
-				await sql.file(path);
-				const [{ name }] =
-					await sql`INSERT INTO elysium_migrations (name, batch, applied_at) VALUES (${getMigrationName(path)}, ${batch}, ${new Date()}) RETURNING name;`;
-				s.pause(`Migration ${this.bold(name)} applied successfully.`);
+			for (const hook of hooks) await hook.before?.(run);
+
+			if (sqlFiles.length === 0) {
+				this.success('No new migrations to apply.');
+			} else {
+				const s = this.spinner(`Running migrations for tenant ${this.bold(this.tenant)}...`);
+
+				for (const path of sqlFiles) {
+					const step = { sql, name: getMigrationName(path), path, run };
+					for (const hook of hooks) await hook.beforeEach?.(step);
+
+					await sql.file(path);
+					await sql`INSERT INTO elysium_migrations (name, batch, applied_at) VALUES (${step.name}, ${run.batch}, ${new Date()});`;
+					applied.push(step.name);
+
+					for (const hook of hooks) await hook.afterEach?.(step);
+					s.pause(`Migration ${this.bold(step.name)} applied successfully.`);
+				}
+
+				s.complete(`Migrations for tenant ${this.bold(this.tenant)} applied successfully.`);
 			}
 
-			s.complete(`Migrations for tenant ${this.bold(this.tenant)} applied successfully.`);
+			for (const hook of hooks) await hook.after?.(run);
 		});
 	}
 

@@ -12,15 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { MigrationHook, MigrationRun, MigrationStep } from '../src';
+
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { Application, Service } from '@elysiumjs/core';
+import { Application, Module, Service } from '@elysiumjs/core';
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import prompts from 'prompts';
 
-import { DrizzleModule } from '../src';
+import { DrizzleModule, Migration } from '../src';
 
 type Statement = { tx: boolean; text: string };
 
@@ -136,12 +138,18 @@ describe('migration:run', () => {
 		schemaExists: boolean,
 		args: string[] = [],
 		tenant = 'acme',
-		setup: (fake: ReturnType<typeof fakeBunSql>) => void = () => {}
+		setup: (fake: ReturnType<typeof fakeBunSql>) => void = () => {},
+		services: Function[] = []
 	) => {
 		const fake = fakeBunSql(schemaExists);
 		setup(fake);
+		@Module.register({ services: services as never })
+		class HooksModule extends Module {}
 		@Application.register({
-			modules: [DrizzleModule.with({ connections: { default: { client: fake.client as never } } })]
+			modules: [
+				DrizzleModule.with({ connections: { default: { client: fake.client as never } } }),
+				HooksModule
+			]
 		})
 		class TestApp extends Application {}
 		const app = new TestApp();
@@ -252,5 +260,108 @@ describe('migration:run', () => {
 
 		expect(client!.begin).toHaveBeenCalled();
 		expect(client!.close).toHaveBeenCalled();
+	});
+
+	describe('hooks', () => {
+		/**
+		 * Builds a hook class recording its calls, as a statement in the transaction and in `calls`.
+		 * @param label Prefixes the recorded calls.
+		 * @param calls Receives the calls.
+		 * @param overrides Replaces some methods.
+		 */
+		const recorder = (label: string, calls: string[], overrides: Partial<MigrationHook> = {}) => {
+			@Migration.hook()
+			class Recorder implements MigrationHook {
+				public async before({ sql, tenant, pending, applied }: MigrationRun) {
+					calls.push(`${label}.before ${tenant} [${pending}] [${applied}]`);
+					await sql`SELECT ${`${label}.before`}`;
+				}
+
+				public async beforeEach({ sql, name, run }: MigrationStep) {
+					calls.push(`${label}.beforeEach ${name} [${run.applied}]`);
+					await sql`SELECT ${`${label}.beforeEach`}`;
+				}
+
+				public async afterEach({ sql, name, run }: MigrationStep) {
+					calls.push(`${label}.afterEach ${name} [${run.applied}]`);
+					await sql`SELECT ${`${label}.afterEach`}`;
+				}
+
+				public async after({ sql, applied }: MigrationRun) {
+					calls.push(`${label}.after [${applied}]`);
+					await sql`SELECT ${`${label}.after`}`;
+				}
+			}
+			Object.assign(Recorder.prototype, overrides);
+			return Recorder;
+		};
+
+		it('runs the hooks in the transaction, after the lock, around each migration', async () => {
+			writeFileSync(join(project, 'src/database/migrations/0002_users.sql'), 'SELECT 2;');
+			const calls: string[] = [];
+
+			const { statements } = await run(true, [], 'acme', undefined, [
+				recorder('a', calls),
+				recorder('b', calls)
+			]);
+
+			expect(calls).toEqual([
+				'a.before acme [0001_init.sql,0002_users.sql] []',
+				'b.before acme [0001_init.sql,0002_users.sql] []',
+				'a.beforeEach 0001_init.sql []',
+				'b.beforeEach 0001_init.sql []',
+				'a.afterEach 0001_init.sql [0001_init.sql]',
+				'b.afterEach 0001_init.sql [0001_init.sql]',
+				'a.beforeEach 0002_users.sql [0001_init.sql]',
+				'b.beforeEach 0002_users.sql [0001_init.sql]',
+				'a.afterEach 0002_users.sql [0001_init.sql,0002_users.sql]',
+				'b.afterEach 0002_users.sql [0001_init.sql,0002_users.sql]',
+				'a.after [0001_init.sql,0002_users.sql]',
+				'b.after [0001_init.sql,0002_users.sql]'
+			]);
+
+			const texts = statements.filter(({ tx }) => tx).map(({ text }) => text);
+			const index = (text: string) => texts.indexOf(text);
+			expect(texts[0]).toStartWith('SELECT pg_advisory_xact_lock');
+			expect(index('SELECT <a.before>')).toBeGreaterThan(
+				texts.findIndex((text) => text.startsWith('CREATE TABLE IF NOT EXISTS elysium_migrations'))
+			);
+			expect(index('SELECT <a.beforeEach>')).toBeLessThan(
+				index(`FILE ${join(project, 'src/database/migrations/0001_init.sql')}`)
+			);
+			expect(index('SELECT <a.afterEach>')).toBeGreaterThan(
+				texts.findIndex((text) => text.startsWith('INSERT INTO elysium_migrations'))
+			);
+			expect(texts.at(-1)).toBe('SELECT <b.after>');
+		});
+
+		it('runs before and after when no migration is pending', async () => {
+			rmSync(join(project, 'src/database/migrations/0001_init.sql'));
+			const calls: string[] = [];
+
+			await run(true, [], 'acme', undefined, [recorder('a', calls)]);
+
+			expect(calls).toEqual(['a.before acme [] []', 'a.after []']);
+			expect(output).toContain('No new migrations to apply.');
+		});
+
+		it('rolls the run back when a hook fails', async () => {
+			const calls: string[] = [];
+
+			const failing = recorder('a', calls, {
+				afterEach: async () => {
+					throw new Error('check failed');
+				}
+			});
+
+			const { statements, client } = await run(true, [], 'acme', undefined, [failing]);
+
+			const texts = statements.map(({ text }) => text);
+			expect(texts).toContain('SELECT <a.beforeEach>');
+			expect(texts).not.toContain('COMMIT');
+			expect(calls.some((call) => call.startsWith('a.after '))).toBe(false);
+			expect(output).toContain('check failed');
+			expect(client.close).toHaveBeenCalled();
+		});
 	});
 });
