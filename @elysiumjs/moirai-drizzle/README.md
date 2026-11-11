@@ -19,17 +19,17 @@ export const billing = moiraiTables('billing');
 
 `moiraiTables(schema?, options?)` builds the `idempotency_keys`, `outbox`, `inbox`, `events` and `projections` tables, in a Postgres schema when one is given (one set of tables per domain schema, for example).
 
-With `{ partitioned: true }`, `events` is partitioned by range of `occurred_at` and `outbox` by range of `created_at`. Their primary and unique keys then include that column, and `migration:generate` creates them with `PARTITION BY RANGE`. The partitions are up to the app: create them in a migration hook, or add them to the migration that creates the table with `Migration.afterCreate()` from `@elysiumjs/mnemosyne-drizzle`:
+With `{ partitioned: true }`, `events` is partitioned by range of `occurred_at` and `outbox` by range of `created_at`. Their primary and unique keys then include that column, and `migration:generate` creates them with `PARTITION BY RANGE`. The partitions are up to the app: create them in a migration hook, or add them to the migration that creates the table with `DrizzleTable.afterCreate()` from `@elysiumjs/mnemosyne-drizzle`:
 
 ```ts
-import { Migration } from '@elysiumjs/mnemosyne-drizzle';
+import { DrizzleTable } from '@elysiumjs/mnemosyne-drizzle';
 
 const tables = moiraiTables('billing', { partitioned: true });
 
 export const billing = {
 	...tables,
-	events: Migration.table(
-		Migration.afterCreate(
+	events: DrizzleTable.define(
+		DrizzleTable.afterCreate(
 			({ qualified }) => `CREATE TABLE "billing"."events_default" PARTITION OF ${qualified} DEFAULT`
 		)
 	)(tables.events)

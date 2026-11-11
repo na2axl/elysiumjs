@@ -37,6 +37,7 @@ export { DrizzleModule, type DrizzleModuleConfig } from './drizzle.module';
 export { Migration, type MigrationHook, type MigrationRun, type MigrationStep } from './migration';
 export {
 	applyTableMarkers,
+	DrizzleTable,
 	getTableMarker,
 	type CreatedTable,
 	type PartitionColumn,

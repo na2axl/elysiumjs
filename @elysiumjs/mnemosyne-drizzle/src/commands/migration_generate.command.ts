@@ -58,7 +58,7 @@ const loadTables = async (exports: SchemaExport[]): Promise<PgTable[]> => {
 };
 
 /**
- * Generates migration files, with the markers of `Migration.table()` applied to the migration that
+ * Generates migration files, with the markers of `DrizzleTable.define()` applied to the migration that
  * creates each marked table. The schema is the one of the app: every table, Postgres schema, enum,
  * sequence, view, role and policy that the project files it loads export, directly or as a value
  * of an exported object (like the tables `moiraiTables()` builds).

@@ -27,7 +27,7 @@ import type {
 } from '@elysiumjs/moirai';
 
 import { Clock } from '@elysiumjs/core';
-import { Database, Migration } from '@elysiumjs/mnemosyne-drizzle';
+import { Database, DrizzleTable } from '@elysiumjs/mnemosyne-drizzle';
 import { ConcurrencyConflictError, IdempotencyConflictError } from '@elysiumjs/moirai';
 import { and, asc, eq, gt, inArray, is, isNull, lt, lte, max, sql } from 'drizzle-orm';
 import {
@@ -78,7 +78,7 @@ export const moiraiTables = (schema?: string, options: MoiraiTablesOptions = {})
 	const table = (schema ? pgSchema(schema).table : pgTable) as typeof pgTable;
 	const partitioned = options.partitioned ?? false;
 	const partition = <T extends PgTable>(range: string, target: T): T =>
-		partitioned ? Migration.table(Migration.partitioned({ range }))(target) : target;
+		partitioned ? DrizzleTable.define(DrizzleTable.partitioned({ range }))(target) : target;
 	return {
 		idempotencyKeys: table('idempotency_keys', {
 			key: text('key').primaryKey(),

@@ -173,3 +173,58 @@ export const applyTableMarkers = (sql: string, tables: Iterable<PgTable>): strin
 
 	return output;
 };
+
+/**
+ * Drizzle tables: the markers that `migration:generate` applies to the migration creating a table.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export namespace DrizzleTable {
+	/**
+	 * Marks a table with what `migration:generate` adds to the migration that creates it. Later
+	 * migrations, and tables created before the markers were added, are left as they are.
+	 * @example
+	 * ```ts
+	 * export const audit = DrizzleTable.define(
+	 * 	DrizzleTable.partitioned({ range: 'recorded_at' }),
+	 * 	DrizzleTable.afterCreate(
+	 * 		({ qualified }) =>
+	 * 			`CREATE TRIGGER audit_append_only BEFORE UPDATE OR DELETE ON ${qualified} FOR EACH ROW EXECUTE FUNCTION forbid_change()`
+	 * 	)
+	 * )(
+	 * 	kernel.table('audit', { ... }, (t) => [primaryKey({ columns: [t.id, t.recordedAt] })])
+	 * );
+	 * ```
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param markers The markers, from `DrizzleTable.partitioned()` and `DrizzleTable.afterCreate()`.
+	 * @returns A function marking the table and returning it.
+	 */
+	export const define =
+		(...markers: TableMarker[]) =>
+		<T extends PgTable>(target: T): T =>
+			markTable(target, markers);
+
+	/**
+	 * Creates the table partitioned by range: `PARTITION BY RANGE (...)` follows its `CREATE TABLE`.
+	 * The primary key and the unique constraints of the table must include the partition columns.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param options The partition key: a column name in the database, a function returning the
+	 * column, or several of them.
+	 */
+	export const partitioned = (options: {
+		range: PartitionColumn | readonly PartitionColumn[];
+	}): TableMarker => ({
+		range: Array.isArray(options.range)
+			? (options.range as readonly PartitionColumn[])
+			: [options.range as PartitionColumn]
+	});
+
+	/**
+	 * Runs SQL right after the table is created, in the same migration: partitions, triggers or
+	 * grants that belong to the table.
+	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @param build Returns the SQL, as a string or a `sql` template, from the created table.
+	 */
+	export const afterCreate = (build: (table: CreatedTable) => string | SQL): TableMarker => ({
+		afterCreate: [build]
+	});
+}

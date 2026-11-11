@@ -16,7 +16,7 @@ import { describe, expect, it } from 'bun:test';
 import { sql } from 'drizzle-orm';
 import { pgSchema, pgTable, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
-import { applyTableMarkers, getTableMarker, Migration } from '../src';
+import { applyTableMarkers, DrizzleTable, getTableMarker } from '../src';
 
 const kernel = pgSchema('kernel');
 
@@ -42,14 +42,14 @@ const auditColumns = {
 	note: text('note').default('a;(b)')
 };
 
-describe('Migration.table', () => {
+describe('DrizzleTable.define', () => {
 	it('returns the table it marks, with the markers merged', () => {
 		const table = kernel.table('audit', auditColumns);
 		const after = () => 'SELECT 1';
 
-		const marked = Migration.table(
-			Migration.partitioned({ range: 'recorded_at' }),
-			Migration.afterCreate(after)
+		const marked = DrizzleTable.define(
+			DrizzleTable.partitioned({ range: 'recorded_at' }),
+			DrizzleTable.afterCreate(after)
 		)(table);
 
 		expect(marked).toBe(table);
@@ -64,13 +64,13 @@ describe('Migration.table', () => {
 
 describe('applyTableMarkers', () => {
 	it('partitions the table its migration creates and runs the SQL after it', () => {
-		const audit = Migration.table(
-			Migration.partitioned({ range: (t) => t.recordedAt }),
-			Migration.afterCreate(
+		const audit = DrizzleTable.define(
+			DrizzleTable.partitioned({ range: (t) => t.recordedAt }),
+			DrizzleTable.afterCreate(
 				({ qualified }) =>
 					`CREATE TRIGGER audit_append_only BEFORE UPDATE OR DELETE ON ${qualified} FOR EACH ROW EXECUTE FUNCTION forbid_change()`
 			),
-			Migration.afterCreate(
+			DrizzleTable.afterCreate(
 				({ schema, name }) =>
 					sql`CREATE TABLE ${sql.identifier(schema!)}.${sql.identifier(`${name}_default`)} PARTITION OF ${sql.identifier(schema!)}.${sql.identifier(name)} DEFAULT;`
 			)
@@ -90,9 +90,9 @@ CREATE TABLE "events" (`);
 	});
 
 	it('handles public tables and partition keys of several columns', () => {
-		const events = Migration.table(
-			Migration.partitioned({ range: ['occurred_at', 'id'] }),
-			Migration.afterCreate(
+		const events = DrizzleTable.define(
+			DrizzleTable.partitioned({ range: ['occurred_at', 'id'] }),
+			DrizzleTable.afterCreate(
 				({ schema, qualified }) => `COMMENT ON TABLE ${qualified} IS '${schema ?? 'public'}'`
 			)
 		)(pgTable('events', { id: uuid('id'), occurredAt: timestamp('occurred_at') }));
@@ -108,7 +108,7 @@ CREATE INDEX`);
 	});
 
 	it('leaves migrations that do not create a marked table as they are', () => {
-		const outbox = Migration.table(Migration.partitioned({ range: 'created_at' }))(
+		const outbox = DrizzleTable.define(DrizzleTable.partitioned({ range: 'created_at' }))(
 			kernel.table('outbox', { id: uuid('id'), createdAt: timestamp('created_at') })
 		);
 		const unmarked = kernel.table('audit', auditColumns);
