@@ -1,5 +1,11 @@
 # @elysiumjs/mnemosyne-drizzle
 
+## 0.7.0
+
+### Minor Changes
+
+- [#89](https://github.com/na2axl/elysiumjs/pull/89) [`7a3e076`](https://github.com/na2axl/elysiumjs/commit/7a3e07630ccbd5c90f48ff23430a94a0b08c9909) Thanks [@na2axl](https://github.com/na2axl)! - `migration:generate` reads the schema of the application: every table, Postgres schema, enum, sequence, view, role and policy that the project files the app loads export, directly or as a value of an exported object (like the tables `moiraiTables()` returns). Models may live anywhere in the project, in any number of modules. Without a terminal, the command asks for `--name` instead of waiting on the prompt.
+
 ## 0.6.3
 
 ### Patch Changes
