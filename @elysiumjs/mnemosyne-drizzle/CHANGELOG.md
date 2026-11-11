@@ -1,5 +1,20 @@
 # @elysiumjs/mnemosyne-drizzle
 
+## 0.9.0
+
+### Minor Changes
+
+- [#99](https://github.com/na2axl/elysiumjs/pull/99) [`2cfba22`](https://github.com/na2axl/elysiumjs/commit/2cfba227331e720b8ff79a6a4cdfeb3c251a450e) Thanks [@na2axl](https://github.com/na2axl)! - `migration:run` works on any connection whose driver runs migrations: `bun-sql`, `postgres-js`, `node-postgres`, and `hyperdrive` through the driver it wraps. Drivers implement `migrations(connection)`, with `templateClientMigrations()` and `nodePostgresMigrations()` for those clients; a connection whose driver has none fails with a clear error.
+
+  Breaking: migration hooks receive `db` (a `MigrationDatabase`, with `execute(sql\`...\`)`and`script(text)`) instead of the Bun SQL client `sql`.
+
+### Patch Changes
+
+- Updated dependencies [[`2cfba22`](https://github.com/na2axl/elysiumjs/commit/2cfba227331e720b8ff79a6a4cdfeb3c251a450e)]:
+  - @elysiumjs/core@0.24.1
+  - @elysiumjs/mnemosyne@0.8.1
+  - @elysiumjs/runtime-workers@0.1.13
+
 ## 0.8.0
 
 ### Minor Changes
