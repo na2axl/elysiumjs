@@ -15,8 +15,11 @@
 import type { SQL } from 'bun';
 import type { DrizzleConnection } from '../database';
 import type { DrizzleDriver } from '../driver';
+import type { TemplateClient } from '../migration-clients';
 
 import { drizzle } from 'drizzle-orm/bun-sql';
+
+import { templateClientMigrations } from '../migration-clients';
 
 /**
  * Options of {@link bunSql}: a connection URL or options, or a client.
@@ -41,5 +44,6 @@ export const bunSql = (options: BunSqlDriverOptions): DrizzleDriver => ({
 	connect: (config) => drizzle({ ...config, ...options } as never) as unknown as DrizzleConnection,
 	close: async (connection) => {
 		await (connection.$client as SQL).close();
-	}
+	},
+	migrations: (connection) => templateClientMigrations(connection.$client as TemplateClient)
 });

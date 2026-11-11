@@ -17,6 +17,8 @@ import type { DrizzleDriver, DrizzleDriverConfig } from '../driver';
 
 import { Workers } from '@elysiumjs/runtime-workers';
 
+import { MissingMigrationsError } from '../driver';
+
 /**
  * A Hyperdrive binding, as Cloudflare Workers pass it.
  * @author Axel Nana <axel.nana@workbud.com>
@@ -64,7 +66,13 @@ export type HyperdriveDriverOptions = {
 export const hyperdrive = (options: HyperdriveDriverOptions): DrizzleDriver => ({
 	name: 'hyperdrive',
 	connect: (config) => invocationDatabase(options, config),
-	close: () => {}
+	close: () => {},
+	migrations: (connection) => {
+		const { connectionString } = Workers.binding<HyperdriveBinding>(options.binding);
+		const migrations = options.driver(connectionString).migrations?.(connection);
+		if (!migrations) throw new MissingMigrationsError('hyperdrive');
+		return migrations;
+	}
 });
 
 /** A database that forwards to the database of the current invocation, opened on first use. */

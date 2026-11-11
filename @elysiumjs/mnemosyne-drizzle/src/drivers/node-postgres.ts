@@ -15,8 +15,11 @@
 import type { Pool, PoolConfig } from 'pg';
 import type { DrizzleConnection } from '../database';
 import type { DrizzleDriver } from '../driver';
+import type { PgPool } from '../migration-clients';
 
 import { drizzle } from 'drizzle-orm/node-postgres';
+
+import { nodePostgresMigrations } from '../migration-clients';
 
 /**
  * Options of {@link nodePostgres}: a connection URL or pool options, or a pool.
@@ -40,5 +43,6 @@ export const nodePostgres = (options: NodePostgresDriverOptions): DrizzleDriver 
 	connect: (config) => drizzle({ ...config, ...options } as never) as unknown as DrizzleConnection,
 	close: async (connection) => {
 		await (connection.$client as Pool).end();
-	}
+	},
+	migrations: (connection) => nodePostgresMigrations(connection.$client as PgPool)
 });

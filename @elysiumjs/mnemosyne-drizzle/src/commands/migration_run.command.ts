@@ -12,15 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { MigrationRun } from '../migration';
+import type { MigrationConnection, MigrationDatabase, MigrationRun } from '../migration';
 
-import { readdir } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { Command, CommandArgumentType, Service } from '@elysiumjs/core';
 import { isValidTenantId } from '@elysiumjs/mnemosyne';
+import { sql } from 'drizzle-orm';
 
-import { Database } from '../database';
+import { closeConnection, Database, getConnectionDriver } from '../database';
 import { Migration } from '../migration';
 import { getMigrationName, planMigrations } from '../migrations';
 import { getMigrationsPath } from './project';
@@ -40,15 +41,6 @@ const listMigrationFiles = async (folder: string): Promise<string[]> => {
 		.filter((entry) => entry.isFile() && entry.name.endsWith('.sql'))
 		.map((entry) => join(entry.parentPath, entry.name));
 };
-
-/**
- * Whether a client is a `Bun.SQL` client, the one `migration:run` runs the migrations with.
- * @param sql The client of the connection.
- */
-const isBunSql = (sql: Partial<Bun.SQL>): sql is Bun.SQL =>
-	['connect', 'close', 'begin'].every(
-		(method) => typeof sql[method as keyof Bun.SQL] === 'function'
-	);
 
 /**
  * Execute migration files.
@@ -102,53 +94,64 @@ export class MigrationRunCommand extends Command {
 			return process.exit(1);
 		}
 
-		const sql = Database.getConnection(this.connection).$client as Partial<Bun.SQL>;
-		if (!isBunSql(sql)) {
+		const connection = Database.getConnection(this.connection);
+		const driver = getConnectionDriver(connection);
+		if (!driver?.migrations) {
 			this.error(
-				`Connection ${this.bold(this.connection)} does not use the Bun SQL driver (bun-sql), ` +
-					'which migration:run needs. Give it a connection on that driver with --connection.'
+				`Connection ${this.bold(this.connection)} uses the ${this.bold(driver?.name ?? 'unknown')} ` +
+					'driver, which cannot run migrations. Use a connection on the bun-sql, postgres-js ' +
+					'or node-postgres driver with --connection.'
 			);
 			return process.exit(1);
 		}
-		await sql.connect();
+
 		try {
+			const db = driver.migrations(connection);
+
 			// Decide everything that needs the user before opening the transaction, so that no
 			// prompt keeps it (and its lock) open.
-			if (!this.fresh && !(await this.ensureSchemaChoice(sql))) return process.exit(1);
+			if (!this.fresh && !(await this.ensureSchemaChoice(db))) return process.exit(1);
 
-			await this.migrate(sql);
+			await this.migrate(db);
 		} finally {
-			await sql.close();
+			await closeConnection(connection);
 		}
 	}
 
 	/**
 	 * Runs the pending migrations in one transaction.
-	 * @param sql The client.
+	 * @param connection The migration connection.
 	 */
-	private async migrate(sql: Bun.SQL): Promise<void> {
-		await sql.begin(async (sql: Bun.SQL) => {
+	private async migrate(connection: MigrationConnection): Promise<void> {
+		await connection.transaction(async (db: MigrationDatabase) => {
+			const schema = sql.identifier(this.tenant);
+
 			// Serialises concurrent runs for the same tenant: the lock is released at commit.
-			await sql`SELECT pg_advisory_xact_lock(hashtext(${`elysium_migrations:${this.tenant}`}))`;
+			await db.execute(
+				sql`SELECT pg_advisory_xact_lock(hashtext(${`elysium_migrations:${this.tenant}`}))`
+			);
 
 			if (this.fresh) {
-				await sql`DROP SCHEMA IF EXISTS ${sql(this.tenant)} CASCADE;`;
+				await db.execute(sql`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
 			}
-			await sql`CREATE SCHEMA IF NOT EXISTS ${sql(this.tenant)};`;
+			await db.execute(sql`CREATE SCHEMA IF NOT EXISTS ${schema}`);
 
-			await sql`SET LOCAL search_path TO ${sql(this.tenant)}`;
+			await db.execute(sql`SET LOCAL search_path TO ${schema}`);
 
-			await sql`CREATE TABLE IF NOT EXISTS elysium_migrations (
+			await db.execute(sql`CREATE TABLE IF NOT EXISTS elysium_migrations (
 				id SERIAL PRIMARY KEY,
 				name TEXT NOT NULL,
 				batch INTEGER NOT NULL,
 				applied_at TIMESTAMP NOT NULL
-			);`;
+			)`);
 			// Also added to tables created by earlier versions.
-			await sql`CREATE UNIQUE INDEX IF NOT EXISTS elysium_migrations_name_unique ON elysium_migrations (name);`;
+			await db.execute(
+				sql`CREATE UNIQUE INDEX IF NOT EXISTS elysium_migrations_name_unique ON elysium_migrations (name)`
+			);
 
-			const rows: { name: string; applied_at: Date }[] =
-				await sql`SELECT name, applied_at FROM elysium_migrations;`;
+			const rows = await db.execute<{ name: string; applied_at: Date }>(
+				sql`SELECT name, applied_at FROM elysium_migrations`
+			);
 			const completedMigrations = rows.map((row) => ({
 				name: row.name,
 				appliedAt: row.applied_at
@@ -158,21 +161,22 @@ export class MigrationRunCommand extends Command {
 			const { pending: sqlFiles, renames } = planMigrations(files, completedMigrations);
 
 			for (const { from, to } of renames) {
-				await sql`UPDATE elysium_migrations SET name = ${to} WHERE name = ${from};`;
+				await db.execute(sql`UPDATE elysium_migrations SET name = ${to} WHERE name = ${from}`);
 				this.info(`Migration ${this.bold(from)} is now tracked as ${this.bold(to)}.`);
 			}
 
 			const hooks = await Service.resolveAll(Migration.Hooks);
 
-			const [{ max }]: [{ max?: number }] =
-				await sql`SELECT MAX(batch) + 1 AS max FROM elysium_migrations;`;
+			const [{ max } = { max: null }] = await db.execute<{ max: number | null }>(
+				sql`SELECT MAX(batch) + 1 AS max FROM elysium_migrations`
+			);
 
 			const applied: string[] = [];
 			const run: MigrationRun = {
-				sql,
+				db,
 				tenant: this.tenant,
 				connection: this.connection,
-				batch: max ?? 0,
+				batch: Number(max ?? 0),
 				pending: sqlFiles.map((path) => getMigrationName(path)),
 				applied
 			};
@@ -185,11 +189,13 @@ export class MigrationRunCommand extends Command {
 				const s = this.spinner(`Running migrations for tenant ${this.bold(this.tenant)}...`);
 
 				for (const path of sqlFiles) {
-					const step = { sql, name: getMigrationName(path), path, run };
+					const step = { db, name: getMigrationName(path), path, run };
 					for (const hook of hooks) await hook.beforeEach?.(step);
 
-					await sql.file(path);
-					await sql`INSERT INTO elysium_migrations (name, batch, applied_at) VALUES (${step.name}, ${run.batch}, ${new Date()});`;
+					await db.script(await readFile(path, 'utf8'));
+					await db.execute(
+						sql`INSERT INTO elysium_migrations (name, batch, applied_at) VALUES (${step.name}, ${run.batch}, now())`
+					);
 					applied.push(step.name);
 
 					for (const hook of hooks) await hook.afterEach?.(step);
@@ -206,15 +212,17 @@ export class MigrationRunCommand extends Command {
 	/**
 	 * Checks that the tenant schema exists, or that it may be created: with `--create-schema`, or
 	 * when the user agrees. Without a terminal to ask, a missing schema is an error.
-	 * @param sql The client.
+	 * @param db The migration connection.
 	 * @returns `false` if the schema must not be created.
 	 */
-	private async ensureSchemaChoice(sql: Bun.SQL): Promise<boolean> {
-		const [{ schema_exists }] = await sql`SELECT EXISTS (
+	private async ensureSchemaChoice(db: MigrationDatabase): Promise<boolean> {
+		const [{ schema_exists } = { schema_exists: false }] = await db.execute<{
+			schema_exists: boolean;
+		}>(sql`SELECT EXISTS (
 			SELECT schema_name
 			  FROM information_schema.schemata
 			 WHERE schema_name = ${this.tenant}
-		) AS schema_exists;`;
+		) AS schema_exists`);
 		if (schema_exists || this.createSchema) return true;
 
 		if (!process.stdin.isTTY) {

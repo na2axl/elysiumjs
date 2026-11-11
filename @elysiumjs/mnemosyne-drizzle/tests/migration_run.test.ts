@@ -20,6 +20,7 @@ import { join } from 'node:path';
 
 import { Application, Module, Service } from '@elysiumjs/core';
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
+import { sql } from 'drizzle-orm';
 import prompts from 'prompts';
 
 import { DrizzleModule, Migration } from '../src';
@@ -27,53 +28,39 @@ import { DrizzleModule, Migration } from '../src';
 type Statement = { tx: boolean; text: string };
 
 /**
- * A stand-in for `Bun.SQL` supporting what `migration:run` uses: tagged queries, `sql(name)`
- * identifiers, `begin`, `file`, `connect` and `close`.
+ * A stand-in for a tagged-template client (Bun SQL, postgres.js) supporting what `migration:run`
+ * uses: `unsafe` (with `simple`), `begin` and `close`. Parameters are logged as `<value>`.
  * @param schemaExists Whether the tenant schema exists.
  */
 const fakeBunSql = (schemaExists: boolean) => {
 	const statements: Statement[] = [];
-	const files: string[] = [];
+	const scripts: string[] = [];
 
 	const respond = (text: string) => {
 		if (text.includes('information_schema.schemata')) return [{ schema_exists: schemaExists }];
-		if (text.includes('information_schema.tables')) return [{ table_exists: false }];
 		if (text.startsWith('SELECT MAX(batch)')) return [{ max: null }];
-		if (text.startsWith('INSERT INTO elysium_migrations')) return [{ name: 'migration' }];
 		return [];
 	};
 
-	const make = (tx: boolean): any => {
-		const sql: any = (strings: TemplateStringsArray | string, ...values: unknown[]) => {
-			if (typeof strings === 'string') return { identifier: strings };
-			const text = strings
-				.reduce(
-					(acc, part, i) =>
-						acc +
-						part +
-						(i < values.length
-							? typeof values[i] === 'object' && values[i] !== null && 'identifier' in values[i]!
-								? `"${(values[i] as { identifier: string }).identifier}"`
-								: `<${String(values[i])}>`
-							: ''),
-					''
-				)
+	const make = (tx: boolean): any => ({
+		unsafe: (query: string, params?: unknown[]) => {
+			const text = query
+				.replace(/\$(\d+)/g, (_, i: string) => `<${String(params?.[Number(i) - 1])}>`)
 				.replace(/\s+/g, ' ')
 				.trim();
-			statements.push({ tx, text });
-			return Promise.resolve(respond(text));
-		};
-		sql.file = async (path: string) => {
-			files.push(path);
-			statements.push({ tx, text: `FILE ${path}` });
-			return [];
-		};
-		return sql;
-	};
+			const run = () => {
+				if (params === undefined) {
+					scripts.push(query);
+					statements.push({ tx, text: `SCRIPT ${text}` });
+				} else statements.push({ tx, text });
+				return Promise.resolve(respond(text));
+			};
+			return { then: (resolve: any, reject: any) => run().then(resolve, reject), simple: run };
+		}
+	});
 
 	const client = make(false);
 	client.options = {};
-	client.connect = mock(async () => {});
 	client.close = mock(async () => {});
 	client.begin = mock(async (callback: (sql: unknown) => Promise<unknown>) => {
 		statements.push({ tx: false, text: 'BEGIN' });
@@ -82,7 +69,7 @@ const fakeBunSql = (schemaExists: boolean) => {
 		return result;
 	});
 
-	return { client, statements, files };
+	return { client, statements, scripts };
 };
 
 describe('migration:run', () => {
@@ -179,14 +166,14 @@ describe('migration:run', () => {
 		const { statements } = await run(true);
 
 		expect(statements.map(({ text }) => text)).toContain(
-			'CREATE UNIQUE INDEX IF NOT EXISTS elysium_migrations_name_unique ON elysium_migrations (name);'
+			'CREATE UNIQUE INDEX IF NOT EXISTS elysium_migrations_name_unique ON elysium_migrations (name)'
 		);
 	});
 
 	it('reads the migrations from the project root', async () => {
-		const { files } = await run(true);
+		const { scripts } = await run(true);
 
-		expect(files).toEqual([join(project, 'src/database/migrations/0001_init.sql')]);
+		expect(scripts).toEqual(['SELECT 1;']);
 	});
 
 	it('asks to create a missing schema before opening the transaction', async () => {
@@ -199,7 +186,7 @@ describe('migration:run', () => {
 		const check = texts.findIndex((text) => text.includes('information_schema.schemata'));
 		expect(check).toBeGreaterThanOrEqual(0);
 		expect(check).toBeLessThan(texts.indexOf('BEGIN'));
-		expect(texts).toContain('CREATE SCHEMA IF NOT EXISTS "acme";');
+		expect(texts).toContain('CREATE SCHEMA IF NOT EXISTS "acme"');
 	});
 
 	it('stops without opening a transaction when the schema creation is declined', async () => {
@@ -209,7 +196,7 @@ describe('migration:run', () => {
 		const { statements, client } = await run(false);
 
 		expect(client.begin).not.toHaveBeenCalled();
-		expect(statements.map(({ text }) => text)).not.toContain('CREATE SCHEMA IF NOT EXISTS "acme";');
+		expect(statements.map(({ text }) => text)).not.toContain('CREATE SCHEMA IF NOT EXISTS "acme"');
 		expect(process.exit).toHaveBeenCalledWith(1);
 	});
 
@@ -219,7 +206,7 @@ describe('migration:run', () => {
 		const { statements, client } = await run(false);
 
 		expect(client.begin).not.toHaveBeenCalled();
-		expect(statements.map(({ text }) => text)).not.toContain('CREATE SCHEMA IF NOT EXISTS "acme";');
+		expect(statements.map(({ text }) => text)).not.toContain('CREATE SCHEMA IF NOT EXISTS "acme"');
 		expect(output).toContain('--create-schema');
 		expect(process.exit).toHaveBeenCalledWith(1);
 		expect(client.close).toHaveBeenCalled();
@@ -232,7 +219,7 @@ describe('migration:run', () => {
 
 		const { statements } = await run(false, ['--create-schema']);
 
-		expect(statements.map(({ text }) => text)).toContain('CREATE SCHEMA IF NOT EXISTS "acme";');
+		expect(statements.map(({ text }) => text)).toContain('CREATE SCHEMA IF NOT EXISTS "acme"');
 		expect(process.exit).not.toHaveBeenCalledWith(1);
 	});
 
@@ -241,22 +228,26 @@ describe('migration:run', () => {
 		async (tenant) => {
 			const { client, statements } = await run(true, [], tenant);
 
-			expect(client.connect).not.toHaveBeenCalled();
+			expect(client.begin).not.toHaveBeenCalled();
 			expect(statements).toEqual([]);
 			expect(output).toContain('Invalid tenant');
 			expect(process.exit).toHaveBeenCalledWith(1);
 		}
 	);
 
-	it('fails with the connection name when its client is not a Bun SQL client', async () => {
-		const { statements } = await run(true, [], 'acme', (fake) => {
-			// postgres-js clients have no connect().
-			delete fake.client.connect;
-		});
+	it('fails with the connection name when its driver cannot run migrations', async () => {
+		const fake = fakeBunSql(true);
+		const driver = { name: 'custom', connect: () => ({ $client: fake.client }), close: () => {} };
+		@Application.register({
+			modules: [DrizzleModule.with({ connections: { default: { driver: driver as never } } })]
+		})
+		class TestApp extends Application {}
+		started = new TestApp();
+		await started.run(['migration:run', '--tenant', 'acme']);
 
-		expect(statements).toEqual([]);
-		expect(output).toContain('does not use the Bun SQL driver');
-		expect(output).toContain('default');
+		expect(fake.statements).toEqual([]);
+		expect(output).toContain('cannot run migrations');
+		expect(output).toContain('custom');
 		expect(process.exit).toHaveBeenCalledWith(1);
 	});
 
@@ -284,24 +275,24 @@ describe('migration:run', () => {
 		const recorder = (label: string, calls: string[], overrides: Partial<MigrationHook> = {}) => {
 			@Migration.hook()
 			class Recorder implements MigrationHook {
-				public async before({ sql, tenant, pending, applied }: MigrationRun) {
+				public async before({ db, tenant, pending, applied }: MigrationRun) {
 					calls.push(`${label}.before ${tenant} [${pending}] [${applied}]`);
-					await sql`SELECT ${`${label}.before`}`;
+					await db.execute(sql`SELECT ${`${label}.before`}`);
 				}
 
-				public async beforeEach({ sql, name, run }: MigrationStep) {
+				public async beforeEach({ db, name, run }: MigrationStep) {
 					calls.push(`${label}.beforeEach ${name} [${run.applied}]`);
-					await sql`SELECT ${`${label}.beforeEach`}`;
+					await db.execute(sql`SELECT ${`${label}.beforeEach`}`);
 				}
 
-				public async afterEach({ sql, name, run }: MigrationStep) {
+				public async afterEach({ db, name, run }: MigrationStep) {
 					calls.push(`${label}.afterEach ${name} [${run.applied}]`);
-					await sql`SELECT ${`${label}.afterEach`}`;
+					await db.execute(sql`SELECT ${`${label}.afterEach`}`);
 				}
 
-				public async after({ sql, applied }: MigrationRun) {
+				public async after({ db, applied }: MigrationRun) {
 					calls.push(`${label}.after [${applied}]`);
-					await sql`SELECT ${`${label}.after`}`;
+					await db.execute(sql`SELECT ${`${label}.after`}`);
 				}
 			}
 			Object.assign(Recorder.prototype, overrides);
@@ -338,9 +329,7 @@ describe('migration:run', () => {
 			expect(index('SELECT <a.before>')).toBeGreaterThan(
 				texts.findIndex((text) => text.startsWith('CREATE TABLE IF NOT EXISTS elysium_migrations'))
 			);
-			expect(index('SELECT <a.beforeEach>')).toBeLessThan(
-				index(`FILE ${join(project, 'src/database/migrations/0001_init.sql')}`)
-			);
+			expect(index('SELECT <a.beforeEach>')).toBeLessThan(index('SCRIPT SELECT 1;'));
 			expect(index('SELECT <a.afterEach>')).toBeGreaterThan(
 				texts.findIndex((text) => text.startsWith('INSERT INTO elysium_migrations'))
 			);
