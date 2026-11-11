@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import { Service } from '@elysiumjs/core';
+import { applyTableMarkers, getTableMarker } from '@elysiumjs/mnemosyne-drizzle';
 import { ConcurrencyConflictError, IdempotencyConflictError } from '@elysiumjs/moirai';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import {
@@ -61,6 +62,45 @@ describe('moirai stores', () => {
 		expect(outbox.indexes.map((i) => i.config.name)).toEqual(['outbox_due_idx']);
 		expect(getTableConfig(tables.inbox).primaryKeys).toHaveLength(1);
 		expect(getTableConfig(moiraiTables().idempotencyKeys).schema).toBeUndefined();
+	});
+
+	it('leaves the tables unpartitioned by default', () => {
+		expect(getTableMarker(tables.events)).toBeUndefined();
+		expect(getTableMarker(tables.outbox)).toBeUndefined();
+		expect(getTableConfig(tables.events).columns.find((c) => c.name === 'position')?.primary).toBe(
+			true
+		);
+	});
+
+	it('partitions events and outbox by time, with the time column in their keys', () => {
+		const partitioned = moiraiTables('billing', { partitioned: true });
+
+		const events = getTableConfig(partitioned.events);
+		expect(events.columns.some((c) => c.primary)).toBe(false);
+		expect(events.primaryKeys[0]!.columns.map((c) => c.name)).toEqual(['position', 'occurred_at']);
+		expect(events.uniqueConstraints[0]!.columns.map((c) => c.name)).toEqual([
+			'aggregate_id',
+			'version',
+			'occurred_at'
+		]);
+
+		const outbox = getTableConfig(partitioned.outbox);
+		expect(outbox.columns.some((c) => c.primary)).toBe(false);
+		expect(outbox.primaryKeys[0]!.columns.map((c) => c.name)).toEqual(['id', 'created_at']);
+		expect(outbox.indexes.map((i) => i.config.name)).toEqual(['outbox_due_idx']);
+
+		const migration = [
+			'CREATE TABLE "billing"."events" (\n\t"position" bigserial NOT NULL\n);',
+			'CREATE TABLE "billing"."outbox" (\n\t"id" uuid NOT NULL\n);',
+			'CREATE TABLE "billing"."inbox" (\n\t"consumer" text NOT NULL\n);'
+		].join('\n--> statement-breakpoint\n');
+		expect(applyTableMarkers(migration, Object.values(partitioned))).toBe(
+			[
+				'CREATE TABLE "billing"."events" (\n\t"position" bigserial NOT NULL\n) PARTITION BY RANGE ("occurred_at");',
+				'CREATE TABLE "billing"."outbox" (\n\t"id" uuid NOT NULL\n) PARTITION BY RANGE ("created_at");',
+				'CREATE TABLE "billing"."inbox" (\n\t"consumer" text NOT NULL\n);'
+			].join('\n--> statement-breakpoint\n')
+		);
 	});
 
 	it('reads and writes idempotency records, and reports a taken key as a conflict', async () => {

@@ -12,13 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { PgTable } from 'drizzle-orm/pg-core';
+import type { SchemaExport } from './schema';
+
 import { access, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { Command, CommandArgumentType } from '@elysiumjs/core';
+import { is } from 'drizzle-orm';
+import { PgTable as PgTableClass } from 'drizzle-orm/pg-core';
 
 import { stripPublicSchema } from '../migrations';
+import { applyTableMarkers } from '../table-markers';
 import { getMigrationsPath, getProjectPath } from './project';
 import { collectAppSchema, renderSchemaEntry } from './schema';
 
@@ -38,8 +44,22 @@ const listSqlFiles = async (migrationsPath: string): Promise<string[]> => {
 	);
 };
 
+/** Reads the tables among the schema objects, from the files that export them. */
+const loadTables = async (exports: SchemaExport[]): Promise<PgTable[]> => {
+	const tables: PgTable[] = [];
+	for (const { file, path } of exports) {
+		const value = path.reduce<unknown>(
+			(acc, key) => (acc as Record<string, unknown>)[key],
+			await import(file)
+		);
+		if (is(value, PgTableClass)) tables.push(value);
+	}
+	return tables;
+};
+
 /**
- * Generates migration files. The schema is the one of the app: every table, Postgres schema, enum,
+ * Generates migration files, with the markers of `DrizzleTable.define()` applied to the migration that
+ * creates each marked table. The schema is the one of the app: every table, Postgres schema, enum,
  * sequence, view, role and policy that the project files it loads export, directly or as a value
  * of an exported object (like the tables `moiraiTables()` builds).
  * @author Axel Nana <axel.nana@workbud.com>
@@ -115,10 +135,11 @@ export class MigrationGenerateCommand extends Command {
 		}
 
 		// Only the migration generated now is rewritten: earlier ones may have been edited by hand.
+		const tables = await loadTables(schema);
 		for (const path of await listSqlFiles(migrationsPath)) {
 			if (existing.has(path)) continue;
 			const file = Bun.file(path);
-			await file.write(stripPublicSchema(await file.text()));
+			await file.write(applyTableMarkers(stripPublicSchema(await file.text()), tables));
 		}
 	}
 }

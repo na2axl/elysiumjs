@@ -35,6 +35,14 @@ export {
 } from './model';
 export { DrizzleModule, type DrizzleModuleConfig } from './drizzle.module';
 export { Migration, type MigrationHook, type MigrationRun, type MigrationStep } from './migration';
+export {
+	applyTableMarkers,
+	DrizzleTable,
+	getTableMarker,
+	type CreatedTable,
+	type PartitionColumn,
+	type TableMarker
+} from './table-markers';
 export { compileAfter, compileFilter, compileQuery } from './query';
 export { DrizzleRepository, type DrizzleRepositoryOptions, RepositoryKeyError } from './repository';
 export {

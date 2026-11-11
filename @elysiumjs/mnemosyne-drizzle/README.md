@@ -98,6 +98,39 @@ export class DatabaseHook implements MigrationHook {
 
 Hooks run for every tenant, in the order the modules register them: read `tenant` to act on some tenants only.
 
+### Table markers
+
+`DrizzleTable.define()` marks a table with what `migration:generate` adds to the migration that creates it. Later migrations are left as they are.
+
+```ts
+import { DrizzleTable } from '@elysiumjs/mnemosyne-drizzle';
+import { pgSchema, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+
+const kernel = pgSchema('kernel');
+
+export const audit = DrizzleTable.define(
+	DrizzleTable.partitioned({ range: 'recorded_at' }),
+	DrizzleTable.afterCreate(
+		({ qualified }) =>
+			`CREATE TRIGGER audit_append_only BEFORE UPDATE OR DELETE ON ${qualified} FOR EACH ROW EXECUTE FUNCTION forbid_change()`
+	)
+)(
+	kernel.table(
+		'audit',
+		{
+			id: uuid('id').notNull().defaultRandom(),
+			action: text('action').notNull(),
+			recordedAt: timestamp('recorded_at').notNull().defaultNow()
+		},
+		(t) => [primaryKey({ columns: [t.id, t.recordedAt] })]
+	)
+);
+```
+
+- `DrizzleTable.partitioned({ range })` adds `PARTITION BY RANGE (...)` to the `CREATE TABLE`. `range` is a column name in the database, a function returning the column (`(t) => t.recordedAt`), or several of them. The primary key and unique constraints must include those columns.
+- `DrizzleTable.afterCreate(build)` adds SQL right after the table is created, as its own statement. `build` receives the `schema` (`undefined` for `public`), the `name` and the quoted, schema-qualified `qualified` name, and returns a string or a `sql` template.
+- `DrizzleTable.define()` returns the table it marks, so its type is unchanged. Marking a table again adds to its markers.
+
 ## License
 
 This project is licensed under the Apache License, Version 2.0. See the [LICENSE](../../LICENSE) file for more info.
