@@ -45,7 +45,8 @@
 	},
 	"devDependencies": {
 		"@elysiumjs/core": "workspace:*",
-		"@elysiumjs/redis": "workspace:*"
+		"@elysiumjs/redis": "workspace:*",
+		"@elysiumjs/runtime-bun": "workspace:*"
 	},
 	"dependencies": {
 		"cache-manager": "^7.2.9",

@@ -1,0 +1,8 @@
+import { Seeder } from '@elysiumjs/mnemosyne';
+
+@Seeder.register()
+export class {name} extends Seeder {
+	protected async run(): Promise<void> {
+		this.write('Hello, World!');
+	}
+}

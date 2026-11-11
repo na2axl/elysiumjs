@@ -51,6 +51,18 @@ export {
 	Listing
 } from './query';
 
+export {
+	DuplicateSeederError,
+	type PlannedSeeder,
+	Seeder,
+	type SeederClass,
+	SeederCycleError,
+	type SeederInput,
+	type SeederProps,
+	UnknownSeederError
+} from './seeder';
+export { DbSeedCommand } from './commands/db_seed.command';
+
 export * from './tenancy';
 export type { TenancyConfig, TenancyMode, ModelTenancyConfig } from './tenancy';
 

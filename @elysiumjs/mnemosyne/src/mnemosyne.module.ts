@@ -24,6 +24,7 @@ import {
 	MEMORY_CACHE_SERVICE,
 	REDIS_CACHE_SERVICE
 } from './cache';
+import { DbSeedCommand } from './commands/db_seed.command';
 import { KeyvRedis } from './keyv-redis';
 
 /**
@@ -61,11 +62,12 @@ export type MnemosyneModuleConfig = {
 
 /**
  * Provides the caches as the global services `mnemosyne.cache.redis`,
- * `mnemosyne.cache.memory` and `mnemosyne.cache.store.<name>`. Tenancy config and strategy, and database connections, are
- * registered by the database driver modules.
+ * `mnemosyne.cache.memory` and `mnemosyne.cache.store.<name>`, and the `db:seed` command. Tenancy
+ * config and strategy, and database connections, are registered by the database driver modules.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 @Module.register<MnemosyneModuleConfig>({
+	commands: [DbSeedCommand],
 	services: (config) => {
 		const services: ServiceFactoryDefinition[] = [];
 		const { redis, memory, stores } = config.cache;

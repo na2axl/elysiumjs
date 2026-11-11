@@ -83,7 +83,13 @@ export {
 } from './errors';
 export { needsDefaultAlias, runAll } from './connections';
 export { Kernel, KERNEL_SERVICE } from './kernel';
-export { type ConfiguredModule, type ModuleClass, type ModuleProps, Module } from './module';
+export {
+	type ConfiguredModule,
+	type ModuleClass,
+	type ModuleCollections,
+	type ModuleProps,
+	Module
+} from './module';
 export { ModuleContext } from './module-context';
 export { type ModuleGraph, type ModuleNode } from './module-graph';
 export {

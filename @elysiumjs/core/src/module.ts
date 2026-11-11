@@ -43,19 +43,19 @@ export type ConfiguredModule<TConfig> = {
 };
 
 /**
- * Properties used when declaring a module with `@Module.register()`.
+ * The lists of classes a module declares, which the kernel and packages gather across the active
+ * modules with `graph.collect()`. A package adds its own list by augmenting this interface:
+ * @example
+ * ```ts
+ * declare module '@elysiumjs/core' {
+ * 	interface ModuleCollections {
+ * 		seeders?: Class<Seeder>[];
+ * 	}
+ * }
+ * ```
  * @author Axel Nana <axel.nana@workbud.com>
  */
-export type ModuleProps<TConfig = unknown> = {
-	/** Modules (or configured modules) whose exports this module can use. */
-	imports?: (ModuleClass | ConfiguredModule<any>)[];
-
-	/** The services this module provides, optionally derived from its resolved config. */
-	services?: ServiceDefinition[] | ((config: TConfig) => ServiceDefinition[]);
-
-	/** What this module exposes to importers, or `true` to expose everything. */
-	exports?: (Class<any> | string | ModuleClass)[] | true;
-
+export interface ModuleCollections {
 	/** The controllers provided by the module. */
 	controllers?: Class<any>[];
 
@@ -64,6 +64,21 @@ export type ModuleProps<TConfig = unknown> = {
 
 	/** The jobs provided by the module. */
 	jobs?: Class<any>[];
+}
+
+/**
+ * Properties used when declaring a module with `@Module.register()`.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export type ModuleProps<TConfig = unknown> = ModuleCollections & {
+	/** Modules (or configured modules) whose exports this module can use. */
+	imports?: (ModuleClass | ConfiguredModule<any>)[];
+
+	/** The services this module provides, optionally derived from its resolved config. */
+	services?: ServiceDefinition[] | ((config: TConfig) => ServiceDefinition[]);
+
+	/** What this module exposes to importers, or `true` to expose everything. */
+	exports?: (Class<any> | string | ModuleClass)[] | true;
 
 	/** The base path prefixed to every controller path of this module. */
 	prefix?: Route;
