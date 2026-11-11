@@ -19,14 +19,15 @@ import { Command, CommandArgumentType, KERNEL_SERVICE, Runtime, Service } from '
 import { Seeder } from '../seeder';
 
 /**
- * Runs the seeders of the active modules, in order, each in its own transaction.
+ * Runs the seeders of the active modules, in order, each in its own transaction. The app boots
+ * lazily: only the services the seeders take are built, so services that need a host (such as
+ * the bindings of a Worker) do not stop a seed run.
  * @author Axel Nana <axel.nana@workbud.com>
  */
 @Command.register()
 export class DbSeedCommand extends Command {
 	public static readonly command: string = 'db:seed';
 	public static readonly description: string = 'Runs the seeders of the active modules.';
-	public static readonly boot = true;
 
 	@Command.arg({
 		description:
