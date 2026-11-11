@@ -67,6 +67,7 @@ import {
 	Query,
 	registerEffect,
 	requestHash,
+	UndeclaredRefusalError,
 	uuidv7
 } from './exports';
 
@@ -1109,6 +1110,60 @@ describe('outcomes', () => {
 		expect(refused).toBeInstanceOf(NestedCallRefusedError);
 		expect((refused as NestedCallRefusedError).refusal).toBeInstanceOf(InvalidInputError);
 		expect((refused as Error).message).toContain('Find');
+	});
+
+	it('pass on a nested refusal thrown with orThrow() only when the errors of the caller list it', async () => {
+		@Action.register({ errors: [Missing], input: t.Object({ id: t.String() }) })
+		class Declared extends Action {
+			public async handle(input: { id: string }) {
+				return Moirai.execute(Rename, input).orThrow();
+			}
+		}
+
+		@Action.register({ errors: [], input: t.Object({ id: t.String() }) })
+		class Undeclared extends Action {
+			public async handle(input: { id: string }) {
+				return Moirai.ask(Find, input).orThrow();
+			}
+		}
+
+		expect((await Moirai.execute(Declared, { id: 'none' })).error).toBeInstanceOf(Missing);
+		expect(await Moirai.execute(Undeclared, { id: 'a' }).orThrow()).toEqual({ id: 'a' });
+
+		const fault = await Promise.resolve(Moirai.execute(Undeclared, { id: 'none' })).catch(
+			(error: unknown) => error
+		);
+		expect(fault).toBeInstanceOf(UndeclaredRefusalError);
+		expect((fault as UndeclaredRefusalError).call).toBe('Undeclared');
+		expect((fault as UndeclaredRefusalError).refusal).toBeInstanceOf(Missing);
+		expect((fault as Error).cause).toBeInstanceOf(Missing);
+	});
+
+	it('throw a refusal that the errors of an action or a query do not list', async () => {
+		class Other extends DomainError.for('OTHER', 409) {}
+
+		@Action.register({ errors: [Missing] })
+		class Returns extends Action {
+			public handle() {
+				return new Other('Not listed.') as never;
+			}
+		}
+
+		@Query.register({ errors: [Missing] })
+		class Throws extends Query {
+			public handle(): { ok: true } {
+				throw new Other('Not listed.');
+			}
+		}
+
+		await expect(Promise.resolve(Moirai.execute(Returns))).rejects.toBeInstanceOf(
+			UndeclaredRefusalError
+		);
+		await expect(Promise.resolve(Moirai.ask(Throws))).rejects.toBeInstanceOf(
+			UndeclaredRefusalError
+		);
+		// The refusals of moirai itself are always declared.
+		expect((await Moirai.ask(Find, { id: 1 } as never)).error).toBeInstanceOf(InvalidInputError);
 	});
 
 	it('name the errors of the handler alone', () => {
