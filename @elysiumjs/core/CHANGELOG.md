@@ -1,5 +1,11 @@
 # @elysiumjs/core
 
+## 0.23.1
+
+### Patch Changes
+
+- [#87](https://github.com/na2axl/elysiumjs/pull/87) [`17bfb6b`](https://github.com/na2axl/elysiumjs/commit/17bfb6b8be3b7b12a1bfb5f658569ce42358c4eb) Thanks [@na2axl](https://github.com/na2axl)! - `Resource.serialize` serializes an object through the union branch it belongs to: the first object branch whose required properties it has and whose literals it matches, keeping the most of its properties. It used to take the first object branch, which stripped the fields of the others.
+
 ## 0.23.0
 
 ### Minor Changes
