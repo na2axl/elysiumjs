@@ -248,6 +248,18 @@ describe('migration:run', () => {
 		}
 	);
 
+	it('fails with the connection name when its client is not a Bun SQL client', async () => {
+		const { statements } = await run(true, [], 'acme', (fake) => {
+			// postgres-js clients have no connect().
+			delete fake.client.connect;
+		});
+
+		expect(statements).toEqual([]);
+		expect(output).toContain('does not use the Bun SQL driver');
+		expect(output).toContain('default');
+		expect(process.exit).toHaveBeenCalledWith(1);
+	});
+
 	it('closes the client when the transaction fails', async () => {
 		let client: ReturnType<typeof fakeBunSql>['client'];
 

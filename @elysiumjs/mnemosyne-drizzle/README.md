@@ -66,7 +66,7 @@ public listFor(userId: string, query: ParsedQuery<'cursor'>) {
 
 ### Migration hooks
 
-`migration:run --tenant <name>` applies the pending migrations of a tenant in one transaction, under a lock per tenant. A migration hook runs SQL around them, in the same transaction: when a hook fails, the whole run is rolled back. Register it with `@Migration.hook()` and list it in the `services` of a module. Every method is optional:
+`migration:run --tenant <name>` applies the pending migrations of a tenant in one transaction, under a lock per tenant. It runs on Bun and needs a connection on the Bun SQL driver (`bun-sql`, the default): an app whose connections use another driver, such as Hyperdrive or postgres-js, adds one for the CLI and passes it with `--connection`. A migration hook runs SQL around them, in the same transaction: when a hook fails, the whole run is rolled back. Register it with `@Migration.hook()` and list it in the `services` of a module. Every method is optional:
 
 ```ts
 import type { MigrationHook, MigrationRun, MigrationStep } from '@elysiumjs/mnemosyne-drizzle';

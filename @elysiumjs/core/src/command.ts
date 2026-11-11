@@ -613,12 +613,19 @@ class CommandProgressBar extends InteractsWithConsole {
 	#startTime: number = 0;
 
 	/**
+	 * Whether the runtime has a terminal to redraw the bar on.
+	 */
+	#interactive: boolean = true;
+
+	/**
 	 * Create a new progress bar instance.
 	 * @param total The total number of items to process.
 	 * @param title Optional title for the progress bar.
 	 */
 	constructor(total: number = 0, title: string = 'Processing') {
 		super();
+
+		this.#interactive = this.isInteractive();
 
 		this.#total = total;
 		this.#title = title;
@@ -676,9 +683,12 @@ class CommandProgressBar extends InteractsWithConsole {
 		// Create the full progress line
 		const progressLine = `${this.#title}: ${bar} ${percentage}% (${this.#current}/${this.#total})${timeInfo}`;
 
-		// Clear the current line and write the new progress
-		this.clearLine();
-		this.write(progressLine, false);
+		// Clear the current line and write the new progress. Without a terminal, only the
+		// completion is written.
+		if (this.#interactive) {
+			this.clearLine();
+			this.write(progressLine, false);
+		}
 
 		// If we're done, add a newline
 		if (this.#current >= this.#total) {
@@ -701,7 +711,7 @@ class CommandProgressBar extends InteractsWithConsole {
 		const elapsedSec = elapsedMs / 1000;
 
 		// Clear the current line
-		this.clearLine();
+		if (this.#interactive) this.clearLine();
 
 		// Write completion message
 		if (message) {
@@ -722,7 +732,7 @@ class CommandProgressBar extends InteractsWithConsole {
 		if (!this.#active) return;
 
 		// Add a newline to move below the progress bar
-		this.newLine();
+		if (this.#interactive) this.newLine();
 
 		// Display the message
 		this.write(message);
@@ -805,6 +815,12 @@ export class CommandSpinner extends InteractsWithConsole {
 	readonly #frameDelay: number = 80; // milliseconds between frames
 
 	/**
+	 * Whether the runtime has a terminal to animate the spinner on. Without one, the title is
+	 * written once, as a line.
+	 */
+	#interactive: boolean = true;
+
+	/**
 	 * Create a new spinner instance.
 	 * @param title Optional title for the spinner.
 	 * @param frames Optional custom frames for the spinner animation.
@@ -822,6 +838,12 @@ export class CommandSpinner extends InteractsWithConsole {
 		this.#active = true;
 		this.#startTime = Date.now();
 		this.#currentFrame = 0;
+		this.#interactive = this.isInteractive();
+
+		if (!this.#interactive) {
+			this.write(`${this.#title}`);
+			return;
+		}
 
 		// Start the animation
 		this.#intervalId = setInterval(() => {
@@ -860,7 +882,7 @@ export class CommandSpinner extends InteractsWithConsole {
 		const elapsedSec = elapsedMs / 1000;
 
 		// Clear the current line
-		this.clearLine();
+		if (this.#interactive) this.clearLine();
 
 		// Determine completion symbol
 		const time = this.formatTime(elapsedSec);
@@ -898,10 +920,12 @@ export class CommandSpinner extends InteractsWithConsole {
 		}
 
 		// Clear the current line
-		this.clearLine();
+		if (this.#interactive) this.clearLine();
 
 		// Display the message
 		this.write(message);
+
+		if (!this.#interactive) return;
 
 		// Restart the animation
 		this.#intervalId = setInterval(() => {

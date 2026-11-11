@@ -42,6 +42,15 @@ const listMigrationFiles = async (folder: string): Promise<string[]> => {
 };
 
 /**
+ * Whether a client is a `Bun.SQL` client, the one `migration:run` runs the migrations with.
+ * @param sql The client of the connection.
+ */
+const isBunSql = (sql: Partial<Bun.SQL>): sql is Bun.SQL =>
+	['connect', 'close', 'begin'].every(
+		(method) => typeof sql[method as keyof Bun.SQL] === 'function'
+	);
+
+/**
  * Execute migration files.
  * @author Axel Nana <axel.nana@workbud.com>
  */
@@ -93,7 +102,14 @@ export class MigrationRunCommand extends Command {
 			return process.exit(1);
 		}
 
-		const sql = Database.getConnection(this.connection).$client;
+		const sql = Database.getConnection(this.connection).$client as Partial<Bun.SQL>;
+		if (!isBunSql(sql)) {
+			this.error(
+				`Connection ${this.bold(this.connection)} does not use the Bun SQL driver (bun-sql), ` +
+					'which migration:run needs. Give it a connection on that driver with --connection.'
+			);
+			return process.exit(1);
+		}
 		await sql.connect();
 		try {
 			// Decide everything that needs the user before opening the transaction, so that no

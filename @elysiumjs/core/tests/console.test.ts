@@ -14,6 +14,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
+import { Command, CommandSpinner } from '../src/command';
 import { ConsoleFormat, InteractsWithConsole } from '../src/console';
 import { Runtime, RuntimeNotSupportedError } from '../src/runtime';
 import { testRuntime } from './test-runtime';
@@ -619,5 +620,38 @@ describe('InteractsWithConsole through the runtime', () => {
 			'Interactive console is not supported on the headless runtime.'
 		);
 		await expect(probe.askPassword()).rejects.toThrow(RuntimeNotSupportedError);
+	});
+
+	it('spinners and progress bars write plain lines without a terminal', () => {
+		let output = '';
+		const write = mock((_stream: 'stdout' | 'stderr', text: string) => {
+			output += text;
+		});
+		Runtime.use({ ...testRuntime, name: 'headless', terminal: () => undefined, write });
+
+		const spinner = new CommandSpinner('Migrating');
+		expect(spinner.isActive()).toBe(true);
+		spinner.pause('0001_init applied');
+		spinner.update('Still migrating');
+		spinner.complete('Done');
+		expect(spinner.isActive()).toBe(false);
+
+		class Seed extends Command {
+			public async run() {}
+			public bar = (total: number, title: string) => this.progress(total, title);
+		}
+		const bar = new Seed().bar(2, 'Seeding');
+		bar.update();
+		bar.pause('halfway');
+		bar.update();
+		expect(bar.isActive()).toBe(false);
+
+		const lines = output.split('\n').filter(Boolean);
+		expect(lines[0]).toBe('Migrating');
+		expect(lines[1]).toBe('0001_init applied');
+		expect(lines[2]).toContain('Done (');
+		expect(lines[3]).toBe('halfway');
+		expect(lines[4]).toContain('Seeding completed in');
+		expect(lines).toHaveLength(5);
 	});
 });
