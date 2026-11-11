@@ -1,5 +1,11 @@
 # @elysiumjs/core
 
+## 0.23.0
+
+### Minor Changes
+
+- [#82](https://github.com/na2axl/elysiumjs/pull/82) [`8235094`](https://github.com/na2axl/elysiumjs/commit/823509464b9f71a80fdac117418b7e3e1213103c) Thanks [@na2axl](https://github.com/na2axl)! - `authorize()` and `validate()` are optional on a validator class: core calls each one only when the class has it, so a validator that holds only its schema works.
+
 ## 0.22.0
 
 ### Minor Changes

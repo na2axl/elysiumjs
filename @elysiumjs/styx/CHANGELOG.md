@@ -1,5 +1,13 @@
 # @elysiumjs/styx
 
+## 0.14.2
+
+### Patch Changes
+
+- Updated dependencies [[`8235094`](https://github.com/na2axl/elysiumjs/commit/823509464b9f71a80fdac117418b7e3e1213103c)]:
+  - @elysiumjs/core@0.23.0
+  - @elysiumjs/runtime-bun@0.1.12
+
 ## 0.14.1
 
 ### Patch Changes

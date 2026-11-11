@@ -1,5 +1,16 @@
 # @elysiumjs/ariadne
 
+## 0.4.0
+
+### Minor Changes
+
+- [#83](https://github.com/na2axl/elysiumjs/pull/83) [`1bba86e`](https://github.com/na2axl/elysiumjs/commit/1bba86e529a692abfbd2b767b9af11b792b518c0) Thanks [@na2axl](https://github.com/na2axl)! - A flow step may return a `Result` or an `AsyncResult`, unwrapped like a route's, and a flow's `ttl` may be a function, read each time a flow starts or a step is committed. The start and state routes of a flow declare their response schemas, so `styx routes:check` accepts them.
+
+### Patch Changes
+
+- Updated dependencies [[`8235094`](https://github.com/na2axl/elysiumjs/commit/823509464b9f71a80fdac117418b7e3e1213103c)]:
+  - @elysiumjs/core@0.23.0
+
 ## 0.3.3
 
 ### Patch Changes
