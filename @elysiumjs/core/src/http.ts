@@ -83,19 +83,20 @@ export type ValidatorClass<T extends TSchema = TSchema> = {
 
 	/**
 	 * Whether the request should be authorized before validation. If the request is not authorized,
-	 * the validation will be skipped.
+	 * the validation will be skipped. Optional: without it, every request goes on to validation.
 	 * @returns `true` to go on, `false` to answer 401, or the `DomainError` to answer instead.
 	 */
-	authorize(ctx: Context<Static<T>>): Promise<boolean | DomainError>;
+	authorize?(ctx: Context<Static<T>>): Promise<boolean | DomainError>;
 
 	/**
 	 * Processes custom validation logic. This method is called after the validation schema is checked
-	 * against the input data. So it's safe to assume that the schema is valid.
+	 * against the input data. So it's safe to assume that the schema is valid. Optional: without it,
+	 * the schema alone decides.
 	 * @param ctx The request context, with the input data as its body.
 	 * @returns `true` when the input data is valid, `false` to answer a generic 400, or the
 	 * `DomainError` to answer instead, with its own status, code and extensions.
 	 */
-	validate(ctx: Context<Static<T>>): Promise<boolean | DomainError>;
+	validate?(ctx: Context<Static<T>>): Promise<boolean | DomainError>;
 };
 
 /**
@@ -1265,11 +1266,10 @@ export namespace Http {
 							return toBody(c, result);
 						};
 
-						if (isValidator) {
+						const validator = route.body?.validator;
+						if (isValidator && validator?.validate) {
 							return async function (c: Context) {
-								const valid = await ModuleContext.run(node, () =>
-									route.body!.validator!.validate(c)
-								);
+								const valid = await ModuleContext.run(node, () => validator.validate!(c));
 								if (valid instanceof DomainError) throw valid;
 								if (!valid) throw new BadRequestError('The request body is invalid.');
 
@@ -1355,10 +1355,9 @@ export namespace Http {
 							async transform(c: Context) {
 								// Read by the error hook, which gets the same context object.
 								(c as unknown as Record<symbol, unknown>)[FILTER_LEVELS] = filterLevels;
-								if (isValidator) {
-									const authorized = await ModuleContext.run(node, () =>
-										route.body!.validator!.authorize(c)
-									);
+								const validator = route.body?.validator;
+								if (isValidator && validator?.authorize) {
+									const authorized = await ModuleContext.run(node, () => validator.authorize!(c));
 									if (authorized instanceof DomainError) throw authorized;
 									if (!authorized) throw c.status(401, 'Unauthorized');
 								}
