@@ -15,6 +15,7 @@
 import type { DrizzleConfig } from 'drizzle-orm';
 import type { DrizzleDatabaseCache } from './cache';
 import type { DrizzleConnection } from './database';
+import type { MigrationConnection } from './migration';
 
 import { ElysiumError } from '@elysiumjs/core';
 
@@ -47,6 +48,13 @@ export interface DrizzleDriver {
 	 * @param connection The database.
 	 */
 	close(connection: DrizzleConnection): Promise<void> | void;
+
+	/**
+	 * Gives the connection `migration:run` works on, over the client of a database the driver
+	 * created. `migration:run` refuses a connection whose driver has none.
+	 * @param connection The database.
+	 */
+	migrations?(connection: DrizzleConnection): MigrationConnection;
 }
 
 /**
@@ -60,6 +68,19 @@ export class MissingDriverError extends ElysiumError {
 			`Connection "${name}" sets no driver, and the default Bun SQL driver runs on Bun only. ` +
 				'Set `driver` to postgresJs() or nodePostgres() on Node.js, or hyperdrive() on ' +
 				'Cloudflare Workers.'
+		);
+	}
+}
+
+/**
+ * Raised when `migration:run` uses a connection whose driver cannot run migrations.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export class MissingMigrationsError extends ElysiumError {
+	constructor(driver: string) {
+		super(
+			`The ${driver} driver cannot run migrations: it gives no migration connection. Use a ` +
+				'connection on the bun-sql, postgres-js or node-postgres driver.'
 		);
 	}
 }

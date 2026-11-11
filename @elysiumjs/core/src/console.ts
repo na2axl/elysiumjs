@@ -463,6 +463,14 @@ export class InteractsWithConsole {
 	}
 
 	/**
+	 * Whether the runtime has an interactive terminal. Without one, spinners and progress bars
+	 * write plain lines instead of redrawing the current one.
+	 */
+	public isInteractive(): boolean {
+		return Runtime.get().terminal() !== undefined;
+	}
+
+	/**
 	 * Gets the interactive terminal of the runtime.
 	 * @throws {RuntimeNotSupportedError} When the runtime has no terminal.
 	 */

@@ -12,13 +12,42 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { SQL } from 'drizzle-orm';
+
 import { Service } from '@elysiumjs/core';
 
 /**
- * The transaction `migration:run` hands to its hooks: a `Bun.SQL` client.
+ * Where `migration:run` runs SQL: a transaction, or the connection outside of one. Every driver
+ * gives one through `DrizzleDriver.migrations()`.
+ * @author Axel Nana <axel.nana@workbud.com>
  */
-// portability-allow: a type only, migration:run runs on Bun
-type MigrationClient = Bun.SQL;
+export interface MigrationDatabase {
+	/**
+	 * Runs one statement, with its parameters.
+	 * @param query The statement, from the `sql` template of Drizzle.
+	 * @returns The rows of the statement.
+	 */
+	execute<T = Record<string, unknown>>(query: SQL): Promise<T[]>;
+
+	/**
+	 * Runs a script of several statements, without parameters, such as a migration file.
+	 * @param text The script.
+	 */
+	script(text: string): Promise<void>;
+}
+
+/**
+ * The connection `migration:run` works on, from the driver of a Drizzle connection.
+ * @author Axel Nana <axel.nana@workbud.com>
+ */
+export interface MigrationConnection extends MigrationDatabase {
+	/**
+	 * Runs a function in a transaction, committed when it resolves and rolled back when it
+	 * throws.
+	 * @param fn Receives the transaction.
+	 */
+	transaction<T>(fn: (db: MigrationDatabase) => Promise<T>): Promise<T>;
+}
 
 /**
  * A run of `migration:run`, as its hooks see it.
@@ -26,7 +55,7 @@ type MigrationClient = Bun.SQL;
  */
 export type MigrationRun = {
 	/** The transaction of the run. */
-	readonly sql: MigrationClient;
+	readonly db: MigrationDatabase;
 
 	/** The tenant the migrations run in: the schema set as `search_path`. */
 	readonly tenant: string;
@@ -50,7 +79,7 @@ export type MigrationRun = {
  */
 export type MigrationStep = {
 	/** The transaction of the run. */
-	readonly sql: MigrationClient;
+	readonly db: MigrationDatabase;
 
 	/** The name of the migration. */
 	readonly name: string;
@@ -110,8 +139,8 @@ export namespace Migration {
 	 * ```ts
 	 * @Migration.hook()
 	 * export class GrantsHook implements MigrationHook {
-	 * 	public async after({ sql, tenant }: MigrationRun) {
-	 * 		await sql`GRANT USAGE ON SCHEMA ${sql(tenant)} TO app`;
+	 * 	public async after({ db, tenant }: MigrationRun) {
+	 * 		await db.execute(sql`GRANT USAGE ON SCHEMA ${sql.identifier(tenant)} TO app`);
 	 * 	}
 	 * }
 	 * ```

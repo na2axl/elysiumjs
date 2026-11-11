@@ -15,8 +15,11 @@
 import type { Options, PostgresType, Sql } from 'postgres';
 import type { DrizzleConnection } from '../database';
 import type { DrizzleDriver } from '../driver';
+import type { TemplateClient } from '../migration-clients';
 
 import { drizzle } from 'drizzle-orm/postgres-js';
+
+import { templateClientMigrations } from '../migration-clients';
 
 /**
  * Options of {@link postgresJs}: a connection URL or options, or a client.
@@ -42,5 +45,6 @@ export const postgresJs = (options: PostgresJsDriverOptions): DrizzleDriver => (
 	connect: (config) => drizzle({ ...config, ...options } as never) as unknown as DrizzleConnection,
 	close: async (connection) => {
 		await (connection.$client as Sql).end();
-	}
+	},
+	migrations: (connection) => templateClientMigrations(connection.$client as TemplateClient)
 });

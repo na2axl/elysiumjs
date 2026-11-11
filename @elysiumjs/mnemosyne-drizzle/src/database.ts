@@ -23,6 +23,7 @@ import { sql } from 'drizzle-orm';
 
 import { DrizzleDatabaseCache } from './cache';
 import { MissingDriverError } from './driver';
+import { templateClientMigrations } from './migration-clients';
 
 export { DEFAULT_CACHE_TTL, DrizzleDatabaseCache } from './cache';
 
@@ -65,6 +66,9 @@ export interface DrizzleQueryResultHKT extends PgQueryResultHKT {
 	type: this['row'][];
 }
 
+/** The connections already closed. */
+const closedConnections = new WeakSet<object>();
+
 /** The driver of each connection, to close it with. */
 const connectionDrivers = new WeakMap<object, DrizzleDriver>();
 
@@ -86,9 +90,19 @@ const defaultDriver = (props: Record<string, unknown>, name: string): DrizzleDri
 		connect: (config) => drizzle({ ...config, ...client }),
 		close: async (connection) => {
 			await connection.$client.close();
-		}
+		},
+		migrations: (connection) => templateClientMigrations(connection.$client)
 	};
 };
+
+/**
+ * The driver of a connection.
+ * @internal
+ * @author Axel Nana <axel.nana@workbud.com>
+ * @param connection The connection.
+ */
+export const getConnectionDriver = (connection: DrizzleConnection): DrizzleDriver | undefined =>
+	connectionDrivers.get(connection);
 
 /**
  * Closes the client of a connection through its driver.
@@ -98,7 +112,10 @@ const defaultDriver = (props: Record<string, unknown>, name: string): DrizzleDri
  */
 export const closeConnection = async (connection: DrizzleConnection): Promise<void> => {
 	const driver = connectionDrivers.get(connection);
-	if (driver) await driver.close(connection);
+	// Closed once: a command may close its connection before the module closes them all.
+	if (!driver || closedConnections.has(connection)) return;
+	closedConnections.add(connection);
+	await driver.close(connection);
 };
 
 // ============================================================================

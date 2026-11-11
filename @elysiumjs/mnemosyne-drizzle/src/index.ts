@@ -26,7 +26,12 @@ export { pgTable, getTableBuilders } from './table';
 // Re-exports
 export { Database, DEFAULT_CACHE_TTL, DrizzleDatabaseCache, TenantMismatchError } from './database';
 export type { DrizzleConnectionProps, DrizzleConnection, DrizzleQueryResultHKT } from './database';
-export { type DrizzleDriver, type DrizzleDriverConfig, MissingDriverError } from './driver';
+export {
+	type DrizzleDriver,
+	type DrizzleDriverConfig,
+	MissingDriverError,
+	MissingMigrationsError
+} from './driver';
 export {
 	DrizzleModel,
 	createSchemaFromDrizzle,
@@ -34,7 +39,20 @@ export {
 	type DrizzleModelOptions
 } from './model';
 export { DrizzleModule, type DrizzleModuleConfig } from './drizzle.module';
-export { Migration, type MigrationHook, type MigrationRun, type MigrationStep } from './migration';
+export {
+	Migration,
+	type MigrationConnection,
+	type MigrationDatabase,
+	type MigrationHook,
+	type MigrationRun,
+	type MigrationStep
+} from './migration';
+export {
+	nodePostgresMigrations,
+	templateClientMigrations,
+	type PgPool,
+	type TemplateClient
+} from './migration-clients';
 export {
 	applyTableMarkers,
 	DrizzleTable,

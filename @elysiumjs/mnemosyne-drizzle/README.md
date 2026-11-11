@@ -66,35 +66,40 @@ public listFor(userId: string, query: ParsedQuery<'cursor'>) {
 
 ### Migration hooks
 
-`migration:run --tenant <name>` applies the pending migrations of a tenant in one transaction, under a lock per tenant. A migration hook runs SQL around them, in the same transaction: when a hook fails, the whole run is rolled back. Register it with `@Migration.hook()` and list it in the `services` of a module. Every method is optional:
+`migration:run --tenant <name>` applies the pending migrations of a tenant in one transaction, under a lock per tenant. It works on the connection given by `--connection` (`default` when omitted), whose driver runs the migrations: `bun-sql`, `postgres-js` and `node-postgres` do, and `hyperdrive` hands them to the driver it wraps, which needs its binding. A custom driver runs them by implementing `migrations(connection)`, with `templateClientMigrations()` or `nodePostgresMigrations()` for clients like those.
+
+A migration hook runs SQL around the migrations, in the same transaction: when a hook fails, the whole run is rolled back. Register it with `@Migration.hook()` and list it in the `services` of a module. Every method is optional:
 
 ```ts
 import type { MigrationHook, MigrationRun, MigrationStep } from '@elysiumjs/mnemosyne-drizzle';
 
-import { Migration } from '@elysiumjs/mnemosyne-drizzle';
+import { Migration, sql } from '@elysiumjs/mnemosyne-drizzle';
 
 @Migration.hook()
 export class DatabaseHook implements MigrationHook {
-	public async before({ sql }: MigrationRun) {
-		await sql`CREATE EXTENSION IF NOT EXISTS pgcrypto`;
+	public async before({ db }: MigrationRun) {
+		await db.execute(sql`CREATE EXTENSION IF NOT EXISTS pgcrypto`);
 	}
 
 	public async beforeEach({ name }: MigrationStep) {}
 
-	public async afterEach({ sql, name }: MigrationStep) {
-		const [{ count }] = await sql`SELECT count(*)::int AS count FROM pg_constraint WHERE ...`;
+	public async afterEach({ db, name }: MigrationStep) {
+		const [{ count }] = await db.execute<{ count: number }>(
+			sql`SELECT count(*)::int AS count FROM pg_constraint WHERE ...`
+		);
 		if (count > 0) throw new Error(`${name} adds a foreign key across schemas`);
 	}
 
-	public async after({ sql, tenant }: MigrationRun) {
-		await sql`GRANT USAGE ON SCHEMA ${sql(tenant)} TO app`;
+	public async after({ db, tenant }: MigrationRun) {
+		await db.execute(sql`GRANT USAGE ON SCHEMA ${sql.identifier(tenant)} TO app`);
 	}
 }
 ```
 
 - `before` runs once the tenant schema and the migrations table exist, and `after` at the end. Both also run when no migration is pending, so `after` fits what must stay in place, such as grants or partitions.
 - `beforeEach` runs before each migration, and `afterEach` once it is recorded.
-- A `MigrationRun` holds the transaction (`sql`), the `tenant`, the `connection`, the `batch`, the `pending` migrations and the ones `applied` so far. A `MigrationStep` holds the transaction, the `name` and `path` of the migration, and its `run`.
+- A `MigrationRun` holds the transaction (`db`), the `tenant`, the `connection`, the `batch`, the `pending` migrations and the ones `applied` so far. A `MigrationStep` holds the transaction, the `name` and `path` of the migration, and its `run`.
+- `db.execute(query)` runs one statement written with the `sql` template of Drizzle and returns its rows. `db.script(text)` runs several statements without parameters.
 
 Hooks run for every tenant, in the order the modules register them: read `tenant` to act on some tenants only.
 
