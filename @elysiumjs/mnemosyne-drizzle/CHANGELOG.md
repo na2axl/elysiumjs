@@ -1,5 +1,13 @@
 # @elysiumjs/mnemosyne-drizzle
 
+## 0.8.0
+
+### Minor Changes
+
+- [#96](https://github.com/na2axl/elysiumjs/pull/96) [`4d5809f`](https://github.com/na2axl/elysiumjs/commit/4d5809f264de7195ad865c2676d12fe3e96da859) Thanks [@na2axl](https://github.com/na2axl)! - Add migration hooks: services registered with `@Migration.hook()` run SQL in the transaction of `migration:run`, with `before` and `after` (a `MigrationRun`) and `beforeEach` and `afterEach` (a `MigrationStep`). `before` and `after` also run when no migration is pending.
+
+- [#97](https://github.com/na2axl/elysiumjs/pull/97) [`7eb3d1c`](https://github.com/na2axl/elysiumjs/commit/7eb3d1ccf4c5602fe67b7f3fac0da587047f168a) Thanks [@na2axl](https://github.com/na2axl)! - Add table markers: `DrizzleTable.define(DrizzleTable.partitioned({ range }), DrizzleTable.afterCreate(build))(table)` makes `migration:generate` create the table with `PARTITION BY RANGE` and add SQL right after it, in the migration that creates the table.
+
 ## 0.7.1
 
 ### Patch Changes
