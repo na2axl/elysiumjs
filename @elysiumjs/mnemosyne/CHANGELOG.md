@@ -1,5 +1,11 @@
 # @elysiumjs/mnemosyne
 
+## 0.8.1
+
+### Patch Changes
+
+- [#93](https://github.com/na2axl/elysiumjs/pull/93) [`c697c49`](https://github.com/na2axl/elysiumjs/commit/c697c49354503633cf93bf3b4b89162d03692fec) Thanks [@na2axl](https://github.com/na2axl)! - `db:seed` boots the app lazily: only the services the seeders take are built, so a service that needs its host (such as a Worker binding) no longer stops a seed run.
+
 ## 0.8.0
 
 ### Minor Changes

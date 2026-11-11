@@ -173,7 +173,7 @@
     },
     "@elysiumjs/mnemosyne": {
       "name": "@elysiumjs/mnemosyne",
-      "version": "0.8.0",
+      "version": "0.8.1",
       "dependencies": {
         "cache-manager": "^7.2.9",
         "cacheable": "^2.5.0",
