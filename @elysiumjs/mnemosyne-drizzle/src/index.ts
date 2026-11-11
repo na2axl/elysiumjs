@@ -34,6 +34,7 @@ export {
 	type DrizzleModelOptions
 } from './model';
 export { DrizzleModule, type DrizzleModuleConfig } from './drizzle.module';
+export { Migration, type MigrationHook, type MigrationRun, type MigrationStep } from './migration';
 export { compileAfter, compileFilter, compileQuery } from './query';
 export { DrizzleRepository, type DrizzleRepositoryOptions, RepositoryKeyError } from './repository';
 export {
