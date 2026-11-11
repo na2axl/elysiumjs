@@ -1,6 +1,6 @@
 {
   "name": "@elysiumjs/moirai",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "license": "Apache-2.0",
   "description": "Actions, queries, idempotency, outbox, inbox and domain events for the Elysium.js framework.",
   "private": false,

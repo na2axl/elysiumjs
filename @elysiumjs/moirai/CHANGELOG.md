@@ -1,5 +1,11 @@
 # @elysiumjs/moirai
 
+## 0.8.0
+
+### Minor Changes
+
+- [#85](https://github.com/na2axl/elysiumjs/pull/85) [`9a5f13a`](https://github.com/na2axl/elysiumjs/commit/9a5f13a9d432da0ae901b93e676262bc2ce17586) Thanks [@na2axl](https://github.com/na2axl)! - An action or a query refused with a DomainError that its `errors` do not list now throws `UndeclaredRefusalError`, with the refusal as its `cause`, so that a route answers 500 instead of a problem it never declared. This makes `orThrow()` inside a handler safe: a nested refusal reaches the client only when the caller declares it.
+
 ## 0.7.1
 
 ### Patch Changes
