@@ -20,6 +20,7 @@ export * from './make_job.command';
 export * from './make_middleware.command';
 export * from './make_model.command';
 export * from './make_repository.command';
+export * from './make_seeder.command';
 export * from './make_service.command';
 export * from './make_validator.command';
 

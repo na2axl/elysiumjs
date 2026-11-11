@@ -39,6 +39,7 @@ styx make:job --name ImportUsers
 styx make:middleware --name AuthMiddleware
 styx make:model --name User
 styx make:repository --name UserRepository
+styx make:seeder --name CountriesSeeder
 styx make:service --name UserService
 styx make:validator --name CreateUser
 styx module:new --name billing

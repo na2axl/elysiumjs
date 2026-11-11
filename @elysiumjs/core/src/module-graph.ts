@@ -14,7 +14,7 @@
 
 import type { Class } from 'type-fest';
 import type { Environment } from './environments';
-import type { ConfiguredModule, ModuleClass, ModuleProps } from './module';
+import type { ConfiguredModule, ModuleClass, ModuleCollections, ModuleProps } from './module';
 import type { ServiceToken } from './token';
 
 import { isEqual } from 'radash';
@@ -58,7 +58,8 @@ export type ModuleNode = {
 	readonly configSources: readonly ConfigSource[];
 };
 
-type Collectable = 'controllers' | 'commands' | 'jobs';
+/** The keys of the class lists modules declare. */
+type Collectable = keyof ModuleCollections;
 
 /**
  * The resolved module graph.
@@ -85,7 +86,7 @@ export type ModuleGraph = {
 	/** The controllers, commands or jobs of one module that are active in the graph's environment. */
 	own<K extends Collectable>(node: ModuleNode, key: K): readonly Class<any>[];
 
-	/** Gathers the active controllers, commands or jobs across modules, with their owner. */
+	/** Gathers the active classes of a list (controllers, commands, jobs...) across modules, with their owner. */
 	collect<K extends Collectable>(key: K): readonly { item: Class<any>; module: ModuleNode }[];
 };
 

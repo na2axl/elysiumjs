@@ -114,7 +114,7 @@ export const getModulePath = async (moduleName: string) => {
  * @returns The hint to print.
  */
 export const addToModuleHint = async (
-	list: 'commands' | 'jobs' | 'services' | 'controllers',
+	list: 'commands' | 'jobs' | 'seeders' | 'services' | 'controllers',
 	className: string,
 	moduleName?: string
 ) => {

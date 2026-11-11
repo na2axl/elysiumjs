@@ -10,7 +10,7 @@ bun add @elysiumjs/mnemosyne
 
 ## Usage
 
-`MnemosyneModule` provides the caches (`Cache.redis` and `Cache.memory`). Database driver modules such as `DrizzleModule` from `@elysiumjs/mnemosyne-drizzle` import it for you, so you only add it yourself when you want to configure the caches or use them without a database:
+`MnemosyneModule` provides the caches (`Cache.redis` and `Cache.memory`) and the `db:seed` command. Database driver modules such as `DrizzleModule` from `@elysiumjs/mnemosyne-drizzle` import it for you, so you only add it yourself when you want to configure the caches or use them without a database:
 
 ```ts
 import { Application, RedisModule } from '@elysiumjs/core';
@@ -40,6 +40,45 @@ MnemosyneModule.with({
 
 await Cache.store('kv').set('greeting', 'hello', 120_000);
 ```
+
+## Seeders
+
+A seeder writes the rows an application needs to run, such as reference data. List it in the `seeders` of a module, and `styx db:seed` runs it inside that module, so its `run` method takes the module's services, in a transaction of its own:
+
+```ts
+import { Service } from '@elysiumjs/core';
+import { Seeder } from '@elysiumjs/mnemosyne';
+
+@Seeder.register()
+export class CountriesSeeder extends Seeder {
+	protected async run(@Service.inject() countries: CountryRepository): Promise<void> {
+		await countries.upsertMany(await readCountries());
+	}
+}
+
+@Seeder.register({ after: [CountriesSeeder], manual: true })
+export class CitiesSeeder extends Seeder {
+	protected async run(@Service.inject() cities: CityRepository): Promise<void> {
+		await cities.upsertMany(await readCities(this.input.file));
+	}
+}
+
+@Module.register({ services: [CountryRepository, CityRepository], seeders: [CountriesSeeder, CitiesSeeder] })
+export class GeoModule extends Module {}
+```
+
+```bash
+styx db:seed                                  # every seeder that is not manual
+styx db:seed --only geo.cities --file cities.zip
+styx db:seed --arg region=africa --list       # prints the order, runs nothing
+```
+
+- Seeders run on every call, so write them as upserts.
+- A seeder is named after its module and class, without the `Module` and `Seeder` suffixes, in kebab case (`geo.cities` above). `name` sets another one.
+- `after` lists the seeder classes that run first when both run. It sets an order and does not add them: `--only geo.cities` runs `geo.cities` alone. Give a function, `after: () => [CountriesSeeder]`, when an import cycle leaves the class undefined.
+- `manual: true` seeders run only when `--only` names them. `env` limits a seeder to some environments, and `connection` picks the connection of its transaction.
+- `--file` and the `--arg key=value` pairs reach the seeders as `this.input.file` and `this.input.args`.
+- `styx make:seeder --name CountriesSeeder --module geo` writes `seeders/countries.seeder.ts`.
 
 ## Listings
 

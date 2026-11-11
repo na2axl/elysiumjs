@@ -183,6 +183,7 @@
       "devDependencies": {
         "@elysiumjs/core": "workspace:*",
         "@elysiumjs/redis": "workspace:*",
+        "@elysiumjs/runtime-bun": "workspace:*",
       },
       "peerDependencies": {
         "@elysiumjs/core": "workspace:^",

@@ -29,7 +29,7 @@ const importPattern = /^import \{([^}]+)\} from '(@elysiumjs\/[^']+)';$/gm;
 
 describe('stub imports', () => {
 	it('has stubs to check', async () => {
-		expect((await readdir(stubsDir)).filter((f) => f.endsWith('.stub'))).toHaveLength(12);
+		expect((await readdir(stubsDir)).filter((f) => f.endsWith('.stub'))).toHaveLength(13);
 	});
 
 	for (const file of [
@@ -39,6 +39,7 @@ describe('stub imports', () => {
 		'middleware',
 		'model',
 		'repository',
+		'seeder',
 		'service',
 		'validator',
 		'validator.authorize',
