@@ -1,5 +1,12 @@
 # @elysiumjs/ariadne-workers
 
+## 0.1.3
+
+### Patch Changes
+
+- Updated dependencies [[`1bba86e`](https://github.com/na2axl/elysiumjs/commit/1bba86e529a692abfbd2b767b9af11b792b518c0)]:
+  - @elysiumjs/ariadne@0.4.0
+
 ## 0.1.2
 
 ### Patch Changes
