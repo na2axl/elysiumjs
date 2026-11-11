@@ -12,12 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { access } from 'node:fs/promises';
+import { access, mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { Command, CommandArgumentType } from '@elysiumjs/core';
 
 import { stripPublicSchema } from '../migrations';
 import { getMigrationsPath, getProjectPath } from './project';
+import { collectAppSchema, renderSchemaEntry } from './schema';
 
 /** Whether a path exists. `node:fs/promises` has no `exists` outside Bun, and this module loads on every runtime. */
 const exists = (path: string): Promise<boolean> =>
@@ -36,7 +39,9 @@ const listSqlFiles = async (migrationsPath: string): Promise<string[]> => {
 };
 
 /**
- * Generates migration files.
+ * Generates migration files. The schema is the one of the app: every table, Postgres schema, enum,
+ * sequence, view, role and policy that the project files it loads export, directly or as a value
+ * of an exported object (like the tables `moiraiTables()` builds).
  * @author Axel Nana <axel.nana@workbud.com>
  */
 @Command.register()
@@ -51,6 +56,11 @@ export class MigrationGenerateCommand extends Command {
 	private name?: string;
 
 	public async run(): Promise<void> {
+		if (!this.name && !process.stdin.isTTY) {
+			this.error('Give the migration a name with --name when no terminal can answer the prompt.');
+			process.exit(1);
+		}
+
 		if (!this.name) {
 			// Loaded on use: prompts needs Node.js streams, which Workers bundles leave out.
 			const { default: prompts } = await import('prompts');
@@ -83,14 +93,26 @@ export class MigrationGenerateCommand extends Command {
 
 		const projectRoot = getProjectPath();
 		const migrationsPath = getMigrationsPath();
-		let schemaPath = `${projectRoot}/src/database/schemas`;
-		if (await exists(`${projectRoot}/src/database/schema.ts`)) {
-			schemaPath = `${projectRoot}/src/database/schema.ts`;
+
+		const schema = await collectAppSchema(projectRoot);
+		if (schema.length === 0) {
+			this.error('No Drizzle table is exported by the files the application loads.');
+			process.exit(1);
 		}
 
 		const existing = new Set(await listSqlFiles(migrationsPath));
 
-		await Bun.$`bunx --bun drizzle-kit generate --dialect postgresql --schema ${schemaPath} --out ${migrationsPath} --name ${this.name}`;
+		// Drizzle Kit reads tables from the top-level exports of schema files: one file exports them all.
+		const entryDir = await mkdtemp(join(tmpdir(), 'elysium-schema-'));
+		const entry = join(entryDir, 'schema.ts');
+		try {
+			await Bun.write(entry, renderSchemaEntry(schema));
+			await Bun.$`bunx --bun drizzle-kit generate --dialect postgresql --schema ${entry} --out ${migrationsPath} --name ${this.name}`.cwd(
+				projectRoot
+			);
+		} finally {
+			await rm(entryDir, { recursive: true, force: true });
+		}
 
 		// Only the migration generated now is rewritten: earlier ones may have been edited by hand.
 		for (const path of await listSqlFiles(migrationsPath)) {
