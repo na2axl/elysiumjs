@@ -379,7 +379,14 @@ Without a runtime, `Runtime.get()` throws `RuntimeNotConfiguredError`; only the 
 
 ## Documentation
 
-TODO
+This README documents core. Each package documents itself in its own README, and the [repository README](../../README.md#packages) lists them. The ones most apps read next:
+
+- [@elysiumjs/styx](../styx): creating projects, generating code and route types, and running app commands.
+- [@elysiumjs/mnemosyne](../mnemosyne) and [@elysiumjs/mnemosyne-drizzle](../mnemosyne-drizzle): models, repositories, queries, units of work and migrations.
+- [@elysiumjs/moirai](../moirai): actions, queries, the outbox and domain events.
+- [@elysiumjs/heracles](../heracles): background jobs and schedules.
+- [@elysiumjs/themis](../themis) and [@elysiumjs/cerberus](../cerberus): authentication and permissions.
+- [@elysiumjs/ariadne](../ariadne): multi-step flows.
 
 ## Contributing
 
