@@ -318,6 +318,35 @@ describe('db:seed', () => {
 		});
 	});
 
+	it('builds only the services the seeders take', async () => {
+		@Module.register({
+			services: [
+				{
+					name: 'test.needs-host',
+					global: true,
+					factory: () => {
+						throw new Error('no host here');
+					}
+				}
+			]
+		})
+		class HostModule extends Module {}
+
+		@Application.register({
+			runtime: bunRuntime,
+			modules: [
+				FakeDatabaseModule,
+				MnemosyneModule.with({ cache: { redis: false } }),
+				HostModule,
+				CoreModule
+			]
+		})
+		class HostApp extends Application {}
+		started = new HostApp();
+		await started.run(['db:seed']);
+		expect(calls).toContain('countries from default');
+	});
+
 	it('lists the plan without running it', async () => {
 		await run('--list', '--only', 'core.cities');
 		expect(calls).toEqual([]);
