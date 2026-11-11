@@ -1,5 +1,11 @@
 # @elysiumjs/core
 
+## 0.24.1
+
+### Patch Changes
+
+- [#99](https://github.com/na2axl/elysiumjs/pull/99) [`2cfba22`](https://github.com/na2axl/elysiumjs/commit/2cfba227331e720b8ff79a6a4cdfeb3c251a450e) Thanks [@na2axl](https://github.com/na2axl)! - Command spinners and progress bars write plain lines when the runtime has no terminal, such as the workers runtime, instead of throwing `RuntimeNotSupportedError`. Prompts still throw.
+
 ## 0.24.0
 
 ### Minor Changes
