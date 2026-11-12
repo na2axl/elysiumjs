@@ -30,7 +30,15 @@ export type PortabilityFinding = { file: string; line: number; match: string };
  * Node.js modules available on Workers under nodejs_compat. On Workers, `fs` has no real file
  * system behind it: code that needs one checks for it before relying on it.
  */
-const ALLOWED_NODE_MODULES = ['async_hooks', 'buffer', 'crypto', 'events', 'fs', 'fs/promises'];
+const ALLOWED_NODE_MODULES = [
+	'async_hooks',
+	'buffer',
+	'crypto',
+	'events',
+	'fs',
+	'fs/promises',
+	'path'
+];
 
 const BARE_BUILTINS = builtinModules
 	.filter(
