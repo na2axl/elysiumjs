@@ -19,7 +19,6 @@ import { PITHOS_DISKS, Storage } from './storage';
 import { StorageController } from './storage.controller';
 
 import './memory';
-import './local';
 
 type Option<T> = T | (() => T);
 

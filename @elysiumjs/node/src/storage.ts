@@ -12,48 +12,37 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ServedSigning } from './signing';
 import type {
 	ListOptions,
 	ListPage,
 	ObjectInfo,
 	PutOptions,
+	ServedSigning,
 	SignedUrlOptions,
 	StorageBody,
 	StoredObject
-} from './storage';
+} from '@elysiumjs/olympus/pithos';
 
 import { copyFile, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 
-import { ElysiumError } from '../errors';
-import { joinUrl, signServedUrl } from './signing';
 import {
 	assertKey,
 	DEFAULT_LIST_LIMIT,
 	DiskCannotSignError,
 	DiskNotPublicError,
+	joinUrl,
 	ObjectNotFoundError,
 	objectOf,
+	signServedUrl,
 	Storage,
 	StorageDriver,
 	toBytes
-} from './storage';
+} from '@elysiumjs/olympus/pithos';
 
-declare module '../port' {
+declare module '@elysiumjs/olympus' {
 	interface PortDrivers {
 		'storage:local': typeof LocalDisk;
-	}
-}
-
-/**
- * Thrown when a local disk is built on a runtime without a lasting file system, such as
- * Cloudflare Workers.
- * @author Axel Nana <ax.lnana@outlook.com>
- */
-export class LocalDiskUnavailableError extends ElysiumError {
-	constructor() {
-		super('The local disk needs a file system that lasts: use another disk on this runtime.');
 	}
 }
 
@@ -76,10 +65,19 @@ const META = '.pithos';
 type Meta = { contentType?: string; metadata: Record<string, string> };
 
 /**
- * Keeps objects as files in a folder, on Node.js and Bun. The content type and metadata of each
- * object are kept next to them, in a `.pithos` folder. It refuses to start on Cloudflare Workers,
- * whose file system does not last.
+ * Keeps objects as files in a folder, through `node:fs`. The content type and metadata of each
+ * object are kept next to them, in a `.pithos` folder. Registered as the `local` driver of the
+ * `Storage` port when `@elysiumjs/node` is imported.
  * @author Axel Nana <ax.lnana@outlook.com>
+ * @example
+ * ```ts
+ * import '@elysiumjs/node';
+ * import { PithosModule, Storage } from '@elysiumjs/olympus/pithos';
+ *
+ * PithosModule.with({
+ * 	disks: { public: () => Storage.for('local', { root: './storage/public', url: '/files' }) }
+ * });
+ * ```
  */
 @Storage.driver('local')
 export class LocalDisk extends StorageDriver {
@@ -87,9 +85,6 @@ export class LocalDisk extends StorageDriver {
 
 	constructor(private readonly options: LocalDiskOptions) {
 		super();
-		if (globalThis.navigator?.userAgent === 'Cloudflare-Workers') {
-			throw new LocalDiskUnavailableError();
-		}
 		this.#root = resolve(options.root);
 	}
 

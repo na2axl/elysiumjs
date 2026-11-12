@@ -109,7 +109,6 @@
 		"./src/hermes/channels/*.ts",
 		"./src/pithos/index.ts",
 		"./src/pithos/memory.ts",
-		"./src/pithos/local.ts",
 		"./src/pithos/pithos.module.ts",
 		"./dist/index.js",
 		"./dist/moirai/heracles.js",

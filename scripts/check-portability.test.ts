@@ -44,7 +44,7 @@ describe('checkPortability', () => {
 				'Bun.sleep(1);',
 				'// Bun.sleep',
 				'/** process.exit() */',
-				"import { x } from 'node:os';",
+				"import { x } from 'node:path';",
 				"import { y } from 'node:events';"
 			].join('\n')
 		});
@@ -64,9 +64,9 @@ describe('checkPortability', () => {
 		const root = await fixture({
 			'b.ts': [
 				"const a = import('node:child_process');",
-				"import 'node:net';",
+				"import 'node:path';",
 				"const c = require('node:os');",
-				"import { d } from 'os';",
+				"import { d } from 'path';",
 				"import { e } from 'child_process';",
 				"import { f } from 'events';",
 				"const g = import('node:events');",
@@ -85,7 +85,6 @@ describe('checkPortability', () => {
 				"import { scrypt } from 'node:crypto';",
 				"import { readFile } from 'node:fs/promises';",
 				"import { existsSync } from 'node:fs';",
-				"import { join } from 'node:path';",
 				"import { Buffer } from 'node:buffer';"
 			].join('\n')
 		});

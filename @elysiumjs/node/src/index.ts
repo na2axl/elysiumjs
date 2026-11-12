@@ -17,6 +17,7 @@ import type { Runtime } from '@elysiumjs/olympus';
 import { peerAddress, serveNode } from './serve';
 
 export { type FetchHandler, peerAddress, serveNode } from './serve';
+export { LocalDisk, type LocalDiskOptions } from './storage';
 
 const SIGNALS = ['SIGINT', 'SIGTERM'] as const;
 

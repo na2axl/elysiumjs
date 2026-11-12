@@ -15,6 +15,7 @@
 import type { Runtime } from '@elysiumjs/olympus';
 
 export { BunPasswordHasher, type BunPasswordHasherOptions } from './password';
+export { BunDisk, type BunDiskOptions } from './storage';
 
 const SIGNALS = ['SIGINT', 'SIGTERM'] as const;
 

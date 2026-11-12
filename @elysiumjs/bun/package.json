@@ -45,6 +45,7 @@
 	"sideEffects": [
 		"./src/index.ts",
 		"./src/password.ts",
+		"./src/storage.ts",
 		"./dist/index.js"
 	],
 	"devDependencies": {

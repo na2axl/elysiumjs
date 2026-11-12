@@ -186,8 +186,9 @@ export const objectOf = (info: ObjectInfo, bytes: Uint8Array): StoredObject => (
 });
 
 /**
- * A disk: where objects are stored, under keys such as `avatars/42.webp`. `memory` and `local`
- * are built in; backend packages add others, such as `r2` from `@elysiumjs/workers`.
+ * A disk: where objects are stored, under keys such as `avatars/42.webp`. `memory` is built in;
+ * runtime packages add others: `local` from `@elysiumjs/node`, `bun` from `@elysiumjs/bun` and
+ * `r2` from `@elysiumjs/workers`.
  * Subclasses implement the storage calls; `exists()` and `move()` have defaults built on them.
  * @author Axel Nana <ax.lnana@outlook.com>
  */

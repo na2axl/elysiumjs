@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export type { LocalDiskOptions } from './local';
 export type { MemoryDiskOptions } from './memory';
 export type { PithosModuleConfig } from './pithos.module';
 export type { ServedSigning } from './signing';
+export { joinUrl, signServedUrl } from './signing';
 export type {
 	ListOptions,
 	ListPage,
@@ -26,18 +26,21 @@ export type {
 	StoredObject
 } from './storage';
 
-export { LocalDisk, LocalDiskUnavailableError } from './local';
 export { MemoryDisk } from './memory';
 export { PithosModule } from './pithos.module';
 export { StorageController } from './storage.controller';
 export {
+	assertKey,
 	DEFAULT_LIST_LIMIT,
 	DiskCannotSignError,
 	DiskNotPublicError,
 	InvalidObjectKeyError,
 	ObjectNotFoundError,
+	objectOf,
 	PITHOS_DISKS,
 	Storage,
 	StorageDriver,
+	streamOf,
+	toBytes,
 	UnknownDiskError
 } from './storage';
