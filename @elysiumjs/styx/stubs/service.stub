@@ -2,7 +2,9 @@ import { getLogger, Service, ServiceScope } from '@elysiumjs/olympus';
 
 @Service.register({ name: '{alias}', scope: ServiceScope.{scope} })
 export class {name} {
-    private readonly logger = getLogger({ name: {name}.name });
+    private get logger() {
+        return getLogger({ name: {name}.name });
+    }
 
     public constructor() {}
 }

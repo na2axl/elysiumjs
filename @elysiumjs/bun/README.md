@@ -5,7 +5,7 @@ Bun runtime for [Elysium.js](https://github.com/na2axl/elysiumjs).
 ## Installation
 
 ```bash
-bun add @elysiumjs/bun
+bun add @elysiumjs/olympus @elysiumjs/bun
 ```
 
 ## Usage

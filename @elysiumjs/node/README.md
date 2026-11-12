@@ -5,7 +5,7 @@ Node.js runtime for [Elysium.js](https://github.com/na2axl/elysiumjs).
 ## Installation
 
 ```bash
-bun add @elysiumjs/node
+bun add @elysiumjs/olympus @elysiumjs/node
 ```
 
 ## Usage

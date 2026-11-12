@@ -14,7 +14,7 @@
 
 import type { LockAcquireOptions, LockHandle } from '@elysiumjs/olympus';
 
-import { Lock, LockDriver } from '@elysiumjs/olympus';
+import { ElysiumError, Lock, LockDriver } from '@elysiumjs/olympus';
 
 import { Workers } from './workers';
 
@@ -23,6 +23,15 @@ declare module '@elysiumjs/olympus' {
 		'lock:durable-object': typeof DurableObjectLock;
 	}
 }
+
+/** A Durable Object alarm needs a finite time, so a lock needs a finite time to live. */
+const assertTtl = (ttl: number): void => {
+	if (!Number.isFinite(ttl) || ttl <= 0) {
+		throw new ElysiumError(
+			`A durable-object lock needs a finite, positive time to live, not ${ttl}.`
+		);
+	}
+};
 
 /**
  * The RPC surface of `LockObject` (`@elysiumjs/workers/durable-objects`), as a binding's stub
@@ -62,7 +71,8 @@ export type DurableObjectLockOptions = {
  * Holds locks in Durable Objects, one object per key, so that every isolate and every Worker that
  * shares the binding sees the same holder. A lock ends when its holder releases it or when its
  * time to live ends. Declare `LockObject` in the wrangler config and export it from the Worker's
- * entry.
+ * entry. A wait asks the object again every `retryDelay` milliseconds, and each try is a billed
+ * request: prefer short, bounded waits.
  * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
@@ -73,8 +83,8 @@ export type DurableObjectLockOptions = {
  * // "durable_objects": { "bindings": [{ "name": "LOCKS", "class_name": "LockObject" }] },
  * // "migrations": [{ "tag": "v1", "new_sqlite_classes": ["LockObject"] }]
  *
- * // app.ts
- * HeraclesModule.with({ lock: Lock.for('durable-object') });
+ * // in a handler, during an invocation
+ * const run = await Lock.for('durable-object').run('report:daily', 60_000, () => buildReport());
  * ```
  */
 @Lock.driver('durable-object')
@@ -88,6 +98,7 @@ export class DurableObjectLock extends LockDriver {
 		ttl: number,
 		options: LockAcquireOptions = {}
 	): Promise<LockHandle | null> {
+		assertTtl(ttl);
 		const token = crypto.randomUUID();
 		const stub = this.#stub(key);
 		const wait = Math.max(0, options.wait ?? 0);
@@ -106,7 +117,8 @@ export class DurableObjectLock extends LockDriver {
 		return this.#stub(handle.key).release(handle.token);
 	}
 
-	public extend(handle: LockHandle, ttl: number): Promise<boolean> {
+	public async extend(handle: LockHandle, ttl: number): Promise<boolean> {
+		assertTtl(ttl);
 		return this.#stub(handle.key).extend(handle.token, ttl);
 	}
 

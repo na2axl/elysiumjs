@@ -47,12 +47,6 @@ const serializable = (value: unknown): unknown => {
  * each level on Cloudflare Workers, where Workers Logs index the fields and keep the level.
  * @author Axel Nana <ax.lnana@outlook.com>
  */
-declare module '../../port' {
-	interface PortDrivers {
-		'logger:console': typeof JsonConsoleLogger;
-	}
-}
-
 @Logger.driver('console')
 export class JsonConsoleLogger implements LoggerInterface {
 	readonly #console = new InteractsWithConsole();

@@ -8,7 +8,7 @@ The Elysium.js framework: an application built from modules of controllers and s
 bun add @elysiumjs/olympus
 ```
 
-Add a runtime package too: `@elysiumjs/bun`, `@elysiumjs/node` or `@elysiumjs/workers` (see [Runtimes](#runtimes)).
+Add a runtime package too: `@elysiumjs/bun`, `@elysiumjs/node` or `@elysiumjs/workers` (see [Runtimes](#runtimes)), and `@elysiumjs/pino` for pino logs (see [Logging](#logging)).
 
 ## Exports
 
@@ -289,7 +289,7 @@ const search = Search.for('meilisearch', { url: 'http://localhost:7700' });
 
 ## Locks
 
-`Lock` is a port: one holder per key at a time, until it lets go or its time to live ends. The `memory` driver ships here; backend packages add others, such as `redis` from `@elysiumjs/redis`, `durable-object` from `@elysiumjs/workers` and `postgres` from `@elysiumjs/drizzle`. Each domain takes its own lock: `HeraclesModule.with({ lock })` for scheduler ticks, `MoiraiModule.with({ lock })` for `serializeBy` and `Moirai.lock()`.
+`Lock` is a port: one holder per key at a time, until it lets go or its time to live ends. The `memory` driver ships here; backend packages add others, such as `redis` from `@elysiumjs/redis`, `durable-object` from `@elysiumjs/workers` and `postgres` from `@elysiumjs/drizzle`. Each domain takes its own lock: `HeraclesModule.with({ lock })` for the ticks of `heracles:schedule` processes, `MoiraiModule.with({ lock })` for `serializeBy` and `Moirai.lock()`.
 
 ```ts
 import { Lock } from '@elysiumjs/olympus';
@@ -327,7 +327,20 @@ HermesModule.with({ name: 'shop', level: 'debug', format: 'pretty' });
 getLogger({ module: 'orders' }).info('Order placed', { orderId: 'o-1' });
 ```
 
-A logging package registers its driver with `@Logger.driver(name)` on a class that implements `LoggerInterface` and takes `LoggerOptions` (`name`, `level`, `format`).
+A logging package registers its driver with `@Logger.driver(name)` on a class that implements `LoggerInterface` and takes `LoggerOptions` (`name`, `level`, `format`), and declares the name so that `transport` and `Logger.for()` accept it:
+
+```ts
+declare module '@elysiumjs/olympus' {
+	interface PortDrivers {
+		'logger:datadog': typeof DatadogLogger;
+	}
+}
+
+@Logger.driver('datadog')
+export class DatadogLogger implements LoggerInterface {
+	// ...
+}
+```
 
 ## Jobs in tests
 
@@ -464,7 +477,7 @@ Olympus never calls a host API directly. Environment variables, timers, the HTTP
 | Package              | Exports                             | Notes                                                                                                     |
 | -------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `@elysiumjs/bun`     | `runtime`                           | `Bun.env`, `Bun.sleep`, `listen`, process exit and signals                                                |
-| `@elysiumjs/node`    | `runtime`                           | Same on Node.js; set `server: { adapter: node() }` from `@elysiajs/node`                                  |
+| `@elysiumjs/node`    | `runtime`                           | Same on Node.js, served on a `node:http` server; no adapter to configure                                  |
 | `@elysiumjs/workers` | `runtime`, `createRuntime({ env })` | Env from `process.env` (`nodejs_compat`) or `env`; no `serve` (export the app's `fetch`), exit or signals |
 
 Each package exports `runtime` (rename it at import if you like). Pass it to the application, or call `Runtime.use()` before anything needs it:

@@ -95,7 +95,7 @@ import { AriadneModule } from '@elysiumjs/olympus/ariadne';
 import { Redis, RedisFlowStore } from '@elysiumjs/redis';
 
 AriadneModule.with({
-	store: new RedisFlowStore({ connection: () => Redis.connection(), prefix: 'flow:' })
+	store: new RedisFlowStore({ connection: () => Redis.getConnection(), prefix: 'flow:' })
 });
 ```
 
@@ -112,7 +112,7 @@ import { Redis, RedisSessionStore } from '@elysiumjs/redis';
 ThemisModule.with({
 	secret: env.APP_SECRET,
 	session: {
-		store: new RedisSessionStore({ connection: () => Redis.connection(), prefix: 'session:' })
+		store: new RedisSessionStore({ connection: () => Redis.getConnection(), prefix: 'session:' })
 	}
 });
 ```

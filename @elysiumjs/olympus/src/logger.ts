@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { JsonConsoleLogger } from './hermes/services/json-console.logger';
+
 import { Container } from './container';
 import { Port } from './port';
 
@@ -56,6 +58,12 @@ export type LoggerOptions = {
 declare module './port' {
 	interface Ports {
 		logger: LoggerInterface;
+	}
+
+	// The `console` driver lives in `@elysiumjs/olympus/hermes`; it is declared here, with the
+	// port, so that its name is typed whatever order the app imports packages in.
+	interface PortDrivers {
+		'logger:console': typeof JsonConsoleLogger;
 	}
 }
 

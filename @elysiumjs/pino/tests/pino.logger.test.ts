@@ -165,6 +165,30 @@ describe('PinoLogger', () => {
 			expect((logger as any).pino.level).toBe('debug');
 		});
 
+		it('keeps the console driver on Cloudflare Workers', async () => {
+			const navigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+			Object.defineProperty(globalThis, 'navigator', {
+				value: { userAgent: 'Cloudflare-Workers' },
+				configurable: true
+			});
+			try {
+				app = await Application.testing({ modules: [HermesModule] });
+				expect(await app.get('logger')).toBeInstanceOf(JsonConsoleLogger);
+			} finally {
+				if (navigator) Object.defineProperty(globalThis, 'navigator', navigator);
+				else delete (globalThis as { navigator?: unknown }).navigator;
+			}
+		});
+
+		it('constructs nothing on shutdown when the logger was never resolved', async () => {
+			const flush = spyOn(PinoLogger.prototype, 'flush');
+			app = await Application.testing({ modules: [HermesModule] });
+			await app.shutdown();
+			app = undefined;
+			expect(flush).not.toHaveBeenCalled();
+			flush.mockRestore();
+		});
+
 		it('gives way to the console driver when asked', async () => {
 			app = await Application.testing({ modules: [HermesModule.with({ transport: 'console' })] });
 			expect(await app.get('logger')).toBeInstanceOf(JsonConsoleLogger);

@@ -56,7 +56,8 @@
 		}
 	},
 	"files": [
-		"dist"
+		"dist",
+		"CHANGELOG.md"
 	],
 	"sideEffects": [
 		"./dist/index.js",

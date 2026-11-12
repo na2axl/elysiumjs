@@ -5,7 +5,7 @@ The Drizzle ORM backend of [Elysium.js](https://github.com/na2axl/elysiumjs): da
 ## Installation
 
 ```bash
-bun add @elysiumjs/drizzle
+bun add @elysiumjs/olympus @elysiumjs/drizzle
 ```
 
 ## Usage

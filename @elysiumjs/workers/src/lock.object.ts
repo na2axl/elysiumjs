@@ -30,8 +30,9 @@ export class LockObject extends DurableObject {
 
 	async #hold(token: string, ttl: number): Promise<void> {
 		const expiresAt = Date.now() + Math.max(1, ttl);
-		await this.ctx.storage.put({ holder: { token, expiresAt } satisfies Holder });
+		// The alarm first: a time it refuses leaves no holder behind.
 		await this.ctx.storage.setAlarm(expiresAt);
+		await this.ctx.storage.put({ holder: { token, expiresAt } satisfies Holder });
 	}
 
 	/** Takes the lock for `token`, unless another holder has it. */

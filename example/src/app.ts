@@ -66,7 +66,7 @@ import { env } from './env';
 })
 export class App extends Application {
 	protected onError(e: ServerError): Promise<boolean> {
-		getLogger().error(e.error.message, e.error);
+		getLogger().error(e.error.message, { error: e.error });
 		return super.onError(e);
 	}
 }

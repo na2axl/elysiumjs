@@ -17,7 +17,7 @@ Durable Object classes come from the `@elysiumjs/workers/durable-objects` subpat
 ## Installation
 
 ```bash
-bun add @elysiumjs/workers
+bun add @elysiumjs/olympus @elysiumjs/workers
 ```
 
 ## Usage
@@ -214,14 +214,15 @@ export { LockObject } from '@elysiumjs/workers/durable-objects';
 
 ```ts
 import { Lock } from '@elysiumjs/olympus';
-import { HeraclesModule } from '@elysiumjs/olympus/heracles';
 
 import '@elysiumjs/workers';
 
-HeraclesModule.with({ lock: Lock.for('durable-object') });
+// In a route, a queue or a cron handler: the binding is read from the current invocation.
+const run = await Lock.for('durable-object').run('report:daily', 60_000, () => buildReport());
+if (!run.acquired) return; // another isolate builds it
 ```
 
-The binding defaults to `LOCKS`; pass `{ binding: 'OTHER' }`, the binding itself, or a function that returns it. A bounded wait (`acquire(key, ttl, { wait })`) tries again every `retryDelay` milliseconds (50 by default).
+The binding defaults to `LOCKS`; pass `{ binding: 'OTHER' }`, the binding itself, or a function that returns it. The time to live must be finite, since it sets the object's alarm. A wait (`acquire(key, ttl, { wait })`) asks the object again every `retryDelay` milliseconds (50 by default), and each try is a billed request, so prefer short, bounded waits. Durable Object RPC needs a `compatibility_date` of `2024-04-03` or later.
 
 ## Sessions in KV
 

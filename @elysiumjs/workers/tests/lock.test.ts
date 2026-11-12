@@ -111,6 +111,16 @@ describe('DurableObjectLock', () => {
 		expect(await lock.acquire('k', 60_000)).not.toBeNull();
 	});
 
+	it('refuses a time to live an alarm cannot hold', async () => {
+		const ns = namespace();
+		const lock = new DurableObjectLock({ binding: ns.binding });
+		await expect(lock.acquire('k', Infinity)).rejects.toThrow('finite, positive time to live');
+		await expect(lock.acquire('k', 0)).rejects.toThrow('finite, positive time to live');
+		const handle = (await lock.acquire('k', 60_000))!;
+		await expect(lock.extend(handle, Number.NaN)).rejects.toThrow('finite, positive time to live');
+		expect(ns.objects.size).toBe(1);
+	});
+
 	it('waits for the holder within a bounded wait', async () => {
 		const ns = namespace();
 		const lock = new DurableObjectLock({ binding: ns.binding, retryDelay: 2 });

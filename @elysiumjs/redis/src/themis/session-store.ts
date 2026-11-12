@@ -22,7 +22,7 @@ import type { RedisConnection } from '../connection';
 export class RedisSessionStore implements SessionStore {
 	constructor(
 		private readonly options: {
-			/** The Redis connection, or a function that returns it (such as `() => Redis.connection()`). */
+			/** The Redis connection, or a function that returns it (such as `() => Redis.getConnection()`). */
 			connection: RedisConnection | (() => RedisConnection);
 			/** The prefix of the keys. Defaults to `session:`. */
 			prefix?: string;

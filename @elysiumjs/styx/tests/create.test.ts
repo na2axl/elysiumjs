@@ -78,6 +78,8 @@ describe('createProject', () => {
 
 		const app = await Bun.file(join(path, 'src', 'app.ts')).text();
 		expect(app).toContain("from '@elysiumjs/bun'");
+		expect(app).toContain("import '@elysiumjs/pino';");
+		expect(app).toContain("transport: 'pino'");
 		expect(app).toContain("from '#root/main.module'");
 		expect(app).not.toContain('StyxModule');
 		expect(commands).toEqual([]);
