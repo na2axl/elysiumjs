@@ -197,7 +197,11 @@ describe('Moirai.enqueue', () => {
 	it('refuses an input that does not survive JSON', async () => {
 		await boot();
 		await expect(
-			Moirai.enqueue(Store, { data: new Map([['a', 1]]) }).orThrow()
+			Moirai.enqueue(Store, {
+				data: new (class Point {
+					x = 1;
+				})()
+			}).orThrow()
 		).rejects.toBeInstanceOf(QueuedInputError);
 	});
 

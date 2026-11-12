@@ -253,10 +253,13 @@ export {
 } from './security';
 export { Json } from './json';
 export {
+	BigIntSerializer,
 	DateSerializer,
 	DuplicateSerializerError,
+	MapSerializer,
 	type RegisteredSerializer,
 	Serializer,
+	SetSerializer,
 	type SerializerOptions,
 	UnknownSerializerError
 } from './serializer';
