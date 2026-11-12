@@ -52,8 +52,8 @@ describe('TOTP', () => {
 		const generated = Totp.generateSecret();
 		expect(generated).toMatch(/^[A-Z2-7]{32}$/);
 		expect(await Totp.verify(await Totp.generate(generated), generated)).not.toBeNull();
-		expect(Totp.uri({ secret: generated, issuer: 'Klapzi', account: 'ada@example.com' })).toBe(
-			`otpauth://totp/Klapzi:ada%40example.com?secret=${generated}&issuer=Klapzi&algorithm=SHA1&digits=6&period=30`
+		expect(Totp.uri({ secret: generated, issuer: 'Acme', account: 'ada@example.com' })).toBe(
+			`otpauth://totp/Acme:ada%40example.com?secret=${generated}&issuer=Acme&algorithm=SHA1&digits=6&period=30`
 		);
 		expect(() => Totp.generate('not base32!')).toThrow('base32');
 	});
@@ -98,7 +98,7 @@ describe('passkeys with challenges kept by the app', () => {
 		deviceType: 'singleDevice'
 	};
 	const keys = new Passkeys({
-		rpName: 'Klapzi',
+		rpName: 'Acme',
 		rpID: 'example.com',
 		origin: 'https://example.com',
 		challenges: 'caller',
@@ -128,7 +128,7 @@ describe('passkeys with challenges kept by the app', () => {
 
 	it('passes the timeout and the resident key requirement to the client', async () => {
 		const strict = new Passkeys({
-			rpName: 'Klapzi',
+			rpName: 'Acme',
 			rpID: 'example.com',
 			origin: 'https://example.com',
 			challenges: 'caller',
@@ -254,7 +254,7 @@ describe('OAuth and passkeys over HTTP', () => {
 			fetch: idp.fetcher
 		});
 		const keys = new Passkeys({
-			rpName: 'Klapzi',
+			rpName: 'Acme',
 			rpID: 'example.com',
 			origin: 'https://example.com',
 			repository: {
@@ -369,7 +369,7 @@ describe('OAuth and passkeys over HTTP', () => {
 		expect((await post('/auth/passkey/register', {})).status).toBe(400);
 
 		const options = await (await get('/auth/passkey/register')).json();
-		expect(options.rp).toEqual({ name: 'Klapzi', id: 'example.com' });
+		expect(options.rp).toEqual({ name: 'Acme', id: 'example.com' });
 		expect(options.excludeCredentials).toEqual([{ id: 'cred-1', type: 'public-key' }]);
 		const bad = await post('/auth/passkey/register', {
 			id: 'x',

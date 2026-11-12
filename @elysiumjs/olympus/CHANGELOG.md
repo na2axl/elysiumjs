@@ -1,4 +1,4 @@
-# @elysiumjs/core
+# @elysiumjs/olympus
 
 ## 0.24.1
 

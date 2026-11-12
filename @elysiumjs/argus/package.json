@@ -57,10 +57,5 @@
   },
   "peerDependencies": {
     "@elysiumjs/olympus": "workspace:^"
-  },
-  "peerDependenciesMeta": {
-    "@elysiumjs/olympus": {
-      "optional": true
-    }
   }
 }

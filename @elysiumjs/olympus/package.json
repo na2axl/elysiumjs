@@ -88,7 +88,10 @@
     "CHANGELOG.md"
   ],
   "sideEffects": [
-    "./src/index.ts"
+    "./src/index.ts",
+    "./src/moirai/heracles.ts",
+    "./dist/moirai/heracles.js",
+    "./dist/index-*.js"
   ],
   "dependencies": {
     "@casl/ability": "^7.0.2",

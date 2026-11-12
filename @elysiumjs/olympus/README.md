@@ -1,30 +1,32 @@
 # @elysiumjs/olympus
 
-Core functionalities for the Elysium.js framework.
-
-> **NOTE**
->
-> This package is part of the Elysium.js framework, which is built exclusively for Bun runtime.
+The Elysium.js framework: an application built from modules of controllers and services, wired by dependency injection and declared with decorators, on top of [ElysiaJS](https://elysiajs.com/). It runs on Bun, Node.js and Cloudflare Workers.
 
 ## Installation
 
 ```bash
-bun install @elysiumjs/olympus
+bun add @elysiumjs/olympus
 ```
 
-## Features
+Add a runtime package too: `@elysiumjs/runtime-bun`, `@elysiumjs/runtime-node` or `@elysiumjs/runtime-workers` (see [Runtimes](#runtimes)).
 
-- Dependency Injection
-- HTTP Controllers
-- WebSocket support
-- WAMP protocol integration
-- Command-line interface (`@elysiumjs/styx`), with support for custom commands
-- Lifecycle events
-- Caching (memory and Redis)
-- PostgreSQL database support with Drizzle ORM
-- Model classes and repositories for database interactions
-- Multi-tenancy support enabled
-- OpenAPI documentation (Scalar or Swagger UI)
+## Exports
+
+| Import                               | Contents                                                                                                                                                                                                       |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@elysiumjs/olympus`                 | Application, modules, dependency injection, HTTP, WebSocket and WAMP controllers, middleware, interceptors, filters, problem details, configuration, environment, lifecycle events, console commands, OpenAPI. |
+| `@elysiumjs/olympus/mnemosyne`       | Models, repositories, the query DSL, units of work, caches and seeders.                                                                                                                                        |
+| `@elysiumjs/olympus/moirai`          | Actions and queries, idempotency, outbox, inbox and domain events.                                                                                                                                             |
+| `@elysiumjs/olympus/moirai/heracles` | Outbox effect that dispatches heracles jobs. Import it once in the process that relays the outbox.                                                                                                             |
+| `@elysiumjs/olympus/heracles`        | Background jobs: queues, schedules, fan-out, retries and dead letters.                                                                                                                                         |
+| `@elysiumjs/olympus/ariadne`         | Multi-step flows with server-side state and replayable steps.                                                                                                                                                  |
+| `@elysiumjs/olympus/themis`          | Authentication: passwords, tokens, sessions, guards, CSRF, TOTP, OAuth and passkeys.                                                                                                                           |
+| `@elysiumjs/olympus/themis/scrypt`   | `ScryptPasswordHasher`.                                                                                                                                                                                        |
+| `@elysiumjs/olympus/cerberus`        | Ability-based roles and permissions.                                                                                                                                                                           |
+| `@elysiumjs/olympus/hermes`          | Structured logging with JSON and pretty output and request logs.                                                                                                                                               |
+| `@elysiumjs/olympus/redis`           | Redis connections (ioredis and Upstash).                                                                                                                                                                       |
+
+Database drivers, stores and runtimes ship as separate packages, such as `@elysiumjs/mnemosyne-drizzle`.
 
 ## Usage
 
@@ -61,8 +63,9 @@ export class MainModule extends Module {}
 Create an application class. Modules that need configuration are bound to it with `with()`:
 
 ```typescript
-import { Application, RedisModule } from '@elysiumjs/olympus';
+import { Application } from '@elysiumjs/olympus';
 import { HermesModule } from '@elysiumjs/olympus/hermes';
+import { RedisModule } from '@elysiumjs/olympus/redis';
 
 import { MainModule } from './main.module';
 
@@ -357,7 +360,7 @@ A CLI command boots lazily: running `app:cmd` initialises the command's own modu
 
 ## Runtimes
 
-Core never calls a host API directly. Environment variables, timers, the HTTP server, process exit and shutdown signals come from a runtime, which ships as its own package:
+Olympus never calls a host API directly. Environment variables, timers, the HTTP server, process exit and shutdown signals come from a runtime, which ships as its own package:
 
 | Package                      | Exports                             | Notes                                                                                                     |
 | ---------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------- |
@@ -375,11 +378,7 @@ import { runtime } from '@elysiumjs/runtime-bun';
 class App extends Application {}
 ```
 
-Without a runtime, `Runtime.get()` throws `RuntimeNotConfiguredError`; only the environment name falls back to `development`. `bun run check:runtime` bundles core, fails if it touches the `Bun` global, and boots an application from the bundle under Node.js.
-
-## Documentation
-
-TODO
+Without a runtime, `Runtime.get()` throws `RuntimeNotConfiguredError`; only the environment name falls back to `development`. `bun run check:runtime` bundles the root export, fails if it touches the `Bun` global, and boots an application from the bundle under Node.js.
 
 ## Contributing
 

@@ -213,7 +213,8 @@ describe('createProject', () => {
 		const path = await createProject(defaults({ path: dir, database: false, cache: false }), exec);
 		const pkg = await Bun.file(join(path, 'package.json')).json();
 		expect(pkg.dependencies['@elysiumjs/mnemosyne-drizzle']).toBeUndefined();
-		expect(pkg.dependencies['@elysiumjs/olympus/redis']).toBeUndefined();
+		expect(pkg.dependencies['ioredis']).toBeUndefined();
+		expect(pkg.dependencies['@upstash/redis']).toBeUndefined();
 		expect(pkg.devDependencies['drizzle-kit']).toBeUndefined();
 
 		const app = await Bun.file(join(path, 'src', 'app.ts')).text();

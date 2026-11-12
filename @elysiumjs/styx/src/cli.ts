@@ -56,7 +56,7 @@ const findProjectCli = (project: string): string | undefined => {
 
 /**
  * Loads the build tool modules a project installs. Only the project's own Styx loads them: it
- * shares the project's \`@elysiumjs/core\`, which the tools register their commands with.
+ * shares the project's \`@elysiumjs/olympus\`, which the tools register their commands with.
  */
 const loadTools = async (
 	project: string | undefined,

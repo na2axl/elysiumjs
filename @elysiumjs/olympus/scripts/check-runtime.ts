@@ -45,7 +45,7 @@ try {
 	});
 	if (!result.success) {
 		for (const log of result.logs) console.error(log);
-		throw new Error('Could not bundle @elysiumjs/core.');
+		throw new Error('Could not bundle @elysiumjs/olympus.');
 	}
 
 	const bundle = await Bun.file(join(outdir, 'index.js')).text();

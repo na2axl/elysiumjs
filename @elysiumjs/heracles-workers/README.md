@@ -1,6 +1,6 @@
 # @elysiumjs/heracles-workers
 
-Runs [Heracles](../heracles) jobs on Cloudflare Workers: Cloudflare Queues carry the jobs, and cron triggers dispatch the scheduled jobs.
+Runs [Heracles](../olympus) jobs on Cloudflare Workers: Cloudflare Queues carry the jobs, and cron triggers dispatch the scheduled jobs.
 
 ## Installation
 
