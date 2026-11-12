@@ -250,9 +250,9 @@ Clock.reset();
 
 `freeze()` and `travel()` throw `ClockAdjustmentRefusedError` outside `development` and `test`. `Clock.use(source)` takes the time from another `ClockSource`. Durations that only measure the machine, such as request timings and locks, keep the real time.
 
-## JSON with dates
+## JSON and serializers
 
-`Json` writes and reads JSON that keeps dates, for values that leave the process and come back. A `Date` is written as `{ "$date": "<ISO string>" }` and read back as a `Date`, at any depth; a plain object that already has that shape is escaped, so that it reads back unchanged.
+`Json` writes and reads JSON that keeps more than JSON does, for values that leave the process and come back. Each value a registered serializer supports is written as `{ "$type": "<name>", "$value": <serialized> }` and read back as it was, at any depth. Dates are supported out of the box; a plain object that already has the shape of a tagged value is escaped, so that it reads back unchanged.
 
 ```ts
 import { Json } from '@elysiumjs/olympus';
@@ -260,10 +260,35 @@ import { Json } from '@elysiumjs/olympus';
 const text = Json.stringify({ remindAt: new Date('2026-01-01T09:00:00Z'), tags: ['a'] });
 Json.parse<{ remindAt: Date }>(text).remindAt; // a Date
 
-Json.survives({ tags: new Set(['a']) }); // false: a set does not come back from JSON
+Json.survives({ tags: new Set(['a']) }); // false: no serializer supports a set
 ```
 
-`Json.encode()` and `Json.decode()` do the same on values, for a transport that serializes on its own. `Json.survives()` accepts only `null`, booleans, finite numbers, strings, valid dates, and arrays and plain objects of those.
+A serializer extends `Serializer<TIn, TOut>` and is registered with a name, which every written value carries, so keep it stable across deploys:
+
+```ts
+import { Serializer } from '@elysiumjs/olympus';
+
+@Serializer.register({ name: 'money' })
+export class MoneySerializer extends Serializer<Money, { amount: string; currency: string }> {
+	public supports(value: unknown): boolean {
+		return value instanceof Money;
+	}
+
+	public serialize(money: Money) {
+		return { amount: money.amount.toString(), currency: money.currency };
+	}
+
+	public deserialize(value: { amount: string; currency: string }) {
+		return new Money(BigInt(value.amount), value.currency);
+	}
+}
+```
+
+- Serializers are asked highest `priority` first (0 by default, as the built-in date serializer), and the first that supports a value writes it. A serializer with a higher priority replaces a built-in one.
+- What `serialize()` answers is written with `Json` again, so it may hold dates or other serializable values; `deserialize()` receives it read back.
+- Registering two classes under one name throws `DuplicateSerializerError`. Reading a value whose serializer is not registered throws `UnknownSerializerError`: only registered serializers rebuild values, so stored JSON cannot create other classes. Import the serializers in every process that reads the values, such as the workers of a queue.
+
+`Json.encode()` and `Json.decode()` do the same on values, for a transport that serializes on its own. `Json.survives()` accepts only `null`, booleans, finite numbers, strings, values a serializer supports, and arrays and plain objects of those.
 
 ## Ports
 
@@ -532,7 +557,7 @@ const { jobId } = await Moirai.enqueue(SendDigest, { userId }).orThrow();
 
 List `ActionJob` in the `jobs` of one module, next to `HeraclesModule`, in the processes that queue actions and in those that run them; the latter must import the actions too. Without it, `enqueue()` throws `QueuedActionsUnavailableError`. A call made in a unit of work dispatches its job once the unit commits, through the outbox when there is one, and not at all when it rolls back.
 
-The job runs without the caller's context, such as the current user: what the handler needs goes in the input, which travels as JSON, in clear. It is written with `Json`, so dates come back as dates; an input that `Json.survives()` refuses, such as a `Map` or a class instance, is refused with `QueuedInputError`. The job finds the action by its name, so two action classes cannot share one (`DuplicateActionNameError`).
+The job runs without the caller's context, such as the current user: what the handler needs goes in the input, which travels as JSON, in clear. It is written with `Json`, so dates and the values of registered serializers come back as they were; an input that `Json.survives()` refuses, such as a `Map` or a class instance without a serializer, is refused with `QueuedInputError`. The input is validated again once it is read back, so the schema of a value read by a serializer must accept its instance. The job finds the action by its name, so two action classes cannot share one (`DuplicateActionNameError`).
 
 A refusal of the handler ends the job, logged. A thrown error fails it, and Heracles retries it within the `maxRetries` of the queue (never for an action registered with `retry: false`). A job may run more than once, so give an action that must not an idempotency key: a second run replays the stored response. The job trusts its queue: `authorize` ran when the call was queued, so anything that can write to the queue can run any registered action.
 

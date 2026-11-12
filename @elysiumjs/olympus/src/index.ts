@@ -252,3 +252,11 @@ export {
 	PayloadTooLargeError
 } from './security';
 export { Json } from './json';
+export {
+	DateSerializer,
+	DuplicateSerializerError,
+	type RegisteredSerializer,
+	Serializer,
+	type SerializerOptions,
+	UnknownSerializerError
+} from './serializer';

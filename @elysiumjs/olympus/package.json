@@ -86,6 +86,7 @@
 	"sideEffects": [
 		"./src/index.ts",
 		"./src/lock.ts",
+		"./src/serializer.ts",
 		"./src/hermes/index.ts",
 		"./src/hermes/hermes.module.ts",
 		"./src/hermes/services/json-console.logger.ts",
