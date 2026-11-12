@@ -1,0 +1,99 @@
+{
+	"name": "@elysiumjs/drizzle",
+	"version": "0.0.0",
+	"license": "Apache-2.0",
+	"description": "Drizzle ORM backend for the Elysium.js framework: database drivers, models, repositories, queries, migrations, tenancy, the moirai stores and the postgres lock.",
+	"private": false,
+	"author": "Axel Nana <ax.lnana@outlook.com>",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/na2axl/elysiumjs.git",
+		"directory": "@elysiumjs/drizzle"
+	},
+	"homepage": "https://github.com/na2axl/elysiumjs/tree/main/@elysiumjs/drizzle#readme",
+	"bugs": {
+		"url": "https://github.com/na2axl/elysiumjs/issues"
+	},
+	"scripts": {
+		"format": "prettier --write \"./src/**/*.ts\"",
+		"clean": "rimraf dist",
+		"build": "bun run clean && bun run build:js && bun run build:ts",
+		"typecheck": "tsc --noEmit && tsc -p tsconfig.types.json",
+		"prepublishOnly": "bun run build",
+		"test": "bun test",
+		"test:coverage": "bun test --coverage",
+		"build:js": "bun build ./src/index.ts ./src/drivers/bun-sql.ts ./src/drivers/postgres-js.ts ./src/drivers/node-postgres.ts ./src/drivers/hyperdrive.ts --outdir ./dist --target node --packages external --root ./src --minify-syntax --minify-whitespace",
+		"build:ts": "tsc --emitDeclarationOnly"
+	},
+	"keywords": [
+		"elysium",
+		"database",
+		"orm",
+		"drizzle",
+		"postgresql"
+	],
+	"module": "dist/index.js",
+	"type": "module",
+	"types": "dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./bun-sql": {
+			"types": "./dist/drivers/bun-sql.d.ts",
+			"import": "./dist/drivers/bun-sql.js"
+		},
+		"./postgres-js": {
+			"types": "./dist/drivers/postgres-js.d.ts",
+			"import": "./dist/drivers/postgres-js.js"
+		},
+		"./node-postgres": {
+			"types": "./dist/drivers/node-postgres.d.ts",
+			"import": "./dist/drivers/node-postgres.js"
+		},
+		"./hyperdrive": {
+			"types": "./dist/drivers/hyperdrive.d.ts",
+			"import": "./dist/drivers/hyperdrive.js"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"sideEffects": [
+		"./dist/index.js",
+		"./src/index.ts",
+		"./src/lock.ts"
+	],
+	"peerDependencies": {
+		"@elysiumjs/olympus": "workspace:^",
+		"@elysiumjs/workers": "workspace:^",
+		"pg": "^8.0.0",
+		"postgres": "^3.4.0"
+	},
+	"dependencies": {
+		"drizzle-orm": "^1.0.0-rc.5",
+		"prompts": "^2.4.2",
+		"radash": "catalog:"
+	},
+	"devDependencies": {
+		"@elysiumjs/olympus": "workspace:*",
+		"@elysiumjs/bun": "workspace:*",
+		"@elysiumjs/workers": "workspace:*",
+		"@types/pg": "8.15.5",
+		"@types/prompts": "^2.4.9",
+		"pg": "8.16.3",
+		"postgres": "3.4.7"
+	},
+	"peerDependenciesMeta": {
+		"@elysiumjs/workers": {
+			"optional": true
+		},
+		"pg": {
+			"optional": true
+		},
+		"postgres": {
+			"optional": true
+		}
+	}
+}

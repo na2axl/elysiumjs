@@ -77,7 +77,7 @@ describe('createProject', () => {
 		expect(pkg.imports).toEqual({ '#root/*': './src/*.ts' });
 
 		const app = await Bun.file(join(path, 'src', 'app.ts')).text();
-		expect(app).toContain("from '@elysiumjs/runtime-bun'");
+		expect(app).toContain("from '@elysiumjs/bun'");
 		expect(app).toContain("from '#root/main.module'");
 		expect(app).not.toContain('StyxModule');
 		expect(commands).toEqual([]);
@@ -99,7 +99,8 @@ describe('createProject', () => {
 
 		const versionOf = async (dir: string) =>
 			`^${(await Bun.file(new URL(`../../${dir}/package.json`, import.meta.url)).json()).version}`;
-		expect(pkg.dependencies['@elysiumjs/runtime-bun']).toBe(await versionOf('runtime-bun'));
+		expect(pkg.dependencies['@elysiumjs/bun']).toBe(await versionOf('bun'));
+		expect(pkg.dependencies['@elysiumjs/pino']).toBe(await versionOf('pino'));
 		expect(pkg.dependencies['@elysiumjs/plugin-sentry']).toBe(await versionOf('plugin-sentry'));
 		expect(pkg.devDependencies.prettier).toBe('^3.9.10');
 		expect(commands).toEqual([]);
@@ -157,13 +158,13 @@ describe('createProject', () => {
 		expect(pkg.scripts.build).toBe('styx build --target node --entry ./index.ts');
 		expect(pkg.scripts.start).toContain('node --enable-source-maps dist/server.js serve');
 		expect(Object.keys(pkg.dependencies)).toEqual(
-			expect.arrayContaining(['@elysiumjs/runtime-node', 'postgres', 'ioredis'])
+			expect.arrayContaining(['@elysiumjs/node', 'postgres', 'ioredis'])
 		);
 		expect(pkg.devDependencies['@types/node']).toBeDefined();
 		expect(pkg.devDependencies['@types/bun']).toBeUndefined();
 
 		const app = await Bun.file(join(path, 'src', 'app.ts')).text();
-		expect(app).toContain("from '@elysiumjs/runtime-node'");
+		expect(app).toContain("from '@elysiumjs/node'");
 		expect(app).toContain("postgresJs({ connection: Env.get('DATABASE_URL').reveal() })");
 		const env = await Bun.file(join(path, 'src', 'env.ts')).text();
 		expect(env).toContain('PORT: t.Number({ default: 3000 })');
@@ -199,8 +200,11 @@ describe('createProject', () => {
 		expect(pkg.scripts.deploy).toBe('styx build --target workers && wrangler deploy');
 		expect(pkg.devDependencies.wrangler).toBeDefined();
 
+		expect(pkg.dependencies['@elysiumjs/pino']).toBeUndefined();
+
 		const app = await Bun.file(join(path, 'src', 'app.ts')).text();
 		expect(app).toContain("transport: 'console'");
+		expect(app).not.toContain('@elysiumjs/pino');
 		expect(app).toContain("hyperdrive({\n\t\t\t\t\t\tbinding: 'HYPERDRIVE'");
 		expect(app).toContain("upstash({ token: Env.get('UPSTASH_REDIS_REST_TOKEN').reveal() })");
 		const env = await Bun.file(join(path, 'src', 'env.ts')).text();
@@ -212,7 +216,7 @@ describe('createProject', () => {
 	it('leaves the database and the cache out when not asked for', async () => {
 		const path = await createProject(defaults({ path: dir, database: false, cache: false }), exec);
 		const pkg = await Bun.file(join(path, 'package.json')).json();
-		expect(pkg.dependencies['@elysiumjs/mnemosyne-drizzle']).toBeUndefined();
+		expect(pkg.dependencies['@elysiumjs/drizzle']).toBeUndefined();
 		expect(pkg.dependencies['@elysiumjs/redis']).toBeUndefined();
 		expect(pkg.dependencies['ioredis']).toBeUndefined();
 		expect(pkg.devDependencies['drizzle-kit']).toBeUndefined();

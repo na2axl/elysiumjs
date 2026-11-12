@@ -1,11 +1,17 @@
-import type { Context, LifecycleEvent } from '@elysiumjs/olympus';
+import type { Context, LifecycleEvent, LoggerInterface } from '@elysiumjs/olympus';
 import type { MainModule } from '#hero/hero.module';
 import type { User, UserInsert } from '#hero/models/user.model';
 import type { Class } from 'type-fest';
 
-import { Http, HttpControllerScope, Lifecycle, Service, t } from '@elysiumjs/olympus';
+import {
+	Http,
+	HttpControllerScope,
+	Lifecycle,
+	LOGGER_SERVICE,
+	Service,
+	t
+} from '@elysiumjs/olympus';
 import { Heracles } from '@elysiumjs/olympus/heracles';
-import { HermesLogger } from '@elysiumjs/olympus/hermes';
 import { Cache } from '@elysiumjs/olympus/mnemosyne';
 import { isEmpty, uid } from 'radash';
 
@@ -29,7 +35,7 @@ export class UserController {
 	})
 	private async list(
 		@mo() module: InstanceType<Class<MainModule>>,
-		@Service.inject() logger: HermesLogger,
+		@Service.inject(LOGGER_SERVICE) logger: LoggerInterface,
 		@Http.context() c: Context
 	): Promise<Array<User>> {
 		// logger.log('ctx', App.context.getStore());

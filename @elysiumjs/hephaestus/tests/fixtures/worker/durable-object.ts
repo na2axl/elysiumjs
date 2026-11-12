@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-// A Worker entry that exports a Durable Object class, as `@elysiumjs/ariadne-workers` asks.
+// A Worker entry that exports a Durable Object class, as `@elysiumjs/workers` asks.
 import { DurableObject } from 'cloudflare:workers';
 import { Elysia } from 'elysia';
 

@@ -15,7 +15,6 @@
 export { HermesModule } from './hermes.module';
 export { RequestLogInterceptor } from './interceptors/request-log.interceptor';
 export { JsonConsoleLogger } from './services/json-console.logger';
-export { HermesLogger } from './services/logger.service';
 export { HttpTransport } from './transports/http.transport';
 export type { HttpTransportOptions } from './transports/http.transport';
 export { Logged } from './decorators/logged';

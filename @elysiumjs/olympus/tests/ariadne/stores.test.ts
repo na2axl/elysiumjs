@@ -35,7 +35,7 @@ const commit = (stepId: string, step: string, expectStep: string | null, termina
 	ttlSeconds: 60
 });
 
-/** The rules every store follows (`@elysiumjs/ariadne-redis` runs the same ones on Redis). */
+/** The rules every store follows (`@elysiumjs/redis` runs the same ones on Redis). */
 const contract = (name: string, make: () => FlowStore) => {
 	describe(name, () => {
 		let n = 0;

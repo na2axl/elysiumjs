@@ -30,7 +30,15 @@ export {
 export { type AppEnv, type EnvName, type EnvValue, Env, EnvironmentNotReadyError } from './env';
 export { type BackgroundScope, type BackgroundWork, Background } from './background';
 export { type LifecycleEvent, type LifecycleHandler, Lifecycle } from './lifecycle';
-export { type LoggerInterface, ConsoleLogger, getLogger, LOGGER_SERVICE } from './logger';
+export {
+	type LoggerInterface,
+	type LoggerOptions,
+	type LogLevel,
+	ConsoleLogger,
+	getLogger,
+	Logger,
+	LOGGER_SERVICE
+} from './logger';
 export {
 	type Context,
 	type HttpBodyParser,

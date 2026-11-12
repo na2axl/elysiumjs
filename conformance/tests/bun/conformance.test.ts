@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { runtime as runtimeBun } from '@elysiumjs/runtime-bun';
+import { runtime as runtimeBun } from '@elysiumjs/bun';
 import { describe, expect, it } from 'bun:test';
 
 import { runScenario, scenarios } from '../../src/scenarios';

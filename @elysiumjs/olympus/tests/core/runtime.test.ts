@@ -52,7 +52,7 @@ describe('Runtime', () => {
 		Runtime.reset();
 		expect(Runtime.find()).toBeUndefined();
 		expect(() => Runtime.get()).toThrow(RuntimeNotConfiguredError);
-		expect(() => Runtime.get()).toThrow('@elysiumjs/runtime-bun');
+		expect(() => Runtime.get()).toThrow('@elysiumjs/bun');
 	});
 
 	it('returns the runtime set with use', () => {

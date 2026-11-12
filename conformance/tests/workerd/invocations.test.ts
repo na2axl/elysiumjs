@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { WorkersMessageBatch } from '@elysiumjs/runtime-workers';
+import type { WorkersMessageBatch } from '@elysiumjs/workers';
 
 import {
 	Application,
@@ -23,7 +23,7 @@ import {
 	Service,
 	ServiceScope
 } from '@elysiumjs/olympus';
-import { createWorker, runtime as runtimeWorkers, Workers } from '@elysiumjs/runtime-workers';
+import { createWorker, runtime as runtimeWorkers, Workers } from '@elysiumjs/workers';
 import {
 	createExecutionContext,
 	createMessageBatch,

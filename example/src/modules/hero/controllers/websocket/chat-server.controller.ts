@@ -1,14 +1,13 @@
-import type { WS, WSError } from '@elysiumjs/olympus';
+import type { LoggerInterface, WS, WSError } from '@elysiumjs/olympus';
 import type { UserInsert } from '#hero/models/user.model';
 
-import { Service, Websocket } from '@elysiumjs/olympus';
-import { HermesLogger } from '@elysiumjs/olympus/hermes';
+import { LOGGER_SERVICE, Service, Websocket } from '@elysiumjs/olympus';
 
 import { UserModel } from '#hero/models/user.model';
 
 @Websocket.controller('/chat', { idleTimeout: 10 })
 export class ChatServerController {
-	public constructor(@Service.inject() public logger: HermesLogger) {}
+	public constructor(@Service.inject(LOGGER_SERVICE) public logger: LoggerInterface) {}
 
 	@Websocket.onOpen()
 	private onOpen() {

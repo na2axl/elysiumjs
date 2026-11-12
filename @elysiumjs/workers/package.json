@@ -1,0 +1,74 @@
+{
+	"name": "@elysiumjs/workers",
+	"version": "0.0.0",
+	"license": "Apache-2.0",
+	"description": "Cloudflare Workers backend for the Elysium.js framework: the runtime, bindings, Queues and cron jobs, KV caches and sessions, rate limits, and Durable Object flows and locks.",
+	"private": false,
+	"author": {
+		"name": "Axel Nana",
+		"email": "ax.lnana@outlook.com"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/na2axl/elysiumjs.git",
+		"directory": "@elysiumjs/workers"
+	},
+	"homepage": "https://github.com/na2axl/elysiumjs/tree/main/@elysiumjs/workers#readme",
+	"bugs": {
+		"url": "https://github.com/na2axl/elysiumjs/issues"
+	},
+	"scripts": {
+		"format": "prettier --write \"./src/**/*.ts\"",
+		"clean": "rimraf dist",
+		"build:js": "bun build ./src/index.ts ./src/durable-objects.ts --outdir ./dist --target browser --packages external -e 'cloudflare:workers' --root ./src --minify-syntax --minify-whitespace",
+		"build:ts": "tsc",
+		"build": "bun run clean && bun run build:js && bun run build:ts",
+		"typecheck": "tsc --noEmit",
+		"prepublishOnly": "bun run build",
+		"test": "bun test",
+		"test:coverage": "bun test --coverage",
+		"check:runtime": "bun scripts/check-runtime.ts",
+		"check:aot": "bun scripts/check-aot.ts",
+		"check:wrangler": "bun scripts/check-wrangler.ts"
+	},
+	"keywords": [
+		"elysium",
+		"framework",
+		"typescript",
+		"runtime",
+		"cloudflare",
+		"workers",
+		"durable-objects",
+		"queues",
+		"kv"
+	],
+	"type": "module",
+	"module": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./durable-objects": {
+			"types": "./dist/durable-objects.d.ts",
+			"import": "./dist/durable-objects.js"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"sideEffects": [
+		"./dist/index.js",
+		"./src/index.ts",
+		"./src/lock.ts"
+	],
+	"devDependencies": {
+		"@elysiumjs/olympus": "workspace:*",
+		"elysia": "^2.0.0-rc.1",
+		"wrangler": "4.158.0"
+	},
+	"peerDependencies": {
+		"@elysiumjs/olympus": "workspace:^"
+	}
+}

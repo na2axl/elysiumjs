@@ -14,7 +14,7 @@
 
 import type { AssertAdapter } from '../../src/scenarios';
 
-import { runtime as runtimeNode } from '@elysiumjs/runtime-node';
+import { runtime as runtimeNode } from '@elysiumjs/node';
 import { describe, expect, it } from 'vitest';
 
 import { runScenario, scenarios } from '../../src/scenarios';

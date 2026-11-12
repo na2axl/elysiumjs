@@ -15,8 +15,7 @@
 import type { LoggerInterface } from '../../index';
 import type { HermesConfig, LogLevel } from '../types';
 
-import { InteractsWithConsole } from '../../index';
-
+import { InteractsWithConsole, Logger } from '../../index';
 import { DEFAULT_CONFIG } from '../types';
 
 const LEVELS: Record<LogLevel, number> = {
@@ -48,6 +47,13 @@ const serializable = (value: unknown): unknown => {
  * each level on Cloudflare Workers, where Workers Logs index the fields and keep the level.
  * @author Axel Nana <ax.lnana@outlook.com>
  */
+declare module '../../port' {
+	interface PortDrivers {
+		'logger:console': typeof JsonConsoleLogger;
+	}
+}
+
+@Logger.driver('console')
 export class JsonConsoleLogger implements LoggerInterface {
 	readonly #console = new InteractsWithConsole();
 	readonly #threshold: number;

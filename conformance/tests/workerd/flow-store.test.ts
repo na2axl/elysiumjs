@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { FlowStoreNamespace } from '@elysiumjs/ariadne-workers';
+import type { FlowStoreNamespace } from '@elysiumjs/workers';
 
-import { durableFlowStore } from '@elysiumjs/ariadne-workers';
+import { durableFlowStore } from '@elysiumjs/workers';
 import { env, runDurableObjectAlarm } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 

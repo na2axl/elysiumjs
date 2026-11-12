@@ -142,7 +142,7 @@ export abstract class Scheduler<TJob extends JobClass<any, any> = JobClass<any, 
 	/**
 	 * Dispatches a job on a cron schedule, in UTC, with fixed arguments. On Bun and Node.js, the
 	 * `heracles:schedule` command runs the {@link ScheduleRunner}; on Cloudflare Workers,
-	 * `HeraclesWorkersModule` (`@elysiumjs/heracles-workers`) dispatches the jobs whose expression is
+	 * `HeraclesWorkersModule` (`@elysiumjs/workers`) dispatches the jobs whose expression is
 	 * the one of the cron trigger, so list the same expression in the wrangler config. A job can have
 	 * several schedules. To dispatch one job per case due at a tick, extend {@link Scheduler}.
 	 * @author Axel Nana <ax.lnana@outlook.com>

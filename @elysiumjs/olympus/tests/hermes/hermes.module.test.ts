@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Application, Service } from '../../src/index';
-import { afterEach, describe, expect, it, spyOn } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 
-import { HermesLogger, HermesModule } from '../../src/hermes';
+import { HermesModule, JsonConsoleLogger } from '../../src/hermes';
+import { Application, Logger, Service, UnknownPortDriverError } from '../../src/index';
 
 describe('HermesModule', () => {
 	let app: Awaited<ReturnType<typeof Application.testing>> | undefined;
@@ -27,39 +27,35 @@ describe('HermesModule', () => {
 
 	it('registers nothing on import', () => {
 		expect(Service.exists('logger')).toBe(false);
-		expect(Service.exists(HermesLogger)).toBe(false);
 	});
 
-	it('provides one logger under both names, built from config', async () => {
+	it('registers the console driver of the Logger port', () => {
+		expect(Logger.for('console', { level: 'warn' })).toBeInstanceOf(JsonConsoleLogger);
+	});
+
+	it('uses the console driver when no logging package is loaded, built from config', async () => {
 		app = await Application.testing({ modules: [HermesModule.with({ level: 'debug' })] });
-		const logger = await app.get<HermesLogger>('logger');
-		expect(logger).toBeInstanceOf(HermesLogger);
-		expect((logger as any).pino.level).toBe('debug');
-		expect(await app.get(HermesLogger)).toBe(logger);
+		const logger = await app.get<JsonConsoleLogger>('logger');
+		expect(logger).toBeInstanceOf(JsonConsoleLogger);
+		expect(logger.level).toBe('debug');
 	});
 
-	it('falls back to the default level and format', async () => {
+	it('falls back to the default level', async () => {
 		app = await Application.testing({ modules: [HermesModule] });
-		const logger = await app.get<HermesLogger>('logger');
-		expect((logger as any).pino.level).toBe('info');
+		expect((await app.get<JsonConsoleLogger>('logger')).level).toBe('info');
 	});
 
-	it('flushes a built logger on shutdown', async () => {
-		const flush = spyOn(HermesLogger.prototype, 'flush');
-		app = await Application.testing({ modules: [HermesModule.with({})] });
-		await app.get('logger');
-		await app.shutdown();
-		app = undefined;
-		expect(flush).toHaveBeenCalled();
-		flush.mockRestore();
+	it('builds the driver its transport names', async () => {
+		@Logger.driver('hermes-test')
+		class MemoryLogger extends JsonConsoleLogger {}
+		app = await Application.testing({
+			modules: [HermesModule.with({ transport: 'hermes-test' })]
+		});
+		expect(await app.get('logger')).toBeInstanceOf(MemoryLogger);
 	});
 
-	it('constructs nothing on shutdown when the logger was never resolved', async () => {
-		const flush = spyOn(HermesLogger.prototype, 'flush');
-		app = await Application.testing({ modules: [HermesModule.with({})] });
-		await app.shutdown();
-		app = undefined;
-		expect(flush).not.toHaveBeenCalled();
-		flush.mockRestore();
+	it('throws UnknownPortDriverError for a driver nobody registered', async () => {
+		app = await Application.testing({ modules: [HermesModule.with({ transport: 'pino' })] });
+		await expect(app.get('logger')).rejects.toBeInstanceOf(UnknownPortDriverError);
 	});
 });

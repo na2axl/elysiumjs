@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import { Container } from './container';
+import { Port } from './port';
 
 /**
  * Interface for structured application logging.
@@ -32,6 +33,47 @@ export interface LoggerInterface {
 	fatal(msg: string, ctx?: Record<string, unknown>): void;
 	child(ctx: Record<string, unknown>): LoggerInterface;
 }
+
+/**
+ * The levels of a log line, from the most to the least verbose.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+
+/**
+ * The options every logger driver takes.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export type LoggerOptions = {
+	/** The name bound to every line, such as the app name. */
+	name?: string;
+	/** The least severe level written. Defaults to `info`. */
+	level?: LogLevel;
+	/** How lines are written: `json` (the default), or `pretty` for humans when the driver can. */
+	format?: 'json' | 'pretty' | 'logfmt';
+};
+
+declare module './port' {
+	interface Ports {
+		logger: LoggerInterface;
+	}
+}
+
+/**
+ * The logger port: where structured log lines go. `@elysiumjs/olympus/hermes` registers the
+ * `console` driver (JSON lines through `console`, with no dependency); logging packages add
+ * others, such as `pino` from `@elysiumjs/pino`. `HermesModule.with({ transport })` picks one
+ * by name for the app's `logger` service.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ * @example
+ * ```ts
+ * import '@elysiumjs/pino';
+ *
+ * const logger = Logger.for('pino', { name: 'shop', level: 'debug' });
+ * logger.info('Order placed', { orderId: 'o-1' });
+ * ```
+ */
+export class Logger extends Port('logger') {}
 
 /**
  * Default logger implementation using console.* APIs.

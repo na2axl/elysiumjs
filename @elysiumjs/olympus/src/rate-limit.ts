@@ -38,7 +38,7 @@ export type RateLimitHit =
  * Where rate limits keep their counts. Counts use fixed windows: the first hit of a key opens a
  * window of `windowMs`, and the count starts again once it has ended. Implement it to keep the
  * counts anywhere; `MemoryRateLimitStore` keeps them in the process, `RedisRateLimitStore`
- * (`@elysiumjs/redis`) in Redis, and `WorkersRateLimitStore` (`@elysiumjs/runtime-workers`) uses
+ * (`@elysiumjs/redis`) in Redis, and `WorkersRateLimitStore` (`@elysiumjs/workers`) uses
  * a Cloudflare rate limiting binding.
  * @author Axel Nana <ax.lnana@outlook.com>
  */

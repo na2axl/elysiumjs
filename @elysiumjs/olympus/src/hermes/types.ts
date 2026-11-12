@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+import type { LogLevel } from '../logger';
+import type { PortDriverName } from '../port';
+
+export type { LogLevel };
 
 export type LogFormat = 'json' | 'pretty' | 'logfmt';
 
@@ -27,10 +30,12 @@ export interface HermesConfig {
 	format: LogFormat;
 	transports?: TransportConfig[];
 	/**
-	 * Where log lines go: `pino`, or `console` for JSON lines through `console` with no
-	 * dependency. Defaults to `console` on Cloudflare Workers and `pino` elsewhere.
+	 * The `Logger` driver log lines go through: `console` for JSON lines through `console` with no
+	 * dependency, or a driver a logging package registers, such as `pino` from `@elysiumjs/pino`.
+	 * Defaults to `pino` when that package is loaded, except on Cloudflare Workers, and `console`
+	 * otherwise.
 	 */
-	transport?: 'pino' | 'console';
+	transport?: PortDriverName<'logger'>;
 }
 
 export const DEFAULT_CONFIG: HermesConfig = {

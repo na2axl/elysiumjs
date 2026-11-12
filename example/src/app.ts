@@ -1,11 +1,14 @@
 import type { ServerError } from '@elysiumjs/olympus';
 
-import { DrizzleModule } from '@elysiumjs/mnemosyne-drizzle';
-import { Application, Env, Middleware, Service, WampModule } from '@elysiumjs/olympus';
+import { DrizzleModule } from '@elysiumjs/drizzle';
+import { Application, Env, getLogger, Middleware, Service, WampModule } from '@elysiumjs/olympus';
 import { HeraclesModule } from '@elysiumjs/olympus/heracles';
-import { HermesLogger, HermesModule } from '@elysiumjs/olympus/hermes';
+
+import '@elysiumjs/pino';
+
+import { runtime as bunRuntime } from '@elysiumjs/bun';
+import { HermesModule } from '@elysiumjs/olympus/hermes';
 import { HeraclesRedisModule, RedisModule, RedisTransport } from '@elysiumjs/redis';
-import { runtime as bunRuntime } from '@elysiumjs/runtime-bun';
 import { StyxModule } from '@elysiumjs/styx';
 
 import { MainModule } from '#hero/hero.module';
@@ -63,7 +66,7 @@ import { env } from './env';
 })
 export class App extends Application {
 	protected onError(e: ServerError): Promise<boolean> {
-		Service.get(HermesLogger)?.error(e.error.message, e.error);
+		getLogger().error(e.error.message, e.error);
 		return super.onError(e);
 	}
 }

@@ -89,7 +89,7 @@ export const RUNTIMES: Record<'bun' | 'node' | 'workers', RuntimeChoice> = {
 	bun: {
 		title: 'Bun',
 		description: 'Run with Bun (https://bun.sh)',
-		package: '@elysiumjs/runtime-bun',
+		package: '@elysiumjs/bun',
 		alias: 'bunRuntime',
 		types: ['bun'],
 		devPackages: ['@types/bun']
@@ -97,7 +97,7 @@ export const RUNTIMES: Record<'bun' | 'node' | 'workers', RuntimeChoice> = {
 	node: {
 		title: 'Node.js',
 		description: 'Run with Node.js (https://nodejs.org), built with styx build --target node',
-		package: '@elysiumjs/runtime-node',
+		package: '@elysiumjs/node',
 		alias: 'nodeRuntime',
 		types: ['node'],
 		devPackages: ['@types/node']
@@ -105,7 +105,7 @@ export const RUNTIMES: Record<'bun' | 'node' | 'workers', RuntimeChoice> = {
 	workers: {
 		title: 'Cloudflare Workers',
 		description: 'Deploy to Cloudflare Workers (https://workers.cloudflare.com)',
-		package: '@elysiumjs/runtime-workers',
+		package: '@elysiumjs/workers',
 		alias: 'workersRuntime',
 		types: ['@cloudflare/workers-types', 'node'],
 		devPackages: ['@cloudflare/workers-types', '@types/node', 'wrangler']
@@ -116,7 +116,7 @@ export const RUNTIMES: Record<'bun' | 'node' | 'workers', RuntimeChoice> = {
  * The parts of the generated app that can be left out.
  */
 export type AppParts = {
-	/** A PostgreSQL connection through `@elysiumjs/mnemosyne-drizzle`. */
+	/** A PostgreSQL connection through `@elysiumjs/drizzle`. */
 	database: boolean;
 
 	/** A Redis connection through `@elysiumjs/redis`. */
@@ -134,9 +134,11 @@ export const appPackages = (
 	parts: AppParts
 ): { prod: string[]; dev: string[] } => {
 	const prod = ['@elysiumjs/olympus', RUNTIMES[runtime].package];
+	// Pino writes the logs on Bun and Node.js; Workers log JSON lines through `console`.
+	if (runtime !== 'workers') prod.push('@elysiumjs/pino');
 	const dev = ['@elysiumjs/styx', 'typescript', ...RUNTIMES[runtime].devPackages];
 	if (parts.database) {
-		prod.push('@elysiumjs/mnemosyne-drizzle');
+		prod.push('@elysiumjs/drizzle');
 		dev.push('drizzle-kit');
 		if (runtime !== 'bun') prod.push('postgres');
 	}
@@ -190,21 +192,21 @@ const partCode = (runtime: keyof typeof RUNTIMES, parts: AppParts) => {
 		}
 	}
 	if (parts.database) {
-		imports.push("import { DrizzleModule } from '@elysiumjs/mnemosyne-drizzle';");
+		imports.push("import { DrizzleModule } from '@elysiumjs/drizzle';");
 		if (runtime === 'bun') {
 			modules.push(`DrizzleModule.with(() => ({
 			default: 'main',
 			connections: { main: { connection: Env.get('DATABASE_URL').reveal() } }
 		}))`);
 		} else if (runtime === 'node') {
-			imports.push("import { postgresJs } from '@elysiumjs/mnemosyne-drizzle/postgres-js';");
+			imports.push("import { postgresJs } from '@elysiumjs/drizzle/postgres-js';");
 			modules.push(`DrizzleModule.with(() => ({
 			default: 'main',
 			connections: { main: { driver: postgresJs({ connection: Env.get('DATABASE_URL').reveal() }) } }
 		}))`);
 		} else {
-			imports.push("import { hyperdrive } from '@elysiumjs/mnemosyne-drizzle/hyperdrive';");
-			imports.push("import { postgresJs } from '@elysiumjs/mnemosyne-drizzle/postgres-js';");
+			imports.push("import { hyperdrive } from '@elysiumjs/drizzle/hyperdrive';");
+			imports.push("import { postgresJs } from '@elysiumjs/drizzle/postgres-js';");
 			modules.push(`DrizzleModule.with(() => ({
 			default: 'main',
 			connections: {
@@ -233,7 +235,7 @@ export const getAppCode = (
 	const hermes =
 		runtime === 'workers'
 			? "HermesModule.with({ level: 'debug', transport: 'console' })"
-			: "HermesModule.with({ level: 'debug', format: 'pretty' })";
+			: "HermesModule.with({ level: 'debug', format: 'pretty', transport: 'pino' })";
 	const entries = [
 		hermes,
 		...part.modules,
@@ -244,7 +246,7 @@ export const getAppCode = (
 
 import { Application, ${parts.database || parts.cache ? 'Env, ' : ''}getLogger } from '@elysiumjs/olympus';
 import { HermesModule } from '@elysiumjs/olympus/hermes';
-import { runtime as ${choice.alias} } from '${choice.package}';
+${runtime === 'workers' ? '' : "import '@elysiumjs/pino';\n"}import { runtime as ${choice.alias} } from '${choice.package}';
 ${[...part.imports, ...enabledModules.map((module) => `import { ${module.import} } from '${module.name}';`)].join('\n')}
 
 ${Object.keys(modules)
@@ -353,8 +355,7 @@ export const getScripts = (runtime: keyof typeof RUNTIMES): Record<string, strin
 };
 
 /** The Worker entry of a Cloudflare Workers project. */
-export const getWorkerCode =
-	() => /* js */ `import { createWorker } from '@elysiumjs/runtime-workers';
+export const getWorkerCode = () => /* js */ `import { createWorker } from '@elysiumjs/workers';
 
 import { App } from '#root/app';
 

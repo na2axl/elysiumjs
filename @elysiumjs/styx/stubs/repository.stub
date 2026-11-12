@@ -1,5 +1,5 @@
 import { Service, ServiceScope } from '@elysiumjs/olympus';
-import { DrizzleRepository } from '@elysiumjs/mnemosyne-drizzle';
+import { DrizzleRepository } from '@elysiumjs/drizzle';
 
 import { {model} } from '#{module}/models/{model_name}.model';
 

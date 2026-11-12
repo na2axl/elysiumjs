@@ -11,34 +11,41 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+import type { PortDriverName } from '../index';
 import type { HermesConfig } from './types';
 
-import { LOGGER_SERVICE, Module } from '../index';
+import { Logger, LOGGER_SERVICE, Module } from '../index';
 
-import { JsonConsoleLogger } from './services/json-console.logger';
-import { HermesLogger } from './services/logger.service';
+import './services/json-console.logger';
+
 import { DEFAULT_CONFIG } from './types';
 
-/** `console` on Cloudflare Workers, where pino's Node streams are not available; `pino` elsewhere. */
-const defaultTransport = (): 'pino' | 'console' =>
-	globalThis.navigator?.userAgent === 'Cloudflare-Workers' ? 'console' : 'pino';
+/**
+ * `pino` when `@elysiumjs/pino` is loaded, except on Cloudflare Workers, where pino's Node
+ * streams are not available; `console` otherwise.
+ */
+const defaultTransport = (): PortDriverName<'logger'> =>
+	Logger.has('pino') && globalThis.navigator?.userAgent !== 'Cloudflare-Workers'
+		? ('pino' as PortDriverName<'logger'>)
+		: 'console';
 
 /**
- * Provides the {@link HermesLogger} as global services, by its class and as `logger`
- * (the same instance), built from the module config. With `transport: 'console'` (the default
- * on Cloudflare Workers), `logger` is a {@link JsonConsoleLogger} instead.
+ * Provides the application logger as the global `logger` service: the `Logger` driver its
+ * `transport` names, built from the module config.
  * @author Axel Nana <ax.lnana@outlook.com>
+ * @example
+ * ```ts
+ * import '@elysiumjs/pino';
+ *
+ * HermesModule.with({ level: 'debug', transport: 'pino' });
+ * ```
  */
 @Module.register<HermesConfig>({
 	services: (config) => [
-		{ name: HermesLogger, global: true, factory: () => new HermesLogger(config) },
 		{
 			name: LOGGER_SERVICE,
 			global: true,
-			factory: (_config, get) =>
-				(config.transport ?? defaultTransport()) === 'console'
-					? new JsonConsoleLogger(config)
-					: get<HermesLogger>(HermesLogger)
+			factory: () => Logger.for(config.transport ?? defaultTransport(), config)
 		}
 	]
 })

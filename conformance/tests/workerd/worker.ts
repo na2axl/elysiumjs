@@ -21,10 +21,10 @@
  * at boot; `/io/next` reads the next chunk of the kept stream.
  */
 
-import type { WorkersExecutionContext } from '@elysiumjs/runtime-workers';
+import type { WorkersExecutionContext } from '@elysiumjs/workers';
 
 import { Application, Http, Module, Service } from '@elysiumjs/olympus';
-import { createRuntime, createWorker, Workers } from '@elysiumjs/runtime-workers';
+import { createRuntime, createWorker, Workers } from '@elysiumjs/workers';
 
 const SOURCE_DELAY_MS = 50;
 
@@ -99,7 +99,7 @@ class IoApp extends Application {}
 let worker: ReturnType<typeof createWorker> | undefined;
 
 /** The flow store Durable Object, which `tests/workerd/flow-store.test.ts` drives through `FLOWS`. */
-export { FlowStoreObject } from '@elysiumjs/ariadne-workers';
+export { FlowStoreObject, LockObject } from '@elysiumjs/workers/durable-objects';
 
 export default {
 	async fetch(request: Request, env: Record<string, unknown>, ctx: WorkersExecutionContext) {
