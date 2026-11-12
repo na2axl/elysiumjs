@@ -251,3 +251,4 @@ export {
 	InvalidCorsOptionsError,
 	PayloadTooLargeError
 } from './security';
+export { Json } from './json';

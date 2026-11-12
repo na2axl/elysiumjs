@@ -114,13 +114,13 @@ export class DuplicateActionNameError extends ElysiumError {
 }
 
 /**
- * Raised when the input of `Moirai.enqueue()` does not survive JSON, which its job carries, such
- * as a `Date`: pass its JSON form, such as an ISO string.
+ * Raised when the input of `Moirai.enqueue()` does not come back from JSON as it was, which its
+ * job carries: dates do, but maps, sets, class instances and `undefined` items do not.
  * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class QueuedInputError extends ElysiumError {
 	constructor(public readonly action: string) {
-		super(`The input of the queued ${action} action does not survive JSON: pass its JSON form.`);
+		super(`The input of the queued ${action} action does not survive JSON: pass plain data.`);
 	}
 }
 
