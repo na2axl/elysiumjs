@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ import { dirname, join } from 'node:path';
 /**
  * Gets the root path of the Elysium.js project: the closest parent holding an `.elysiumrc`, or
  * the current directory when there is none.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const getProjectPath = (): string => {
 	const startPath = process.cwd();
@@ -38,6 +38,6 @@ export const getProjectPath = (): string => {
 
 /**
  * Gets the directory holding the migrations of the Elysium.js project.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const getMigrationsPath = (): string => join(getProjectPath(), 'src/database/migrations');

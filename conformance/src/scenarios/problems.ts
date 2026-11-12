@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 
 import type { Scenario } from './types';
 
-import { Application, DomainError, Http, Module, NotFoundError } from '@elysiumjs/core';
+import { Application, DomainError, Http, Module, NotFoundError } from '@elysiumjs/olympus';
 import { t } from 'elysia';
 
 class InsufficientFunds extends DomainError.for('INSUFFICIENT_FUNDS', 409) {
@@ -71,7 +71,7 @@ const problemJson = { 'content-type': 'application/problem+json' };
  * Errors are rendered as RFC 9457 problem details with a `code` and the request id: domain errors
  * thrown or returned with their status, validation errors with JSON pointers, unexpected errors
  * as 500. A thrown status is sent as is.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const problems: Scenario = {
 	name: 'problems: errors render as problem details',

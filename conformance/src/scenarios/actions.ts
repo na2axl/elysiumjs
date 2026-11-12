@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,8 +21,8 @@ import {
 	Module,
 	Service,
 	t
-} from '@elysiumjs/core';
-import { withUnitOfWork } from '@elysiumjs/mnemosyne';
+} from '@elysiumjs/olympus';
+import { withUnitOfWork } from '@elysiumjs/olympus/mnemosyne';
 import {
 	Action,
 	Event,
@@ -32,7 +32,7 @@ import {
 	Moirai,
 	MoiraiModule,
 	Outbox
-} from '@elysiumjs/moirai';
+} from '@elysiumjs/olympus/moirai';
 
 const make = async (): Promise<Application> => {
 	const wallet = { balance: 0, mails: [] as string[] };
@@ -136,7 +136,7 @@ const topUp = (key: string | null, amount: number) => () =>
  * a reused key with another input (422), and its outbox effect and its event relay once it
  * commits. The action and the event handler use the stores of their modules, and the
  * idempotency store of MoiraiModule.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const actions: Scenario = {
 	name: 'actions: idempotent replay and outbox relay after commit',

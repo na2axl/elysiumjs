@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { TransportProcessMessage } from '@elysiumjs/heracles';
+import type { TransportProcessMessage } from '@elysiumjs/olympus/heracles';
 import type { WorkersExecutionContext, WorkersMessageBatch } from '@elysiumjs/runtime-workers';
 import type { DeadJob, HeraclesWorkersConfig } from '../src';
 
-import { Application, Http, Module, Service } from '@elysiumjs/core';
-import { Heracles, HeraclesModule, Job, Scheduler } from '@elysiumjs/heracles';
+import { Application, Http, Module, Service } from '@elysiumjs/olympus';
+import { Heracles, HeraclesModule, Job, Scheduler } from '@elysiumjs/olympus/heracles';
 import { createRuntime, createWorker } from '@elysiumjs/runtime-workers';
 import { beforeEach, describe, expect, it } from 'bun:test';
 

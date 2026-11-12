@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
 
 import type { Scenario } from './types';
 
-import { Application, Http, Module } from '@elysiumjs/core';
-import { Auth, jwtGuard, Password, Pbkdf2PasswordHasher, ThemisModule } from '@elysiumjs/themis';
+import { Application, Http, Module } from '@elysiumjs/olympus';
+import { Auth, jwtGuard, Password, Pbkdf2PasswordHasher, ThemisModule } from '@elysiumjs/olympus/themis';
 
 const JWT_SECRET = 'conformance-jwt-secret-of-32-chars!';
 
@@ -82,7 +82,7 @@ const me = (authorization?: string) => () =>
 /**
  * `@Auth()` refuses a request without credentials (401) or with a forged token, and a valid JWT
  * puts its user in the request; PBKDF2 hashes and verifies a password.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const auth: Scenario = {
 	name: 'auth: 401, JWT user and PBKDF2 passwords',

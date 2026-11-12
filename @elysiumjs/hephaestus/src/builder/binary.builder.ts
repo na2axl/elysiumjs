@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import { bunTarget, detectCurrentPlatform, getOutputName } from '../platform';
 
 /**
  * Result of a single binary compilation.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface BuildResult {
 	platform: PlatformTarget;
@@ -31,14 +31,14 @@ export interface BuildResult {
 
 /**
  * Compiles Elysium projects into single-binary executables using Bun.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class BinaryBuilder {
 	constructor(private config: HephaestusConfig) {}
 
 	/**
 	 * Builds a single binary for a specific platform, or the current one if not specified.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param platform The target platform. Defaults to the current platform.
 	 * @returns The build result with metrics.
 	 */
@@ -78,7 +78,7 @@ export class BinaryBuilder {
 
 	/**
 	 * Builds binaries for all configured platforms, or the current one if none are configured.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @returns An array of build results.
 	 */
 	public async buildAll(): Promise<BuildResult[]> {

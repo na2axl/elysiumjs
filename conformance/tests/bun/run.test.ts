@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 
 import type { AssertAdapter, Scenario } from '../../src/scenarios';
 
-import { Application, Http, Module, Service } from '@elysiumjs/core';
+import { Application, Http, Module, Service } from '@elysiumjs/olympus';
 import { runtime as runtimeBun } from '@elysiumjs/runtime-bun';
 import { describe, expect, it } from 'bun:test';
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,11 +20,11 @@ import { createServer } from 'node:http';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
-import { getLogger } from '@elysiumjs/core';
+import { getLogger } from '@elysiumjs/olympus';
 
 /**
  * A web-standard request handler, such as `Elysia.fetch`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type FetchHandler = (request: Request) => Promise<Response>;
 
@@ -80,7 +80,7 @@ const peers = new WeakMap<Request, string>();
 
 /**
  * The address of the peer that sent a request served by {@link serveNode}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param request A request created by the bridge.
  */
 export const peerAddress = (request: Request): string | undefined => peers.get(request);
@@ -180,7 +180,7 @@ const handle = async (
  *
  * This bridge exists because no Elysia 2 Node adapter is released yet (`@elysia/node` only has
  * `2.0.0-exp.*` builds, and `@elysiajs/node` targets Elysia 1).
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param fetch The handler that answers each request, such as `(r) => app.fetch(r)`.
  * @param port The port to listen on; `0` picks a free one (read it from `server.address()`).
  * @returns The listening server, to close it.

@@ -4,7 +4,7 @@
   "license": "Apache-2.0",
   "description": "Compilation and bundling utilities for Elysium.js apps.",
   "private": false,
-  "author": "Workbud Technologies Inc.",
+  "author": "Axel Nana <ax.lnana@outlook.com>",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/na2axl/elysiumjs.git",
@@ -36,7 +36,7 @@
   "scripts": {
     "format": "prettier --write \"./src/**/*.ts\"",
     "clean": "rimraf dist",
-    "build:js": "bun build ./src/index.ts --outdir ./dist --target bun -e zod -e @elysiumjs/core -e elysia -e 'elysia/*' --root ./src --minify-syntax --minify-whitespace",
+    "build:js": "bun build ./src/index.ts --outdir ./dist --target bun -e zod -e @elysiumjs/olympus -e '@elysiumjs/olympus/*' -e elysia -e 'elysia/*' --root ./src --minify-syntax --minify-whitespace",
     "build:ts": "tsc",
     "build": "bun run clean && bun run build:js && bun run build:ts",
     "test": "bun test",
@@ -48,12 +48,12 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@elysiumjs/core": "workspace:*",
-    "elysia": "^2.0.0-rc.1",
-    "@elysiumjs/runtime-node": "workspace:*"
+    "@elysiumjs/olympus": "workspace:*",
+    "@elysiumjs/runtime-node": "workspace:*",
+    "elysia": "^2.0.0-rc.1"
   },
   "peerDependencies": {
-    "@elysiumjs/core": "workspace:^",
+    "@elysiumjs/olympus": "workspace:^",
     "elysia": "^2.0.0-rc.1"
   }
 }

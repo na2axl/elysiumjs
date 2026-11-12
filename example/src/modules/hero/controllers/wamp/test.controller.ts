@@ -1,7 +1,7 @@
-import type { WampRegistrationHandlerArgs } from '@elysiumjs/core';
+import type { WampRegistrationHandlerArgs } from '@elysiumjs/olympus';
 
-import { Service, Wamp } from '@elysiumjs/core';
-import { HermesLogger } from '@elysiumjs/hermes';
+import { Service, Wamp } from '@elysiumjs/olympus';
+import { HermesLogger } from '@elysiumjs/olympus/hermes';
 
 @Wamp.controller({ connection: 'default' })
 export class TestController {

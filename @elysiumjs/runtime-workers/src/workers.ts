@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 
 import type { WorkersExecutionContext } from './types';
 
-import { Metadata, Service } from '@elysiumjs/core';
+import { Metadata, Service } from '@elysiumjs/olympus';
 
 import { BindingNotFoundError, OutsideInvocationError } from './errors';
 import { currentInvocation } from './invocation';
@@ -27,7 +27,7 @@ export const WORKERS_CONTEXT_SERVICE = 'workers.context';
 
 /**
  * A method that handles queue batches or scheduled events.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type WorkersHandlerMeta = {
 	/** What the method handles. */
@@ -42,7 +42,7 @@ export type WorkersHandlerMeta = {
 
 /**
  * Options of `@Workers.queue`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type WorkersQueueOptions = {
 	/** Receive one message at a time instead of the batch, so failures retry only that message. */

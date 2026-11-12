@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 
 import type * as Sentry from '@sentry/bun';
 
-import { Application, Env, MissingModuleConfigError, Module } from '@elysiumjs/core';
+import { Application, Env, MissingModuleConfigError, Module } from '@elysiumjs/olympus';
 
 import { SentryEnv } from './env';
 import { plugin } from './plugin';
@@ -23,7 +23,7 @@ import { plugin } from './plugin';
  * Configurable module that installs the Sentry plugin on the root app when serving.
  * `dsn` may come from the config or from `SENTRY_DSN`; boot fails when neither is set. The module
  * declares `SENTRY_DSN` and `SENTRY_ENVIRONMENT` in its environment schema.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 @Module.register({ envSchema: SentryEnv })
 export class SentryModule extends Module.configurable<Sentry.BunOptions>() {

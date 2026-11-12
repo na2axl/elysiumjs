@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ import { SpanStatusCode, trace } from '@opentelemetry/api';
  * }
  * ```
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param name Optional span name. Defaults to `ClassName.methodName`.
  * @param options Optional OpenTelemetry span options.
  * @returns A method decorator.

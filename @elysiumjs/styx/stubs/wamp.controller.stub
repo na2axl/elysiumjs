@@ -1,4 +1,4 @@
-import { Wamp } from '@elysiumjs/core';
+import { Wamp } from '@elysiumjs/olympus';
 
 @Wamp.controller({ url: '{path}', realm: '{realm}' })
 export class {name} {

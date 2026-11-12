@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Application } from '@elysiumjs/core';
+import type { Application } from '@elysiumjs/olympus';
 
 /**
  * A runtime-agnostic scenario: a fresh application and the requests driven through it.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type Scenario = {
 	name: string;
@@ -45,6 +45,6 @@ export type AssertAdapter = { equal(a: unknown, b: unknown, msg: string): void }
  * Builds a scenario's app and returns the function each of its requests goes through. The
  * default builds the app and calls `elysia.handle`; the workerd lane goes through a Worker's
  * `fetch`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ScenarioDriver = (app: Application) => Promise<(request: Request) => Promise<Response>>;

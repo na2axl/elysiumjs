@@ -6,28 +6,24 @@
   "private": true,
   "author": {
     "name": "Axel Nana",
-    "email": "axel.nana@workbud.com"
+    "email": "ax.lnana@outlook.com"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "bun test tests/bun",
-    "pretest:node": "bun run --cwd ../@elysiumjs/core build && bun run --cwd ../@elysiumjs/mnemosyne build && bun run --cwd ../@elysiumjs/moirai build && bun run --cwd ../@elysiumjs/themis build && bun run --cwd ../@elysiumjs/ariadne build && bun run --cwd ../@elysiumjs/runtime-node build",
+    "pretest:node": "bun run --cwd ../@elysiumjs/olympus build && bun run --cwd ../@elysiumjs/runtime-node build",
     "test:node": "vitest run -c vitest.node.config.ts",
-    "pretest:workerd": "bun run --cwd ../@elysiumjs/core build && bun run --cwd ../@elysiumjs/mnemosyne build && bun run --cwd ../@elysiumjs/moirai build && bun run --cwd ../@elysiumjs/themis build && bun run --cwd ../@elysiumjs/ariadne build && bun run --cwd ../@elysiumjs/ariadne-workers build && bun run --cwd ../@elysiumjs/runtime-workers build",
+    "pretest:workerd": "bun run --cwd ../@elysiumjs/olympus build && bun run --cwd ../@elysiumjs/ariadne-workers build && bun run --cwd ../@elysiumjs/runtime-workers build",
     "test:workerd": "vitest run -c vitest.workerd.config.ts",
-    "pretest:workerd-aot": "bun run --cwd ../@elysiumjs/core build && bun run --cwd ../@elysiumjs/mnemosyne build && bun run --cwd ../@elysiumjs/moirai build && bun run --cwd ../@elysiumjs/themis build && bun run --cwd ../@elysiumjs/ariadne build && bun run --cwd ../@elysiumjs/ariadne-workers build && bun run --cwd ../@elysiumjs/runtime-workers build && bun scripts/build-aot.ts",
+    "pretest:workerd-aot": "bun run --cwd ../@elysiumjs/olympus build && bun run --cwd ../@elysiumjs/ariadne-workers build && bun run --cwd ../@elysiumjs/runtime-workers build && bun scripts/build-aot.ts",
     "test:workerd-aot": "vitest run -c vitest.workerd-aot.config.ts"
   },
   "type": "module",
   "module": "src/index.ts",
   "types": "src/index.ts",
   "dependencies": {
-    "@elysiumjs/ariadne": "workspace:^",
-    "@elysiumjs/core": "workspace:^",
-    "@elysiumjs/mnemosyne": "workspace:^",
-    "@elysiumjs/moirai": "workspace:^",
+    "@elysiumjs/olympus": "workspace:^",
     "@elysiumjs/runtime-bun": "workspace:^",
-    "@elysiumjs/themis": "workspace:^",
     "elysia": "^2.0.0-rc.1"
   },
   "devDependencies": {

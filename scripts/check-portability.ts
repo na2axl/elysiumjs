@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -60,23 +60,15 @@ const LINE_ALLOW = /\/\/\s*portability-allow:\s*\S/;
 
 /** Packages scanned by the gate, relative to the repository root. */
 export const ROOTS = [
-	'@elysiumjs/core',
+	'@elysiumjs/olympus',
 	'conformance',
-	'@elysiumjs/cerberus',
 	'@elysiumjs/argus',
-	'@elysiumjs/hermes',
-	'@elysiumjs/mnemosyne',
-	'@elysiumjs/redis',
-	'@elysiumjs/heracles',
 	'@elysiumjs/plugin-sentry',
 	'@elysiumjs/mnemosyne-drizzle',
 	'@elysiumjs/heracles-workers',
-	'@elysiumjs/moirai',
 	'@elysiumjs/moirai-drizzle',
-	'@elysiumjs/themis',
 	'@elysiumjs/themis-redis',
 	'@elysiumjs/themis-workers',
-	'@elysiumjs/ariadne',
 	'@elysiumjs/ariadne-redis',
 	'@elysiumjs/ariadne-workers'
 ];
@@ -90,7 +82,7 @@ export const ALLOW: Record<string, string[]> = {
 /**
  * Replaces comments with spaces, keeping line breaks and string literals, so that code after a
  * block comment on the same line is still scanned and commented-out code is not.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param source The source text.
  */
 export function stripComments(source: string): string {
@@ -134,7 +126,7 @@ export function stripComments(source: string): string {
  * @param allow Maps a root to the file globs (relative to it) that are exempt.
  * @returns One finding per offending line and pattern.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export function checkPortability(
 	roots: string[],

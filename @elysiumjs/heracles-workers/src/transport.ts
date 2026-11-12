@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { JobStatusInfo, Transport, TransportEvent } from '@elysiumjs/heracles';
+import type { JobStatusInfo, Transport, TransportEvent } from '@elysiumjs/olympus/heracles';
 
-import { ElysiumError, getLogger } from '@elysiumjs/core';
+import { ElysiumError, getLogger } from '@elysiumjs/olympus';
 import { Workers } from '@elysiumjs/runtime-workers';
 
 /**
  * A Cloudflare Queue producer binding.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface WorkersQueueBinding {
 	send(body: unknown, options?: { delaySeconds?: number }): Promise<void>;
@@ -27,7 +27,7 @@ export interface WorkersQueueBinding {
 
 /**
  * Options of {@link CloudflareQueueTransport}, set as the `transportOptions` of a queue.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type CloudflareQueueTransportOptions = {
 	/** The name of the queue producer binding, as declared in the wrangler config. */
@@ -48,7 +48,7 @@ const MAX_DELAY_SECONDS = 12 * 60 * 60;
  * `HeraclesWorkersModule`. Cloudflare Queues keep no job status and cannot cancel a message, so
  * `getJobStatus()` throws and cancellations are logged and dropped. A job scheduled for later is
  * delayed with `delaySeconds`, up to 12 hours.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
  * HeraclesModule.with({

@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,8 +17,8 @@ import type { MigrationConnection, MigrationDatabase, MigrationRun } from '../mi
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { Command, CommandArgumentType, Service } from '@elysiumjs/core';
-import { isValidTenantId } from '@elysiumjs/mnemosyne';
+import { Command, CommandArgumentType, Service } from '@elysiumjs/olympus';
+import { isValidTenantId } from '@elysiumjs/olympus/mnemosyne';
 import { sql } from 'drizzle-orm';
 
 import { closeConnection, Database, getConnectionDriver } from '../database';
@@ -44,7 +44,7 @@ const listMigrationFiles = async (folder: string): Promise<string[]> => {
 
 /**
  * Execute migration files.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 @Command.register()
 export class MigrationRunCommand extends Command {

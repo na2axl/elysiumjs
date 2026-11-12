@@ -1,12 +1,12 @@
-import type { Context, LifecycleEvent } from '@elysiumjs/core';
+import type { Context, LifecycleEvent } from '@elysiumjs/olympus';
 import type { MainModule } from '#hero/hero.module';
 import type { User, UserInsert } from '#hero/models/user.model';
 import type { Class } from 'type-fest';
 
-import { Http, HttpControllerScope, Lifecycle, Service, t } from '@elysiumjs/core';
-import { Heracles } from '@elysiumjs/heracles';
-import { HermesLogger } from '@elysiumjs/hermes';
-import { Cache } from '@elysiumjs/mnemosyne';
+import { Http, HttpControllerScope, Lifecycle, Service, t } from '@elysiumjs/olympus';
+import { Heracles } from '@elysiumjs/olympus/heracles';
+import { HermesLogger } from '@elysiumjs/olympus/hermes';
+import { Cache } from '@elysiumjs/olympus/mnemosyne';
 import { isEmpty, uid } from 'radash';
 
 import { EmailJob } from '#hero/jobs/email.job';

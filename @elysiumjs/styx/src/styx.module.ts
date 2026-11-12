@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Module } from '@elysiumjs/core';
+import { Module } from '@elysiumjs/olympus';
 
 import {
 	MakeCommandCommand,
@@ -30,7 +30,7 @@ import {
 
 /**
  * The development-only module holding the `make:*` and `module:*` scaffolding commands.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 @Module.register({
 	env: ['development'],

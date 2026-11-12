@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { ElysiumError } from '@elysiumjs/core';
+import { ElysiumError } from '@elysiumjs/olympus';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { listAssets, readAsset, useEmbeddedAssets } from '../src/assets';
@@ -213,7 +213,8 @@ describe('createProject', () => {
 		const path = await createProject(defaults({ path: dir, database: false, cache: false }), exec);
 		const pkg = await Bun.file(join(path, 'package.json')).json();
 		expect(pkg.dependencies['@elysiumjs/mnemosyne-drizzle']).toBeUndefined();
-		expect(pkg.dependencies['@elysiumjs/redis']).toBeUndefined();
+		expect(pkg.dependencies['ioredis']).toBeUndefined();
+		expect(pkg.dependencies['@upstash/redis']).toBeUndefined();
 		expect(pkg.devDependencies['drizzle-kit']).toBeUndefined();
 
 		const app = await Bun.file(join(path, 'src', 'app.ts')).text();
@@ -338,8 +339,8 @@ describe('the environment of a new project', () => {
 		await writeFile(
 			join(path, 'src', 'check.ts'),
 			[
-				"import type { Secret } from '@elysiumjs/core';",
-				"import { Env } from '@elysiumjs/core';",
+				"import type { Secret } from '@elysiumjs/olympus';",
+				"import { Env } from '@elysiumjs/olympus';",
 				"export const port: number = Env.get('PORT');",
 				"export const url: Secret<string> = Env.get('DATABASE_URL');",
 				'// @ts-expect-error unknown variable',

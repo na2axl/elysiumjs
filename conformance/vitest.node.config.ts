@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 import swc from 'unplugin-swc';
 import { defineConfig } from 'vitest/config';
 
-// The Node lane. `@elysiumjs/core` and `@elysiumjs/runtime-node` resolve to their built
+// The Node lane. `@elysiumjs/olympus` and `@elysiumjs/runtime-node` resolve to their built
 // `dist` (their `module` field, see `resolve.mainFields`): run `bun run build` first. The scenarios are TypeScript with
 // legacy decorators, and Vitest's default transform does not emit `design:paramtypes`, which
 // the container reads for constructor injection: SWC compiles them instead.

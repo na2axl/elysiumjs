@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Runtime } from '@elysiumjs/core';
+import type { Runtime } from '@elysiumjs/olympus';
 
 import { peerAddress, serveNode } from './serve';
 
@@ -24,7 +24,7 @@ const SIGNALS = ['SIGINT', 'SIGTERM'] as const;
  * The Elysium runtime for Node.js. It serves the app's `fetch` handler on a `node:http` server
  * through {@link serveNode}, a bridge used instead of an Elysia Node adapter because none is
  * released for Elysia 2 yet (`@elysia/node` only has `2.0.0-exp.*` builds).
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const runtime: Runtime = {
 	name: 'node',

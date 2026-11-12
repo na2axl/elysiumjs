@@ -4,7 +4,7 @@
   "license": "Apache-2.0",
   "description": "OpenTelemetry telemetry package for the Elysium.js framework.",
   "private": false,
-  "author": "Workbud Technologies Inc.",
+  "author": "Axel Nana <ax.lnana@outlook.com>",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/na2axl/elysiumjs.git",
@@ -53,16 +53,9 @@
     "@opentelemetry/semantic-conventions": "^1.43.0"
   },
   "devDependencies": {
-    "@elysiumjs/core": "workspace:*",
-    "@elysiumjs/hermes": "workspace:*"
+    "@elysiumjs/olympus": "workspace:*"
   },
   "peerDependencies": {
-    "@elysiumjs/core": "workspace:^",
-    "@elysiumjs/hermes": "workspace:^"
-  },
-  "peerDependenciesMeta": {
-    "@elysiumjs/hermes": {
-      "optional": true
-    }
+    "@elysiumjs/olympus": "workspace:^"
   }
 }

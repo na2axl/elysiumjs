@@ -1,11 +1,11 @@
 # @elysiumjs/moirai-drizzle
 
-Postgres stores for [`@elysiumjs/moirai`](../moirai), through Drizzle ORM and the connections of [`@elysiumjs/mnemosyne-drizzle`](../mnemosyne-drizzle). They write in the transaction of the action, so an idempotency record, the outbox rows and the stored events commit with the data.
+Postgres stores for [`@elysiumjs/olympus/moirai`](../olympus), through Drizzle ORM and the connections of [`@elysiumjs/mnemosyne-drizzle`](../mnemosyne-drizzle). They write in the transaction of the action, so an idempotency record, the outbox rows and the stored events commit with the data.
 
 ## Installation
 
 ```bash
-bun add @elysiumjs/moirai @elysiumjs/moirai-drizzle @elysiumjs/mnemosyne-drizzle
+bun add @elysiumjs/olympus @elysiumjs/moirai-drizzle @elysiumjs/mnemosyne-drizzle
 ```
 
 ## Tables
@@ -39,7 +39,7 @@ export const billing = {
 ## Stores
 
 ```ts
-import { MoiraiModule } from '@elysiumjs/moirai';
+import { MoiraiModule } from '@elysiumjs/olympus/moirai';
 import {
 	DrizzleEventStore,
 	DrizzleIdempotencyStore,

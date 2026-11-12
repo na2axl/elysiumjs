@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@ import swc from 'unplugin-swc';
 import { defineConfig } from 'vitest/config';
 
 // The workerd lane. The tests run inside workerd, in the Worker `wrangler.jsonc` describes, through
-// the Workers Vitest integration. `@elysiumjs/core` and `@elysiumjs/runtime-workers` resolve to
+// the Workers Vitest integration. `@elysiumjs/olympus` and `@elysiumjs/runtime-workers` resolve to
 // their built `dist` (their `module` field): run `bun run build` first. As in the Node lane, SWC
 // compiles the legacy decorators and emits `design:paramtypes` for constructor injection.
 // `tests/workerd/setup.ts` explains the two shims the lane needs.

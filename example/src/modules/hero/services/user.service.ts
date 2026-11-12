@@ -1,7 +1,7 @@
-import type { LifecycleEvent } from '@elysiumjs/core';
+import type { LifecycleEvent } from '@elysiumjs/olympus';
 
-import { Lifecycle, Service, ServiceScope } from '@elysiumjs/core';
-import { HermesLogger } from '@elysiumjs/hermes';
+import { Lifecycle, Service, ServiceScope } from '@elysiumjs/olympus';
+import { HermesLogger } from '@elysiumjs/olympus/hermes';
 
 import { UserRepository } from '#hero/repositories/user.repository';
 

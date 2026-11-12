@@ -11,7 +11,7 @@ bun add @elysiumjs/runtime-node
 ## Usage
 
 ```ts
-import { Application } from '@elysiumjs/core';
+import { Application } from '@elysiumjs/olympus';
 import { runtime } from '@elysiumjs/runtime-node';
 
 @Application.register({ runtime, modules: [] })

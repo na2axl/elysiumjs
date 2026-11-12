@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,20 +16,20 @@ import { existsSync } from 'node:fs';
 import { mkdir, readdir, rename } from 'node:fs/promises';
 import { dirname, extname, join } from 'node:path';
 
-import { Application, ElysiumError } from '@elysiumjs/core';
+import { Application, ElysiumError } from '@elysiumjs/olympus';
 import { dash, pascal } from 'radash';
 
 /**
  * The kebab-case form of a name, used for every file and module folder that Styx creates, such as
  * `user-profile.service.ts` for `UserProfileService`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param name The name, in any case.
  */
 export const fileName = (name: string): string => dash(name);
 
 /**
  * Thrown when the project entry point exports no `Application` subclass.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class AppEntryNotFoundError extends ElysiumError {
 	constructor(public readonly path: string) {
@@ -39,7 +39,7 @@ export class AppEntryNotFoundError extends ElysiumError {
 
 /**
  * Loads the project entry (`src/app.ts`, else `index.ts`) and returns its exported `Application` subclass.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  *
  * @param projectPath The root path of the project.
  * @throws {AppEntryNotFoundError} When the entry exports no `Application` subclass.
@@ -60,7 +60,7 @@ export const resolveAppEntry = async (projectPath: string): Promise<typeof Appli
 
 /**
  * Gets the root path of the styx package.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const getRootPath = () => {
 	return dirname(Bun.fileURLToPath(import.meta.url));
@@ -68,7 +68,7 @@ export const getRootPath = () => {
 
 /**
  * Gets the root path of the Elysium.js project.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  *
  * @returns The detected project path.
  */
@@ -90,7 +90,7 @@ export const getProjectPath = () => {
 
 /**
  * Creates a new module or rename an existing module.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  *
  * @param name The name of the module to create or rename.
  * @param oldName The old name of the module to rename.
@@ -109,7 +109,7 @@ export const createModule = async (name: string, oldName?: string) => {
 				const className = `${pascal(name)}Module`;
 				await Bun.write(
 					moduleFile,
-					`import { Module } from '@elysiumjs/core';\n\n@Module.register({\n\tservices: [],\n\tcontrollers: [],\n\tcommands: []\n})\nexport class ${className} extends Module {}\n`
+					`import { Module } from '@elysiumjs/olympus';\n\n@Module.register({\n\tservices: [],\n\tcontrollers: [],\n\tcommands: []\n})\nexport class ${className} extends Module {}\n`
 				);
 			}
 		}

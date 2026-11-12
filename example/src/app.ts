@@ -1,10 +1,10 @@
-import type { ServerError } from '@elysiumjs/core';
+import type { ServerError } from '@elysiumjs/olympus';
 
-import { Application, Env, Middleware, Service, WampModule } from '@elysiumjs/core';
-import { HeraclesModule, RedisTransport } from '@elysiumjs/heracles';
-import { HermesLogger, HermesModule } from '@elysiumjs/hermes';
+import { Application, Env, Middleware, Service, WampModule } from '@elysiumjs/olympus';
+import { HeraclesModule, RedisTransport } from '@elysiumjs/olympus/heracles';
+import { HermesLogger, HermesModule } from '@elysiumjs/olympus/hermes';
 import { DrizzleModule } from '@elysiumjs/mnemosyne-drizzle';
-import { RedisModule } from '@elysiumjs/redis';
+import { RedisModule } from '@elysiumjs/olympus/redis';
 import { runtime as bunRuntime } from '@elysiumjs/runtime-bun';
 import { StyxModule } from '@elysiumjs/styx';
 

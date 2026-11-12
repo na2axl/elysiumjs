@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { RedisConnection } from '@elysiumjs/redis';
-import type { SessionData, SessionStore } from '@elysiumjs/themis';
+import type { RedisConnection } from '@elysiumjs/olympus/redis';
+import type { SessionData, SessionStore } from '@elysiumjs/olympus/themis';
 
 /**
  * Keeps sessions in Redis, under `session:<id>`, expiring with the session.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class RedisSessionStore implements SessionStore {
 	constructor(

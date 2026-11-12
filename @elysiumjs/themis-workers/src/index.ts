@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { SessionData, SessionStore } from '@elysiumjs/themis';
+import type { SessionData, SessionStore } from '@elysiumjs/olympus/themis';
 
 /**
  * The part of a Workers KV namespace binding the KV session store uses.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface KvNamespaceLike {
 	get(key: string): Promise<string | null>;
@@ -27,7 +27,7 @@ export interface KvNamespaceLike {
 /**
  * Keeps sessions in a Cloudflare Workers KV namespace. KV is eventually consistent: a session saved
  * in one location can take a few seconds to be seen in another.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class KvSessionStore implements SessionStore {
 	constructor(

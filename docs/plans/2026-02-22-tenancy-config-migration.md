@@ -90,7 +90,7 @@ With:
  * Reads from the 'elysium:mnemosyne' app config key. Returns a default
  * configuration if the app is not yet initialized or no tenancy config is set.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @returns The current tenancy configuration.
  */
 export const getConfig = (): TenancyConfig => {

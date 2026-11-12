@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ import { getTableConfig, PgDialect } from 'drizzle-orm/pg-core';
 
 /**
  * A table as the SQL that follows its creation sees it.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type CreatedTable = {
 	/** The Postgres schema of the table, `undefined` for `public`. */
@@ -40,7 +40,7 @@ export type PartitionColumn = string | ((table: any) => AnyPgColumn);
 
 /**
  * What `migration:generate` adds to the migration that creates a table.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type TableMarker = {
 	/** The columns of the range partition key. */
@@ -54,7 +54,7 @@ const MARKERS = Symbol.for('elysium:mnemosyne-drizzle:table-markers');
 
 /**
  * Attaches markers to a table, after the ones it already has.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param table The table.
  * @param markers The markers.
  * @returns The table.
@@ -79,7 +79,7 @@ export const markTable = <T extends PgTable>(table: T, markers: readonly TableMa
 
 /**
  * Reads the markers of a table.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param table The table.
  * @returns The markers merged into one, or `undefined` when the table has none.
  */
@@ -126,7 +126,7 @@ const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\
  * Applies the markers of the given tables to the migration that creates them: the partition key
  * after `CREATE TABLE`, then the SQL to run after it, each as its own statement. A table the
  * migration does not create is left as it is.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param sql The SQL of the migration, without the `public` qualifiers.
  * @param tables The tables of the app.
  * @returns The SQL with the markers applied.
@@ -176,7 +176,7 @@ export const applyTableMarkers = (sql: string, tables: Iterable<PgTable>): strin
 
 /**
  * Drizzle tables: the markers that `migration:generate` applies to the migration creating a table.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export namespace DrizzleTable {
 	/**
@@ -194,7 +194,7 @@ export namespace DrizzleTable {
 	 * 	kernel.table('audit', { ... }, (t) => [primaryKey({ columns: [t.id, t.recordedAt] })])
 	 * );
 	 * ```
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param markers The markers, from `DrizzleTable.partitioned()` and `DrizzleTable.afterCreate()`.
 	 * @returns A function marking the table and returning it.
 	 */
@@ -206,7 +206,7 @@ export namespace DrizzleTable {
 	/**
 	 * Creates the table partitioned by range: `PARTITION BY RANGE (...)` follows its `CREATE TABLE`.
 	 * The primary key and the unique constraints of the table must include the partition columns.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param options The partition key: a column name in the database, a function returning the
 	 * column, or several of them.
 	 */
@@ -221,7 +221,7 @@ export namespace DrizzleTable {
 	/**
 	 * Runs SQL right after the table is created, in the same migration: partitions, triggers or
 	 * grants that belong to the table.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param build Returns the SQL, as a string or a `sql` template, from the created table.
 	 */
 	export const afterCreate = (build: (table: CreatedTable) => string | SQL): TableMarker => ({

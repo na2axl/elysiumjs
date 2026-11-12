@@ -1,4 +1,4 @@
-import { Command } from '@elysiumjs/core';
+import { Command } from '@elysiumjs/olympus';
 
 @Command.register()
 export class {name} extends Command {

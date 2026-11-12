@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,11 +17,11 @@ import type { DrizzleDatabaseCache } from './cache';
 import type { DrizzleConnection } from './database';
 import type { MigrationConnection } from './migration';
 
-import { ElysiumError } from '@elysiumjs/core';
+import { ElysiumError } from '@elysiumjs/olympus';
 
 /**
  * What a driver connects with: the Drizzle options of the connection and its query cache.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type DrizzleDriverConfig = Omit<DrizzleConfig<Record<string, unknown>>, 'cache'> & {
 	cache?: DrizzleDatabaseCache;
@@ -31,7 +31,7 @@ export type DrizzleDriverConfig = Omit<DrizzleConfig<Record<string, unknown>>, '
  * Connects Drizzle to PostgreSQL through a client: Bun SQL (`/bun-sql`), postgres.js
  * (`/postgres-js`), node-postgres (`/node-postgres`) or Cloudflare Hyperdrive (`/hyperdrive`).
  * Implement it to plug in another client.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface DrizzleDriver {
 	/** The name of the driver, for errors and logs. */
@@ -60,7 +60,7 @@ export interface DrizzleDriver {
 /**
  * Raised when a connection sets no driver outside Bun, where the default Bun SQL driver is not
  * available.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class MissingDriverError extends ElysiumError {
 	constructor(name: string) {
@@ -74,7 +74,7 @@ export class MissingDriverError extends ElysiumError {
 
 /**
  * Raised when `migration:run` uses a connection whose driver cannot run migrations.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class MissingMigrationsError extends ElysiumError {
 	constructor(driver: string) {

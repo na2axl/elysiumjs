@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 
 import type { Scenario } from './types';
 
-import { Application, Http, Module } from '@elysiumjs/core';
+import { Application, Http, Module } from '@elysiumjs/olympus';
 
 const make = async (): Promise<Application> => {
 	@Http.controller('/boom')
@@ -36,7 +36,7 @@ const make = async (): Promise<Application> => {
 
 /**
  * A thrown error gives a 500.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const errors: Scenario = {
 	name: 'errors: a thrown error gives 500',

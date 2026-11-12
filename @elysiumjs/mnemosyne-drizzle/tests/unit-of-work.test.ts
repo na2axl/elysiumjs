@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { ConflictError, Service } from '@elysiumjs/core';
-import { Transactional, UnitOfWork, withUnitOfWork } from '@elysiumjs/mnemosyne';
+import { ConflictError, Service } from '@elysiumjs/olympus';
+import { Transactional, UnitOfWork, withUnitOfWork } from '@elysiumjs/olympus/mnemosyne';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import * as d from 'drizzle-orm/pg-core';
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 
 import type { Scenario } from './types';
 
-import { Application, Http, MemoryRateLimitStore, Module, RateLimit } from '@elysiumjs/core';
+import { Application, Http, MemoryRateLimitStore, Module, RateLimit } from '@elysiumjs/olympus';
 
 const make = async (): Promise<Application> => {
 	@Http.controller('/limited')
@@ -50,7 +50,7 @@ const limited = () => new Request('http://localhost/limited');
 /**
  * A rate limited route sends the `RateLimit-*` headers, and answers 429 problem details with
  * `Retry-After` once a client goes over the limit.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const rateLimits: Scenario = {
 	name: 'rate limits: RateLimit headers and 429',

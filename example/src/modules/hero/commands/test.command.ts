@@ -1,6 +1,6 @@
 import type { UserService } from '#hero/services/user.service';
 
-import { Command, Service } from '@elysiumjs/core';
+import { Command, Service } from '@elysiumjs/olympus';
 
 @Command.register()
 export class TestCommand extends Command {

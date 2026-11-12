@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { OutputLevel, Runtime } from '@elysiumjs/core';
+import type { OutputLevel, Runtime } from '@elysiumjs/olympus';
 
-import { RuntimeNotSupportedError } from '@elysiumjs/core';
+import { RuntimeNotSupportedError } from '@elysiumjs/olympus';
 
 /** The console method of each level. */
 const CONSOLE_METHODS: Record<OutputLevel, 'debug' | 'info' | 'warn' | 'error'> = {
@@ -28,7 +28,7 @@ const CONSOLE_METHODS: Record<OutputLevel, 'debug' | 'info' | 'warn' | 'error'> 
 
 /**
  * Options of {@link createRuntime}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type WorkersRuntimeOptions = {
 	/**
@@ -43,7 +43,7 @@ export type WorkersRuntimeOptions = {
  * lifetime: export the app's `fetch` from the Worker instead of serving, and nothing exits or
  * receives signals.
  * @param options The runtime options.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const createRuntime = (options: WorkersRuntimeOptions = {}): Runtime => ({
 	name: 'workers',
@@ -72,6 +72,6 @@ export const createRuntime = (options: WorkersRuntimeOptions = {}): Runtime => (
 
 /**
  * The Workers runtime reading `process.env`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const runtime: Runtime = createRuntime();

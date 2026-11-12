@@ -1,0 +1,208 @@
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+import type { Elysia } from 'elysia';
+import type { Class } from 'type-fest';
+import type { TSchema } from 'typebox';
+import type { CommandClass } from './command';
+import type { Environment } from './environments';
+import type { FilterClass } from './filter';
+import type { Route } from './http';
+import type { InterceptorClass } from './interceptor';
+import type { ServiceDefinition } from './service';
+
+import { InvalidModuleError, MissingModuleConfigError } from './errors';
+import { Metadata } from './metadata';
+import { deepMerge, Symbols } from './utils';
+
+/**
+ * Type for a module class.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export type ModuleClass = Class<Module>;
+
+/**
+ * A module bound to a configuration, as returned by `Module.with()`.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export type ConfiguredModule<TConfig> = {
+	readonly [Symbols.configuredModule]: true;
+	readonly module: ModuleClass;
+	readonly config: Partial<TConfig> | (() => Partial<TConfig> | Promise<Partial<TConfig>>);
+};
+
+/**
+ * The lists of classes a module declares, which the kernel and packages gather across the active
+ * modules with `graph.collect()`. A package adds its own list by augmenting this interface:
+ * @example
+ * ```ts
+ * declare module '@elysiumjs/olympus' {
+ * 	interface ModuleCollections {
+ * 		seeders?: Class<Seeder>[];
+ * 	}
+ * }
+ * ```
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export interface ModuleCollections {
+	/** The controllers provided by the module. */
+	controllers?: Class<any>[];
+
+	/** The commands provided by the module. */
+	commands?: CommandClass[];
+
+	/** The jobs provided by the module. */
+	jobs?: Class<any>[];
+}
+
+/**
+ * Properties used when declaring a module with `@Module.register()`.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export type ModuleProps<TConfig = unknown> = ModuleCollections & {
+	/** Modules (or configured modules) whose exports this module can use. */
+	imports?: (ModuleClass | ConfiguredModule<any>)[];
+
+	/** The services this module provides, optionally derived from its resolved config. */
+	services?: ServiceDefinition[] | ((config: TConfig) => ServiceDefinition[]);
+
+	/** What this module exposes to importers, or `true` to expose everything. */
+	exports?: (Class<any> | string | ModuleClass)[] | true;
+
+	/** The base path prefixed to every controller path of this module. */
+	prefix?: Route;
+
+	/** Environments (`NODE_ENV` values) in which the module is active. */
+	env?: readonly Environment[];
+
+	/**
+	 * The environment variables the module needs, as a TypeBox object. Merged with the schemas of
+	 * the app and the other active modules, and validated at boot.
+	 */
+	envSchema?: TSchema;
+
+	/**
+	 * Exception filters for the routes of this module's controllers. They run after the filters
+	 * of the route and the controller, and before those of the app.
+	 */
+	filters?: FilterClass[];
+
+	/**
+	 * Interceptors around the handlers of this module's controllers, inside those of the app and
+	 * outside those of the controller.
+	 */
+	interceptors?: InterceptorClass[];
+};
+
+/**
+ * Checks whether a value is a configured module.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export function isConfiguredModule(value: unknown): value is ConfiguredModule<unknown> {
+	return (
+		typeof value === 'object' &&
+		value !== null &&
+		(value as Record<symbol, unknown>)[Symbols.configuredModule] === true
+	);
+}
+
+/**
+ * Reads the props a module class was declared with.
+ * @throws {InvalidModuleError} When the class is not decorated with `@Module.register()`.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export function getModuleProps(cls: ModuleClass): ModuleProps {
+	const props = Metadata.get(Symbols.module, cls);
+	if (props === undefined) {
+		throw new InvalidModuleError(cls.name);
+	}
+	return props;
+}
+
+/**
+ * Base class for all modules.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export abstract class Module {
+	/**
+	 * Marks a class as a module. Only stores metadata.
+	 * @author Axel Nana <ax.lnana@outlook.com>
+	 */
+	public static register<TConfig = any>(props: ModuleProps<TConfig> = {}) {
+		return function (target: ModuleClass) {
+			Metadata.define(Symbols.module, props, target);
+		};
+	}
+
+	/**
+	 * Creates a base class for modules that accept configuration.
+	 * @author Axel Nana <ax.lnana@outlook.com>
+	 */
+	public static configurable<TConfig extends object>(
+		options: { defaults?: Partial<TConfig>; required?: (keyof TConfig)[] } = {}
+	) {
+		abstract class ConfigurableModule extends Module {
+			/** Injection token of the resolved config of this module. */
+			public static get config(): string {
+				return `elysium.module.${this.name}.config`;
+			}
+
+			/** Binds a configuration to this module. */
+			public static with(
+				config: Partial<TConfig> | (() => Partial<TConfig> | Promise<Partial<TConfig>>)
+			): ConfiguredModule<TConfig> {
+				return {
+					[Symbols.configuredModule]: true,
+					module: this as unknown as ModuleClass,
+					config
+				};
+			}
+
+			/**
+			 * Merges the defaults with the input and checks required keys. Array defaults are
+			 * concatenated with the user's arrays (primitives are de-duplicated), not replaced.
+			 */
+			public static resolveConfig(input: Partial<TConfig> = {}): TConfig {
+				// deepMerge keeps the target's values, so the input is the target.
+				const resolved = deepMerge(
+					{ ...input } as Record<string, any>,
+					{ ...(options.defaults ?? {}) } as Record<string, any>
+				) as TConfig;
+				const missing = (options.required ?? []).filter(
+					(key) => (resolved as any)[key] === undefined
+				);
+				if (missing.length > 0) {
+					throw new MissingModuleConfigError(this.name, missing.map(String));
+				}
+				return resolved;
+			}
+
+			/** The resolved configuration, set by the kernel. */
+			public get config(): TConfig {
+				return Metadata.get(Symbols.moduleConfig, this);
+			}
+		}
+
+		return ConfigurableModule;
+	}
+
+	/** Called once the module's services are ready. */
+	public onInit(): Promise<void> | void {}
+
+	/** Called when the application shuts down. */
+	public onDestroy(): Promise<void> | void {}
+
+	/** Called with the Elysia app before it starts listening. */
+	public onServe(_app: Elysia<any>): Promise<void> | void {}
+}

@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,19 +19,19 @@ import type {
 	Page,
 	ParsedQuery,
 	RowKey
-} from '@elysiumjs/mnemosyne';
+} from '@elysiumjs/olympus/mnemosyne';
 import type { SQL } from 'drizzle-orm';
 import type { PgColumn, PgTable, PgTableWithColumns } from 'drizzle-orm/pg-core';
 import type { DrizzleConnection } from './database';
 
-import { ElysiumError } from '@elysiumjs/core';
+import { ElysiumError } from '@elysiumjs/olympus';
 import {
 	AbstractRepository,
 	getCurrentTenant,
 	getTenancyConfig,
 	getTenancyStrategy,
 	Listing
-} from '@elysiumjs/mnemosyne';
+} from '@elysiumjs/olympus/mnemosyne';
 import { and, eq, getTableColumns } from 'drizzle-orm';
 import { getTableConfig } from 'drizzle-orm/pg-core';
 
@@ -46,13 +46,13 @@ import { DrizzleRLSTenancy } from './tenancy';
 /**
  * Raised when a repository cannot tell the primary key of its table, or gets a key that does not
  * match it.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class RepositoryKeyError extends ElysiumError {}
 
 /**
  * Options of {@link DrizzleRepository}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type DrizzleRepositoryOptions<TSelect> = {
 	/**
@@ -84,7 +84,7 @@ const primaryKeyOf = (table: PgTable): string[] => {
  * object of the values of its columns when it spans several, such as
  * `{ userId, creatorId }`.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @template TModel The model class type.
  * @param model The model class to create the repository for.
  * @param options The columns of the primary key, when they differ from the table's.

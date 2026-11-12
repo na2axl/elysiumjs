@@ -13,7 +13,7 @@ bun add @elysiumjs/plugin-sentry
 Add `SentryModule` to your application:
 
 ```ts
-import { Application } from '@elysiumjs/core';
+import { Application } from '@elysiumjs/olympus';
 import { SentryModule } from '@elysiumjs/plugin-sentry';
 
 @Application.register({

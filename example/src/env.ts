@@ -1,6 +1,6 @@
-import type { Env } from '@elysiumjs/core';
+import type { Env } from '@elysiumjs/olympus';
 
-import { Secret, t } from '@elysiumjs/core';
+import { Secret, t } from '@elysiumjs/olympus';
 
 /** The environment variables of the app, validated at boot and read with `Env.get()`. */
 export const env = t.Object({
@@ -10,6 +10,6 @@ export const env = t.Object({
 	WAMP_URL: t.String()
 });
 
-declare module '@elysiumjs/core' {
+declare module '@elysiumjs/olympus' {
 	interface AppEnv extends Env.Infer<typeof env> {}
 }

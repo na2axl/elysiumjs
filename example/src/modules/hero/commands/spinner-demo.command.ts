@@ -1,8 +1,8 @@
-import { Command, CommandArgumentType } from '@elysiumjs/core';
+import { Command, CommandArgumentType } from '@elysiumjs/olympus';
 
 /**
  * A command that demonstrates the use of the spinner for indeterminate operations.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 @Command.register()
 export class SpinnerDemoCommand extends Command {

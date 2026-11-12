@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ import { join } from 'node:path';
 
 /**
  * Options of {@link NodeBuilder.build}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface NodeBuildOptions {
 	/** The server entry: it builds the app with the Node.js runtime and serves it. */
@@ -39,7 +39,7 @@ export interface NodeBuildOptions {
 
 /**
  * Result of a Node.js build.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface NodeBuildResult {
 	outputPath: string;
@@ -51,7 +51,7 @@ export interface NodeBuildResult {
  * Bundles an Elysium app into one ES module for Node.js. The bundler emits the decorator
  * metadata the container reads (`emitDecoratorMetadata` in tsconfig), so the app needs no `tsc`
  * step; run the output with `node`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class NodeBuilder {
 	/**

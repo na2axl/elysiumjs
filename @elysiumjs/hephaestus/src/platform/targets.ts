@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@ import type { PlatformTarget } from '../types';
 
 /**
  * Maps Hephaestus platform targets to Bun's `--target` flag values.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 const BUN_TARGET_MAP: Record<PlatformTarget, string> = {
 	'linux-x64': 'bun-linux-x64',
@@ -29,7 +29,7 @@ const BUN_TARGET_MAP: Record<PlatformTarget, string> = {
 
 /**
  * Converts a Hephaestus platform target to a Bun target string.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param platform The Hephaestus platform target.
  * @returns The Bun `--target` value.
  */
@@ -39,7 +39,7 @@ export function bunTarget(platform: PlatformTarget): string {
 
 /**
  * Detects the current platform and returns the corresponding target.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @returns The detected platform target.
  */
 export function detectCurrentPlatform(): PlatformTarget {
@@ -57,7 +57,7 @@ export function detectCurrentPlatform(): PlatformTarget {
 
 /**
  * Returns the output file name for a given platform.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param baseName The base binary name.
  * @param platform The target platform.
  * @returns The platform-specific output file name.

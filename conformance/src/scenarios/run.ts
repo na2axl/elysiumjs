@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Application } from '@elysiumjs/core';
+import type { Application } from '@elysiumjs/olympus';
 import type { AssertAdapter, Scenario, ScenarioDriver } from './types';
 
-import { createHttpClient, resetContainer, Runtime } from '@elysiumjs/core';
+import { createHttpClient, resetContainer, Runtime } from '@elysiumjs/olympus';
 
 const EVENT_COUNT = 2;
 
@@ -67,7 +67,7 @@ const checkResponse = async (
 
 /**
  * Sends a scenario's requests through `handle` and asserts each response.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param s The scenario.
  * @param handle How a request reaches the app.
  * @param assert The assertion adapter of the test framework.
@@ -95,7 +95,7 @@ const handleDriver: ScenarioDriver = async (app) => {
  * Runs a scenario against a runtime: builds a fresh app, drives its requests through the
  * driver (`elysia.handle` by default), runs the `after` hook, then shuts the app down and resets
  * the container, also when the app factory or a request fails.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param s The scenario.
  * @param runtime The runtime to run it on.
  * @param assert The assertion adapter of the test framework.

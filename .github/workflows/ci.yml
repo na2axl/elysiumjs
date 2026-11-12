@@ -35,7 +35,7 @@ jobs:
 
       - name: Core runs outside Bun
         run: |
-          bun run --cwd @elysiumjs/core check:runtime
+          bun run --cwd @elysiumjs/olympus check:runtime
           bun run --cwd @elysiumjs/runtime-workers check:runtime
 
       - name: Lint
@@ -142,7 +142,7 @@ jobs:
         run: bun run build
 
       - name: Services resolve in a minified build
-        run: bun run --cwd @elysiumjs/core check:minified
+        run: bun run --cwd @elysiumjs/olympus check:minified
 
       - name: Compiles ahead of time for Workers
         run: bun run --cwd @elysiumjs/runtime-workers check:aot
@@ -160,5 +160,5 @@ jobs:
         if: always()
         uses: codecov/codecov-action@v5
         with:
-          files: "**/coverage/lcov.info"
+          files: "**/coverage/**/lcov.info"
           token: ${{ secrets.CODECOV_TOKEN }}

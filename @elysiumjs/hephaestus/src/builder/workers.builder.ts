@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -60,7 +60,7 @@ const stubCloudflareModules = (): void => {
 
 /**
  * Options of {@link WorkersBuilder.build}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface WorkersBuildOptions {
 	/** The Worker entry: it exports the handlers as default and the root Elysia app as `app`. */
@@ -79,7 +79,7 @@ export interface WorkersBuildOptions {
 
 /**
  * Result of a Worker build.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface WorkersBuildResult {
 	outputPath: string;
@@ -160,7 +160,7 @@ const wasmModules = (outdir: string): BunPlugin => {
 /**
  * Bundles an Elysium app for Cloudflare Workers, with its routes compiled ahead of time by
  * `elysia/plugin/aot`, since workerd forbids generating code at runtime.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class WorkersBuilder {
 	/**

@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Interceptor, InterceptorContext } from '@elysiumjs/core';
+import type { Interceptor, InterceptorContext } from '@elysiumjs/olympus';
 import type { Scenario } from './types';
 
-import { Application, Http, Module, TimingInterceptor } from '@elysiumjs/core';
+import { Application, Http, Module, TimingInterceptor } from '@elysiumjs/olympus';
 
 const make = async (): Promise<Application> => {
 	const tag = (name: string) =>
@@ -49,7 +49,7 @@ const make = async (): Promise<Application> => {
 
 /**
  * Interceptors wrap the handler from the app inwards to the route.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const interceptors: Scenario = {
 	name: 'interceptors: app, module, controller and route wrap the handler',

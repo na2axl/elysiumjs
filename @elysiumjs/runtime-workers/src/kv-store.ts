@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,13 +14,13 @@
 
 import type { WorkersKVNamespace } from './types';
 
-import { getLogger } from '@elysiumjs/core';
+import { getLogger } from '@elysiumjs/olympus';
 
 import { Workers } from './workers';
 
 /**
  * Options of {@link KeyvWorkersKV}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type KeyvWorkersKVOptions = {
 	/** The name of the KV namespace binding. */
@@ -48,7 +48,7 @@ const KV_DELETE_CHUNK = 50;
 const DEFAULT_MAX_OPERATIONS = 900;
 
 /**
- * A Keyv store over Workers KV, for the caches of `@elysiumjs/mnemosyne`.
+ * A Keyv store over Workers KV, for the caches of `@elysiumjs/olympus/mnemosyne`.
  *
  * The KV namespace is read from the current invocation on every call, so the store holds no
  * binding between invocations. KV is eventually consistent, and entries expire after at least
@@ -60,7 +60,7 @@ const DEFAULT_MAX_OPERATIONS = 900;
  * 	cache: { redis: false, stores: { kv: () => new KeyvWorkersKV({ binding: 'CACHE' }) } }
  * });
  * ```
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class KeyvWorkersKV {
 	public namespace: string | undefined;

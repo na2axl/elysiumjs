@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { Application, Module, Service } from '@elysiumjs/core';
+import { Application, Module, Service } from '@elysiumjs/olympus';
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { sql } from 'drizzle-orm';
 import prompts from 'prompts';

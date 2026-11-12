@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ import { bunRequire } from '../bun-require';
 /**
  * A schema object found in a project file: the export that holds it, and the keys that lead to it
  * when the export is an object grouping several of them.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type SchemaExport = {
 	/** The absolute path of the file. */
@@ -50,7 +50,7 @@ const SOURCE = /\.[cm]?[jt]sx?$/;
 /**
  * Whether a value is something Drizzle Kit generates SQL for: a table, a Postgres schema, an
  * enum, a sequence, a view, a role or a policy.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param value The value to check.
  */
 export const isSchemaObject = (value: unknown): boolean => {
@@ -78,7 +78,7 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> => {
  * Finds the schema objects that the given modules export, each once: exported directly, or as a
  * value of an exported plain object (the tables a function builds for a Postgres schema, for
  * example).
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param modules The exports of each file, by absolute path.
  */
 export const findSchemaExports = (
@@ -113,7 +113,7 @@ export const findSchemaExports = (
  * Lists the source files of the project that the app has loaded, outside `node_modules`.
  * Importing the app loads every model its modules use, whatever the file name; importing a loaded
  * file again gives back its exports without running it.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param projectPath The root of the project.
  * @param loaded The paths of the loaded files, the keys of the module cache.
  */
@@ -133,7 +133,7 @@ export const loadedProjectFiles = (projectPath: string, loaded: Iterable<string>
 
 /**
  * Finds the schema objects of the app: the ones the project files it loaded export.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param projectPath The root of the project.
  */
 export const collectAppSchema = async (projectPath: string): Promise<SchemaExport[]> => {
@@ -150,7 +150,7 @@ export const collectAppSchema = async (projectPath: string): Promise<SchemaExpor
 /**
  * Writes the source of a schema file that exports every given schema object at its top level,
  * where Drizzle Kit looks for them.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param exports The schema objects to export.
  */
 export const renderSchemaEntry = (exports: SchemaExport[]): string => {

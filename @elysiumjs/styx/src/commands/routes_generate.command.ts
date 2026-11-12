@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 
 import { relative, resolve } from 'node:path';
 
-import { Command, CommandArgumentType, ConsoleFormat } from '@elysiumjs/core';
+import { Command, CommandArgumentType, ConsoleFormat } from '@elysiumjs/olympus';
 
 import { parseProjectConfig } from '../config';
 import { collectRoutes } from '../routes/collect';
@@ -24,7 +24,7 @@ import { BaseCommand } from './base.command';
 
 /**
  * Writes the route types of the app, for typed clients such as Eden: `treaty<AppRoutes>(url)`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 @Command.register()
 export class RoutesGenerateCommand extends BaseCommand {

@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@ import type { ModuleRoutes } from '../src/routes/render';
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { Application, Http, Module, t } from '@elysiumjs/core';
+import { Application, Http, Module, t } from '@elysiumjs/olympus';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { routesWithoutResponse } from '../src/routes/check';

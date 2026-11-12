@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,9 +16,9 @@ import type {
 	HttpRouteDescription,
 	HttpRouteTypeRef,
 	HttpRouteTypesContributor
-} from '@elysiumjs/core';
+} from '@elysiumjs/olympus';
 
-import { Environments, Http, Service } from '@elysiumjs/core';
+import { Environments, Http, Service } from '@elysiumjs/olympus';
 
 const pinged = new WeakSet<Function>();
 

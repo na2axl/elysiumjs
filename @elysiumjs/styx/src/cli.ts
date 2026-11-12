@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 /**
  * The `styx` command. Installed globally (`bun add -g @elysiumjs/styx`) or in a project.
  */
-import type { ModuleClass } from '@elysiumjs/core';
+import type { ModuleClass } from '@elysiumjs/olympus';
 
 import { existsSync, realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -56,7 +56,7 @@ const findProjectCli = (project: string): string | undefined => {
 
 /**
  * Loads the build tool modules a project installs. Only the project's own Styx loads them: it
- * shares the project's \`@elysiumjs/core\`, which the tools register their commands with.
+ * shares the project's \`@elysiumjs/olympus\`, which the tools register their commands with.
  */
 const loadTools = async (
 	project: string | undefined,
@@ -110,7 +110,7 @@ switch (decision.kind) {
 		const { stubCloudflareModules } = await import('./cloudflare-stubs');
 		stubCloudflareModules();
 		const { resolveAppEntry } = await import('./utils');
-		const { Application, ElysiumError } = await import('@elysiumjs/core');
+		const { Application, ElysiumError } = await import('@elysiumjs/olympus');
 		try {
 			let App = await resolveAppEntry(decision.project);
 			if (listsCommands(decision.argv)) {

@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,18 +17,18 @@ import type {
 	HttpRouteDescription,
 	HttpRouteTypes,
 	HttpRouteTypesContributor
-} from '@elysiumjs/core';
+} from '@elysiumjs/olympus';
 import type { ControllerRoutes, ModuleRoutes } from './render';
 
 import { basename, dirname, relative, resolve, sep } from 'node:path';
 
-import { Environments, Http, Service } from '@elysiumjs/core';
+import { Environments, Http, Service } from '@elysiumjs/olympus';
 
 import { CONTROLLER, quote } from './render';
 
 /**
  * The result of reading the routes of an app.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type CollectedRoutes = {
 	/** The modules with controllers, in mounting order. */
@@ -154,7 +154,7 @@ const specifierFor = (outFile: string, file: string): string => {
 
 /**
  * Reads the modules, controllers and routes of an app, without booting it.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param projectPath The project folder.
  * @param app The application class, already imported.
  * @param outFile The file the routes will be written to, to compute import paths.

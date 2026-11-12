@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import {
 	Module,
 	Service,
 	ServiceScope
-} from '@elysiumjs/core';
+} from '@elysiumjs/olympus';
 
 import { waitFor } from './wait';
 
@@ -83,7 +83,7 @@ const get = (path: string) => () => new Request(`http://localhost${path}`);
 
 /**
  * Singleton, factory and request scopes, the latter with an async `onInit`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const diScopes: Scenario = {
 	name: 'di-scopes: singleton, factory and request with async onInit',
@@ -151,7 +151,7 @@ const makeDisposal = async (): Promise<Application> => {
 
 /**
  * Request-scoped services are destroyed, in reverse order, after the response, also on failure.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const diDisposal: Scenario = {
 	name: 'di-scopes: request-scoped services are destroyed after the response',

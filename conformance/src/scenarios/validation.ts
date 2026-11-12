@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 
 import type { Scenario } from './types';
 
-import { Application, Http, Module } from '@elysiumjs/core';
+import { Application, Http, Module } from '@elysiumjs/olympus';
 import { t } from 'elysia';
 
 const make = async (): Promise<Application> => {
@@ -44,7 +44,7 @@ const post = (body: unknown) => () =>
 
 /**
  * A body that does not match its schema is refused with 422.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const validation: Scenario = {
 	name: 'validation: a bad body gives 422',

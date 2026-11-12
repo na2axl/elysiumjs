@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Runtime } from '@elysiumjs/core';
+import type { Runtime } from '@elysiumjs/olympus';
 
 const SIGNALS = ['SIGINT', 'SIGTERM'] as const;
 
@@ -26,7 +26,7 @@ let server: { requestIP(request: Request): { address: string } | null } | undefi
  * @Application.register({ runtime, modules: [...] })
  * class App extends Application {}
  * ```
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const runtime: Runtime = {
 	name: 'bun',

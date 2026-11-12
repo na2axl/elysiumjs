@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ const ELYSIUM_VERSIONS = elysiumVersions();
  * The version range written to the `package.json` of a new project for a package: a caret range
  * on the version released with Styx for `@elysiumjs/*` (each package has its own version), a
  * known range for the tools features add.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param name The package name.
  * @throws When no version is known for the package.
  */
@@ -49,7 +49,7 @@ export const versionFor = (name: string): string => {
 	return range;
 };
 
-export const getModuleCode = (module: string) => /* js */ `import { Module } from '@elysiumjs/core';
+export const getModuleCode = (module: string) => /* js */ `import { Module } from '@elysiumjs/olympus';
 
 @Module.register({
 	controllers: []
@@ -117,13 +117,13 @@ export type AppParts = {
 	/** A PostgreSQL connection through `@elysiumjs/mnemosyne-drizzle`. */
 	database: boolean;
 
-	/** A Redis connection through `@elysiumjs/redis`. */
+	/** A Redis connection through `@elysiumjs/olympus/redis`. */
 	cache: boolean;
 };
 
 /**
  * The packages the app of a runtime needs for its parts.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param runtime The runtime key.
  * @param parts The parts of the app.
  */
@@ -131,7 +131,7 @@ export const appPackages = (
 	runtime: keyof typeof RUNTIMES,
 	parts: AppParts
 ): { prod: string[]; dev: string[] } => {
-	const prod = ['@elysiumjs/core', '@elysiumjs/hermes', RUNTIMES[runtime].package];
+	const prod = ['@elysiumjs/olympus', RUNTIMES[runtime].package];
 	const dev = ['@elysiumjs/styx', 'typescript', ...RUNTIMES[runtime].devPackages];
 	if (parts.database) {
 		prod.push('@elysiumjs/mnemosyne-drizzle');
@@ -139,7 +139,6 @@ export const appPackages = (
 		if (runtime !== 'bun') prod.push('postgres');
 	}
 	if (parts.cache) {
-		prod.push('@elysiumjs/redis');
 		if (runtime === 'node') prod.push('ioredis');
 	}
 	return { prod, dev };
@@ -165,13 +164,13 @@ const partCode = (runtime: keyof typeof RUNTIMES, parts: AppParts) => {
 	const modules: string[] = [];
 	if (parts.cache) {
 		if (runtime === 'bun') {
-			imports.push("import { RedisModule } from '@elysiumjs/redis';");
+			imports.push("import { RedisModule } from '@elysiumjs/olympus/redis';");
 			modules.push(`RedisModule.with(() => ({
 			default: 'cache',
 			connections: { cache: { url: Env.get('REDIS_URL').reveal() } }
 		}))`);
 		} else if (runtime === 'node') {
-			imports.push("import { ioredis, RedisModule } from '@elysiumjs/redis';");
+			imports.push("import { ioredis, RedisModule } from '@elysiumjs/olympus/redis';");
 			imports.push("import IORedis from 'ioredis';");
 			modules.push(`RedisModule.with(() => ({
 			default: 'cache',
@@ -179,7 +178,7 @@ const partCode = (runtime: keyof typeof RUNTIMES, parts: AppParts) => {
 			connections: { cache: { url: Env.get('REDIS_URL').reveal() } }
 		}))`);
 		} else {
-			imports.push("import { RedisModule, upstash } from '@elysiumjs/redis';");
+			imports.push("import { RedisModule, upstash } from '@elysiumjs/olympus/redis';");
 			modules.push(`RedisModule.with(() => ({
 			default: 'cache',
 			client: upstash({ token: Env.get('UPSTASH_REDIS_REST_TOKEN').reveal() }),
@@ -238,10 +237,10 @@ export const getAppCode = (
 		...enabledModules.map((module) => module.expression),
 		...Object.keys(modules).map((module) => `${pascal(module)}Module`)
 	];
-	return /* js */ `import type { ServerError } from '@elysiumjs/core';
+	return /* js */ `import type { ServerError } from '@elysiumjs/olympus';
 
-import { Application, ${parts.database || parts.cache ? 'Env, ' : ''}getLogger } from '@elysiumjs/core';
-import { HermesModule } from '@elysiumjs/hermes';
+import { Application, ${parts.database || parts.cache ? 'Env, ' : ''}getLogger } from '@elysiumjs/olympus';
+import { HermesModule } from '@elysiumjs/olympus/hermes';
 import { runtime as ${choice.alias} } from '${choice.package}';
 ${[...part.imports, ...enabledModules.map((module) => `import { ${module.import} } from '${module.name}';`)].join('\n')}
 
@@ -283,7 +282,7 @@ export class App extends Application {
 /**
  * The environment schema of a project, with the declaration that types `Env.get()` from it. A
  * `.ts` file, so that the compiler checks it even with `skipLibCheck`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const getEnvCode = (
 	runtime: keyof typeof RUNTIMES = 'bun',
@@ -305,9 +304,9 @@ export const getEnvCode = (
 		}
 	}
 	const secret = variables.some((variable) => variable.includes('Secret.schema()'));
-	return /* js */ `import type { Env } from '@elysiumjs/core';
+	return /* js */ `import type { Env } from '@elysiumjs/olympus';
 
-import { ${secret ? 'Secret, ' : ''}t } from '@elysiumjs/core';
+import { ${secret ? 'Secret, ' : ''}t } from '@elysiumjs/olympus';
 
 /**
  * The environment variables of the app, validated at boot and read with \`Env.get()\`. Modules
@@ -315,7 +314,7 @@ import { ${secret ? 'Secret, ' : ''}t } from '@elysiumjs/core';
  */
 export const env = t.Object({${variables.length ? `\n\t${variables.join(',\n\t')}\n` : ''}});
 
-declare module '@elysiumjs/core' {
+declare module '@elysiumjs/olympus' {
 	interface AppEnv extends Env.Infer<typeof env> {}
 }
 `;
@@ -323,7 +322,7 @@ declare module '@elysiumjs/core' {
 
 /**
  * The scripts of a project, per runtime and package manager.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param runtime The runtime key.
  */
 export const getScripts = (runtime: keyof typeof RUNTIMES): Record<string, string> => {
@@ -366,7 +365,7 @@ export default worker;
 
 /**
  * The wrangler config of a Cloudflare Workers project.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param projectName The project name.
  * @param parts The parts of the app, for the bindings they need.
  */

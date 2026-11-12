@@ -1,4 +1,4 @@
-import { Job } from '@elysiumjs/heracles';
+import { Job } from '@elysiumjs/olympus/heracles';
 
 @Job.register()
 export class FailingJob extends Job {

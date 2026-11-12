@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ExceptionFilter } from '@elysiumjs/core';
+import type { ExceptionFilter } from '@elysiumjs/olympus';
 import type { Scenario } from './types';
 
-import { Application, Catch, Http, Module, Service } from '@elysiumjs/core';
+import { Application, Catch, Http, Module, Service } from '@elysiumjs/olympus';
 
 class DeclinedError extends Error {}
 
@@ -67,7 +67,7 @@ const make = async (): Promise<Application> => {
 /**
  * Exception filters turn errors into responses: a module filter with an injected service, and an
  * app filter for errors raised before routing.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const filters: Scenario = {
 	name: 'filters: module and app exception filters',

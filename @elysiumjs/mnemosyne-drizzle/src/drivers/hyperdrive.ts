@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,13 +21,13 @@ import { MissingMigrationsError } from '../driver';
 
 /**
  * A Hyperdrive binding, as Cloudflare Workers pass it.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type HyperdriveBinding = { readonly connectionString: string };
 
 /**
  * Options of {@link hyperdrive}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type HyperdriveDriverOptions = {
 	/** The name of the Hyperdrive binding, as declared in the wrangler config. */
@@ -44,7 +44,7 @@ export type HyperdriveDriverOptions = {
  * another invocation, so the database opens a client per invocation (request, queue batch or
  * scheduled event) on first use. The runtime closes its sockets when the invocation ends, and
  * Hyperdrive pools the connections to the database.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param options The binding name and the client driver.
  * @example
  * ```ts

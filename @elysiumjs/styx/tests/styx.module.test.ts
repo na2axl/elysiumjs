@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 import { describe, expect, it } from 'bun:test';
 import { join } from 'node:path';
 
-import { Application, ElysiumError } from '@elysiumjs/core';
+import { Application, ElysiumError } from '@elysiumjs/olympus';
 
 import { StyxModule } from '../src';
 import { AppEntryNotFoundError, resolveAppEntry } from '../src/utils';

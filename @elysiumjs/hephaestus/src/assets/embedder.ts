@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ import { relative } from 'node:path';
 
 /**
  * Manifest mapping asset paths to their base64 content and MIME type.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface AssetManifest {
 	[path: string]: {
@@ -38,14 +38,14 @@ export interface AssetManifest {
  *
  * This class is for dynamic glob-based embedding from config.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class AssetEmbedder {
 	constructor(private config: HephaestusConfig) {}
 
 	/**
 	 * Scans for assets matching the config patterns and generates a loader module.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @returns A string containing the generated asset loader module.
 	 */
 	public async embed(): Promise<string> {

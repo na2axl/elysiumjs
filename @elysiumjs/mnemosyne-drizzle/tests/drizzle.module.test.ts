@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Application, Lifecycle, Service } from '@elysiumjs/core';
-import { getTenancyConfig, getTenancyStrategy } from '@elysiumjs/mnemosyne';
+import { Application, Lifecycle, Service } from '@elysiumjs/olympus';
+import { getTenancyConfig, getTenancyStrategy } from '@elysiumjs/olympus/mnemosyne';
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
 import * as pkg from '../src';

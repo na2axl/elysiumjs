@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ import type { AddressInfo } from 'node:net';
 import { once } from 'node:events';
 import { request as httpRequest } from 'node:http';
 
-import { Application, getLogger, Http, Module, resetContainer, Runtime } from '@elysiumjs/core';
+import { Application, getLogger, Http, Module, resetContainer, Runtime } from '@elysiumjs/olympus';
 import { runtime as runtimeNode, serveNode } from '@elysiumjs/runtime-node';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 

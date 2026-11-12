@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { Application, Env, MissingModuleConfigError, Module } from '@elysiumjs/core';
+import { Application, Env, MissingModuleConfigError, Module } from '@elysiumjs/olympus';
 import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test';
 import { Elysia } from 'elysia';
 

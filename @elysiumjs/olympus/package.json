@@ -1,0 +1,119 @@
+{
+  "name": "@elysiumjs/olympus",
+  "version": "0.24.1",
+  "license": "Apache-2.0",
+  "description": "A structured web framework built on ElysiaJS, for Bun, Node.js and Cloudflare Workers: the core, its domains and their ports.",
+  "private": false,
+  "author": "Axel Nana <ax.lnana@outlook.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/na2axl/elysiumjs.git",
+    "directory": "@elysiumjs/olympus"
+  },
+  "homepage": "https://github.com/na2axl/elysiumjs/tree/main/@elysiumjs/olympus#readme",
+  "bugs": {
+    "url": "https://github.com/na2axl/elysiumjs/issues"
+  },
+  "scripts": {
+    "format": "prettier --write \"./src/**/*.ts\"",
+    "clean": "rimraf dist",
+    "build:js": "bun build ./src/index.ts ./src/heracles/index.ts ./src/mnemosyne/index.ts ./src/moirai/index.ts ./src/ariadne/index.ts ./src/themis/index.ts ./src/cerberus/index.ts ./src/hermes/index.ts ./src/redis/index.ts ./src/moirai/heracles.ts ./src/themis/scrypt.ts --outdir ./dist --target node --packages external --splitting --root ./src --minify-syntax --minify-whitespace",
+    "build:ts": "tsc",
+    "build": "bun run clean && bun run build:js && bun run build:ts",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.types.json",
+    "prepublishOnly": "bun run build",
+    "test": "bun scripts/test.ts",
+    "test:coverage": "bun scripts/test.ts --coverage",
+    "check:runtime": "bun scripts/check-runtime.ts",
+    "check:minified": "bun scripts/check-minified.ts"
+  },
+  "keywords": [
+    "elysium",
+    "framework",
+    "web",
+    "api",
+    "typescript"
+  ],
+  "module": "dist/index.js",
+  "type": "module",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./heracles": {
+      "types": "./dist/heracles/index.d.ts",
+      "import": "./dist/heracles/index.js"
+    },
+    "./mnemosyne": {
+      "types": "./dist/mnemosyne/index.d.ts",
+      "import": "./dist/mnemosyne/index.js"
+    },
+    "./moirai": {
+      "types": "./dist/moirai/index.d.ts",
+      "import": "./dist/moirai/index.js"
+    },
+    "./ariadne": {
+      "types": "./dist/ariadne/index.d.ts",
+      "import": "./dist/ariadne/index.js"
+    },
+    "./themis": {
+      "types": "./dist/themis/index.d.ts",
+      "import": "./dist/themis/index.js"
+    },
+    "./cerberus": {
+      "types": "./dist/cerberus/index.d.ts",
+      "import": "./dist/cerberus/index.js"
+    },
+    "./hermes": {
+      "types": "./dist/hermes/index.d.ts",
+      "import": "./dist/hermes/index.js"
+    },
+    "./redis": {
+      "types": "./dist/redis/index.d.ts",
+      "import": "./dist/redis/index.js"
+    },
+    "./moirai/heracles": {
+      "types": "./dist/moirai/heracles.d.ts",
+      "import": "./dist/moirai/heracles.js"
+    },
+    "./themis/scrypt": {
+      "types": "./dist/themis/scrypt.d.ts",
+      "import": "./dist/themis/scrypt.js"
+    }
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md"
+  ],
+  "sideEffects": [
+    "./src/index.ts",
+    "./src/moirai/heracles.ts",
+    "./dist/moirai/heracles.js",
+    "./dist/index-*.js"
+  ],
+  "dependencies": {
+    "@casl/ability": "^7.0.2",
+    "@elysia/openapi": "^2.0.0-rc.0",
+    "@simplewebauthn/server": "^14.0.3",
+    "cache-manager": "^7.2.9",
+    "cacheable": "^2.5.0",
+    "commander": "^15.0.0",
+    "elysia": "^2.0.0-rc.1",
+    "exact-mirror": "^1.2.6",
+    "http-status": "^2.1.0",
+    "jose": "^6.2.15",
+    "keyv": "^5.6.0",
+    "oauth4webapi": "^3.8.8",
+    "openapi-types": "^12.1.3",
+    "pino": "^10.4.0",
+    "pino-pretty": "^13.2.0",
+    "radash": "catalog:",
+    "typebox": "^1.3.0",
+    "wampy": "^8.0.2"
+  },
+  "trustedDependencies": [
+    "es5-ext"
+  ]
+}

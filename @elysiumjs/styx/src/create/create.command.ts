@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, readdir, rm } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
 
-import { Command, CommandArgumentType, ConsoleFormat } from '@elysiumjs/core';
+import { Command, CommandArgumentType, ConsoleFormat } from '@elysiumjs/olympus';
 import prompts from 'prompts';
 import { assign, objectify, pascal } from 'radash';
 
@@ -95,7 +95,7 @@ const copyAssets = async (folder: string, to: string, projectName: string, skip:
 
 /**
  * Writes a new Elysium project. Installing dependencies and running git are left to `run`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param options The project to create.
  * @param exec Runs a shell command in the project folder.
  * @param progress Reports the current step.
@@ -281,7 +281,7 @@ const execIn = async (cwd: string, command: string[]): Promise<void> => {
 
 /**
  * Creates a new Elysium project: `styx create my-app`. Asks for what the arguments leave out.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 @Command.register()
 export class CreateCommand extends Command {
