@@ -29,8 +29,10 @@ export {
 	R2Disk,
 	type R2DiskOptions,
 	type R2ObjectBodyLike,
-	type R2ObjectLike
+	type R2ObjectLike,
+	type R2S3Options
 } from './storage';
+export { presignS3Url, type S3PresignInput } from './sigv4';
 export { createWorker } from './worker';
 export {
 	type WorkersHandlerMeta,

@@ -121,4 +121,23 @@ describe('PithosModule', () => {
 		expect((await testing!.http.get(path(get).replace('a.txt', 'b.txt')).send()).status).toBe(403);
 		expect((await testing!.http.get('/storage/public/a').send()).status).toBe(404);
 	});
+
+	it('refuses an upload of another size than signed', async () => {
+		await boot();
+		const put = new URL(
+			await uploads.signedUrl('staging/sized.txt', {
+				method: 'PUT',
+				expiresIn: 60,
+				contentLength: 5
+			})
+		);
+		const send = (body: string) =>
+			testing!.http
+				.put(put.pathname + put.search)
+				.body(body)
+				.send();
+		expect((await send('too long')).status).toBe(403);
+		expect(await uploads.exists('staging/sized.txt')).toBe(false);
+		expect((await send('fives')).status).toBe(204);
+	});
 });

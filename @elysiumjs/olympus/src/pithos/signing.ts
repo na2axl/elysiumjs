@@ -45,5 +45,8 @@ export const signServedUrl = (
 	const url = new URL(joinUrl(signing.url, key));
 	url.searchParams.set('method', options.method);
 	if (options.contentType) url.searchParams.set('contentType', options.contentType);
+	if (options.contentLength !== undefined) {
+		url.searchParams.set('contentLength', String(options.contentLength));
+	}
 	return SignedUrl.sign(url, { secret: signing.secret, expiresIn: options.expiresIn });
 };

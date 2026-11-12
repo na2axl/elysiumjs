@@ -83,9 +83,17 @@ export class StorageController {
 		const declared = ctx.request.headers.get('content-type') ?? undefined;
 		const expected = checked.url.searchParams.get('contentType');
 		if (expected !== null && declared !== expected) return new Response(null, { status: 403 });
-		await checked.disk.put(checked.key, await ctx.request.arrayBuffer(), {
-			contentType: declared
-		});
+		const length = checked.url.searchParams.get('contentLength');
+		// A declared length that differs is refused before the body is read.
+		const sent = ctx.request.headers.get('content-length');
+		if (length !== null && sent !== null && sent !== length) {
+			return new Response(null, { status: 403 });
+		}
+		const body = await ctx.request.arrayBuffer();
+		if (length !== null && body.byteLength !== Number(length)) {
+			return new Response(null, { status: 403 });
+		}
+		await checked.disk.put(checked.key, body, { contentType: declared });
 		return new Response(null, { status: 204 });
 	}
 }

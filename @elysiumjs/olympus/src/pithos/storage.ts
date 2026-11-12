@@ -94,6 +94,8 @@ export type SignedUrlOptions = {
 	readonly expiresIn: number;
 	/** For `PUT`: the content type the upload must declare. */
 	readonly contentType?: string;
+	/** For `PUT`: the size, in bytes, the upload must have. */
+	readonly contentLength?: number;
 };
 
 /** The default size of a listing page. */

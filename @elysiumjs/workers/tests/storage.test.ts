@@ -104,6 +104,34 @@ describe('R2Disk', () => {
 		expect(await disk.exists('a')).toBe(false);
 	});
 
+	it('presigns URLs on the S3 API with credentials', async () => {
+		const disk = new R2Disk({
+			binding: new FakeBucket(),
+			s3: {
+				accountId: 'acct',
+				bucket: 'media',
+				accessKeyId: 'id',
+				secretAccessKey: () => 'secret'
+			},
+			signing: contractUrls('r2').signing
+		});
+		expect(disk.served).toBeUndefined();
+		const url = new URL(
+			await disk.signedUrl('staging/a b', {
+				method: 'PUT',
+				expiresIn: 60,
+				contentType: 'image/png',
+				contentLength: 42
+			})
+		);
+		expect(url.origin + url.pathname).toBe(
+			'https://acct.r2.cloudflarestorage.com/media/staging/a%20b'
+		);
+		expect(url.searchParams.get('X-Amz-SignedHeaders')).toBe('content-length;content-type;host');
+		const get = new URL(await disk.signedUrl('a', { method: 'GET', expiresIn: 60 }));
+		expect(get.searchParams.get('X-Amz-SignedHeaders')).toBe('host');
+	});
+
 	it('reads a stream in full before writing it', async () => {
 		const bucket = new FakeBucket();
 		const disk = new R2Disk({ binding: bucket });
