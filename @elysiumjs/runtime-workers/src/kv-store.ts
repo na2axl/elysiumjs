@@ -14,7 +14,7 @@
 
 import type { WorkersKVNamespace } from './types';
 
-import { getLogger } from '@elysiumjs/core';
+import { getLogger } from '@elysiumjs/olympus';
 
 import { Workers } from './workers';
 
@@ -48,7 +48,7 @@ const KV_DELETE_CHUNK = 50;
 const DEFAULT_MAX_OPERATIONS = 900;
 
 /**
- * A Keyv store over Workers KV, for the caches of `@elysiumjs/mnemosyne`.
+ * A Keyv store over Workers KV, for the caches of `@elysiumjs/olympus/mnemosyne`.
  *
  * The KV namespace is read from the current invocation on every call, so the store holds no
  * binding between invocations. KV is eventually consistent, and entries expire after at least

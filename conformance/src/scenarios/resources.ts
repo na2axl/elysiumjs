@@ -14,7 +14,7 @@
 
 import type { Scenario } from './types';
 
-import { Application, Http, Module, Resource } from '@elysiumjs/core';
+import { Application, Http, Module, Resource } from '@elysiumjs/olympus';
 import { t } from 'elysia';
 
 const PostResource = t.Object({

@@ -16,9 +16,9 @@ import type {
 	HttpRouteDescription,
 	HttpRouteTypeRef,
 	HttpRouteTypesContributor
-} from '@elysiumjs/core';
+} from '@elysiumjs/olympus';
 
-import { Environments, Http, Service } from '@elysiumjs/core';
+import { Environments, Http, Service } from '@elysiumjs/olympus';
 
 const pinged = new WeakSet<Function>();
 

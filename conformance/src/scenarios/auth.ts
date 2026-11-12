@@ -14,8 +14,8 @@
 
 import type { Scenario } from './types';
 
-import { Application, Http, Module } from '@elysiumjs/core';
-import { Auth, jwtGuard, Password, Pbkdf2PasswordHasher, ThemisModule } from '@elysiumjs/themis';
+import { Application, Http, Module } from '@elysiumjs/olympus';
+import { Auth, jwtGuard, Password, Pbkdf2PasswordHasher, ThemisModule } from '@elysiumjs/olympus/themis';
 
 const JWT_SECRET = 'conformance-jwt-secret-of-32-chars!';
 

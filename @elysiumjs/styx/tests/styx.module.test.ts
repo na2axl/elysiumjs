@@ -15,7 +15,7 @@
 import { describe, expect, it } from 'bun:test';
 import { join } from 'node:path';
 
-import { Application, ElysiumError } from '@elysiumjs/core';
+import { Application, ElysiumError } from '@elysiumjs/olympus';
 
 import { StyxModule } from '../src';
 import { AppEntryNotFoundError, resolveAppEntry } from '../src/utils';

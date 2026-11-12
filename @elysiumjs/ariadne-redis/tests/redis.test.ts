@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { FlowStore } from '@elysiumjs/ariadne';
+import type { FlowStore } from '@elysiumjs/olympus/ariadne';
 
-import { bunRedis } from '@elysiumjs/redis';
+import { bunRedis } from '@elysiumjs/olympus/redis';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { RedisFlowStore } from '../src';
@@ -36,7 +36,7 @@ const commit = (stepId: string, step: string, expectStep: string | null, termina
 	ttlSeconds: 60
 });
 
-/** The rules every store follows (the same as the stores of `@elysiumjs/ariadne`). */
+/** The rules every store follows (the same as the stores of `@elysiumjs/olympus/ariadne`). */
 const contract = (name: string, make: () => FlowStore) => {
 	describe(name, () => {
 		let n = 0;

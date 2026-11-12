@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Application, Module } from '@elysiumjs/core';
+import { Application, Module } from '@elysiumjs/olympus';
 
 import { PostController } from './controllers/post.controller';
 

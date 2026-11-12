@@ -21,8 +21,8 @@ import {
 	Module,
 	Service,
 	t
-} from '@elysiumjs/core';
-import { withUnitOfWork } from '@elysiumjs/mnemosyne';
+} from '@elysiumjs/olympus';
+import { withUnitOfWork } from '@elysiumjs/olympus/mnemosyne';
 import {
 	Action,
 	Event,
@@ -32,7 +32,7 @@ import {
 	Moirai,
 	MoiraiModule,
 	Outbox
-} from '@elysiumjs/moirai';
+} from '@elysiumjs/olympus/moirai';
 
 const make = async (): Promise<Application> => {
 	const wallet = { balance: 0, mails: [] as string[] };

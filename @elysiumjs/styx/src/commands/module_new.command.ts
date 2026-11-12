@@ -15,7 +15,7 @@
 import { exists, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { Command, CommandArgumentType } from '@elysiumjs/core';
+import { Command, CommandArgumentType } from '@elysiumjs/olympus';
 import prompts from 'prompts';
 
 import { parseProjectConfig } from '../config';

@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ColumnMetadata, ModelAdapter } from '@elysiumjs/mnemosyne';
+import type { ColumnMetadata, ModelAdapter } from '@elysiumjs/olympus/mnemosyne';
 import type { InferInsertModel, InferSelectModel } from 'drizzle-orm';
 import type { PgColumn, PgTable, PgTableWithColumns } from 'drizzle-orm/pg-core';
 
-import { AbstractModel, createSchemaFromModel } from '@elysiumjs/mnemosyne';
+import { AbstractModel, createSchemaFromModel } from '@elysiumjs/olympus/mnemosyne';
 import { getTableConfig } from 'drizzle-orm/pg-core';
 
 import { getTableBuilders } from './table';

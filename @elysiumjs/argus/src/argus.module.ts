@@ -14,7 +14,7 @@
 
 import type { TracingConfig } from './types';
 
-import { Module } from '@elysiumjs/core';
+import { Module } from '@elysiumjs/olympus';
 
 import { argusPlugin } from './plugin';
 import { ArgusSDK } from './sdk';

@@ -1,4 +1,4 @@
-import { Module } from '@elysiumjs/core';
+import { Module } from '@elysiumjs/olympus';
 
 import { ProgressDemoCommand } from '#hero/commands/progress-demo.command';
 import { SpinnerDemoCommand } from '#hero/commands/spinner-demo.command';

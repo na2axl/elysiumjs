@@ -14,7 +14,7 @@
 
 import type { AnyElysia } from 'elysia';
 
-import { RuntimeNotSupportedError } from '@elysiumjs/core';
+import { RuntimeNotSupportedError } from '@elysiumjs/olympus';
 import { describe, expect, it, spyOn } from 'bun:test';
 
 import { createRuntime, runtime } from '../src';

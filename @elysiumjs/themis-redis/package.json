@@ -51,11 +51,9 @@
   ],
   "sideEffects": false,
   "devDependencies": {
-    "@elysiumjs/core": "workspace:*",
-    "@elysiumjs/themis": "workspace:*"
+    "@elysiumjs/olympus": "workspace:*"
   },
   "peerDependencies": {
-    "@elysiumjs/themis": "workspace:^",
-    "@elysiumjs/redis": "workspace:^"
+    "@elysiumjs/olympus": "workspace:^"
   }
 }

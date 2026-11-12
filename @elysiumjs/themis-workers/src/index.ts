@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { SessionData, SessionStore } from '@elysiumjs/themis';
+import type { SessionData, SessionStore } from '@elysiumjs/olympus/themis';
 
 /**
  * The part of a Workers KV namespace binding the KV session store uses.

@@ -14,7 +14,7 @@
 
 import type { Scenario } from './types';
 
-import { Application, Http, Middleware, Module } from '@elysiumjs/core';
+import { Application, Http, Middleware, Module } from '@elysiumjs/olympus';
 
 const make = async (): Promise<Application> => {
 	class Guard extends Middleware {

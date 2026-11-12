@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ExceptionFilter } from '@elysiumjs/core';
+import type { ExceptionFilter } from '@elysiumjs/olympus';
 import type { Scenario } from './types';
 
-import { Application, Catch, Http, Module, Service } from '@elysiumjs/core';
+import { Application, Catch, Http, Module, Service } from '@elysiumjs/olympus';
 
 class DeclinedError extends Error {}
 

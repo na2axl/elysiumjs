@@ -15,8 +15,8 @@
 import type { WorkersQueueMessage, WorkersScheduledController } from '@elysiumjs/runtime-workers';
 import type { DeadJob } from './consumer';
 
-import { getLogger, Module, Service } from '@elysiumjs/core';
-import { HeraclesModule, Scheduler } from '@elysiumjs/heracles';
+import { getLogger, Module, Service } from '@elysiumjs/olympus';
+import { HeraclesModule, Scheduler } from '@elysiumjs/olympus/heracles';
 import { Workers } from '@elysiumjs/runtime-workers';
 
 import { runJobMessage } from './consumer';

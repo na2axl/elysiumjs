@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { RateLimitStore } from '@elysiumjs/core';
+import type { RateLimitStore } from '@elysiumjs/olympus';
 import type { WorkersRateLimitBinding } from './types';
 
 import { Workers } from './workers';

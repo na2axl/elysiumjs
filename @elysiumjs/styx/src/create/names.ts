@@ -14,7 +14,7 @@
 
 import { relative, resolve, sep } from 'node:path';
 
-import { ElysiumError } from '@elysiumjs/core';
+import { ElysiumError } from '@elysiumjs/olympus';
 
 /** An npm package name, optionally scoped. No part may start with a dot. */
 const PACKAGE_NAME = /^(?:@([a-z0-9-~][a-z0-9-._~]*)\/)?([a-z0-9-~][a-z0-9-._~]*)$/;

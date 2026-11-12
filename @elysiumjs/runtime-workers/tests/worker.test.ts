@@ -27,7 +27,7 @@ import {
 	ScopeMismatchError,
 	Service,
 	ServiceScope
-} from '@elysiumjs/core';
+} from '@elysiumjs/olympus';
 import { beforeEach, describe, expect, it } from 'bun:test';
 
 import {

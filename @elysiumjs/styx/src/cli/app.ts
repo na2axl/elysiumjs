@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ModuleClass } from '@elysiumjs/core';
+import type { ModuleClass } from '@elysiumjs/olympus';
 
-import { Application, Module } from '@elysiumjs/core';
+import { Application, Module } from '@elysiumjs/olympus';
 import { runtime as bunRuntime } from '@elysiumjs/runtime-bun';
 
 import {

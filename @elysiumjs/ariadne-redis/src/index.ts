@@ -20,10 +20,10 @@ import type {
 	FlowCommitResult,
 	FlowRecord,
 	FlowStore
-} from '@elysiumjs/ariadne';
-import type { RedisConnection } from '@elysiumjs/redis';
+} from '@elysiumjs/olympus/ariadne';
+import type { RedisConnection } from '@elysiumjs/olympus/redis';
 
-import { FLOW_TOMBSTONE_SECONDS } from '@elysiumjs/ariadne';
+import { FLOW_TOMBSTONE_SECONDS } from '@elysiumjs/olympus/ariadne';
 
 // Each flow is a hash (owner, step, lastStepId, completedAt, and the JSON of state and answer),
 // a lease key that expires on its own, and a marker hash that outlives a finished flow. A missing

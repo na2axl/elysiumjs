@@ -24,11 +24,11 @@ import type {
 	OutboxStore,
 	ProjectionStorage,
 	StoredEventRecord
-} from '@elysiumjs/moirai';
+} from '@elysiumjs/olympus/moirai';
 
-import { Clock } from '@elysiumjs/core';
+import { Clock } from '@elysiumjs/olympus';
 import { Database, DrizzleTable } from '@elysiumjs/mnemosyne-drizzle';
-import { ConcurrencyConflictError, IdempotencyConflictError } from '@elysiumjs/moirai';
+import { ConcurrencyConflictError, IdempotencyConflictError } from '@elysiumjs/olympus/moirai';
 import { and, asc, eq, gt, inArray, is, isNull, lt, lte, max, sql } from 'drizzle-orm';
 import {
 	bigserial,

@@ -23,7 +23,7 @@
 
 import type { WorkersExecutionContext } from '@elysiumjs/runtime-workers';
 
-import { Application, Http, Module, Service } from '@elysiumjs/core';
+import { Application, Http, Module, Service } from '@elysiumjs/olympus';
 import { createRuntime, createWorker, Workers } from '@elysiumjs/runtime-workers';
 
 const SOURCE_DELAY_MS = 50;

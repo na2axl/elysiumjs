@@ -14,7 +14,7 @@
 
 import type { SQL } from 'drizzle-orm';
 
-import { Service } from '@elysiumjs/core';
+import { Service } from '@elysiumjs/olympus';
 
 /**
  * Where `migration:run` runs SQL: a transaction, or the connection outside of one. Every driver

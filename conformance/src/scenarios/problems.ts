@@ -14,7 +14,7 @@
 
 import type { Scenario } from './types';
 
-import { Application, DomainError, Http, Module, NotFoundError } from '@elysiumjs/core';
+import { Application, DomainError, Http, Module, NotFoundError } from '@elysiumjs/olympus';
 import { t } from 'elysia';
 
 class InsufficientFunds extends DomainError.for('INSUFFICIENT_FUNDS', 409) {

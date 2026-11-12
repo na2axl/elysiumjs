@@ -51,12 +51,9 @@
   ],
   "sideEffects": false,
   "devDependencies": {
-    "@elysiumjs/ariadne": "workspace:*",
-    "@elysiumjs/core": "workspace:*",
-    "@elysiumjs/redis": "workspace:*"
+    "@elysiumjs/olympus": "workspace:*"
   },
   "peerDependencies": {
-    "@elysiumjs/ariadne": "workspace:^",
-    "@elysiumjs/redis": "workspace:^"
+    "@elysiumjs/olympus": "workspace:^"
   }
 }

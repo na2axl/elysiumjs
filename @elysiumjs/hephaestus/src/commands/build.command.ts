@@ -15,7 +15,7 @@
 import type { WorkersBuildOptions, WorkersBuildResult } from '../builder/workers.builder';
 import type { PlatformTarget } from '../types';
 
-import { Command, CommandArgumentType } from '@elysiumjs/core';
+import { Command, CommandArgumentType } from '@elysiumjs/olympus';
 
 import { BinaryBuilder } from '../builder/binary.builder';
 import { NodeBuilder } from '../builder/node.builder';

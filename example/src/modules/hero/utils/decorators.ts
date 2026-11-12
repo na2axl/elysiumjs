@@ -1,6 +1,6 @@
-import type { Context } from '@elysiumjs/core';
+import type { Context } from '@elysiumjs/olympus';
 
-import { Http } from '@elysiumjs/core';
+import { Http } from '@elysiumjs/olympus';
 
 /**
  * Extracts the controller instance from the context.

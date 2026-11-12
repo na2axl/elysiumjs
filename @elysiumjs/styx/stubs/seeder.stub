@@ -1,4 +1,4 @@
-import { Seeder } from '@elysiumjs/mnemosyne';
+import { Seeder } from '@elysiumjs/olympus/mnemosyne';
 
 @Seeder.register()
 export class {name} extends Seeder {

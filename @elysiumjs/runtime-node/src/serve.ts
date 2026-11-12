@@ -20,7 +20,7 @@ import { createServer } from 'node:http';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
-import { getLogger } from '@elysiumjs/core';
+import { getLogger } from '@elysiumjs/olympus';
 
 /**
  * A web-standard request handler, such as `Elysia.fetch`.

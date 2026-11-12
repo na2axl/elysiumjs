@@ -14,7 +14,7 @@
 
 import type { PromptObject } from 'prompts';
 
-import { Command, CommandArgumentType } from '@elysiumjs/core';
+import { Command, CommandArgumentType } from '@elysiumjs/olympus';
 import prompts from 'prompts';
 import { pascal, trim } from 'radash';
 import formatter from 'string-template';

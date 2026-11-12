@@ -14,7 +14,7 @@
 
 import type * as Sentry from '@sentry/bun';
 
-import { Application, Env, MissingModuleConfigError, Module } from '@elysiumjs/core';
+import { Application, Env, MissingModuleConfigError, Module } from '@elysiumjs/olympus';
 
 import { SentryEnv } from './env';
 import { plugin } from './plugin';

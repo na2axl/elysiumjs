@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Service } from '@elysiumjs/core';
-import { Listing } from '@elysiumjs/mnemosyne';
+import { Service } from '@elysiumjs/olympus';
+import { Listing } from '@elysiumjs/olympus/mnemosyne';
 import { afterEach, describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import * as d from 'drizzle-orm/pg-core';

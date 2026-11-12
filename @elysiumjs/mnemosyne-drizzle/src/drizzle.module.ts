@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { TenancyConfig } from '@elysiumjs/mnemosyne';
+import type { TenancyConfig } from '@elysiumjs/olympus/mnemosyne';
 import type { DrizzleConnection, DrizzleConnectionProps } from './database';
 
-import { Module, needsDefaultAlias, runAll, Service } from '@elysiumjs/core';
+import { Module, needsDefaultAlias, runAll, Service } from '@elysiumjs/olympus';
 import {
 	AbstractDatabase,
 	DATABASE_TRANSACTION_SERVICE,
@@ -23,7 +23,7 @@ import {
 	TENANCY_CONFIG_SERVICE,
 	TENANCY_STRATEGY_SERVICE,
 	withUnitOfWork
-} from '@elysiumjs/mnemosyne';
+} from '@elysiumjs/olympus/mnemosyne';
 
 import { MigrationGenerateCommand } from './commands/migration_generate.command';
 import { MigrationRunCommand } from './commands/migration_run.command';

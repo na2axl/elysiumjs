@@ -21,9 +21,9 @@ import type {
 	FlowRecord,
 	FlowSlot,
 	FlowStore
-} from '@elysiumjs/ariadne';
+} from '@elysiumjs/olympus/ariadne';
 
-import { FLOW_TOMBSTONE_SECONDS, FlowRules } from '@elysiumjs/ariadne';
+import { FLOW_TOMBSTONE_SECONDS, FlowRules } from '@elysiumjs/olympus/ariadne';
 import { DurableObject } from 'cloudflare:workers';
 
 /** `active`: a running flow. `tombstone`: its last answer replays. `marker`: owner and end time only. */

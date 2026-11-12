@@ -19,7 +19,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, readdir, rm } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
 
-import { Command, CommandArgumentType, ConsoleFormat } from '@elysiumjs/core';
+import { Command, CommandArgumentType, ConsoleFormat } from '@elysiumjs/olympus';
 import prompts from 'prompts';
 import { assign, objectify, pascal } from 'radash';
 

@@ -21,7 +21,7 @@ import {
 	Module,
 	Service,
 	ServiceScope
-} from '@elysiumjs/core';
+} from '@elysiumjs/olympus';
 
 import { waitFor } from './wait';
 

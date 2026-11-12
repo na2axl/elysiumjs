@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Runtime } from '@elysiumjs/core';
+import { Runtime } from '@elysiumjs/olympus';
 import { runtime as bunRuntime } from '@elysiumjs/runtime-bun';
 
 Runtime.use(bunRuntime);

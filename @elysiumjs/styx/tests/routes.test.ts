@@ -17,7 +17,7 @@ import type { ModuleRoutes } from '../src/routes/render';
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { Application, Http, Module, t } from '@elysiumjs/core';
+import { Application, Http, Module, t } from '@elysiumjs/olympus';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { routesWithoutResponse } from '../src/routes/check';

@@ -13,8 +13,8 @@ bun add @elysiumjs/heracles-workers
 Send the jobs of a queue to a Cloudflare Queue with `CloudflareQueueTransport`, and add `HeraclesWorkersModule` to consume them in the same Worker (or another one):
 
 ```ts
-import { Application } from '@elysiumjs/core';
-import { HeraclesModule } from '@elysiumjs/heracles';
+import { Application } from '@elysiumjs/olympus';
+import { HeraclesModule } from '@elysiumjs/olympus/heracles';
 import { CloudflareQueueTransport, HeraclesWorkersModule } from '@elysiumjs/heracles-workers';
 import { runtime } from '@elysiumjs/runtime-workers';
 

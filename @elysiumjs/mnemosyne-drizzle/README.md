@@ -1,6 +1,6 @@
 # @elysiumjs/mnemosyne-drizzle
 
-Drizzle ORM driver for `@elysiumjs/mnemosyne`.
+Drizzle ORM driver for `@elysiumjs/olympus/mnemosyne`.
 
 ## Installation
 
@@ -13,7 +13,7 @@ bun add @elysiumjs/mnemosyne-drizzle
 Add `DrizzleModule` to your application. It declares the connections as global services, registers the tenancy strategy and provides the `migration:generate` and `migration:run` commands.
 
 ```ts
-import { Application } from '@elysiumjs/core';
+import { Application } from '@elysiumjs/olympus';
 import { DrizzleModule } from '@elysiumjs/mnemosyne-drizzle';
 
 @Application.register({

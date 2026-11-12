@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { ElysiumError } from '@elysiumjs/core';
+import { ElysiumError } from '@elysiumjs/olympus';
 
 /**
  * Thrown when a binding is read outside a Worker invocation.

@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Interceptor, InterceptorContext } from '@elysiumjs/core';
+import type { Interceptor, InterceptorContext } from '@elysiumjs/olympus';
 import type { Scenario } from './types';
 
-import { Application, Http, Module, TimingInterceptor } from '@elysiumjs/core';
+import { Application, Http, Module, TimingInterceptor } from '@elysiumjs/olympus';
 
 const make = async (): Promise<Application> => {
 	const tag = (name: string) =>

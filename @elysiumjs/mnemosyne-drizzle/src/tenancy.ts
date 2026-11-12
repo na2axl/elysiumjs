@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { TenancyStrategy } from '@elysiumjs/mnemosyne';
+import type { TenancyStrategy } from '@elysiumjs/olympus/mnemosyne';
 import type {
 	AnyPgColumnBuilder,
 	PgAsyncTransaction,
@@ -21,7 +21,7 @@ import type {
 } from 'drizzle-orm/pg-core';
 import type { DrizzleConnection } from './database';
 
-import { getTenancyConfig, isValidTenantId, withTenant } from '@elysiumjs/mnemosyne';
+import { getTenancyConfig, isValidTenantId, withTenant } from '@elysiumjs/olympus/mnemosyne';
 import { sql } from 'drizzle-orm';
 import { getTableConfig, pgPolicy, pgSchema, pgTable } from 'drizzle-orm/pg-core';
 

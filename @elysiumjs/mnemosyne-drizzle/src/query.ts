@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ParsedFilter, ParsedQuery } from '@elysiumjs/mnemosyne';
+import type { ParsedFilter, ParsedQuery } from '@elysiumjs/olympus/mnemosyne';
 import type { SQL } from 'drizzle-orm';
 import type { PgColumn, PgTableWithColumns } from 'drizzle-orm/pg-core';
 

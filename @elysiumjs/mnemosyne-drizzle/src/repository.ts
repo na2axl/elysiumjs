@@ -19,19 +19,19 @@ import type {
 	Page,
 	ParsedQuery,
 	RowKey
-} from '@elysiumjs/mnemosyne';
+} from '@elysiumjs/olympus/mnemosyne';
 import type { SQL } from 'drizzle-orm';
 import type { PgColumn, PgTable, PgTableWithColumns } from 'drizzle-orm/pg-core';
 import type { DrizzleConnection } from './database';
 
-import { ElysiumError } from '@elysiumjs/core';
+import { ElysiumError } from '@elysiumjs/olympus';
 import {
 	AbstractRepository,
 	getCurrentTenant,
 	getTenancyConfig,
 	getTenancyStrategy,
 	Listing
-} from '@elysiumjs/mnemosyne';
+} from '@elysiumjs/olympus/mnemosyne';
 import { and, eq, getTableColumns } from 'drizzle-orm';
 import { getTableConfig } from 'drizzle-orm/pg-core';
 

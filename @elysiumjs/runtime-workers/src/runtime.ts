@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { OutputLevel, Runtime } from '@elysiumjs/core';
+import type { OutputLevel, Runtime } from '@elysiumjs/olympus';
 
-import { RuntimeNotSupportedError } from '@elysiumjs/core';
+import { RuntimeNotSupportedError } from '@elysiumjs/olympus';
 
 /** The console method of each level. */
 const CONSOLE_METHODS: Record<OutputLevel, 'debug' | 'info' | 'warn' | 'error'> = {

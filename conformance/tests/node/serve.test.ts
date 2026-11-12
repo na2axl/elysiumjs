@@ -18,7 +18,7 @@ import type { AddressInfo } from 'node:net';
 import { once } from 'node:events';
 import { request as httpRequest } from 'node:http';
 
-import { Application, getLogger, Http, Module, resetContainer, Runtime } from '@elysiumjs/core';
+import { Application, getLogger, Http, Module, resetContainer, Runtime } from '@elysiumjs/olympus';
 import { runtime as runtimeNode, serveNode } from '@elysiumjs/runtime-node';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 

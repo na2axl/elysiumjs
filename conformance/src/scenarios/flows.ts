@@ -21,8 +21,8 @@ import {
 	FLOW_OWNER_HEADER,
 	FLOW_STEP_HEADER,
 	MemoryFlowStore
-} from '@elysiumjs/ariadne';
-import { Application, Http, Module, t } from '@elysiumjs/core';
+} from '@elysiumjs/olympus/ariadne';
+import { Application, Http, Module, t } from '@elysiumjs/olympus';
 
 type Greeting = { name: string };
 

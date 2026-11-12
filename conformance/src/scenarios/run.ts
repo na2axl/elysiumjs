@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Application } from '@elysiumjs/core';
+import type { Application } from '@elysiumjs/olympus';
 import type { AssertAdapter, Scenario, ScenarioDriver } from './types';
 
-import { createHttpClient, resetContainer, Runtime } from '@elysiumjs/core';
+import { createHttpClient, resetContainer, Runtime } from '@elysiumjs/olympus';
 
 const EVENT_COUNT = 2;
 

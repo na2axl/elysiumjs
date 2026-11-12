@@ -1,6 +1,6 @@
-import type { LifecycleEvent } from '@elysiumjs/core';
+import type { LifecycleEvent } from '@elysiumjs/olympus';
 
-import { Lifecycle } from '@elysiumjs/core';
+import { Lifecycle } from '@elysiumjs/olympus';
 import { App } from '#root/app';
 
 Lifecycle.on('elysium:error', (e: LifecycleEvent<Error>) => {

@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Application, Elysia, ModuleNode } from '@elysiumjs/core';
+import type { Application, Elysia, ModuleNode } from '@elysiumjs/olympus';
 import type { WorkersHandler, WorkersMessageBatch, WorkersQueueMessage } from './types';
 import type { WorkersHandlerMeta } from './workers';
 
-import { getLogger, ModuleContext, Service } from '@elysiumjs/core';
+import { getLogger, ModuleContext, Service } from '@elysiumjs/olympus';
 
 import { DuplicateQueueConsumerError, NoWorkersHandlerError } from './errors';
 import { runInvocation } from './invocation';

@@ -48,12 +48,11 @@
   ],
   "sideEffects": false,
   "devDependencies": {
-    "@elysiumjs/core": "workspace:*",
+    "@elysiumjs/olympus": "workspace:*",
     "elysia": "^2.0.0-rc.1",
-    "wrangler": "4.158.0",
-    "@elysiumjs/mnemosyne": "workspace:*"
+    "wrangler": "4.158.0"
   },
   "peerDependencies": {
-    "@elysiumjs/core": "workspace:^"
+    "@elysiumjs/olympus": "workspace:^"
   }
 }

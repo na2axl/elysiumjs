@@ -1,4 +1,4 @@
-import { Http, HttpControllerScope } from '@elysiumjs/core';
+import { Http, HttpControllerScope } from '@elysiumjs/olympus';
 
 @Http.controller('{path}', { scope: HttpControllerScope.{scope} })
 export class {name} {

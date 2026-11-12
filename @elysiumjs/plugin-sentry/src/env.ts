@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Env } from '@elysiumjs/core';
+import type { Env } from '@elysiumjs/olympus';
 
-import { t } from '@elysiumjs/core';
+import { t } from '@elysiumjs/olympus';
 
 /**
  * The environment variables of the Sentry module, validated at boot. Both are optional: the
@@ -28,6 +28,6 @@ export const SentryEnv = t.Object({
 	)
 });
 
-declare module '@elysiumjs/core' {
+declare module '@elysiumjs/olympus' {
 	interface AppEnv extends Env.Infer<typeof SentryEnv> {}
 }

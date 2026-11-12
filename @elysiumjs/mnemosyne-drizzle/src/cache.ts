@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { CacheInterface } from '@elysiumjs/mnemosyne';
+import type { CacheInterface } from '@elysiumjs/olympus/mnemosyne';
 import type { CacheConfig } from 'drizzle-orm/cache/core/types';
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-import { Service, ServiceNotReadyError } from '@elysiumjs/core';
-import { createDatabaseCacheStorage, getCurrentTenant } from '@elysiumjs/mnemosyne';
+import { Service, ServiceNotReadyError } from '@elysiumjs/olympus';
+import { createDatabaseCacheStorage, getCurrentTenant } from '@elysiumjs/olympus/mnemosyne';
 import { getTableName, is, Table } from 'drizzle-orm';
 import { Cache as DrizzleCache } from 'drizzle-orm/cache/core';
 

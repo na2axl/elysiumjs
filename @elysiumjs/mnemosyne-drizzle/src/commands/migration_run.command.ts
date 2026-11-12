@@ -17,8 +17,8 @@ import type { MigrationConnection, MigrationDatabase, MigrationRun } from '../mi
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { Command, CommandArgumentType, Service } from '@elysiumjs/core';
-import { isValidTenantId } from '@elysiumjs/mnemosyne';
+import { Command, CommandArgumentType, Service } from '@elysiumjs/olympus';
+import { isValidTenantId } from '@elysiumjs/olympus/mnemosyne';
 import { sql } from 'drizzle-orm';
 
 import { closeConnection, Database, getConnectionDriver } from '../database';

@@ -1,11 +1,11 @@
 # @elysiumjs/ariadne-workers
 
-A Cloudflare Durable Object store for [`@elysiumjs/ariadne`](../ariadne) flows: one object per flow, which deletes itself once the flow expires.
+A Cloudflare Durable Object store for [`@elysiumjs/olympus/ariadne`](../olympus) flows: one object per flow, which deletes itself once the flow expires.
 
 ## Installation
 
 ```bash
-bun add @elysiumjs/ariadne @elysiumjs/ariadne-workers
+bun add @elysiumjs/olympus @elysiumjs/ariadne-workers
 ```
 
 ## Usage
@@ -28,7 +28,7 @@ Declare it in `wrangler.jsonc`:
 And give its binding to the flows:
 
 ```ts
-import { AriadneModule } from '@elysiumjs/ariadne';
+import { AriadneModule } from '@elysiumjs/olympus/ariadne';
 import { durableFlowStore } from '@elysiumjs/ariadne-workers';
 import { Workers } from '@elysiumjs/runtime-workers';
 

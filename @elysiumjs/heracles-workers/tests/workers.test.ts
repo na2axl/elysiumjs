@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { TransportProcessMessage } from '@elysiumjs/heracles';
+import type { TransportProcessMessage } from '@elysiumjs/olympus/heracles';
 import type { WorkersExecutionContext, WorkersMessageBatch } from '@elysiumjs/runtime-workers';
 import type { DeadJob, HeraclesWorkersConfig } from '../src';
 
-import { Application, Http, Module, Service } from '@elysiumjs/core';
-import { Heracles, HeraclesModule, Job, Scheduler } from '@elysiumjs/heracles';
+import { Application, Http, Module, Service } from '@elysiumjs/olympus';
+import { Heracles, HeraclesModule, Job, Scheduler } from '@elysiumjs/olympus/heracles';
 import { createRuntime, createWorker } from '@elysiumjs/runtime-workers';
 import { beforeEach, describe, expect, it } from 'bun:test';
 

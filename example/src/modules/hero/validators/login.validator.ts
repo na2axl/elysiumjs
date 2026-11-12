@@ -1,4 +1,4 @@
-import type { Static } from '@elysiumjs/core';
+import type { Static } from '@elysiumjs/olympus';
 
 import { t } from 'elysia';
 

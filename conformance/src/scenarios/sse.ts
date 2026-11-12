@@ -14,7 +14,7 @@
 
 import type { Scenario } from './types';
 
-import { Application, Http, Module, Service, ServiceScope } from '@elysiumjs/core';
+import { Application, Http, Module, Service, ServiceScope } from '@elysiumjs/olympus';
 
 import { waitFor } from './wait';
 

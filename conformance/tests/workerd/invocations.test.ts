@@ -22,7 +22,7 @@ import {
 	Runtime,
 	Service,
 	ServiceScope
-} from '@elysiumjs/core';
+} from '@elysiumjs/olympus';
 import { createWorker, runtime as runtimeWorkers, Workers } from '@elysiumjs/runtime-workers';
 import {
 	createExecutionContext,

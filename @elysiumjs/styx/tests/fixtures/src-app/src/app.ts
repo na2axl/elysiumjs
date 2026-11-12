@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Application } from '@elysiumjs/core';
+import { Application } from '@elysiumjs/olympus';
 
 export const notAClass = 1;
 export class FromSrcApp extends Application {}

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Application, Service } from '@elysiumjs/core';
-import { TENANCY_CONFIG_SERVICE, TENANCY_STRATEGY_SERVICE, withTenant } from '@elysiumjs/mnemosyne';
+import { Application, Service } from '@elysiumjs/olympus';
+import { TENANCY_CONFIG_SERVICE, TENANCY_STRATEGY_SERVICE, withTenant } from '@elysiumjs/olympus/mnemosyne';
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import * as d from 'drizzle-orm/pg-core';
 

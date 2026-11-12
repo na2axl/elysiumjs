@@ -17,7 +17,7 @@ import type { DrizzleDatabaseCache } from './cache';
 import type { DrizzleConnection } from './database';
 import type { MigrationConnection } from './migration';
 
-import { ElysiumError } from '@elysiumjs/core';
+import { ElysiumError } from '@elysiumjs/olympus';
 
 /**
  * What a driver connects with: the Drizzle options of the connection and its query cache.

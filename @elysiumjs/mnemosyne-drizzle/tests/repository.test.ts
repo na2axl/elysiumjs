@@ -14,7 +14,7 @@
 
 import type { Responder } from './fake-sql';
 
-import { Service } from '@elysiumjs/core';
+import { Service } from '@elysiumjs/olympus';
 import { afterEach, describe, expect, it } from 'bun:test';
 import * as d from 'drizzle-orm/pg-core';
 

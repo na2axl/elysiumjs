@@ -14,7 +14,7 @@
 
 import { join } from 'node:path';
 
-import { Command } from '@elysiumjs/core';
+import { Command } from '@elysiumjs/olympus';
 
 import { AssetEmbedder } from '../assets/embedder';
 import { loadConfig } from '../config/loader';

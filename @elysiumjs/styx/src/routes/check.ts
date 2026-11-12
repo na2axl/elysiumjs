@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Application } from '@elysiumjs/core';
+import type { Application } from '@elysiumjs/olympus';
 
-import { Http } from '@elysiumjs/core';
+import { Http } from '@elysiumjs/olympus';
 
 /**
  * A route that declares no schema for its success response.

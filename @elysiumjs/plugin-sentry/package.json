@@ -46,10 +46,10 @@
     "CHANGELOG.md"
   ],
   "devDependencies": {
-    "@elysiumjs/core": "workspace:*"
+    "@elysiumjs/olympus": "workspace:*"
   },
   "peerDependencies": {
-    "@elysiumjs/core": "workspace:^"
+    "@elysiumjs/olympus": "workspace:^"
   },
   "dependencies": {
     "@elysia/opentelemetry": "^2.0.0-rc.0",

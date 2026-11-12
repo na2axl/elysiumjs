@@ -15,7 +15,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { Application, Env, MissingModuleConfigError, Module } from '@elysiumjs/core';
+import { Application, Env, MissingModuleConfigError, Module } from '@elysiumjs/olympus';
 import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test';
 import { Elysia } from 'elysia';
 

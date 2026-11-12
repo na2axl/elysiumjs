@@ -60,23 +60,15 @@ const LINE_ALLOW = /\/\/\s*portability-allow:\s*\S/;
 
 /** Packages scanned by the gate, relative to the repository root. */
 export const ROOTS = [
-	'@elysiumjs/core',
+	'@elysiumjs/olympus',
 	'conformance',
-	'@elysiumjs/cerberus',
 	'@elysiumjs/argus',
-	'@elysiumjs/hermes',
-	'@elysiumjs/mnemosyne',
-	'@elysiumjs/redis',
-	'@elysiumjs/heracles',
 	'@elysiumjs/plugin-sentry',
 	'@elysiumjs/mnemosyne-drizzle',
 	'@elysiumjs/heracles-workers',
-	'@elysiumjs/moirai',
 	'@elysiumjs/moirai-drizzle',
-	'@elysiumjs/themis',
 	'@elysiumjs/themis-redis',
 	'@elysiumjs/themis-workers',
-	'@elysiumjs/ariadne',
 	'@elysiumjs/ariadne-redis',
 	'@elysiumjs/ariadne-workers'
 ];

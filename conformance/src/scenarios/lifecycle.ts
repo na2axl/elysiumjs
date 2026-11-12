@@ -14,7 +14,7 @@
 
 import type { Scenario } from './types';
 
-import { Application, Http, Module, Service } from '@elysiumjs/core';
+import { Application, Http, Module, Service } from '@elysiumjs/olympus';
 
 const make = async (): Promise<Application> => {
 	let failuresLeft = 1;

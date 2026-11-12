@@ -48,8 +48,8 @@
     "CHANGELOG.md"
   ],
   "devDependencies": {
-    "@elysiumjs/core": "workspace:*",
     "@elysiumjs/hephaestus": "workspace:*",
+    "@elysiumjs/olympus": "workspace:*",
     "@elysiumjs/runtime-bun": "workspace:*",
     "@types/prompts": "^2.4.9",
     "@types/string-template": "^1.0.7",
@@ -58,7 +58,7 @@
     "string-template": "^1.0.0"
   },
   "dependencies": {
-    "@elysiumjs/core": "workspace:^",
+    "@elysiumjs/olympus": "workspace:^",
     "@elysiumjs/runtime-bun": "workspace:^"
   }
 }

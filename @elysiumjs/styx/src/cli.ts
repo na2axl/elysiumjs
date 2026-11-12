@@ -16,7 +16,7 @@
 /**
  * The `styx` command. Installed globally (`bun add -g @elysiumjs/styx`) or in a project.
  */
-import type { ModuleClass } from '@elysiumjs/core';
+import type { ModuleClass } from '@elysiumjs/olympus';
 
 import { existsSync, realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -110,7 +110,7 @@ switch (decision.kind) {
 		const { stubCloudflareModules } = await import('./cloudflare-stubs');
 		stubCloudflareModules();
 		const { resolveAppEntry } = await import('./utils');
-		const { Application, ElysiumError } = await import('@elysiumjs/core');
+		const { Application, ElysiumError } = await import('@elysiumjs/olympus');
 		try {
 			let App = await resolveAppEntry(decision.project);
 			if (listsCommands(decision.argv)) {

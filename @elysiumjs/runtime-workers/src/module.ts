@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ServiceFactoryDefinition } from '@elysiumjs/core';
+import type { ServiceFactoryDefinition } from '@elysiumjs/olympus';
 
-import { Module, ServiceScope } from '@elysiumjs/core';
+import { Module, ServiceScope } from '@elysiumjs/olympus';
 
 import { Workers, WORKERS_CONTEXT_SERVICE, WORKERS_ENV_SERVICE } from './workers';
 

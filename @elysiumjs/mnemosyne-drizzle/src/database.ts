@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { DatabaseCacheConfig, DatabaseDriver } from '@elysiumjs/mnemosyne';
+import type { DatabaseCacheConfig, DatabaseDriver } from '@elysiumjs/olympus/mnemosyne';
 import type { DrizzleConfig } from 'drizzle-orm';
 import type { PgAsyncDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core';
 import type { DrizzleDriver } from './driver';
 
-import { ElysiumError } from '@elysiumjs/core';
-import { AbstractDatabase, getCurrentTenant, getTenancyConfig } from '@elysiumjs/mnemosyne';
+import { ElysiumError } from '@elysiumjs/olympus';
+import { AbstractDatabase, getCurrentTenant, getTenancyConfig } from '@elysiumjs/olympus/mnemosyne';
 import { sql } from 'drizzle-orm';
 
 import { bunRequire } from './bun-require';

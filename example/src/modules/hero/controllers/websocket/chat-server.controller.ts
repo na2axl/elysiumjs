@@ -1,8 +1,8 @@
-import type { WS, WSError } from '@elysiumjs/core';
+import type { WS, WSError } from '@elysiumjs/olympus';
 import type { UserInsert } from '#hero/models/user.model';
 
-import { Service, Websocket } from '@elysiumjs/core';
-import { HermesLogger } from '@elysiumjs/hermes';
+import { Service, Websocket } from '@elysiumjs/olympus';
+import { HermesLogger } from '@elysiumjs/olympus/hermes';
 
 import { UserModel } from '#hero/models/user.model';
 

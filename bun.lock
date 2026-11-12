@@ -29,83 +29,34 @@
         "@opentelemetry/semantic-conventions": "^1.43.0",
       },
       "devDependencies": {
-        "@elysiumjs/core": "workspace:*",
-        "@elysiumjs/hermes": "workspace:*",
+        "@elysiumjs/olympus": "workspace:*",
       },
       "peerDependencies": {
-        "@elysiumjs/core": "workspace:^",
-        "@elysiumjs/hermes": "workspace:^",
+        "@elysiumjs/olympus": "workspace:^",
       },
       "optionalPeers": [
-        "@elysiumjs/hermes",
+        "@elysiumjs/olympus",
       ],
-    },
-    "@elysiumjs/ariadne": {
-      "name": "@elysiumjs/ariadne",
-      "version": "0.4.1",
-      "dependencies": {
-        "typebox": "^1.3.0",
-      },
-      "devDependencies": {
-        "@elysiumjs/core": "workspace:*",
-        "@elysiumjs/runtime-bun": "workspace:*",
-        "@elysiumjs/themis": "workspace:*",
-        "elysia": "^2.0.0-rc.1",
-      },
-      "peerDependencies": {
-        "@elysiumjs/core": "workspace:^",
-      },
     },
     "@elysiumjs/ariadne-redis": {
       "name": "@elysiumjs/ariadne-redis",
       "version": "0.1.3",
       "devDependencies": {
-        "@elysiumjs/ariadne": "workspace:*",
-        "@elysiumjs/core": "workspace:*",
-        "@elysiumjs/redis": "workspace:*",
+        "@elysiumjs/olympus": "workspace:*",
       },
       "peerDependencies": {
-        "@elysiumjs/ariadne": "workspace:^",
-        "@elysiumjs/redis": "workspace:^",
+        "@elysiumjs/olympus": "workspace:^",
       },
     },
     "@elysiumjs/ariadne-workers": {
       "name": "@elysiumjs/ariadne-workers",
       "version": "0.1.3",
       "devDependencies": {
-        "@elysiumjs/ariadne": "workspace:*",
-        "@elysiumjs/core": "workspace:*",
+        "@elysiumjs/olympus": "workspace:*",
         "elysia": "^2.0.0-rc.1",
       },
       "peerDependencies": {
-        "@elysiumjs/ariadne": "workspace:^",
-      },
-    },
-    "@elysiumjs/cerberus": {
-      "name": "@elysiumjs/cerberus",
-      "version": "0.3.16",
-      "dependencies": {
-        "@casl/ability": "^7.0.2",
-      },
-      "devDependencies": {
-        "@elysiumjs/core": "workspace:*",
-      },
-      "peerDependencies": {
-        "@elysiumjs/core": "workspace:^",
-      },
-    },
-    "@elysiumjs/core": {
-      "name": "@elysiumjs/core",
-      "version": "0.24.1",
-      "dependencies": {
-        "@elysia/openapi": "^2.0.0-rc.0",
-        "elysia": "^2.0.0-rc.1",
-        "exact-mirror": "^1.2.6",
-        "http-status": "^2.1.0",
-        "openapi-types": "^12.1.3",
-        "radash": "catalog:",
-        "typebox": "^1.3.0",
-        "wampy": "^8.0.2",
+        "@elysiumjs/olympus": "workspace:^",
       },
     },
     "@elysiumjs/hephaestus": {
@@ -115,79 +66,26 @@
         "zod": "^4.6.7",
       },
       "devDependencies": {
-        "@elysiumjs/core": "workspace:*",
+        "@elysiumjs/olympus": "workspace:*",
         "@elysiumjs/runtime-node": "workspace:*",
         "elysia": "^2.0.0-rc.1",
       },
       "peerDependencies": {
-        "@elysiumjs/core": "workspace:^",
+        "@elysiumjs/olympus": "workspace:^",
         "elysia": "^2.0.0-rc.1",
-      },
-    },
-    "@elysiumjs/heracles": {
-      "name": "@elysiumjs/heracles",
-      "version": "0.11.3",
-      "dependencies": {
-        "commander": "^15.0.0",
-        "radash": "catalog:",
-      },
-      "devDependencies": {
-        "@elysiumjs/core": "workspace:*",
-        "@elysiumjs/redis": "workspace:*",
-      },
-      "peerDependencies": {
-        "@elysiumjs/core": "workspace:^",
-        "@elysiumjs/redis": "workspace:^",
       },
     },
     "@elysiumjs/heracles-workers": {
       "name": "@elysiumjs/heracles-workers",
       "version": "0.2.11",
       "devDependencies": {
-        "@elysiumjs/core": "workspace:*",
-        "@elysiumjs/heracles": "workspace:*",
-        "@elysiumjs/redis": "workspace:*",
+        "@elysiumjs/olympus": "workspace:*",
         "@elysiumjs/runtime-workers": "workspace:*",
         "elysia": "^2.0.0-rc.1",
       },
       "peerDependencies": {
-        "@elysiumjs/core": "workspace:^",
-        "@elysiumjs/heracles": "workspace:^",
+        "@elysiumjs/olympus": "workspace:^",
         "@elysiumjs/runtime-workers": "workspace:^",
-      },
-    },
-    "@elysiumjs/hermes": {
-      "name": "@elysiumjs/hermes",
-      "version": "0.5.13",
-      "dependencies": {
-        "pino": "^10.4.0",
-        "pino-pretty": "^13.2.0",
-      },
-      "devDependencies": {
-        "@elysiumjs/core": "workspace:*",
-        "@elysiumjs/runtime-bun": "workspace:*",
-      },
-      "peerDependencies": {
-        "@elysiumjs/core": "workspace:^",
-      },
-    },
-    "@elysiumjs/mnemosyne": {
-      "name": "@elysiumjs/mnemosyne",
-      "version": "0.8.1",
-      "dependencies": {
-        "cache-manager": "^7.2.9",
-        "cacheable": "^2.5.0",
-        "keyv": "^5.6.0",
-        "radash": "catalog:",
-      },
-      "devDependencies": {
-        "@elysiumjs/core": "workspace:*",
-        "@elysiumjs/redis": "workspace:*",
-        "@elysiumjs/runtime-bun": "workspace:*",
-      },
-      "peerDependencies": {
-        "@elysiumjs/core": "workspace:^",
-        "@elysiumjs/redis": "workspace:^",
       },
     },
     "@elysiumjs/mnemosyne-drizzle": {
@@ -199,8 +97,7 @@
         "radash": "catalog:",
       },
       "devDependencies": {
-        "@elysiumjs/core": "workspace:*",
-        "@elysiumjs/mnemosyne": "workspace:*",
+        "@elysiumjs/olympus": "workspace:*",
         "@elysiumjs/runtime-bun": "workspace:*",
         "@elysiumjs/runtime-workers": "workspace:*",
         "@types/pg": "8.15.5",
@@ -209,8 +106,7 @@
         "postgres": "3.4.7",
       },
       "peerDependencies": {
-        "@elysiumjs/core": "workspace:^",
-        "@elysiumjs/mnemosyne": "workspace:^",
+        "@elysiumjs/olympus": "workspace:^",
         "@elysiumjs/runtime-workers": "workspace:^",
         "pg": "^8.0.0",
         "postgres": "^3.4.0",
@@ -221,28 +117,6 @@
         "postgres",
       ],
     },
-    "@elysiumjs/moirai": {
-      "name": "@elysiumjs/moirai",
-      "version": "0.8.1",
-      "dependencies": {
-        "typebox": "^1.3.0",
-      },
-      "devDependencies": {
-        "@elysiumjs/core": "workspace:*",
-        "@elysiumjs/heracles": "workspace:*",
-        "@elysiumjs/mnemosyne": "workspace:*",
-        "@elysiumjs/redis": "workspace:*",
-        "elysia": "^2.0.0-rc.1",
-      },
-      "peerDependencies": {
-        "@elysiumjs/core": "workspace:^",
-        "@elysiumjs/heracles": "workspace:^",
-        "@elysiumjs/mnemosyne": "workspace:^",
-      },
-      "optionalPeers": [
-        "@elysiumjs/heracles",
-      ],
-    },
     "@elysiumjs/moirai-drizzle": {
       "name": "@elysiumjs/moirai-drizzle",
       "version": "0.4.1",
@@ -250,15 +124,37 @@
         "drizzle-orm": "^1.0.0-rc.5",
       },
       "devDependencies": {
-        "@elysiumjs/core": "workspace:*",
         "@elysiumjs/mnemosyne-drizzle": "workspace:*",
-        "@elysiumjs/moirai": "workspace:*",
+        "@elysiumjs/olympus": "workspace:*",
         "@elysiumjs/runtime-bun": "workspace:*",
       },
       "peerDependencies": {
-        "@elysiumjs/core": "workspace:^",
         "@elysiumjs/mnemosyne-drizzle": "workspace:^",
-        "@elysiumjs/moirai": "workspace:^",
+        "@elysiumjs/olympus": "workspace:^",
+      },
+    },
+    "@elysiumjs/olympus": {
+      "name": "@elysiumjs/olympus",
+      "version": "0.24.1",
+      "dependencies": {
+        "@casl/ability": "^7.0.2",
+        "@elysia/openapi": "^2.0.0-rc.0",
+        "@simplewebauthn/server": "^14.0.3",
+        "cache-manager": "^7.2.9",
+        "cacheable": "^2.5.0",
+        "commander": "^15.0.0",
+        "elysia": "^2.0.0-rc.1",
+        "exact-mirror": "^1.2.6",
+        "http-status": "^2.1.0",
+        "jose": "^6.2.15",
+        "keyv": "^5.6.0",
+        "oauth4webapi": "^3.8.8",
+        "openapi-types": "^12.1.3",
+        "pino": "^10.4.0",
+        "pino-pretty": "^13.2.0",
+        "radash": "catalog:",
+        "typebox": "^1.3.0",
+        "wampy": "^8.0.2",
       },
     },
     "@elysiumjs/plugin-sentry": {
@@ -269,58 +165,44 @@
         "@sentry/bun": "^11.9.0",
       },
       "devDependencies": {
-        "@elysiumjs/core": "workspace:*",
+        "@elysiumjs/olympus": "workspace:*",
       },
       "peerDependencies": {
-        "@elysiumjs/core": "workspace:^",
-      },
-    },
-    "@elysiumjs/redis": {
-      "name": "@elysiumjs/redis",
-      "version": "0.1.13",
-      "dependencies": {
-        "radash": "catalog:",
-      },
-      "devDependencies": {
-        "@elysiumjs/core": "workspace:*",
-      },
-      "peerDependencies": {
-        "@elysiumjs/core": "workspace:^",
+        "@elysiumjs/olympus": "workspace:^",
       },
     },
     "@elysiumjs/runtime-bun": {
       "name": "@elysiumjs/runtime-bun",
       "version": "0.1.13",
       "devDependencies": {
-        "@elysiumjs/core": "workspace:*",
+        "@elysiumjs/olympus": "workspace:*",
         "elysia": "^2.0.0-rc.1",
       },
       "peerDependencies": {
-        "@elysiumjs/core": "workspace:^",
+        "@elysiumjs/olympus": "workspace:^",
       },
     },
     "@elysiumjs/runtime-node": {
       "name": "@elysiumjs/runtime-node",
       "version": "0.1.13",
       "devDependencies": {
-        "@elysiumjs/core": "workspace:*",
+        "@elysiumjs/olympus": "workspace:*",
         "elysia": "^2.0.0-rc.1",
       },
       "peerDependencies": {
-        "@elysiumjs/core": "workspace:^",
+        "@elysiumjs/olympus": "workspace:^",
       },
     },
     "@elysiumjs/runtime-workers": {
       "name": "@elysiumjs/runtime-workers",
       "version": "0.1.13",
       "devDependencies": {
-        "@elysiumjs/core": "workspace:*",
-        "@elysiumjs/mnemosyne": "workspace:*",
+        "@elysiumjs/olympus": "workspace:*",
         "elysia": "^2.0.0-rc.1",
         "wrangler": "4.158.0",
       },
       "peerDependencies": {
-        "@elysiumjs/core": "workspace:^",
+        "@elysiumjs/olympus": "workspace:^",
       },
     },
     "@elysiumjs/styx": {
@@ -330,12 +212,12 @@
         "styx": "dist/cli.js",
       },
       "dependencies": {
-        "@elysiumjs/core": "workspace:^",
+        "@elysiumjs/olympus": "workspace:^",
         "@elysiumjs/runtime-bun": "workspace:^",
       },
       "devDependencies": {
-        "@elysiumjs/core": "workspace:*",
         "@elysiumjs/hephaestus": "workspace:*",
+        "@elysiumjs/olympus": "workspace:*",
         "@elysiumjs/runtime-bun": "workspace:*",
         "@types/prompts": "^2.4.9",
         "@types/string-template": "^1.0.7",
@@ -344,56 +226,32 @@
         "string-template": "^1.0.0",
       },
     },
-    "@elysiumjs/themis": {
-      "name": "@elysiumjs/themis",
-      "version": "0.4.4",
-      "dependencies": {
-        "@simplewebauthn/server": "^14.0.3",
-        "jose": "^6.2.15",
-        "oauth4webapi": "^3.8.8",
-      },
-      "devDependencies": {
-        "@elysiumjs/core": "workspace:*",
-        "@elysiumjs/runtime-bun": "workspace:*",
-        "elysia": "^2.0.0-rc.1",
-      },
-      "peerDependencies": {
-        "@elysiumjs/core": "workspace:^",
-      },
-    },
     "@elysiumjs/themis-redis": {
       "name": "@elysiumjs/themis-redis",
       "version": "0.0.4",
       "devDependencies": {
-        "@elysiumjs/core": "workspace:*",
-        "@elysiumjs/themis": "workspace:*",
+        "@elysiumjs/olympus": "workspace:*",
       },
       "peerDependencies": {
-        "@elysiumjs/redis": "workspace:^",
-        "@elysiumjs/themis": "workspace:^",
+        "@elysiumjs/olympus": "workspace:^",
       },
     },
     "@elysiumjs/themis-workers": {
       "name": "@elysiumjs/themis-workers",
       "version": "0.0.4",
       "devDependencies": {
-        "@elysiumjs/core": "workspace:*",
-        "@elysiumjs/themis": "workspace:*",
+        "@elysiumjs/olympus": "workspace:*",
       },
       "peerDependencies": {
-        "@elysiumjs/themis": "workspace:^",
+        "@elysiumjs/olympus": "workspace:^",
       },
     },
     "conformance": {
       "name": "@elysiumjs/conformance",
       "version": "0.0.0",
       "dependencies": {
-        "@elysiumjs/ariadne": "workspace:^",
-        "@elysiumjs/core": "workspace:^",
-        "@elysiumjs/mnemosyne": "workspace:^",
-        "@elysiumjs/moirai": "workspace:^",
+        "@elysiumjs/olympus": "workspace:^",
         "@elysiumjs/runtime-bun": "workspace:^",
-        "@elysiumjs/themis": "workspace:^",
         "elysia": "^2.0.0-rc.1",
       },
       "devDependencies": {
@@ -419,11 +277,8 @@
     "example": {
       "name": "example",
       "dependencies": {
-        "@elysiumjs/core": "workspace:^",
-        "@elysiumjs/heracles": "workspace:^",
-        "@elysiumjs/hermes": "workspace:^",
         "@elysiumjs/mnemosyne-drizzle": "workspace:^",
-        "@elysiumjs/redis": "workspace:^",
+        "@elysiumjs/olympus": "workspace:^",
         "@elysiumjs/runtime-bun": "workspace:^",
         "@elysiumjs/styx": "workspace:^",
         "radash": "catalog:",
@@ -540,37 +395,23 @@
 
     "@elysiumjs/argus": ["@elysiumjs/argus@workspace:@elysiumjs/argus"],
 
-    "@elysiumjs/ariadne": ["@elysiumjs/ariadne@workspace:@elysiumjs/ariadne"],
-
     "@elysiumjs/ariadne-redis": ["@elysiumjs/ariadne-redis@workspace:@elysiumjs/ariadne-redis"],
 
     "@elysiumjs/ariadne-workers": ["@elysiumjs/ariadne-workers@workspace:@elysiumjs/ariadne-workers"],
 
-    "@elysiumjs/cerberus": ["@elysiumjs/cerberus@workspace:@elysiumjs/cerberus"],
-
     "@elysiumjs/conformance": ["@elysiumjs/conformance@workspace:conformance"],
-
-    "@elysiumjs/core": ["@elysiumjs/core@workspace:@elysiumjs/core"],
 
     "@elysiumjs/hephaestus": ["@elysiumjs/hephaestus@workspace:@elysiumjs/hephaestus"],
 
-    "@elysiumjs/heracles": ["@elysiumjs/heracles@workspace:@elysiumjs/heracles"],
-
     "@elysiumjs/heracles-workers": ["@elysiumjs/heracles-workers@workspace:@elysiumjs/heracles-workers"],
-
-    "@elysiumjs/hermes": ["@elysiumjs/hermes@workspace:@elysiumjs/hermes"],
-
-    "@elysiumjs/mnemosyne": ["@elysiumjs/mnemosyne@workspace:@elysiumjs/mnemosyne"],
 
     "@elysiumjs/mnemosyne-drizzle": ["@elysiumjs/mnemosyne-drizzle@workspace:@elysiumjs/mnemosyne-drizzle"],
 
-    "@elysiumjs/moirai": ["@elysiumjs/moirai@workspace:@elysiumjs/moirai"],
-
     "@elysiumjs/moirai-drizzle": ["@elysiumjs/moirai-drizzle@workspace:@elysiumjs/moirai-drizzle"],
 
-    "@elysiumjs/plugin-sentry": ["@elysiumjs/plugin-sentry@workspace:@elysiumjs/plugin-sentry"],
+    "@elysiumjs/olympus": ["@elysiumjs/olympus@workspace:@elysiumjs/olympus"],
 
-    "@elysiumjs/redis": ["@elysiumjs/redis@workspace:@elysiumjs/redis"],
+    "@elysiumjs/plugin-sentry": ["@elysiumjs/plugin-sentry@workspace:@elysiumjs/plugin-sentry"],
 
     "@elysiumjs/runtime-bun": ["@elysiumjs/runtime-bun@workspace:@elysiumjs/runtime-bun"],
 
@@ -579,8 +420,6 @@
     "@elysiumjs/runtime-workers": ["@elysiumjs/runtime-workers@workspace:@elysiumjs/runtime-workers"],
 
     "@elysiumjs/styx": ["@elysiumjs/styx@workspace:@elysiumjs/styx"],
-
-    "@elysiumjs/themis": ["@elysiumjs/themis@workspace:@elysiumjs/themis"],
 
     "@elysiumjs/themis-redis": ["@elysiumjs/themis-redis@workspace:@elysiumjs/themis-redis"],
 

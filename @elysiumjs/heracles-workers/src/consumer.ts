@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { TransportProcessMessage } from '@elysiumjs/heracles';
+import type { TransportProcessMessage } from '@elysiumjs/olympus/heracles';
 import type { WorkersQueueMessage } from '@elysiumjs/runtime-workers';
 
-import { getLogger, ModuleContext, Service } from '@elysiumjs/core';
-import { JobRegistry, JobStatus, Queue, QUEUES_SERVICE, WithId } from '@elysiumjs/heracles';
+import { getLogger, ModuleContext, Service } from '@elysiumjs/olympus';
+import { JobRegistry, JobStatus, Queue, QUEUES_SERVICE, WithId } from '@elysiumjs/olympus/heracles';
 import { Workers } from '@elysiumjs/runtime-workers';
 
 /** Whether a queue message carries a Heracles job. */

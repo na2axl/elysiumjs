@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { JobStatusInfo, Transport, TransportEvent } from '@elysiumjs/heracles';
+import type { JobStatusInfo, Transport, TransportEvent } from '@elysiumjs/olympus/heracles';
 
-import { ElysiumError, getLogger } from '@elysiumjs/core';
+import { ElysiumError, getLogger } from '@elysiumjs/olympus';
 import { Workers } from '@elysiumjs/runtime-workers';
 
 /**

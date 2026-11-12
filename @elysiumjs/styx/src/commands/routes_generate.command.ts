@@ -14,7 +14,7 @@
 
 import { relative, resolve } from 'node:path';
 
-import { Command, CommandArgumentType, ConsoleFormat } from '@elysiumjs/core';
+import { Command, CommandArgumentType, ConsoleFormat } from '@elysiumjs/olympus';
 
 import { parseProjectConfig } from '../config';
 import { collectRoutes } from '../routes/collect';

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Application, Module } from '@elysiumjs/core';
+import { Application, Module } from '@elysiumjs/olympus';
 
 import { GreetingController, makeHealthController } from './greeting';
 import { PingRouteTypes } from './pingable';

@@ -1,4 +1,4 @@
-import { Service, ServiceScope } from '@elysiumjs/core';
+import { Service, ServiceScope } from '@elysiumjs/olympus';
 import { DrizzleRepository } from '@elysiumjs/mnemosyne-drizzle';
 
 import { UserModel } from '#hero/models/user.model';

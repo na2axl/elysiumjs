@@ -27,8 +27,8 @@ import {
 	Service,
 	ServiceScope,
 	t
-} from '@elysiumjs/core';
-import { Cache, MnemosyneModule } from '@elysiumjs/mnemosyne';
+} from '@elysiumjs/olympus';
+import { Cache, MnemosyneModule } from '@elysiumjs/olympus/mnemosyne';
 
 import {
 	createRuntime,

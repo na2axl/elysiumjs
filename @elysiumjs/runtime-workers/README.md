@@ -11,7 +11,7 @@ bun add @elysiumjs/runtime-workers
 ## Usage
 
 ```ts
-import { Application } from '@elysiumjs/core';
+import { Application } from '@elysiumjs/olympus';
 import { runtime } from '@elysiumjs/runtime-workers';
 
 @Application.register({ runtime, modules: [] })
@@ -49,7 +49,7 @@ A singleton whose `onInit` calls its own app, through a service binding or a fet
 Each invocation runs with its own env and execution context. Read them with `Workers.env()`, `Workers.context()` and `Workers.binding(name)`, or inject them: `WorkersModule` provides the env (`workers.env`), the context (`workers.context`) and each binding it lists as global request-scoped services.
 
 ```ts
-import { Service, ServiceScope } from '@elysiumjs/core';
+import { Service, ServiceScope } from '@elysiumjs/olympus';
 import { Workers, WorkersModule } from '@elysiumjs/runtime-workers';
 
 @Service.register({ scope: ServiceScope.REQUEST })
@@ -98,7 +98,7 @@ The handler types (`WorkersMessageBatch`, `WorkersScheduledController`, `Workers
 
 ### KV cache
 
-`KeyvWorkersKV` is a Keyv store over a KV namespace, for the caches of `@elysiumjs/mnemosyne`. It reads the binding from the current invocation on every call. KV is eventually consistent and expires entries after at least 60 seconds, so shorter TTLs are rounded up.
+`KeyvWorkersKV` is a Keyv store over a KV namespace, for the caches of `@elysiumjs/olympus/mnemosyne`. It reads the binding from the current invocation on every call. KV is eventually consistent and expires entries after at least 60 seconds, so shorter TTLs are rounded up.
 
 ```ts
 MnemosyneModule.with({

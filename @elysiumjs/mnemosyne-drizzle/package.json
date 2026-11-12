@@ -2,7 +2,7 @@
 	"name": "@elysiumjs/mnemosyne-drizzle",
 	"version": "0.9.1",
 	"license": "Apache-2.0",
-	"description": "Drizzle ORM driver for @elysiumjs/mnemosyne",
+	"description": "Drizzle ORM driver for @elysiumjs/olympus/mnemosyne",
 	"private": false,
 	"author": "Axel Nana <ax.lnana@outlook.com>",
 	"repository": {
@@ -63,8 +63,7 @@
 	],
 	"sideEffects": false,
 	"peerDependencies": {
-		"@elysiumjs/core": "workspace:^",
-		"@elysiumjs/mnemosyne": "workspace:^",
+		"@elysiumjs/olympus": "workspace:^",
 		"@elysiumjs/runtime-workers": "workspace:^",
 		"pg": "^8.0.0",
 		"postgres": "^3.4.0"
@@ -75,14 +74,13 @@
 		"radash": "catalog:"
 	},
 	"devDependencies": {
-		"@elysiumjs/core": "workspace:*",
-		"@elysiumjs/mnemosyne": "workspace:*",
+		"@elysiumjs/olympus": "workspace:*",
 		"@elysiumjs/runtime-bun": "workspace:*",
+		"@elysiumjs/runtime-workers": "workspace:*",
 		"@types/pg": "8.15.5",
 		"@types/prompts": "^2.4.9",
 		"pg": "8.16.3",
-		"postgres": "3.4.7",
-		"@elysiumjs/runtime-workers": "workspace:*"
+		"postgres": "3.4.7"
 	},
 	"peerDependenciesMeta": {
 		"@elysiumjs/runtime-workers": {

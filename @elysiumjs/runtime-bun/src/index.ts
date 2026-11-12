@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Runtime } from '@elysiumjs/core';
+import type { Runtime } from '@elysiumjs/olympus';
 
 const SIGNALS = ['SIGINT', 'SIGTERM'] as const;
 

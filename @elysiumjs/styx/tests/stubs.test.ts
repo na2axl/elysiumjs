@@ -162,7 +162,7 @@ describe('generator output', () => {
 		it('writes a schema-only validator by default', async () => {
 			await make(new MakeValidatorCommand(), '--name', 'SignInValidator');
 			const text = await Bun.file(join(dir, 'src/validators/sign-in.validator.ts')).text();
-			expect(text).toContain("import type { Static } from '@elysiumjs/core';");
+			expect(text).toContain("import type { Static } from '@elysiumjs/olympus';");
 			expect(text).toContain('public static readonly schema = t.Object({});');
 			expect(text).not.toContain('authorize(');
 			expect(text).not.toContain('validate(');
@@ -179,7 +179,7 @@ describe('generator output', () => {
 			);
 			const text = await Bun.file(join(dir, 'src/validators/sign-in.validator.ts')).text();
 			expect(text).toContain(
-				"import type { Context, DomainError, Static } from '@elysiumjs/core';"
+				"import type { Context, DomainError, Static } from '@elysiumjs/olympus';"
 			);
 			expect(text).toContain('public static authorize(ctx: Context<SignInRequest>)');
 			expect(text).toContain('public static validate(ctx: Context<SignInRequest>)');

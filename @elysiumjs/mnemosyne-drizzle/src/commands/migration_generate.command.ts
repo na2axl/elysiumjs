@@ -19,7 +19,7 @@ import { access, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { Command, CommandArgumentType } from '@elysiumjs/core';
+import { Command, CommandArgumentType } from '@elysiumjs/olympus';
 import { is } from 'drizzle-orm';
 import { PgTable as PgTableClass } from 'drizzle-orm/pg-core';
 

@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Application, ElysiumPlugin } from '@elysiumjs/core';
+import type { Application, ElysiumPlugin } from '@elysiumjs/olympus';
 
 import { opentelemetry } from '@elysia/opentelemetry';
-import { Env } from '@elysiumjs/core';
+import { Env } from '@elysiumjs/olympus';
 import * as Sentry from '@sentry/bun';
 import { Elysia } from 'elysia';
 

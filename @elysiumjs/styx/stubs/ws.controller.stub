@@ -1,6 +1,6 @@
-import type { WS, WSError } from '@elysiumjs/core';
+import type { WS, WSError } from '@elysiumjs/olympus';
 
-import { Websocket } from '@elysiumjs/core';
+import { Websocket } from '@elysiumjs/olympus';
 
 @Websocket.controller('{path}')
 export class {name} {

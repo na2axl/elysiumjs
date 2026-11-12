@@ -16,7 +16,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, readdir, rename } from 'node:fs/promises';
 import { dirname, extname, join } from 'node:path';
 
-import { Application, ElysiumError } from '@elysiumjs/core';
+import { Application, ElysiumError } from '@elysiumjs/olympus';
 import { dash, pascal } from 'radash';
 
 /**
@@ -109,7 +109,7 @@ export const createModule = async (name: string, oldName?: string) => {
 				const className = `${pascal(name)}Module`;
 				await Bun.write(
 					moduleFile,
-					`import { Module } from '@elysiumjs/core';\n\n@Module.register({\n\tservices: [],\n\tcontrollers: [],\n\tcommands: []\n})\nexport class ${className} extends Module {}\n`
+					`import { Module } from '@elysiumjs/olympus';\n\n@Module.register({\n\tservices: [],\n\tcontrollers: [],\n\tcommands: []\n})\nexport class ${className} extends Module {}\n`
 				);
 			}
 		}

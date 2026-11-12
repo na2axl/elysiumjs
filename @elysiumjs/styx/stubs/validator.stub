@@ -1,4 +1,4 @@
-import type { {core_types} } from '@elysiumjs/core';
+import type { {core_types} } from '@elysiumjs/olympus';
 
 import { t } from 'elysia';
 

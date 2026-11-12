@@ -1,19 +1,19 @@
 # @elysiumjs/ariadne-redis
 
-A Redis store for [`@elysiumjs/ariadne`](../ariadne) flows. Claims and commits are atomic Lua scripts run with `EVAL`, so they work with any Redis connection of [`@elysiumjs/redis`](../redis), Upstash included.
+A Redis store for [`@elysiumjs/olympus/ariadne`](../olympus) flows. Claims and commits are atomic Lua scripts run with `EVAL`, so they work with any Redis connection of [`@elysiumjs/olympus/redis`](../olympus), Upstash included.
 
 ## Installation
 
 ```bash
-bun add @elysiumjs/ariadne @elysiumjs/ariadne-redis @elysiumjs/redis
+bun add @elysiumjs/olympus @elysiumjs/ariadne-redis
 ```
 
 ## Usage
 
 ```ts
-import { AriadneModule } from '@elysiumjs/ariadne';
+import { AriadneModule } from '@elysiumjs/olympus/ariadne';
 import { RedisFlowStore } from '@elysiumjs/ariadne-redis';
-import { Redis } from '@elysiumjs/redis';
+import { Redis } from '@elysiumjs/olympus/redis';
 
 AriadneModule.with({
 	store: new RedisFlowStore({ connection: () => Redis.connection(), prefix: 'flow:' })

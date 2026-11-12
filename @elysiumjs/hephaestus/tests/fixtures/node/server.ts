@@ -14,7 +14,7 @@
 
 // A Node.js server entry for the NodeBuilder tests: a controller whose service is injected by
 // its constructor type, which needs the decorator metadata emitted at build time.
-import { Application, Http, Module, Service } from '@elysiumjs/core';
+import { Application, Http, Module, Service } from '@elysiumjs/olympus';
 import { runtime } from '@elysiumjs/runtime-node';
 
 @Service.register()

@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { CacheInterface } from '@elysiumjs/mnemosyne';
+import type { CacheInterface } from '@elysiumjs/olympus/mnemosyne';
 
-import { Application } from '@elysiumjs/core';
-import { Cache, MnemosyneModule, withTenant } from '@elysiumjs/mnemosyne';
+import { Application } from '@elysiumjs/olympus';
+import { Cache, MnemosyneModule, withTenant } from '@elysiumjs/olympus/mnemosyne';
 import {
 	afterAll,
 	afterEach,

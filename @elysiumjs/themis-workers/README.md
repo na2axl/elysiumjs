@@ -1,18 +1,18 @@
 # @elysiumjs/themis-workers
 
-A Cloudflare Workers KV session store for [`@elysiumjs/themis`](../themis).
+A Cloudflare Workers KV session store for [`@elysiumjs/olympus/themis`](../olympus).
 
 ## Installation
 
 ```bash
-bun add @elysiumjs/themis @elysiumjs/themis-workers
+bun add @elysiumjs/olympus @elysiumjs/themis-workers
 ```
 
 ## Usage
 
 ```ts
 import { Workers } from '@elysiumjs/runtime-workers';
-import { ThemisModule } from '@elysiumjs/themis';
+import { ThemisModule } from '@elysiumjs/olympus/themis';
 import { KvSessionStore } from '@elysiumjs/themis-workers';
 
 ThemisModule.with({

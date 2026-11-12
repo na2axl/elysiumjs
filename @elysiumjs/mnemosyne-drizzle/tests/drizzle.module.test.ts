@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Application, Lifecycle, Service } from '@elysiumjs/core';
-import { getTenancyConfig, getTenancyStrategy } from '@elysiumjs/mnemosyne';
+import { Application, Lifecycle, Service } from '@elysiumjs/olympus';
+import { getTenancyConfig, getTenancyStrategy } from '@elysiumjs/olympus/mnemosyne';
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
 import * as pkg from '../src';

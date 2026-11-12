@@ -14,7 +14,7 @@
 
 import type { Scenario } from './types';
 
-import { Application, Http, Module } from '@elysiumjs/core';
+import { Application, Http, Module } from '@elysiumjs/olympus';
 import { t } from 'elysia';
 
 const make = async (): Promise<Application> => {

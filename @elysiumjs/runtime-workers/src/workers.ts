@@ -14,7 +14,7 @@
 
 import type { WorkersExecutionContext } from './types';
 
-import { Metadata, Service } from '@elysiumjs/core';
+import { Metadata, Service } from '@elysiumjs/olympus';
 
 import { BindingNotFoundError, OutsideInvocationError } from './errors';
 import { currentInvocation } from './invocation';

@@ -17,12 +17,12 @@ import type {
 	HttpRouteDescription,
 	HttpRouteTypes,
 	HttpRouteTypesContributor
-} from '@elysiumjs/core';
+} from '@elysiumjs/olympus';
 import type { ControllerRoutes, ModuleRoutes } from './render';
 
 import { basename, dirname, relative, resolve, sep } from 'node:path';
 
-import { Environments, Http, Service } from '@elysiumjs/core';
+import { Environments, Http, Service } from '@elysiumjs/olympus';
 
 import { CONTROLLER, quote } from './render';
 

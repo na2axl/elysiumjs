@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Application } from '@elysiumjs/core';
+import { Application } from '@elysiumjs/olympus';
 import { afterAll, afterEach, beforeAll, describe, expect, it, jest, mock, spyOn } from 'bun:test';
 import * as d from 'drizzle-orm/pg-core';
 

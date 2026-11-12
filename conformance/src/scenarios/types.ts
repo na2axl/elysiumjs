@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Application } from '@elysiumjs/core';
+import type { Application } from '@elysiumjs/olympus';
 
 /**
  * A runtime-agnostic scenario: a fresh application and the requests driven through it.

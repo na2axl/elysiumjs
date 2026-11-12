@@ -16,7 +16,7 @@
  * A small Elysium app, built the way a Cloudflare Workers entry builds it, for the AOT gate.
  */
 
-import { Application, Http, Middleware, Module, Service, t } from '@elysiumjs/core';
+import { Application, Http, Middleware, Module, Service, t } from '@elysiumjs/olympus';
 
 import { createRuntime } from '../../src/index';
 

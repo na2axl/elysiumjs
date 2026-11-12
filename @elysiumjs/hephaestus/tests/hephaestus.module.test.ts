@@ -15,7 +15,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { Application } from '@elysiumjs/core';
+import { Application } from '@elysiumjs/olympus';
 import { describe, expect, it } from 'bun:test';
 
 import { HephaestusModule } from '../src';

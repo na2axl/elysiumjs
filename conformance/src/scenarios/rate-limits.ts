@@ -14,7 +14,7 @@
 
 import type { Scenario } from './types';
 
-import { Application, Http, MemoryRateLimitStore, Module, RateLimit } from '@elysiumjs/core';
+import { Application, Http, MemoryRateLimitStore, Module, RateLimit } from '@elysiumjs/olympus';
 
 const make = async (): Promise<Application> => {
 	@Http.controller('/limited')
