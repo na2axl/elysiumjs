@@ -1,5 +1,11 @@
 # @elysiumjs/mnemosyne-drizzle
 
+## 0.9.1
+
+### Patch Changes
+
+- [#101](https://github.com/na2axl/elysiumjs/pull/101) [`aaaac89`](https://github.com/na2axl/elysiumjs/commit/aaaac89cc5c92e4e036da2c842a629733951733f) Thanks [@na2axl](https://github.com/na2axl)! - The bundle loads on Cloudflare Workers: the default Bun SQL driver and `migration:generate` read the module `require` only when they run, so the bundle has no top-level `createRequire(import.meta.url)`, which throws where `import.meta.url` is undefined.
+
 ## 0.9.0
 
 ### Minor Changes
