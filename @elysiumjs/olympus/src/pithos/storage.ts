@@ -281,13 +281,18 @@ export class Storage extends Port('storage') {
 		return disk;
 	}
 
+	/** The name of the default disk of the application. */
+	public static defaultDisk(): string {
+		return Service.get<DiskSource>(PITHOS_DISKS)?.defaultDisk ?? 'default';
+	}
+
 	/**
 	 * Replaces a disk with an empty memory disk until `restore()`, for tests.
 	 * @param name The name of the disk; the default disk without one.
 	 * @param options The options of the memory disk, such as its URL.
 	 */
 	public static fake(name?: string, options: MemoryDiskLike = {}): StorageDriver {
-		const wanted = name ?? Service.get<DiskSource>(PITHOS_DISKS)?.defaultDisk ?? 'default';
+		const wanted = name ?? Storage.defaultDisk();
 		const disk = Storage.for('memory' as never, options as never) as StorageDriver;
 		fakes.set(wanted, disk);
 		return disk;

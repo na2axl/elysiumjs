@@ -65,7 +65,8 @@
 		"./dist/index.js",
 		"./src/index.ts",
 		"./src/lock.ts",
-		"./src/hermes.ts"
+		"./src/hermes.ts",
+		"./src/pithos.ts"
 	],
 	"peerDependencies": {
 		"@elysiumjs/olympus": "workspace:^",

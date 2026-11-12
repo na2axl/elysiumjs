@@ -12,6 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+export type {
+	FileCondition,
+	FileEvent,
+	FileExpectation,
+	FileOwner,
+	FilePatch,
+	FileRecord,
+	FilesOptions,
+	FileStatus,
+	FileStoreDriver
+} from './files';
 export type { MemoryDiskOptions } from './memory';
 export type { PithosModuleConfig } from './pithos.module';
 export type { ServedSigning } from './signing';
@@ -26,9 +37,43 @@ export type {
 	StoredObject
 } from './storage';
 
+export {
+	DuplicateUploadPurposeError,
+	FileNotReadyError,
+	FilesUnavailableError,
+	MissingUploadPurposeServiceError,
+	UploadExpiredError,
+	UploadMissingError,
+	UploadNotPendingError,
+	UploadPurposeUnknownError,
+	UploadRejectedError,
+	UploadTooLargeError,
+	UploadTooManyPendingError,
+	UploadTypeNotAllowedError
+} from './errors';
+export {
+	Files,
+	FileStore,
+	meets,
+	MemoryFileStore,
+	PITHOS_FILE_DELETED,
+	PITHOS_FILE_READY,
+	PITHOS_FILE_REJECTED,
+	stagingKey
+} from './files';
 export { MemoryDisk } from './memory';
 export { PithosModule } from './pithos.module';
 export { StorageController } from './storage.controller';
+export {
+	FINISH_UPLOAD_ERRORS,
+	type FinishUploadErrors,
+	OPEN_UPLOAD_ERRORS,
+	type OpenUploadErrors,
+	Upload,
+	type UploadRequest,
+	Uploads,
+	type UploadTicket
+} from './uploads';
 export {
 	assertKey,
 	DEFAULT_LIST_LIMIT,

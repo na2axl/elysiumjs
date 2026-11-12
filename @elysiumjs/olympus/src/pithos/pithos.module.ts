@@ -12,12 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { FilesOptions, FilesSource, FileStoreDriver } from './files';
 import type { DiskSource, StorageDriver } from './storage';
 
 import { Module } from '../module';
+import { FILES_DEFAULTS, FileStore, PITHOS_FILES } from './files';
 import { PITHOS_DISKS, Storage } from './storage';
 import { StorageController } from './storage.controller';
 
+import './files';
 import './memory';
 
 type Option<T> = T | (() => T);
@@ -31,6 +34,8 @@ export type PithosModuleConfig = {
 	disks?: Record<string, Option<StorageDriver>>;
 	/** The disk `Storage.disk()` answers without a name. Defaults to the first disk. */
 	default?: string;
+	/** Where file records are kept and how files live. The store defaults to `memory`. */
+	files?: FilesOptions & { store?: Option<FileStoreDriver> };
 };
 
 /**
@@ -69,6 +74,18 @@ export type PithosModuleConfig = {
 						built.set(name, disk);
 						return disk;
 					}
+				};
+			}
+		},
+		{
+			name: PITHOS_FILES,
+			global: true,
+			factory: (): FilesSource => {
+				const { store, ...options } = config.files ?? {};
+				const option = store ?? (() => FileStore.for('memory'));
+				return {
+					store: typeof option === 'function' ? option() : option,
+					options: { ...FILES_DEFAULTS, ...options }
 				};
 			}
 		}

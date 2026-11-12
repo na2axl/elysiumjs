@@ -17,7 +17,7 @@
 	"scripts": {
 		"format": "prettier --write \"./src/**/*.ts\"",
 		"clean": "rimraf dist",
-		"build:js": "bun build ./src/index.ts ./src/heracles/index.ts ./src/mnemosyne/index.ts ./src/moirai/index.ts ./src/ariadne/index.ts ./src/themis/index.ts ./src/cerberus/index.ts ./src/moirai/heracles.ts ./src/harpocrates/index.ts ./src/hermes/index.ts ./src/hermes/heracles.ts ./src/pithos/index.ts --outdir ./dist --target node --packages external --splitting --root ./src --minify-syntax --minify-whitespace",
+		"build:js": "bun build ./src/index.ts ./src/heracles/index.ts ./src/mnemosyne/index.ts ./src/moirai/index.ts ./src/ariadne/index.ts ./src/themis/index.ts ./src/cerberus/index.ts ./src/moirai/heracles.ts ./src/harpocrates/index.ts ./src/hermes/index.ts ./src/hermes/heracles.ts ./src/pithos/index.ts ./src/pithos/heracles.ts --outdir ./dist --target node --packages external --splitting --root ./src --minify-syntax --minify-whitespace",
 		"build:ts": "tsc",
 		"build": "bun run clean && bun run build:js && bun run build:ts",
 		"typecheck": "tsc --noEmit && tsc -p tsconfig.types.json",
@@ -85,6 +85,10 @@
 		"./pithos": {
 			"types": "./dist/pithos/index.d.ts",
 			"import": "./dist/pithos/index.js"
+		},
+		"./pithos/heracles": {
+			"types": "./dist/pithos/heracles.d.ts",
+			"import": "./dist/pithos/heracles.js"
 		}
 	},
 	"files": [
@@ -108,6 +112,7 @@
 		"./src/hermes/heracles.ts",
 		"./src/hermes/channels/*.ts",
 		"./src/pithos/index.ts",
+		"./src/pithos/files.ts",
 		"./src/pithos/memory.ts",
 		"./src/pithos/pithos.module.ts",
 		"./dist/index.js",
@@ -128,6 +133,7 @@
 		"elysia": "^2.0.0-rc.1",
 		"emittery": "^2.2.0",
 		"exact-mirror": "^1.2.6",
+		"file-type": "^22.3.0",
 		"http-status": "^2.1.0",
 		"jose": "^6.2.15",
 		"keyv": "^5.6.0",
