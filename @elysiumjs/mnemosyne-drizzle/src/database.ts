@@ -21,6 +21,7 @@ import { ElysiumError } from '@elysiumjs/core';
 import { AbstractDatabase, getCurrentTenant, getTenancyConfig } from '@elysiumjs/mnemosyne';
 import { sql } from 'drizzle-orm';
 
+import { bunRequire } from './bun-require';
 import { DrizzleDatabaseCache } from './cache';
 import { MissingDriverError } from './driver';
 import { templateClientMigrations } from './migration-clients';
@@ -81,9 +82,7 @@ const defaultDriver = (props: Record<string, unknown>, name: string): DrizzleDri
 	if (typeof (globalThis as { Bun?: unknown }).Bun === 'undefined') {
 		throw new MissingDriverError(name);
 	}
-	const { drizzle } = (import.meta as unknown as { require(id: string): any }).require(
-		'drizzle-orm/bun-sql'
-	);
+	const { drizzle } = bunRequire()!('drizzle-orm/bun-sql');
 	const client = 'client' in props ? { client: props.client } : { connection: props.connection };
 	return {
 		name: 'bun-sql',

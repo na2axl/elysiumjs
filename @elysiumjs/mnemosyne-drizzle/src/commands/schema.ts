@@ -26,6 +26,8 @@ import {
 	PgView
 } from 'drizzle-orm/pg-core';
 
+import { bunRequire } from '../bun-require';
+
 /**
  * A schema object found in a project file: the export that holds it, and the keys that lead to it
  * when the export is an object grouping several of them.
@@ -113,12 +115,9 @@ export const findSchemaExports = (
  * file again gives back its exports without running it.
  * @author Axel Nana <axel.nana@workbud.com>
  * @param projectPath The root of the project.
- * @param loaded The paths of the loaded files. Defaults to the module cache.
+ * @param loaded The paths of the loaded files, the keys of the module cache.
  */
-export const loadedProjectFiles = (
-	projectPath: string,
-	loaded: Iterable<string> = Object.keys(require.cache)
-): string[] => {
+export const loadedProjectFiles = (projectPath: string, loaded: Iterable<string>): string[] => {
 	const root = resolve(projectPath) + sep;
 	return [...loaded]
 		.map((file) => resolve(file))
@@ -138,8 +137,11 @@ export const loadedProjectFiles = (
  * @param projectPath The root of the project.
  */
 export const collectAppSchema = async (projectPath: string): Promise<SchemaExport[]> => {
+	// Loaded on use, and only off Bun: this module also loads on Workers, which have no module cache.
+	const cache =
+		bunRequire()?.cache ?? (await import('node:module')).createRequire(import.meta.url).cache;
 	const modules: [string, Record<string, unknown>][] = [];
-	for (const file of loadedProjectFiles(projectPath)) {
+	for (const file of loadedProjectFiles(projectPath, Object.keys(cache))) {
 		modules.push([file, await import(file)]);
 	}
 	return findSchemaExports(modules);
