@@ -77,7 +77,14 @@ class Charge extends Action<{ amount: number }> {
 
 @Action.register({ name: 'queued.remind', errors: [], input: t.Object({ at: t.Date() }) })
 class Remind extends Action<{ at: Date }> {
-	public handle(_input: { at: Date }) {}
+	public handle(input: { at: Date }) {
+		ran.push(`remind ${input.at instanceof Date ? input.at.toISOString() : typeof input.at}`);
+	}
+}
+
+@Action.register({ name: 'queued.store', errors: [], input: t.Object({ data: t.Any() }) })
+class Store extends Action<{ data: unknown }> {
+	public handle(_input: { data: unknown }) {}
 }
 
 @Action.register({ name: 'queued.once', errors: [], retry: false })
@@ -180,11 +187,18 @@ describe('Moirai.enqueue', () => {
 		expect(ran).toEqual([]);
 	});
 
+	it('carries dates in the input', async () => {
+		await boot();
+		await Moirai.enqueue(Remind, { at: new Date('2026-01-01T00:00:00Z') }).orThrow();
+		await MemoryTransport.settled();
+		expect(ran).toEqual(['remind 2026-01-01T00:00:00.000Z']);
+	});
+
 	it('refuses an input that does not survive JSON', async () => {
 		await boot();
-		await expect(Moirai.enqueue(Remind, { at: new Date() }).orThrow()).rejects.toBeInstanceOf(
-			QueuedInputError
-		);
+		await expect(
+			Moirai.enqueue(Store, { data: new Map([['a', 1]]) }).orThrow()
+		).rejects.toBeInstanceOf(QueuedInputError);
 	});
 
 	it('refuses an action whose name another class took', async () => {

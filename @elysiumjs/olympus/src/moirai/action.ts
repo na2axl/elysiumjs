@@ -32,6 +32,7 @@ import {
 	DATABASE_TRANSACTION_SERVICE,
 	DomainError,
 	getLogger,
+	Json,
 	Metadata,
 	Result,
 	Service
@@ -676,8 +677,8 @@ export namespace Moirai {
 	 * when it rolls back.
 	 *
 	 * Needs `ActionJob` from `@elysiumjs/olympus/moirai/heracles` in the `jobs` of a loaded
-	 * module. The input travels as JSON: an input that does not survive JSON, such as a `Date`,
-	 * is refused.
+	 * module. The input travels as JSON, dates included (see `Json`): an input that does not
+	 * come back from it as it was, such as a `Map` or a class instance, is refused.
 	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param action The action class.
 	 * @param args The raw input, left out when `handle()` takes none, and the queue, idempotency
@@ -728,8 +729,10 @@ export namespace Moirai {
 		if (props.idempotent && !call.idempotencyKey) {
 			throw new IdempotencyKeyRequiredError(props.name);
 		}
-		const carried = JSON.parse(JSON.stringify(value ?? null)) ?? undefined;
-		if (!Value.Equal(carried, value ?? undefined)) throw new QueuedInputError(props.name);
+		if (value !== undefined && !Json.survives(value)) {
+			throw new QueuedInputError(props.name);
+		}
+		const carried = Json.encode(value);
 		const queue = call.queue ?? props.queue ?? 'default';
 		const ids = await actionQueue(
 			{
@@ -931,7 +934,7 @@ export const runQueuedAction = async (queued: QueuedRun): Promise<Result<unknown
 		authorized: true
 	};
 	const result = await settle(action, () =>
-		inOwnerModule(action, () => runAction(action, props, queued.input as never, call))
+		inOwnerModule(action, () => runAction(action, props, Json.decode(queued.input), call))
 	);
 	if (result.error instanceof InvalidInputError) throw result.error;
 	return result;
