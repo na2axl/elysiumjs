@@ -22,11 +22,16 @@ export type {
 	TransportProcessMessage
 } from './transport';
 export type { QueuedJob, QueueState, Worker, WorkerInfo, WorkerQueueOptions } from './worker';
-export type { RedisTransportOptions } from './transports/redis.transport';
 
 export { Cron, type CronSchedule, InvalidCronError } from './cron';
 export { HeraclesModule, type HeraclesModuleConfig } from './heracles.module';
-export { DuplicateJobError, JobRegistry, type JobRegistryEntry, QUEUES_SERVICE } from './registry';
+export {
+	DuplicateJobError,
+	HERACLES_LOCK,
+	JobRegistry,
+	type JobRegistryEntry,
+	QUEUES_SERVICE
+} from './registry';
 export {
 	type FanOutCase,
 	type JobSchedule,
@@ -42,9 +47,9 @@ export {
 } from './schedule';
 export { Heracles } from './heracles';
 export { Job, JobStatus, JobOverlapBehavior, WithId } from './job';
+export { getJobMetadata } from './utils';
 export { Queue } from './queue';
 export { TransportMode } from './transport';
-export { RedisTransport } from './transports/redis.transport';
+export { MemoryTransport } from './transports/memory.transport';
 export { WorkerStatus } from './worker';
 export { BaseWorker } from './workers/base.worker';
-export { RedisWorker } from './workers/redis.worker';

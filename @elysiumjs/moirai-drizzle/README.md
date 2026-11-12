@@ -45,15 +45,15 @@ import {
 	DrizzleIdempotencyStore,
 	DrizzleInboxStore,
 	DrizzleOutboxStore,
-	DrizzleProjectionStorage,
-	PgAdvisoryLock
+	DrizzleProjectionStorage
 } from '@elysiumjs/moirai-drizzle';
+import { Lock } from '@elysiumjs/olympus';
 
 MoiraiModule.with({
 	idempotency: () => new DrizzleIdempotencyStore({ table: billing.idempotencyKeys }),
 	outbox: () => new DrizzleOutboxStore({ table: billing.outbox }),
 	inbox: () => new DrizzleInboxStore({ table: billing.inbox }),
-	lock: () => new PgAdvisoryLock(),
+	lock: () => Lock.for('postgres'),
 	events: () => new DrizzleEventStore({ table: billing.events }),
 	projections: () => new DrizzleProjectionStorage({ table: billing.projections })
 });
@@ -64,6 +64,6 @@ MoiraiModule.with({
 - `DrizzleInboxStore` records the messages a consumer has processed.
 - `DrizzleEventStore` keeps the event streams of aggregates. An append locks each stream it writes with a transaction advisory lock and checks that the stream ends right before the first appended version, so a stale writer gets a `ConcurrencyConflictError` even when the unique key of the table spans more columns, such as a partition key. Postgres gives each event its `position` and the id of the transaction that wrote it (`transaction_id`).
 - `DrizzleProjectionStorage` resets the tables of the `models` of a projection (`DrizzleModel`s or Drizzle tables) with `DELETE` in the rebuild's transaction, so readers see the rows until it commits, and keeps the version each projection was built with.
-- `PgAdvisoryLock` serializes the actions that share a `serializeBy` key with a transaction advisory lock.
+- `PgAdvisoryLock` is the `postgres` driver of the `Lock` port. It serializes the actions that share a `serializeBy` key with a transaction advisory lock, which ends with the transaction.
 
 Each store takes `connection`, the name of a mnemosyne-drizzle connection, which defaults to `default`. A store's `table` needs the columns of the matching table in `moiraiTables`, and may add others: it can live in a domain's own `pgSchema` and have another primary key, such as a composite one. `StoreTable<T>` is the type it accepts.

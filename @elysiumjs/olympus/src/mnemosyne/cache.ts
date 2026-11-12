@@ -14,13 +14,11 @@
 
 import type { KeyvStoreAdapter } from 'keyv';
 
-import { Service, ServiceNotFoundError } from '../index';
 import { createCache } from 'cache-manager';
 import { Keyv } from 'keyv';
 import { alphabetical } from 'radash';
 
-/** Name of the global service backing `Cache.redis`. */
-export const REDIS_CACHE_SERVICE = 'mnemosyne.cache.redis';
+import { Service, ServiceNotFoundError } from '../index';
 
 /** Name of the global service backing `Cache.memory`. */
 export const MEMORY_CACHE_SERVICE = 'mnemosyne.cache.memory';
@@ -199,15 +197,6 @@ export abstract class Cache {
 	});
 
 	/**
-	 * Redis-based cache storage.
-	 * @author Axel Nana <ax.lnana@outlook.com>
-	 * @throws {ServiceNotFoundError} If the `MnemosyneModule` is not loaded or has no redis cache.
-	 */
-	public static get redis(): CacheInterface {
-		return getCache(REDIS_CACHE_SERVICE);
-	}
-
-	/**
 	 * Memory-based cache storage.
 	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @throws {ServiceNotFoundError} If the `MnemosyneModule` is not loaded or has no memory cache.
@@ -218,7 +207,7 @@ export abstract class Cache {
 
 	/**
 	 * A cache over a store given in `MnemosyneModule.with({ cache: { stores } })`, such as
-	 * Workers KV.
+	 * Redis or Workers KV.
 	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param name The store name.
 	 * @throws {ServiceNotFoundError} If the `MnemosyneModule` has no store with that name.

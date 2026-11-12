@@ -15,6 +15,9 @@
 import type { BackgroundScope, BackgroundWork, Static, TestingApp } from '../../src/index';
 import type { MoiraiOptions } from '../../src/moirai';
 
+import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'bun:test';
+
+import { Job, JobRegistry, WithId } from '../../src/heracles/index';
 import {
 	Application,
 	Background,
@@ -22,16 +25,14 @@ import {
 	ConflictError,
 	DomainError,
 	isDomainError,
+	MemoryLock,
 	Module,
 	NotFoundError,
 	Result,
 	Service,
 	t
 } from '../../src/index';
-import { Job, JobRegistry, WithId } from '../../src/heracles/index';
 import { UnitOfWork, withUnitOfWork } from '../../src/mnemosyne/index';
-import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'bun:test';
-
 import { HERACLES_JOB_EFFECT, InvalidOnceJobError, job, Once } from '../../src/moirai/heracles';
 import {
 	Action,
@@ -47,7 +48,6 @@ import {
 	InvalidInputError,
 	isTransientError,
 	LockOutsideUnitOfWorkError,
-	MemoryActionLock,
 	MemoryIdempotencyStore,
 	MemoryInboxStore,
 	MemoryOutboxStore,
@@ -107,7 +107,7 @@ beforeEach(() => {
 	Service.instance(MOIRAI_OUTBOX_STORE, outbox);
 	Service.instance(MOIRAI_IDEMPOTENCY_STORE, idempotency);
 	Service.instance(MOIRAI_INBOX_STORE, new MemoryInboxStore());
-	Service.instance(MOIRAI_ACTION_LOCK, new MemoryActionLock());
+	Service.instance(MOIRAI_ACTION_LOCK, new MemoryLock());
 	setOptions();
 });
 
@@ -977,6 +977,25 @@ describe('Moirai.lock', () => {
 		]);
 		expect(order.indexOf('a out')).toBeLessThan(order.indexOf('b in'));
 		expect(order.indexOf('c in')).toBeLessThan(order.indexOf('a out'));
+	});
+
+	it('takes the lock for lockTtl and lets it go once the unit of work commits', async () => {
+		const calls: string[] = [];
+		class SpyLock extends MemoryLock {
+			public override async acquire(key: string, ttl: number, opts?: { wait?: number }) {
+				calls.push(`acquire ${key} ${ttl}`);
+				return super.acquire(key, ttl, opts);
+			}
+			public override async release(handle: { key: string; token: string }) {
+				calls.push(`release ${handle.key} after ${log.at(-1)}`);
+				return super.release(handle);
+			}
+		}
+		Service.remove(MOIRAI_ACTION_LOCK);
+		Service.instance(MOIRAI_ACTION_LOCK, new SpyLock());
+		setOptions({ lockTtl: 1_234 });
+		await UnitOfWork.run(() => Moirai.lock('wallet:9'));
+		expect(calls).toEqual(['acquire wallet:9 1234', 'release wallet:9 after COMMIT']);
 	});
 
 	it('locks from an action handler, on a key read in the handler', async () => {

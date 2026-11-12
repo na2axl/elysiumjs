@@ -16,7 +16,6 @@ import type { StoredEvent, StoredEventClass, StoredEventMeta } from './stored-ev
 
 import { Clock, DATABASE_TRANSACTION_SERVICE, Service } from '../index';
 import { UnitOfWork } from '../mnemosyne/index';
-
 import { eventStore, inOwnerModule, projectionStorage } from './config';
 import { DuplicateStreamNameError } from './errors';
 import { StoredEvents } from './stored-event';
@@ -64,8 +63,8 @@ export const handlerInstance = (owner: Owner): Record<PropertyKey, Function> =>
  * class WalletMovements {
  * 	constructor(@Service.inject() private readonly movements: WalletMovementRepository) {}
  *
- * 	@Projection.on(KlapsSpent)
- * 	protected async spent(event: KlapsSpent, meta: StoredEventMeta) {
+ * 	@Projection.on(CreditsSpent)
+ * 	protected async spent(event: CreditsSpent, meta: StoredEventMeta) {
  * 		await this.movements.insert({ id: event.data.spendId, userId: meta.aggregateId });
  * 	}
  * }

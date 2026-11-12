@@ -14,18 +14,22 @@
 
 import type { BackgroundScope, BackgroundWork } from '../../src/index';
 
-import { Application, Background, Module, Service } from '../../src/index';
 import { afterEach, describe, expect, it, spyOn } from 'bun:test';
 
-import { HeraclesWorkCommand } from '../../src/heracles/commands';
+import { HeraclesScheduleCommand } from '../../src/heracles/commands';
 import { Heracles } from '../../src/heracles/heracles';
 import { HeraclesModule } from '../../src/heracles/heracles.module';
 import { Job } from '../../src/heracles/job';
 import { Queue } from '../../src/heracles/queue';
-import { DuplicateJobError, JobRegistry, QUEUES_SERVICE } from '../../src/heracles/registry';
+import {
+	DuplicateJobError,
+	HERACLES_LOCK,
+	JobRegistry,
+	QUEUES_SERVICE
+} from '../../src/heracles/registry';
 import { clearSchedulers, Scheduler } from '../../src/heracles/schedule';
-import { RedisTransport } from '../../src/heracles/transports/redis.transport';
-import { RedisWorker } from '../../src/heracles/workers/redis.worker';
+import { MemoryTransport } from '../../src/heracles/transports/memory.transport';
+import { Application, Background, Lock, Module, Service } from '../../src/index';
 
 @Service.register({ global: false })
 class Secret {
@@ -226,11 +230,11 @@ describe('HeraclesModule', () => {
 		expect(Queue.exists('module-test-q')).toBe(false);
 	});
 
-	it('shuts down cleanly with a real RedisTransport queue that was never started', async () => {
+	it('shuts down cleanly with a real transport queue that was never started', async () => {
 		app = await Application.testing({
 			modules: [
 				HeraclesModule.with({
-					queues: { 'never-started': { transport: RedisTransport as any } }
+					queues: { 'never-started': { transport: MemoryTransport } }
 				})
 			]
 		});
@@ -355,61 +359,44 @@ describe('HeraclesModule', () => {
 
 	it('runs a job inside its owning module context, across awaits', async () => {
 		app = await Application.testing({
-			modules: [HeraclesModule, BillingModule],
+			modules: [
+				HeraclesModule.with({ queues: { default: { transport: MemoryTransport } } }),
+				BillingModule
+			],
 			boot: 'eager'
 		});
 		seen = undefined;
-		const worker = new RedisWorker('default', { id: 'w1' }) as any;
-		let queued: unknown;
-		worker.sendJobStatusUpdate = async () => {};
-		worker.addJob = async (job: Job) => {
-			queued = { job, retries: 0 };
-		};
-		worker.queues.set('default', { activeJobs: new Map(), jobs: [] });
-		await worker.handleProcessJob('job_1', 'dispatch_1', JOB, [], 'default', {});
-		await worker.processJobInternal(queued, 'default');
+		await Heracles.dispatch(SendInvoiceJob, []);
+		await MemoryTransport.settled();
 		expect(seen).toBe('module-private');
 	});
 
 	it('injects services in execute() and runs the job in the background scopes', async () => {
 		app = await Application.testing({
-			modules: [HeraclesModule, ChargesModule],
+			modules: [
+				HeraclesModule.with({ queues: { default: { transport: MemoryTransport } } }),
+				ChargesModule
+			],
 			boot: 'eager'
 		});
 		seen = undefined;
 		scoped.length = 0;
-		const worker = new RedisWorker('default', { id: 'w3' }) as any;
-		let queued: unknown;
-		worker.sendJobStatusUpdate = async () => {};
-		worker.addJob = async (job: Job) => {
-			queued = { job, retries: 0 };
-		};
-		worker.queues.set('default', { activeJobs: new Map(), jobs: [] });
-		await worker.handleProcessJob(
-			'job_2',
-			'dispatch_2',
-			'elysium.heracles.job.ChargeJob',
-			[42],
-			'default',
-			{}
-		);
-		await worker.processJobInternal(queued, 'default');
+		await Heracles.dispatch(ChargeJob, [42]);
+		await MemoryTransport.settled();
 		expect(seen).toBe('module-private:42');
 		expect(scoped).toEqual(['job:ChargeJob']);
 	});
 
-	it('reports an unknown job as failed', async () => {
-		app = await Application.testing({ modules: [HeraclesModule], boot: 'eager' });
-		const worker = new RedisWorker('default', { id: 'w2' }) as any;
-		const calls: unknown[][] = [];
-		worker.sendJobStatusUpdate = async (...args: unknown[]) => {
-			calls.push(args);
-		};
-		await worker.handleProcessJob('j', 'd', JOB, [], 'default', {});
-		expect(calls.at(-1)?.[3]).toBe('failed');
+	it('boots the whole app before the schedule command runs', () => {
+		expect(HeraclesScheduleCommand.boot).toBe(true);
 	});
 
-	it('boots the whole app before the work command runs', () => {
-		expect(HeraclesWorkCommand.boot).toBe(true);
+	it('offers the configured lock to the scheduler, and none by default', async () => {
+		const lock = Lock.for('memory');
+		app = await Application.testing({ modules: [HeraclesModule.with({ lock })], boot: 'eager' });
+		expect(await Service.resolve(HERACLES_LOCK)).toBe(lock);
+		await app.shutdown();
+		app = await Application.testing({ modules: [HeraclesModule], boot: 'eager' });
+		expect(Service.exists(HERACLES_LOCK)).toBe(false);
 	});
 });

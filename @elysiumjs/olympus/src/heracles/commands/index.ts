@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export * from './clean.command';
 export * from './crons.command';
 export * from './list.command';
-export * from './work.command';
 export * from './schedule.command';

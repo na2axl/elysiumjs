@@ -102,7 +102,7 @@ The handler types (`WorkersMessageBatch`, `WorkersScheduledController`, `Workers
 
 ```ts
 MnemosyneModule.with({
-	cache: { redis: false, stores: { kv: () => new KeyvWorkersKV({ binding: 'CACHE' }) } }
+	cache: { stores: { kv: () => new KeyvWorkersKV({ binding: 'CACHE' }) } }
 });
 
 await Cache.store('kv').set('greeting', 'hello', 120_000);

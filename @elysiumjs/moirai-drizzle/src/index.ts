@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { LockAcquireOptions, LockHandle } from '@elysiumjs/olympus';
 import type {
-	ActionLock,
 	EventReadFilter,
 	EventStore,
 	IdempotencyRecord,
@@ -26,8 +26,8 @@ import type {
 	StoredEventRecord
 } from '@elysiumjs/olympus/moirai';
 
-import { Clock } from '@elysiumjs/olympus';
 import { Database, DrizzleTable } from '@elysiumjs/mnemosyne-drizzle';
+import { Clock, Lock, LockDriver } from '@elysiumjs/olympus';
 import { ConcurrencyConflictError, IdempotencyConflictError } from '@elysiumjs/olympus/moirai';
 import { and, asc, eq, gt, inArray, is, isNull, lt, lte, max, sql } from 'drizzle-orm';
 import {
@@ -335,18 +335,73 @@ export class DrizzleInboxStore implements InboxStore {
 	}
 }
 
-/**
- * Serializes actions with a Postgres advisory lock taken in the action's transaction, and
- * released when it ends.
- * @author Axel Nana <ax.lnana@outlook.com>
- */
-export class PgAdvisoryLock implements ActionLock {
-	constructor(private readonly options: { connection?: string } = {}) {}
+declare module '@elysiumjs/olympus' {
+	interface PortDrivers {
+		'lock:postgres': typeof PgAdvisoryLock;
+	}
+}
 
-	public async lock(key: string): Promise<void> {
-		await Database.getConnection(this.options.connection).execute(
-			sql`select pg_advisory_xact_lock(hashtextextended(${key}, 0))`
-		);
+/**
+ * Takes Postgres advisory locks in the current transaction: a lock lasts until the transaction
+ * ends, whatever its time to live, so `release` and `extend` do nothing. Use it inside a unit of
+ * work only, such as for the `serializeBy` key of an action or `Moirai.lock()`. Outside a
+ * transaction, the lock ends with its own statement and excludes nobody, so it does not suit the
+ * scheduler of `HeraclesModule`.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ * @example
+ * ```ts
+ * MoiraiModule.with({ lock: () => Lock.for('postgres') });
+ * ```
+ */
+@Lock.driver('postgres')
+export class PgAdvisoryLock extends LockDriver {
+	constructor(
+		private readonly options: {
+			/** The mnemosyne-drizzle connection. Defaults to `default`. */
+			connection?: string;
+			/** How long to wait between two tries of a bounded wait, in milliseconds. Defaults to 50. */
+			retryDelay?: number;
+		} = {}
+	) {
+		super();
+	}
+
+	public async acquire(
+		key: string,
+		_ttl: number,
+		options: LockAcquireOptions = {}
+	): Promise<LockHandle | null> {
+		const db = Database.getConnection(this.options.connection);
+		const wait = Math.max(0, options.wait ?? 0);
+		if (wait === Infinity) {
+			await db.execute(sql`select pg_advisory_xact_lock(hashtextextended(${key}, 0))`);
+			return { key, token: crypto.randomUUID() };
+		}
+		const deadline = Date.now() + wait;
+		for (;;) {
+			const result = await db.execute(
+				sql`select pg_try_advisory_xact_lock(hashtextextended(${key}, 0)) as taken`
+			);
+			const rows = (Array.isArray(result) ? result : (result as { rows?: unknown[] }).rows) ?? [];
+			if ((rows[0] as { taken?: boolean } | undefined)?.taken) {
+				return { key, token: crypto.randomUUID() };
+			}
+			const left = deadline - Date.now();
+			if (left <= 0) return null;
+			await new Promise((resolve) =>
+				setTimeout(resolve, Math.min(left, this.options.retryDelay ?? 50))
+			);
+		}
+	}
+
+	/** Does nothing: the lock ends with its transaction. */
+	public async release(_handle: LockHandle): Promise<boolean> {
+		return true;
+	}
+
+	/** Does nothing: the lock lasts until its transaction ends. */
+	public async extend(_handle: LockHandle, _ttl: number): Promise<boolean> {
+		return true;
 	}
 }
 

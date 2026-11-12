@@ -14,7 +14,7 @@
 
 import type { FlowStore } from '@elysiumjs/olympus/ariadne';
 
-import { bunRedis } from '@elysiumjs/olympus/redis';
+import { bunRedis } from '@elysiumjs/redis';
 import { afterAll, describe, expect, it } from 'bun:test';
 
 import { RedisFlowStore } from '../src';

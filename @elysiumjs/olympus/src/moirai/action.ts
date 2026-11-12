@@ -12,9 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Failed, Passed, ProblemClass, ServiceDefinition } from '../index';
 import type { Static, TSchema } from 'typebox';
+import type {
+	Failed,
+	LockDriver,
+	LockHandle,
+	Passed,
+	ProblemClass,
+	ServiceDefinition
+} from '../index';
 import type { MoiraiStores } from './moirai.module';
+
+import Value from 'typebox/value';
 
 import {
 	AsyncResult,
@@ -22,13 +31,12 @@ import {
 	currentUserId,
 	DATABASE_TRANSACTION_SERVICE,
 	DomainError,
+	getLogger,
 	Metadata,
 	Result,
 	Service
 } from '../index';
 import { UnitOfWork } from '../mnemosyne/index';
-import Value from 'typebox/value';
-
 import { actionLock, idempotencyStore, inOwnerModule, options } from './config';
 import {
 	CallForbiddenError,
@@ -49,6 +57,24 @@ const QUERY = Symbol.for('elysium:moirai:query');
  * What an action or a query handler receives besides its input.
  * @author Axel Nana <ax.lnana@outlook.com>
  */
+
+/**
+ * Lets go of a lock once the current unit of work commits or rolls back, or now outside one. A
+ * failed release is logged: the lock then ends with its time to live.
+ */
+const releaseWhenDone = async (lock: LockDriver, handle: LockHandle): Promise<void> => {
+	const release = async () => {
+		try {
+			await lock.release(handle);
+		} catch (error) {
+			getLogger().error('Could not release a moirai lock', { key: handle.key, error });
+		}
+	};
+	if (!UnitOfWork.active()) return release();
+	await UnitOfWork.afterCommit(release);
+	UnitOfWork.afterRollback(release);
+};
+
 export type HandlerContext = {
 	/** The name of the action or the query. */
 	name: string;
@@ -548,11 +574,11 @@ export namespace Moirai {
 	/**
 	 * Serializes the work that shares a key, from inside a handler, for a key known only once the
 	 * handler has read something (`serializeBy` takes it from the input). It waits for the other
-	 * holders of the key and holds it until the unit of work ends, with the action lock of the
-	 * module (`PgAdvisoryLock` takes a transaction-scoped advisory lock).
+	 * holders of the key and holds it until the unit of work ends, with the `lock` of the module
+	 * (the `postgres` driver takes a transaction-scoped advisory lock).
 	 *
 	 * Take the locks of one unit of work in the same order everywhere, and do not take a key twice
-	 * in one unit of work with `MemoryActionLock`, which is not reentrant.
+	 * in one unit of work: the memory driver is not reentrant.
 	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param key The key, such as `wallet:${walletId}`.
 	 * @throws {LockOutsideUnitOfWorkError} Outside a unit of work.
@@ -564,10 +590,10 @@ export namespace Moirai {
 	 */
 	export const lock = async (key: string): Promise<void> => {
 		if (!UnitOfWork.active()) throw new LockOutsideUnitOfWorkError(key);
-		const release = await actionLock().lock(key);
-		if (!release) return;
-		await UnitOfWork.afterCommit(release);
-		UnitOfWork.afterRollback(release);
+		const lock = actionLock();
+		const handle = await lock.acquire(key, options().lockTtl, { wait: Infinity });
+		if (!handle) return;
+		await releaseWhenDone(lock, handle);
 	};
 
 	/**
@@ -616,8 +642,9 @@ export namespace Moirai {
 			: undefined;
 
 		const body = async (attempt: number): Promise<ResultOf<C>> => {
-			const release = props.serializeBy
-				? await actionLock().lock(props.serializeBy(value))
+			const lock = props.serializeBy ? actionLock() : undefined;
+			const handle = lock
+				? await lock.acquire(props.serializeBy!(value), options().lockTtl, { wait: Infinity })
 				: undefined;
 			try {
 				const handler = instanceOf(action);
@@ -643,7 +670,9 @@ export namespace Moirai {
 				});
 				return response;
 			} finally {
-				release?.();
+				// In a unit of work, the lock lasts until it commits or rolls back, so that the next
+				// holder reads what this call wrote.
+				if (lock && handle) await releaseWhenDone(lock, handle);
 			}
 		};
 

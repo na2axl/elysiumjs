@@ -18,15 +18,14 @@ Add a runtime package too: `@elysiumjs/runtime-bun`, `@elysiumjs/runtime-node` o
 | `@elysiumjs/olympus/mnemosyne`       | Models, repositories, the query DSL, units of work, caches and seeders.                                                                                                                                        |
 | `@elysiumjs/olympus/moirai`          | Actions and queries, idempotency, outbox, inbox and domain events.                                                                                                                                             |
 | `@elysiumjs/olympus/moirai/heracles` | Outbox effect that dispatches heracles jobs. Import it once in the process that relays the outbox.                                                                                                             |
-| `@elysiumjs/olympus/heracles`        | Background jobs: queues, schedules, fan-out, retries and dead letters.                                                                                                                                         |
+| `@elysiumjs/olympus/heracles`        | Background jobs: queues, schedules, fan-out, retries and dead letters. `MemoryTransport` runs jobs in the process.                                                                                             |
 | `@elysiumjs/olympus/ariadne`         | Multi-step flows with server-side state and replayable steps.                                                                                                                                                  |
 | `@elysiumjs/olympus/themis`          | Authentication: passwords, tokens, sessions, guards, CSRF, TOTP, OAuth and passkeys.                                                                                                                           |
 | `@elysiumjs/olympus/themis/scrypt`   | `ScryptPasswordHasher`.                                                                                                                                                                                        |
 | `@elysiumjs/olympus/cerberus`        | Ability-based roles and permissions.                                                                                                                                                                           |
 | `@elysiumjs/olympus/hermes`          | Structured logging with JSON and pretty output and request logs.                                                                                                                                               |
-| `@elysiumjs/olympus/redis`           | Redis connections (ioredis and Upstash).                                                                                                                                                                       |
 
-Database drivers, stores and runtimes ship as separate packages, such as `@elysiumjs/mnemosyne-drizzle`.
+Database drivers, stores and runtimes ship as separate packages, such as `@elysiumjs/mnemosyne-drizzle` and `@elysiumjs/redis`.
 
 ## Usage
 
@@ -65,7 +64,7 @@ Create an application class. Modules that need configuration are bound to it wit
 ```typescript
 import { Application } from '@elysiumjs/olympus';
 import { HermesModule } from '@elysiumjs/olympus/hermes';
-import { RedisModule } from '@elysiumjs/olympus/redis';
+import { RedisModule } from '@elysiumjs/redis';
 
 import { MainModule } from './main.module';
 
@@ -247,6 +246,83 @@ Clock.reset();
 ```
 
 `freeze()` and `travel()` throw `ClockAdjustmentRefusedError` outside `development` and `test`. `Clock.use(source)` takes the time from another `ClockSource`. Durations that only measure the machine, such as request timings and locks, keep the real time.
+
+## Ports
+
+A port is an extension point whose drivers register by name. `Port(name)` makes one, `@X.driver(name)` registers a class, and `X.for(name, options)` builds the driver. The names and the options are typed by declaration merging, so a typo fails to compile.
+
+```ts
+import { Port } from '@elysiumjs/olympus';
+
+export interface SearchDriver {
+	query(index: string, text: string): Promise<object[]>;
+}
+
+declare module '@elysiumjs/olympus' {
+	interface Ports {
+		search: SearchDriver;
+	}
+	interface PortDrivers {
+		'search:meilisearch': typeof MeiliSearchDriver;
+	}
+}
+
+export class Search extends Port('search') {}
+
+@Search.driver('meilisearch')
+export class MeiliSearchDriver implements SearchDriver {
+	constructor(private readonly options: { url: string }) {}
+
+	public async query(index: string, text: string): Promise<object[]> {
+		// ...
+		return [];
+	}
+}
+
+const search = Search.for('meilisearch', { url: 'http://localhost:7700' });
+```
+
+`Search.drivers()` lists the registered names. `.for()` throws `UnknownPortDriverError` for a name nobody registered: import the package that provides it.
+
+## Locks
+
+`Lock` is a port: one holder per key at a time, until it lets go or its time to live ends. The `memory` driver ships here; backend packages add others, such as `redis` from `@elysiumjs/redis` and `postgres` from `@elysiumjs/moirai-drizzle`. Each domain takes its own lock: `HeraclesModule.with({ lock })` for scheduler ticks, `MoiraiModule.with({ lock })` for `serializeBy` and `Moirai.lock()`.
+
+```ts
+import { Lock } from '@elysiumjs/olympus';
+
+const lock = Lock.for('memory');
+
+const handle = await lock.acquire('report:daily', 60_000); // null when another holder has it
+if (handle) {
+	await lock.extend(handle, 60_000);
+	await lock.release(handle);
+}
+
+// Waits up to 5 seconds, runs the work, and lets go afterwards.
+const run = await lock.run('report:daily', 60_000, () => buildReport(), { wait: 5_000 });
+if (run.acquired) console.log(run.value);
+```
+
+The locks of `serializeBy` and `Moirai.lock()` are let go when their unit of work commits or rolls back. In case their holder dies first, they also end after `lockTtl` milliseconds (`MoiraiModule.with({ lockTtl: 30_000 })`, 60 seconds by default): keep it longer than your slowest unit of work.
+
+## Jobs in tests
+
+`MemoryTransport` runs the jobs of a queue in the process, with no worker or backend. In a test, `MemoryTransport.settled()` waits until every dispatched job, its retries included, has finished:
+
+```ts
+import { Heracles, HeraclesModule, MemoryTransport } from '@elysiumjs/olympus/heracles';
+
+const app = await Application.testing({
+	modules: [
+		HeraclesModule.with({ queues: { default: { transport: MemoryTransport } } }),
+		MailModule
+	]
+});
+
+await Heracles.dispatch(SendWelcomeMail, ['ada@example.com']);
+await MemoryTransport.settled();
+```
 
 ## Services
 

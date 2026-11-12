@@ -16,7 +16,6 @@ import type { Kernel, ModuleNode } from '../index';
 import type { Job, JobClass } from './job';
 
 import { ElysiumError, KERNEL_SERVICE, Service } from '../index';
-
 import { getJobMetadata } from './utils';
 
 /**
@@ -40,6 +39,9 @@ export type JobRegistryEntry = { jobClass: JobClass<Job>; module: ModuleNode };
 
 /** The name of the global service that creates the configured queues. */
 export const QUEUES_SERVICE = 'heracles.queues';
+
+/** Name of the global service holding the lock of `HeraclesModule.with({ lock })`. */
+export const HERACLES_LOCK = 'heracles.lock';
 
 let entries = new Map<string, JobRegistryEntry>();
 

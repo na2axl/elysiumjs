@@ -13,6 +13,7 @@
 	"dependencies": {
 		"@elysiumjs/mnemosyne-drizzle": "workspace:^",
 		"@elysiumjs/olympus": "workspace:^",
+		"@elysiumjs/redis": "workspace:^",
 		"@elysiumjs/runtime-bun": "workspace:^",
 		"@elysiumjs/styx": "workspace:^",
 		"radash": "catalog:"

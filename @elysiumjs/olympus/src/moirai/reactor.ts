@@ -49,9 +49,9 @@ const REACTORS: Registered[] = [];
  * ```ts
  * @Service.register()
  * class GiftReactor {
- * 	@Reactor.on(KlapsSpent, { when: (event) => event.data.purpose === 'gift' })
- * 	protected async gifted(event: KlapsSpent, meta: StoredEventMeta) {
- * 		await Event.publish('KlapsGifted', { buyerId: meta.aggregateId, klaps: event.data.klaps });
+ * 	@Reactor.on(CreditsSpent, { when: (event) => event.data.purpose === 'gift' })
+ * 	protected async gifted(event: CreditsSpent, meta: StoredEventMeta) {
+ * 		await Event.publish('CreditsGifted', { buyerId: meta.aggregateId, credits: event.data.credits });
  * 	}
  * }
  * ```

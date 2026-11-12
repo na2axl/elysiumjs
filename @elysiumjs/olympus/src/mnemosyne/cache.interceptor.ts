@@ -26,10 +26,10 @@ export type CacheInterceptorOptions = {
 	ttl: number;
 
 	/**
-	 * The cache: `memory` (the default), `redis`, or the name of a store given in
+	 * The cache: `memory` (the default), or the name of a store given in
 	 * `MnemosyneModule.with({ cache: { stores } })`.
 	 */
-	store?: 'memory' | 'redis' | (string & {});
+	store?: 'memory' | (string & {});
 
 	/**
 	 * Builds the cache key of a request. Defaults to the tenant, the method, the path and the query
@@ -39,7 +39,7 @@ export type CacheInterceptorOptions = {
 };
 
 const resolveStore = (store: string): CacheInterface =>
-	store === 'memory' ? Cache.memory : store === 'redis' ? Cache.redis : Cache.store(store);
+	store === 'memory' ? Cache.memory : Cache.store(store);
 
 const defaultKey = (ctx: InterceptorContext): string => {
 	const url = new URL(ctx.request.url);

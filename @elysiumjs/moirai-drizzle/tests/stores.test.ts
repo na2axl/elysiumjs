@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Service } from '@elysiumjs/olympus';
 import { applyTableMarkers, getTableMarker } from '@elysiumjs/mnemosyne-drizzle';
+import { Lock, Service } from '@elysiumjs/olympus';
 import { ConcurrencyConflictError, IdempotencyConflictError } from '@elysiumjs/olympus/moirai';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import {
@@ -254,21 +254,62 @@ describe('moirai stores', () => {
 		);
 	});
 
-	it('takes an advisory lock in the transaction', async () => {
-		await new PgAdvisoryLock().lock('wallet:1');
+	it('waits for an advisory lock in the transaction', async () => {
+		const handle = await new PgAdvisoryLock().acquire('wallet:1', 60_000, { wait: Infinity });
+		expect(handle?.key).toBe('wallet:1');
 		expect(fake.log[0]).toMatchObject({
 			query: 'select pg_advisory_xact_lock(hashtextextended($1, 0))',
 			params: ['wallet:1']
 		});
 	});
 
+	it('tries an advisory lock once without a wait', async () => {
+		answer = () => [{ taken: false }];
+		expect(await new PgAdvisoryLock().acquire('wallet:1', 60_000)).toBeNull();
+		expect(fake.log[0]).toMatchObject({
+			query: 'select pg_try_advisory_xact_lock(hashtextextended($1, 0)) as taken',
+			params: ['wallet:1']
+		});
+		answer = () => [{ taken: true }];
+		expect(await new PgAdvisoryLock().acquire('wallet:1', 60_000)).not.toBeNull();
+	});
+
+	it('retries an advisory lock within a bounded wait', async () => {
+		let tries = 0;
+		answer = () => [{ taken: ++tries === 3 }];
+		const lock = new PgAdvisoryLock({ retryDelay: 1 });
+		expect(await lock.acquire('wallet:1', 60_000, { wait: 1_000 })).not.toBeNull();
+		expect(tries).toBe(3);
+	});
+
+	it('gives up on an advisory lock once a bounded wait ends', async () => {
+		answer = () => [{ taken: false }];
+		const started = Date.now();
+		const lock = new PgAdvisoryLock({ retryDelay: 5 });
+		expect(await lock.acquire('wallet:1', 60_000, { wait: 30 })).toBeNull();
+		expect(Date.now() - started).toBeGreaterThanOrEqual(25);
+		expect(fake.log.length).toBeGreaterThan(1);
+	});
+
+	it('reads the answer of drivers that return { rows }', async () => {
+		Service.remove('db.connection.default');
+		Service.instance('db.connection.default', {
+			execute: async () => ({ rows: [{ taken: true }] })
+		} as never);
+		expect(await new PgAdvisoryLock().acquire('wallet:1', 60_000)).not.toBeNull();
+	});
+
+	it('registers as the postgres lock driver', () => {
+		expect(Lock.for('postgres')).toBeInstanceOf(PgAdvisoryLock);
+	});
+
 	const event = {
 		aggregateId: 'u-1',
 		aggregateType: 'wallet',
 		version: 3,
-		type: 'KlapsSpent',
+		type: 'CreditsSpent',
 		schemaVersion: 2,
-		data: { klaps: '5' },
+		data: { credits: '5' },
 		metadata: { actor: 'user:1' },
 		occurredAt: new Date(0)
 	};
@@ -278,9 +319,9 @@ describe('moirai stores', () => {
 		aggregate_id: 'u-1',
 		aggregate_type: 'wallet',
 		version: 3,
-		type: 'KlapsSpent',
+		type: 'CreditsSpent',
 		schema_version: 2,
-		data: { klaps: '5' },
+		data: { credits: '5' },
 		metadata: { actor: 'user:1' },
 		occurred_at: new Date(0)
 	};
@@ -300,7 +341,7 @@ describe('moirai stores', () => {
 			'where (("billing"."events"."aggregate_id" = $1) and ("billing"."events"."version" > $2)) order by "billing"."events"."version" asc'
 		);
 
-		await store.readAll({ types: ['KlapsSpent'], afterPosition: 6n, limit: 10 });
+		await store.readAll({ types: ['CreditsSpent'], afterPosition: 6n, limit: 10 });
 		expect(queries()[1]).toContain(
 			'where (("billing"."events"."position" > $1) and ("billing"."events"."type" in ($2))) order by "billing"."events"."position" asc limit $3'
 		);

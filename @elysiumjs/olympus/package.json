@@ -17,7 +17,7 @@
   "scripts": {
     "format": "prettier --write \"./src/**/*.ts\"",
     "clean": "rimraf dist",
-    "build:js": "bun build ./src/index.ts ./src/heracles/index.ts ./src/mnemosyne/index.ts ./src/moirai/index.ts ./src/ariadne/index.ts ./src/themis/index.ts ./src/cerberus/index.ts ./src/hermes/index.ts ./src/redis/index.ts ./src/moirai/heracles.ts ./src/themis/scrypt.ts --outdir ./dist --target node --packages external --splitting --root ./src --minify-syntax --minify-whitespace",
+    "build:js": "bun build ./src/index.ts ./src/heracles/index.ts ./src/mnemosyne/index.ts ./src/moirai/index.ts ./src/ariadne/index.ts ./src/themis/index.ts ./src/cerberus/index.ts ./src/hermes/index.ts ./src/moirai/heracles.ts ./src/themis/scrypt.ts --outdir ./dist --target node --packages external --splitting --root ./src --minify-syntax --minify-whitespace",
     "build:ts": "tsc",
     "build": "bun run clean && bun run build:js && bun run build:ts",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.types.json",
@@ -70,10 +70,6 @@
       "types": "./dist/hermes/index.d.ts",
       "import": "./dist/hermes/index.js"
     },
-    "./redis": {
-      "types": "./dist/redis/index.d.ts",
-      "import": "./dist/redis/index.js"
-    },
     "./moirai/heracles": {
       "types": "./dist/moirai/heracles.d.ts",
       "import": "./dist/moirai/heracles.js"
@@ -89,7 +85,9 @@
   ],
   "sideEffects": [
     "./src/index.ts",
+    "./src/lock.ts",
     "./src/moirai/heracles.ts",
+    "./dist/index.js",
     "./dist/moirai/heracles.js",
     "./dist/index-*.js"
   ],

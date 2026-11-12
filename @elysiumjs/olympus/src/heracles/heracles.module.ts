@@ -12,19 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { LockDriver, ServiceFactoryDefinition } from '../index';
 import type { QueueOptions } from './queue';
 
 import { Module, runAll } from '../index';
-
-import {
-	HeraclesCleanCommand,
-	HeraclesCronsCommand,
-	HeraclesListCommand,
-	HeraclesScheduleCommand,
-	HeraclesWorkCommand
-} from './commands';
+import { HeraclesCronsCommand, HeraclesListCommand, HeraclesScheduleCommand } from './commands';
 import { Queue } from './queue';
-import { JobRegistry, QUEUES_SERVICE } from './registry';
+import { HERACLES_LOCK, JobRegistry, QUEUES_SERVICE } from './registry';
 
 /**
  * Configuration of the {@link HeraclesModule}.
@@ -33,6 +27,12 @@ import { JobRegistry, QUEUES_SERVICE } from './registry';
 export type HeraclesModuleConfig = {
 	/** The queues to create, by name. */
 	queues?: Record<string, Omit<QueueOptions, 'name'>>;
+
+	/**
+	 * The lock each scheduler tick takes, so that several `heracles:schedule` processes dispatch
+	 * each tick once, such as `Lock.for('redis')`. Without it, every scheduler dispatches every tick.
+	 */
+	lock?: LockDriver;
 };
 
 /**
@@ -66,16 +66,19 @@ export class ConfiguredQueues {
  * @author Axel Nana <ax.lnana@outlook.com>
  */
 @Module.register<HeraclesModuleConfig>({
-	commands: [
-		HeraclesCleanCommand,
-		HeraclesCronsCommand,
-		HeraclesListCommand,
-		HeraclesScheduleCommand,
-		HeraclesWorkCommand
-	],
-	services: (config) => [
-		{ name: QUEUES_SERVICE, global: true, factory: () => new ConfiguredQueues(config.queues ?? {}) }
-	]
+	commands: [HeraclesCronsCommand, HeraclesListCommand, HeraclesScheduleCommand],
+	services: (config) => {
+		const services: ServiceFactoryDefinition[] = [
+			{
+				name: QUEUES_SERVICE,
+				global: true,
+				factory: () => new ConfiguredQueues(config.queues ?? {})
+			}
+		];
+		const lock = config.lock;
+		if (lock) services.push({ name: HERACLES_LOCK, global: true, factory: () => lock });
+		return services;
+	}
 })
 export class HeraclesModule extends Module.configurable<HeraclesModuleConfig>({
 	defaults: { queues: {} }

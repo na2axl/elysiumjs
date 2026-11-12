@@ -16,7 +16,6 @@ import type { CacheInterface } from './cache';
 import type { DatabaseCacheConfig, DatabaseDriver } from './interfaces';
 
 import { Application, Service, ServiceNotFoundError } from '../index';
-
 import { Cache } from './cache';
 
 /**
@@ -35,7 +34,8 @@ export { DATABASE_TRANSACTION_SERVICE } from '../index';
 export const createDatabaseCacheStorage = (
 	config: DatabaseCacheConfig
 ): Omit<CacheInterface, 'tags'> => {
-	return Cache[config.storage ?? 'redis'].tags('database');
+	const storage = config.storage ?? 'memory';
+	return (storage === 'memory' ? Cache.memory : Cache.store(storage)).tags('database');
 };
 
 /**

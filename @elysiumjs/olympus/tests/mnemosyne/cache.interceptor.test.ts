@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Application, Http, Module, Runtime } from '../../src/index';
 import { afterEach, beforeAll, describe, expect, it } from 'bun:test';
 
+import { Application, Http, Module, Runtime } from '../../src/index';
 import { CacheInterceptor, MnemosyneModule } from '../../src/mnemosyne';
 
 let calls = 0;
@@ -41,7 +41,7 @@ class CachedController {
 class CachedModule extends Module {}
 
 @Application.register({
-	modules: [MnemosyneModule.with({ cache: { redis: false } }), CachedModule],
+	modules: [MnemosyneModule, CachedModule],
 	openapi: false
 })
 class CachedApp extends Application {}

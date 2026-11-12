@@ -14,7 +14,6 @@
 
 import type { PasswordHasher } from './password';
 
-// portability-allow: this entry is the Node.js hasher, imported only where node:crypto exists
 import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
 
 type ScryptOptions = { N?: number; r?: number; p?: number; keyLength?: number };

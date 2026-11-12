@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { LockDriver } from '../index';
 import type { CronSchedule } from './cron';
 import type { JobClass } from './job';
 
@@ -24,8 +25,6 @@ import {
 	ModuleContext,
 	Service
 } from '../index';
-import { Redis } from '../redis/index';
-
 import { Cron } from './cron';
 import { Heracles } from './heracles';
 import { JobRegistry } from './registry';
@@ -300,10 +299,10 @@ export abstract class Scheduler<TJob extends JobClass<any, any> = JobClass<any, 
  */
 export type ScheduleRunnerOptions = {
 	/**
-	 * The Redis connection that holds the lock of each tick, so that one process dispatches it
-	 * when several run the scheduler. `false` runs without a lock. Defaults to `false`.
+	 * The lock each tick takes first, so that one process dispatches it when several run the
+	 * scheduler, such as `Lock.for('redis')`. Without it, every scheduler dispatches every tick.
 	 */
-	redis?: string | false;
+	lock?: LockDriver;
 	/** How long a tick's lock is kept, in milliseconds. Defaults to 60 seconds. */
 	lockTtl?: number;
 };
@@ -312,8 +311,8 @@ export type ScheduleRunnerOptions = {
 const MAX_WAIT = 24 * 60 * 60 * 1000;
 
 /**
- * Dispatches the scheduled jobs at their times, with in-process timers. With a Redis connection,
- * each tick takes a lock first, so that running it in several processes dispatches each tick once.
+ * Dispatches the scheduled jobs at their times, with in-process timers. With a lock, each tick
+ * takes it first, so that running it in several processes dispatches each tick once.
  * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class ScheduleRunner {
@@ -368,17 +367,13 @@ export class ScheduleRunner {
 
 	async #tick(job: ScheduledJob, at: Date): Promise<void> {
 		try {
-			if (this.#options.redis !== undefined && this.#options.redis !== false) {
+			const lock = this.#options.lock;
+			if (lock) {
+				// The lock is left to expire, so that a scheduler whose clock lags does not dispatch
+				// the tick again once the first one is done with it.
 				const key = `heracles:schedule:${job.name}:${job.schedule.cron.expression}:${at.toISOString()}`;
-				const ttl = String(this.#options.lockTtl ?? 60_000);
-				const taken = await Redis.getConnection(this.#options.redis).send('SET', [
-					key,
-					'1',
-					'NX',
-					'PX',
-					ttl
-				]);
-				if (taken !== 'OK') return;
+				const taken = await lock.acquire(key, this.#options.lockTtl ?? 60_000);
+				if (!taken) return;
 			}
 			await Scheduler.dispatch(job, at);
 		} catch (error) {
