@@ -25,6 +25,8 @@ Add a runtime package too: `@elysiumjs/bun`, `@elysiumjs/node` or `@elysiumjs/wo
 | `@elysiumjs/olympus/cerberus`        | Ability-based roles and permissions.                                                                                                                                                                                    |
 | `@elysiumjs/olympus/hermes`          | Notifications: channels with fallback chains, the inbox, mail and broadcast channels, queued notifications and test fakes.                                                                                              |
 | `@elysiumjs/olympus/hermes/heracles` | `NotificationJob`, which delivers queued notifications. List it in a module's `jobs`.                                                                                                                                   |
+| `@elysiumjs/olympus/pithos`          | Storage and files: disks (the `Storage` port and the `memory` disk), signed URLs, file records (the `FileStore` port), claims and deferred uploads.                                                                     |
+| `@elysiumjs/olympus/pithos/heracles` | `FilesPruner`, the base of the job that prunes files.                                                                                                                                                                   |
 
 Database drivers, stores and runtimes ship as separate packages, such as `@elysiumjs/drizzle` and `@elysiumjs/redis`.
 
@@ -713,6 +715,148 @@ mails.assertNothingSent();
 ```
 
 A faked notification records what `channels()` answered for each notifiable, and delivers nothing; a queued one still has its data and routes checked. `restore()`, or the end of a `using` block, turns a fake off, and `HermesModule` turns both off when the application stops.
+
+## Storage and files
+
+`@elysiumjs/olympus/pithos` stores files on disks, follows each file in a record, and lets clients upload straight to a disk.
+
+### Disks
+
+`Storage` is a port. A disk stores objects under keys such as `avatars/42.webp`: `put(key, body, { contentType, metadata })`, `get(key)` (a stream with `bytes()` and `text()`), `head`, `exists`, `delete`, `list({ prefix, cursor, limit })`, `copy`, `move`, `url(key)` for a public disk and `signedUrl(key, { method, expiresIn, contentType, contentLength })` for direct downloads and uploads. A key is a relative path: an empty segment, `.`, `..` or a backslash is refused.
+
+The `memory` disk ships here. The runtime packages add the others: `local` from `@elysiumjs/node` (`node:fs`), `bun` from `@elysiumjs/bun` (`Bun.file`), and `r2` from `@elysiumjs/workers`. `PithosModule` gives the disks of the application names, and `Storage.disk(name)` answers them, the default disk without a name:
+
+```ts
+import '@elysiumjs/node';
+
+import { PithosModule, Storage } from '@elysiumjs/olympus/pithos';
+
+PithosModule.with({
+	disks: {
+		public: () =>
+			Storage.for('local', { root: './storage/public', url: 'https://cdn.example.com' }),
+		uploads: () =>
+			Storage.for('local', {
+				root: './storage/uploads',
+				signing: { url: 'https://api.example.com/storage/uploads', secret: env.STORAGE_SECRET }
+			})
+	},
+	default: 'public'
+});
+
+await Storage.disk().put('reports/2026-01.csv', csv, { contentType: 'text/csv' });
+```
+
+A disk that cannot sign URLs itself, such as `memory`, `local` or `bun`, signs them with `signing`, and `PithosModule` serves them on `/storage/:disk/*`: `GET` downloads the object and `PUT` uploads it, with the content type and size the URL was signed for. `signing.url` is that route followed by the name of the disk.
+
+`Storage.fake(name?)` replaces a disk with an empty memory disk until `Storage.restore()`, which `PithosModule` also calls when the application stops.
+
+### Files
+
+A file is an object of a disk with a record: its purpose, disk, key, content type, size, owner (`{ type, id }`), who uploaded it, and its status. One record follows a file from its upload to its deletion: `pending` while it is uploaded, then `ready`, or `rejected` when the uploaded file is not what was declared, `expired` when it was never uploaded, and `deleted` once its object is gone. The records live in the `FileStore` port: `memory` ships here, and `@elysiumjs/drizzle` adds `drizzle`.
+
+A ready file that nothing claims is deleted after `unclaimedTtl`. A feature keeps a file by claiming it, and lets it go by releasing it:
+
+```ts
+import { Files } from '@elysiumjs/olympus/pithos';
+
+// A profile keeps its new picture...
+const claimed = await Files.claim(input.pictureId, {
+	purpose: 'avatar',
+	owner: { type: 'user', id: user.id }
+});
+if (!claimed.check()) return claimed.error; // FILE_NOT_READY
+
+// ...and lets the previous one go.
+if (profile.pictureId) await Files.release(profile.pictureId);
+```
+
+`Files.ready(id, expect)` makes the same checks without claiming: ready, not past its time and, when given, of the purpose and the owner. `Files.release(id, grace?)` lets the file be deleted after `grace` seconds unless it is claimed again, `Files.remove(id)` deletes a ready file now, and `Files.url(file)` and `Files.signedUrl(file, expiresIn)` answer its URLs. Every change is a transition that applies only while the record still meets its condition, so two requests racing on a file cannot both win.
+
+`Files.prune(limit?)` deletes the files whose time is over: uploads never finished (their staged object) and ready files nothing claims (their object). A file claimed in the meantime is kept. Register a subclass of `FilesPruner`, from `@elysiumjs/olympus/pithos/heracles`, on a schedule to run it:
+
+```ts
+import { Job, Scheduler } from '@elysiumjs/olympus/heracles';
+import { FilesPruner } from '@elysiumjs/olympus/pithos/heracles';
+
+@Job.register({ queue: 'maintenance' })
+@Scheduler.job('*/15 * * * *')
+export class PruneFiles extends FilesPruner {}
+```
+
+`PithosModule.with({ files })` sets the store and how files live:
+
+```ts
+PithosModule.with({
+	disks,
+	files: {
+		store: () => FileStore.for('drizzle', { table: files }),
+		uploadTtl: 900, // seconds an upload URL works (default 15 minutes)
+		unclaimedTtl: 86_400, // seconds a ready file nothing claims is kept (default a day)
+		maxPending: 10 // uploads one person may have in progress (default 10)
+	}
+});
+```
+
+The `elysium:pithos:ready`, `elysium:pithos:rejected` and `elysium:pithos:deleted` lifecycle events carry the file.
+
+### Uploads
+
+An upload purpose says what files of a use may be and who may upload them. When the class is listed in the services of a module, the container builds it in that module, so it can inject what it needs:
+
+```ts
+import type { FileOwner } from '@elysiumjs/olympus/pithos';
+
+import { Upload } from '@elysiumjs/olympus/pithos';
+
+@Upload.purpose('avatar')
+@Service.register()
+export class AvatarUpload extends Upload {
+	constructor(@Service.inject() private readonly limits: UploadLimits) {
+		super();
+	}
+
+	get disk() {
+		return 'public';
+	} // the default disk without it
+	get types() {
+		return ['image/png', 'image/jpeg', 'image/webp'];
+	}
+	get maxBytes() {
+		return this.limits.avatarBytes;
+	}
+	get owners() {
+		return ['user'];
+	} // any kind of owner without it
+
+	authorize(owner: FileOwner, user: string | undefined) {
+		return owner.id === user;
+	}
+}
+```
+
+The client asks to upload, sends the bytes straight to the disk, then asks the server to finish. Here, with the signed-in user of `@elysiumjs/olympus/themis`:
+
+```ts
+@Http.post('/uploads', { errors: OPEN_UPLOAD_ERRORS })
+async open(@Http.body(StartUpload) body: StartUpload, @Auth.user() user: AuthUser) {
+	const ticket = await Uploads.open({ ...body, owner: { type: 'user', id: user.id }, user: user.id });
+	if (!ticket.check()) return ticket.error;
+	const { file, url, method, headers, expiresAt } = ticket.result;
+	return { id: file.id, url, method, headers, expiresAt }; // PUT the bytes to url with headers
+}
+
+@Http.post('/uploads/:id/finish', { errors: FINISH_UPLOAD_ERRORS })
+async finish(@Http.param('id') id: string, @Auth.user() user: AuthUser) {
+	return Uploads.finish(id, { user: user.id });
+}
+```
+
+`Uploads.open()` checks the request against its purpose (`UPLOAD_PURPOSE_UNKNOWN`, `UPLOAD_TYPE_NOT_ALLOWED` with `types`, `UPLOAD_TOO_LARGE` with `maxBytes`, `FORBIDDEN`, and `UPLOAD_TOO_MANY_PENDING` past `maxPending`), records a `pending` file, and answers a signed `PUT` URL for a staging key, signed for the declared content type and size. The URL never targets the key the file is served from, since a signed URL cannot be taken back.
+
+`Uploads.finish()` reads the staged object once, and refuses it for good (`UPLOAD_REJECTED`) unless its size, its stored content type and its first bytes, read with `file-type`, all match what was declared. Only then are those same bytes written to the file's key, the file made `ready`, and the staged object deleted, so an upload racing through the still valid URL cannot swap the bytes in between. Nothing uploaded yet answers `UPLOAD_MISSING`, and the client may upload and finish again; a finished upload answers `UPLOAD_NOT_PENDING` and an expired one `UPLOAD_EXPIRED`. A purpose whose types have no signature, such as `text/plain` or `image/svg+xml`, turns the content check off with `get sniff() { return false; }`.
+
+A ready file is served from `<purpose>/<id>` by default, so a new file is a new key and a served file can be cached for good; a purpose may override `key(file)`. `finish()` holds the file in memory while it checks it, so keep `maxBytes` to what a request may hold.
 
 ## Services
 
