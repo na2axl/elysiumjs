@@ -259,10 +259,13 @@ export { type LoggedOptions, Logged } from './logging/decorators/logged';
 export { type LogFormat, type LoggerConfig, type TransportConfig } from './logging/types';
 export { Json } from './json';
 export {
+	BigIntSerializer,
 	DateSerializer,
 	DuplicateSerializerError,
+	MapSerializer,
 	type RegisteredSerializer,
 	Serializer,
+	SetSerializer,
 	type SerializerOptions,
 	UnknownSerializerError
 } from './serializer';

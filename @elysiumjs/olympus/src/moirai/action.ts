@@ -729,7 +729,11 @@ export namespace Moirai {
 		if (props.idempotent && !call.idempotencyKey) {
 			throw new IdempotencyKeyRequiredError(props.name);
 		}
-		if (value !== undefined && !Json.survives(value)) {
+		// The raw input too: validation clones it, which turns class instances into plain objects.
+		if (
+			(input !== undefined && !Json.survives(input)) ||
+			(value !== undefined && !Json.survives(value))
+		) {
 			throw new QueuedInputError(props.name);
 		}
 		const carried = Json.encode(value);
