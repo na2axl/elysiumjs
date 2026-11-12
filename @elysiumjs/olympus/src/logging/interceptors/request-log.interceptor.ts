@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Interceptor, InterceptorContext } from '../../index';
+import type { Interceptor, InterceptorContext } from '../../interceptor';
 
-import { getLogger } from '../../index';
+import { getLogger } from '../../logger';
 
 /** The status of a thrown error: its own, or 500. */
 const statusOf = (error: unknown): number => {
@@ -30,7 +30,7 @@ const statusOf = (error: unknown): number => {
  * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
- * @Application.register({ modules: [HermesModule], interceptors: [RequestLogInterceptor] })
+ * @Application.register({ modules: [LoggerModule], interceptors: [RequestLogInterceptor] })
  * class App extends Application {}
  * ```
  */

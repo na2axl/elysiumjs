@@ -74,6 +74,7 @@ export {
 	createRLSPolicy
 } from './tenancy';
 export { PgAdvisoryLock } from './lock';
+export { DrizzleNotificationStore, notificationsTable, type NotificationsTable } from './hermes';
 export {
 	DrizzleEventStore,
 	DrizzleIdempotencyStore,

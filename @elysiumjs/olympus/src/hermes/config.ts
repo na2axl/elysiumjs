@@ -12,24 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { describe, expect, it } from 'bun:test';
+/** The service holding the notification store of the application. */
+export const HERMES_NOTIFICATION_STORE = 'hermes.notification-store';
 
-import { DEFAULT_CONFIG } from '../../src/hermes/types';
+/** The service holding the mail transport of the application. */
+export const HERMES_MAIL_TRANSPORT = 'hermes.mail-transport';
 
-describe('DEFAULT_CONFIG', () => {
-	it('should have info as default level', () => {
-		expect(DEFAULT_CONFIG.level).toBe('info');
-	});
+/** The service holding the mail renderer of the application. */
+export const HERMES_MAIL_RENDERER = 'hermes.mail-renderer';
 
-	it('should have json as default format', () => {
-		expect(DEFAULT_CONFIG.format).toBe('json');
-	});
+/** The service holding the options of `HermesModule`. */
+export const HERMES_OPTIONS = 'hermes.options';
 
-	it('should not have a name by default', () => {
-		expect(DEFAULT_CONFIG.name).toBeUndefined();
-	});
-
-	it('should not have transports by default', () => {
-		expect(DEFAULT_CONFIG.transports).toBeUndefined();
-	});
-});
+/** The name of the job that delivers queued notifications. */
+export const HERMES_NOTIFICATION_JOB = 'hermes.notification';

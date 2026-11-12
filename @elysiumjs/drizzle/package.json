@@ -64,7 +64,8 @@
 	"sideEffects": [
 		"./dist/index.js",
 		"./src/index.ts",
-		"./src/lock.ts"
+		"./src/lock.ts",
+		"./src/hermes.ts"
 	],
 	"peerDependencies": {
 		"@elysiumjs/olympus": "workspace:^",

@@ -1,13 +1,20 @@
 import type { ServerError } from '@elysiumjs/olympus';
 
 import { DrizzleModule } from '@elysiumjs/drizzle';
-import { Application, Env, getLogger, Middleware, Service, WampModule } from '@elysiumjs/olympus';
+import {
+	Application,
+	Env,
+	getLogger,
+	LoggerModule,
+	Middleware,
+	Service,
+	WampModule
+} from '@elysiumjs/olympus';
 import { HeraclesModule } from '@elysiumjs/olympus/heracles';
 
 import '@elysiumjs/pino';
 
 import { runtime as bunRuntime } from '@elysiumjs/bun';
-import { HermesModule } from '@elysiumjs/olympus/hermes';
 import { HeraclesRedisModule, RedisModule, RedisTransport } from '@elysiumjs/redis';
 import { StyxModule } from '@elysiumjs/styx';
 
@@ -20,7 +27,7 @@ import { env } from './env';
 @Application.register({
 	runtime: bunRuntime,
 	modules: [
-		HermesModule.with({ level: 'debug', format: 'pretty' }),
+		LoggerModule.with({ level: 'debug', format: 'pretty' }),
 		RedisModule.with(() => ({
 			default: 'cache',
 			connections: {

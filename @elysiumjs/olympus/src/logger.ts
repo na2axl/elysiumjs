@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { JsonConsoleLogger } from './hermes/services/json-console.logger';
+import type { JsonConsoleLogger } from './logging/services/json-console.logger';
 
 import { Container } from './container';
 import { Port } from './port';
@@ -60,17 +60,17 @@ declare module './port' {
 		logger: LoggerInterface;
 	}
 
-	// The `console` driver lives in `@elysiumjs/olympus/hermes`; it is declared here, with the
-	// port, so that its name is typed whatever order the app imports packages in.
+	// The `console` driver is declared here, with the port, so that its name is typed whatever
+	// order the app imports packages in.
 	interface PortDrivers {
 		'logger:console': typeof JsonConsoleLogger;
 	}
 }
 
 /**
- * The logger port: where structured log lines go. `@elysiumjs/olympus/hermes` registers the
- * `console` driver (JSON lines through `console`, with no dependency); logging packages add
- * others, such as `pino` from `@elysiumjs/pino`. `HermesModule.with({ transport })` picks one
+ * The logger port: where structured log lines go. The `console` driver (JSON lines through
+ * `console`, with no dependency) comes with olympus; logging packages add others, such as `pino`
+ * from `@elysiumjs/pino`. `LoggerModule.with({ transport })` picks one
  * by name for the app's `logger` service.
  * @author Axel Nana <ax.lnana@outlook.com>
  * @example
@@ -133,7 +133,7 @@ export const LOGGER_SERVICE = 'logger';
 
 /**
  * Resolves the application logger at call time: the `logger` service when one is registered
- * (e.g. by `@elysiumjs/olympus/hermes`), a {@link ConsoleLogger} otherwise or when it cannot be built
+ * (e.g. by `LoggerModule`), a {@link ConsoleLogger} otherwise or when it cannot be built
  * or fails to create the child logger. Only the global scope is searched, so a module's own
  * `logger` service never replaces the application logger.
  * @author Axel Nana <ax.lnana@outlook.com>

@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { LoggerInterface } from '../../index';
+import type { LoggerInterface } from '../../logger';
 import type { LogLevel } from '../types';
 
-import { getLogger } from '../../index';
+import { getLogger } from '../../logger';
 
 export interface LoggedOptions {
 	level?: LogLevel;

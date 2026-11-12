@@ -12,18 +12,19 @@ Add a runtime package too: `@elysiumjs/bun`, `@elysiumjs/node` or `@elysiumjs/wo
 
 ## Exports
 
-| Import                               | Contents                                                                                                                                                                                                       |
-| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@elysiumjs/olympus`                 | Application, modules, dependency injection, HTTP, WebSocket and WAMP controllers, middleware, interceptors, filters, problem details, configuration, environment, lifecycle events, console commands, OpenAPI. |
-| `@elysiumjs/olympus/mnemosyne`       | Models, repositories with events, pruning jobs, the query DSL, units of work, caches, seeders and an in-memory backend.                                                                                        |
-| `@elysiumjs/olympus/moirai`          | Actions and queries, idempotency, outbox, inbox and domain events.                                                                                                                                             |
-| `@elysiumjs/olympus/moirai/heracles` | Outbox effect that dispatches heracles jobs. Import it once in the process that relays the outbox.                                                                                                             |
-| `@elysiumjs/olympus/heracles`        | Background jobs: queues, schedules, fan-out, retries and dead letters. `MemoryTransport` runs jobs in the process.                                                                                             |
-| `@elysiumjs/olympus/ariadne`         | Multi-step flows with server-side state and replayable steps.                                                                                                                                                  |
-| `@elysiumjs/olympus/themis`          | Authentication: sessions, guards, API keys, CSRF, TOTP, OAuth and passkeys.                                                                                                                                    |
-| `@elysiumjs/olympus/harpocrates`     | Secrets and cryptography: password hashing (`Password` and the `PasswordHasher` port), encryption (the `Cipher` port), JWTs, signed URLs and hashing helpers.                                                  |
-| `@elysiumjs/olympus/cerberus`        | Ability-based roles and permissions.                                                                                                                                                                           |
-| `@elysiumjs/olympus/hermes`          | `HermesModule` (the app logger), the `console` logger driver, request logs and `@Logged()`.                                                                                                                    |
+| Import                               | Contents                                                                                                                                                                                                                |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@elysiumjs/olympus`                 | Application, modules, dependency injection, HTTP, WebSocket and WAMP controllers, middleware, interceptors, filters, problem details, configuration, environment, lifecycle events, logging, console commands, OpenAPI. |
+| `@elysiumjs/olympus/mnemosyne`       | Models, repositories with events, pruning jobs, the query DSL, units of work, caches, seeders and an in-memory backend.                                                                                                 |
+| `@elysiumjs/olympus/moirai`          | Actions and queries, idempotency, outbox, inbox and domain events.                                                                                                                                                      |
+| `@elysiumjs/olympus/moirai/heracles` | Outbox effect that dispatches heracles jobs. Import it once in the process that relays the outbox.                                                                                                                      |
+| `@elysiumjs/olympus/heracles`        | Background jobs: queues, schedules, fan-out, retries and dead letters. `MemoryTransport` runs jobs in the process.                                                                                                      |
+| `@elysiumjs/olympus/ariadne`         | Multi-step flows with server-side state and replayable steps.                                                                                                                                                           |
+| `@elysiumjs/olympus/themis`          | Authentication: sessions, guards, API keys, CSRF, TOTP, OAuth and passkeys.                                                                                                                                             |
+| `@elysiumjs/olympus/harpocrates`     | Secrets and cryptography: password hashing (`Password` and the `PasswordHasher` port), encryption (the `Cipher` port), JWTs, signed URLs and hashing helpers.                                                           |
+| `@elysiumjs/olympus/cerberus`        | Ability-based roles and permissions.                                                                                                                                                                                    |
+| `@elysiumjs/olympus/hermes`          | Notifications: channels with fallback chains, the inbox, mail and broadcast channels, queued notifications and test fakes.                                                                                              |
+| `@elysiumjs/olympus/hermes/heracles` | `NotificationJob`, which delivers queued notifications. List it in a module's `jobs`.                                                                                                                                   |
 
 Database drivers, stores and runtimes ship as separate packages, such as `@elysiumjs/drizzle` and `@elysiumjs/redis`.
 
@@ -62,8 +63,7 @@ export class MainModule extends Module {}
 Create an application class. Modules that need configuration are bound to it with `with()`:
 
 ```typescript
-import { Application } from '@elysiumjs/olympus';
-import { HermesModule } from '@elysiumjs/olympus/hermes';
+import { Application, LoggerModule } from '@elysiumjs/olympus';
 
 import '@elysiumjs/pino';
 
@@ -73,7 +73,7 @@ import { MainModule } from './main.module';
 
 @Application.register({
 	modules: [
-		HermesModule.with({ level: 'debug', format: 'pretty' }),
+		LoggerModule.with({ level: 'debug', format: 'pretty' }),
 		RedisModule.with({
 			default: 'cache',
 			connections: { cache: { url: process.env.REDIS_URL! } }
@@ -459,18 +459,17 @@ const phone = await cipher.decrypt(sealed, 'contacts.phone');
 
 ## Logging
 
-`getLogger()` answers the app's `logger` service, or a plain console logger when there is none. `HermesModule` from `@elysiumjs/olympus/hermes` provides that service from the `Logger` port, through the driver its `transport` names:
+`getLogger()` answers the app's `logger` service, or a plain console logger when there is none. `LoggerModule` provides that service from the `Logger` port, through the driver its `transport` names:
 
-- `console` (in `@elysiumjs/olympus/hermes`): one JSON object per line through `console`, with no dependency. The default on Cloudflare Workers, and wherever no other driver is loaded.
+- `console` (in olympus): one JSON object per line through `console`, with no dependency. The default on Cloudflare Workers, and wherever no other driver is loaded.
 - `pino` (in `@elysiumjs/pino`): JSON lines, or readable ones with `format: 'pretty'`. Importing the package registers it and makes it the default.
 
 ```ts
-import { getLogger } from '@elysiumjs/olympus';
-import { HermesModule } from '@elysiumjs/olympus/hermes';
+import { getLogger, LoggerModule } from '@elysiumjs/olympus';
 
 import '@elysiumjs/pino';
 
-HermesModule.with({ name: 'shop', level: 'debug', format: 'pretty' });
+LoggerModule.with({ name: 'shop', level: 'debug', format: 'pretty' });
 
 getLogger({ module: 'orders' }).info('Order placed', { orderId: 'o-1' });
 ```
@@ -561,6 +560,159 @@ List `ActionJob` in the `jobs` of one module, next to `HeraclesModule`, in the p
 The job runs without the caller's context, such as the current user: what the handler needs goes in the input, which travels as JSON, in clear. It is written with `Json`, so dates and the values of registered serializers come back as they were; an input that `Json.survives()` refuses, such as a function or a class instance without a serializer, is refused with `QueuedInputError`. The input is validated again once it is read back, so the schema of a value read by a serializer must accept its instance. The job finds the action by its name, so two action classes cannot share one (`DuplicateActionNameError`).
 
 A refusal of the handler ends the job, logged. A thrown error fails it, and Heracles retries it within the `maxRetries` of the queue (never for an action registered with `retry: false`). A job may run more than once, so give an action that must not an idempotency key: a second run replays the stored response. The job trusts its queue: `authorize` ran when the call was queued, so anything that can write to the queue can run any registered action.
+
+## Notifications
+
+A notification is a class built with its data. `channels()` says where it goes for each notifiable, and each channel has a method, named after it, that answers the message of that channel. An entry of `channels()` is a channel, or a fallback chain tried in order until one channel delivers:
+
+```ts
+import type { Notifiable } from '@elysiumjs/olympus/hermes';
+
+import { InboxMessage, LogMessage, MailMessage, Notification } from '@elysiumjs/olympus/hermes';
+
+@Notification.register({ type: 'invoice.paid', queue: 'notifications' })
+export class InvoicePaid extends Notification<{ invoiceId: string; amount: number }> {
+	public channels() {
+		// Keep it in the inbox, and send a mail, or write to the log when no mail can go.
+		return ['inbox', ['mail', 'log']] as const;
+	}
+
+	public canSend(notifiable: Notifiable, channel: string) {
+		return true; // such as the preferences of the user
+	}
+
+	public inbox() {
+		return new InboxMessage({ invoiceId: this.data.invoiceId, amount: this.data.amount });
+	}
+
+	public mail() {
+		return new MailMessage()
+			.subject('Your invoice is paid')
+			.greeting('Hello!')
+			.line(`We received ${this.data.amount}.`)
+			.action('See the invoice', `https://example.com/invoices/${this.data.invoiceId}`);
+	}
+
+	public log() {
+		return new LogMessage('An invoice was paid, with no mail address to send it to');
+	}
+}
+
+await Notification.send(user, new InvoicePaid({ invoiceId, amount: 1200 }));
+await Notification.route('mail', 'ada@example.com').notify(
+	new InvoicePaid({ invoiceId, amount: 1200 })
+);
+```
+
+A notifiable implements `Notifiable`: a `notifiableId` (the key of its inbox), an optional `notifiableType`, `routeNotificationFor(channel)` (an address, a phone number, or `null`, or a promise of it) and, optionally, `preferredLocale()`. `Notification.route()` reaches someone at an address only, with no inbox.
+
+`@Notification.register()` type-checks that the class has a method for each channel its `channels()` names, answering the message that channel accepts, and that its constructor takes its data only. A channel of a chain is passed over when `canSend()` refuses it, when the channel is not available (`isAvailable()`), or when it throws `ChannelRejected`; any other error fails that delivery.
+
+- `Notification.send()` checks the channels first, and for a queued notification its data and routes, so that a mistake throws at the call. It then queues the notification when it is registered with a `queue`, and delivers it right away otherwise. In a unit of work, it waits for the commit and is dropped on rollback, unless registered with `afterCommit: false`; a delivery that fails after the commit is logged.
+- `Notification.sendNow()` delivers right away and answers, for each notifiable and entry, the channel that delivered it (`null` when none could).
+- A delivery that fails does not stop the others: once they are done, `NotificationDeliveryError` lists the failures, with the deliveries that went through.
+- The channels emit `elysium:hermes:sending`, `elysium:hermes:sent` and `elysium:hermes:failed`, with the notification, the notifiable, the message, and what the channel answered or the error. A listener that throws is logged, and does not fail the delivery.
+
+### Queued notifications
+
+A queued notification becomes one Heracles job per notifiable and per entry; a fallback chain runs in order inside its job. List `NotificationJob` from `@elysiumjs/olympus/hermes/heracles` in a module's `jobs`, next to `HeraclesModule` and its queue:
+
+```ts
+import { NotificationJob } from '@elysiumjs/olympus/hermes/heracles';
+
+@Module.register({ jobs: [NotificationJob] })
+class AppModule extends Module {}
+```
+
+`delay` (in milliseconds, or one per channel, read from the first channel of the entry), `priority` and `maxRetries` in `@Notification.register()` apply to its jobs. In a unit of work, the jobs go to the outbox of moirai when the module has one, so that they are dispatched once the unit commits even if the process stops in between; without an outbox, they are dispatched after the commit.
+
+The job rebuilds the notification from its type and data, so the data must pass `Json.survives()`. The notifiable is recorded as its id, its type, its locale and its routes for the channels of the entry, which travel in clear on the queue. In the job, `canSend()`, the channels and the channel methods receive that record, unless a resolver is registered for the `notifiableType`: the notifiable is then read again, so that the job sees its current routes and preferences, and a resolver that answers `null` drops the notification:
+
+```ts
+@Notification.resolver('user')
+@Service.register()
+export class UserResolver implements NotifiableResolver {
+	constructor(@Service.inject() private readonly users: UserRepository) {}
+
+	async resolve(id: string) {
+		const user = await this.users.find(id);
+		return user ? new UserRecipient(user) : null;
+	}
+}
+```
+
+A job may run more than once. Each delivery has an id, kept with the job: the inbox keeps one notification per delivery id, and mail transports receive it as `id`, to drop a second mail. With the inbox store of moirai and a database, a delivery that completed is recorded and does not run again.
+
+### Channels
+
+| Channel     | Message            | What it does                                                                                                      |
+| ----------- | ------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| `inbox`     | `InboxMessage`     | Keeps the data in the notification store, for notifiables with an id. Read it with `Notification.store()`.        |
+| `mail`      | `MailMessage`      | Draws the message with the mail renderer and sends it through the mail transport, to the `mail` route.            |
+| `broadcast` | `BroadcastMessage` | Emits `elysium:hermes:broadcast` with the event name and data, for a WebSocket or a stream of the app to forward. |
+| `log`       | `LogMessage`       | Writes a line to the application log.                                                                             |
+
+An app or a package adds a channel with a class and its message, declared in `NotificationChannels`:
+
+```ts
+export class SmsMessage {
+	constructor(public readonly text: string) {}
+}
+
+declare module '@elysiumjs/olympus/hermes' {
+	interface NotificationChannels {
+		sms: SmsMessage;
+	}
+}
+
+@Notification.channel('sms', { message: SmsMessage })
+export class SmsChannel implements NotificationChannel<SmsMessage> {
+	async isAvailable(notifiable: Notifiable) {
+		return (await notifiable.routeNotificationFor('sms')) !== null;
+	}
+
+	async send(notifiable: Notifiable, message: SmsMessage, context: ChannelContext) {
+		const to = await notifiable.routeNotificationFor('sms');
+		const response = await provider.send(to, message.text, { idempotencyKey: context.id });
+		if (response.status === 400) throw new ChannelRejected('Unknown number');
+		return { id: response.id };
+	}
+}
+```
+
+A channel or resolver that needs services is listed in a module's `services`; it then runs in that module.
+
+### Inbox and mail
+
+`HermesModule.with()` provides the notification store (`memory` by default; `@elysiumjs/drizzle` provides a PostgreSQL one), the mail transport (`log` by default, which writes mails to the log), the mail renderer (`basic` by default) and the default sender:
+
+```ts
+HermesModule.with({
+	store: () => NotificationStore.for('drizzle', { table: notifications }),
+	mail: { transport: () => new SmtpTransport(), from: 'Example <hello@example.com>' }
+});
+
+const owner = { notifiableId: user.id, notifiableType: 'user' };
+const page = await Notification.store().list(owner, { unread: true, limit: 20 });
+await Notification.store().markAsRead(owner, [page.items[0].id]);
+```
+
+An inbox belongs to a `notifiableId` and its `notifiableType`, since two types may share ids. The store pages newest first, by the time each notification was kept, counts unread notifications, marks them as read and deletes them. The `basic` renderer lays out the greeting, lines, buttons and salutation as text and HTML; a message drawn with `view(name, data)` needs a renderer of the app, given as `mail.renderer`, that implements `MailRendererDriver`. `Mail.send()` sends a mail through the transport outside notifications too, with the default sender when the mail names none.
+
+### Notifications in tests
+
+```ts
+using notifications = Notification.fake();
+using mails = Mail.fake();
+
+await Moirai.execute(PayInvoice, { invoiceId });
+
+notifications.assertSentTo(user, InvoicePaid, (n) => n.data.invoiceId === invoiceId);
+notifications.assertNotSentTo(admin, InvoicePaid);
+mails.assertNothingSent();
+```
+
+A faked notification records what `channels()` answered for each notifiable, and delivers nothing; a queued one still has its data and routes checked. `restore()`, or the end of a `using` block, turns a fake off, and `HermesModule` turns both off when the application stops.
 
 ## Services
 

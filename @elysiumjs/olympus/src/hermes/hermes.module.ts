@@ -11,44 +11,83 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-import type { PortDriverName } from '../index';
-import type { HermesConfig } from './types';
 
-import { Logger, LOGGER_SERVICE, Module } from '../index';
+import type { MailRendererDriver, MailTransportDriver } from './mail';
+import type { MailAddress } from './messages';
+import type { NotificationStoreDriver } from './store';
 
-import './services/json-console.logger';
+import { Module } from '../module';
+import {
+	HERMES_MAIL_RENDERER,
+	HERMES_MAIL_TRANSPORT,
+	HERMES_NOTIFICATION_STORE,
+	HERMES_OPTIONS
+} from './config';
+import { restoreNotificationFake } from './fake';
+import { MailRenderer, MailTransport, restoreMailFake } from './mail';
+import { NotificationStore } from './store';
 
-import { DEFAULT_CONFIG } from './types';
+type Option<T> = T | (() => T);
+
+const build = <T>(option: Option<T>): T =>
+	typeof option === 'function' ? (option as () => T)() : option;
 
 /**
- * `pino` when `@elysiumjs/pino` is loaded, except on Cloudflare Workers, where pino's Node
- * streams are not available; `console` otherwise.
+ * The configuration of {@link HermesModule}: each driver is an instance or a function that builds
+ * it once.
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
-const defaultTransport = (): PortDriverName<'logger'> =>
-	Logger.has('pino') && globalThis.navigator?.userAgent !== 'Cloudflare-Workers'
-		? ('pino' as PortDriverName<'logger'>)
-		: 'console';
+export type HermesModuleConfig = {
+	/** Where the `inbox` channel keeps notifications. Defaults to the `memory` store. */
+	store?: Option<NotificationStoreDriver>;
+
+	mail?: {
+		/** How mails are sent. Defaults to the `log` transport. */
+		transport?: Option<MailTransportDriver>;
+		/** How mail messages are drawn. Defaults to the `basic` renderer. */
+		renderer?: Option<MailRendererDriver>;
+		/** The sender of mails that name none. */
+		from?: MailAddress;
+	};
+};
 
 /**
- * Provides the application logger as the global `logger` service: the `Logger` driver its
- * `transport` names, built from the module config.
+ * Provides the notification store, the mail transport and the mail renderer to the whole
+ * application. Queued notifications also need `HeraclesModule` and `NotificationJob` from
+ * `@elysiumjs/olympus/hermes/heracles` in a module's jobs.
  * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
- * import '@elysiumjs/pino';
- *
- * HermesModule.with({ level: 'debug', transport: 'pino' });
+ * HermesModule.with({
+ * 	store: () => new DrizzleNotificationStore(notifications),
+ * 	mail: { transport: () => new SmtpTransport(), from: 'Example <hello@example.com>' }
+ * });
  * ```
  */
-@Module.register<HermesConfig>({
+@Module.register<HermesModuleConfig>({
 	services: (config) => [
 		{
-			name: LOGGER_SERVICE,
+			name: HERMES_NOTIFICATION_STORE,
 			global: true,
-			factory: () => Logger.for(config.transport ?? defaultTransport(), config)
-		}
+			factory: () => build(config.store ?? (() => NotificationStore.for('memory')))
+		},
+		{
+			name: HERMES_MAIL_TRANSPORT,
+			global: true,
+			factory: () => build(config.mail?.transport ?? (() => MailTransport.for('log')))
+		},
+		{
+			name: HERMES_MAIL_RENDERER,
+			global: true,
+			factory: () => build(config.mail?.renderer ?? (() => MailRenderer.for('basic')))
+		},
+		{ name: HERMES_OPTIONS, global: true, factory: () => ({ from: config.mail?.from }) }
 	]
 })
-export class HermesModule extends Module.configurable<HermesConfig>({
-	defaults: { ...DEFAULT_CONFIG }
-}) {}
+export class HermesModule extends Module.configurable<HermesModuleConfig>() {
+	/** Turns the fakes off, so that a test that forgets to restore them does not leak them. */
+	public override onDestroy(): void {
+		restoreNotificationFake();
+		restoreMailFake();
+	}
+}

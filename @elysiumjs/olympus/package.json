@@ -17,7 +17,7 @@
 	"scripts": {
 		"format": "prettier --write \"./src/**/*.ts\"",
 		"clean": "rimraf dist",
-		"build:js": "bun build ./src/index.ts ./src/heracles/index.ts ./src/mnemosyne/index.ts ./src/moirai/index.ts ./src/ariadne/index.ts ./src/themis/index.ts ./src/cerberus/index.ts ./src/hermes/index.ts ./src/moirai/heracles.ts ./src/harpocrates/index.ts --outdir ./dist --target node --packages external --splitting --root ./src --minify-syntax --minify-whitespace",
+		"build:js": "bun build ./src/index.ts ./src/heracles/index.ts ./src/mnemosyne/index.ts ./src/moirai/index.ts ./src/ariadne/index.ts ./src/themis/index.ts ./src/cerberus/index.ts ./src/moirai/heracles.ts ./src/harpocrates/index.ts ./src/hermes/index.ts ./src/hermes/heracles.ts --outdir ./dist --target node --packages external --splitting --root ./src --minify-syntax --minify-whitespace",
 		"build:ts": "tsc",
 		"build": "bun run clean && bun run build:js && bun run build:ts",
 		"typecheck": "tsc --noEmit && tsc -p tsconfig.types.json",
@@ -66,10 +66,6 @@
 			"types": "./dist/cerberus/index.d.ts",
 			"import": "./dist/cerberus/index.js"
 		},
-		"./hermes": {
-			"types": "./dist/hermes/index.d.ts",
-			"import": "./dist/hermes/index.js"
-		},
 		"./moirai/heracles": {
 			"types": "./dist/moirai/heracles.d.ts",
 			"import": "./dist/moirai/heracles.js"
@@ -77,6 +73,14 @@
 		"./harpocrates": {
 			"types": "./dist/harpocrates/index.d.ts",
 			"import": "./dist/harpocrates/index.js"
+		},
+		"./hermes": {
+			"types": "./dist/hermes/index.d.ts",
+			"import": "./dist/hermes/index.js"
+		},
+		"./hermes/heracles": {
+			"types": "./dist/hermes/heracles.d.ts",
+			"import": "./dist/hermes/heracles.js"
 		}
 	},
 	"files": [
@@ -87,18 +91,23 @@
 		"./src/index.ts",
 		"./src/lock.ts",
 		"./src/serializer.ts",
-		"./src/hermes/index.ts",
-		"./src/hermes/hermes.module.ts",
-		"./src/hermes/services/json-console.logger.ts",
+		"./src/logging/logger.module.ts",
+		"./src/logging/services/json-console.logger.ts",
 		"./src/moirai/heracles.ts",
 		"./src/harpocrates/index.ts",
 		"./src/harpocrates/cipher.ts",
 		"./src/harpocrates/pbkdf2.ts",
 		"./src/harpocrates/scrypt.ts",
+		"./src/hermes/index.ts",
+		"./src/hermes/store.ts",
+		"./src/hermes/mail.ts",
+		"./src/hermes/heracles.ts",
+		"./src/hermes/channels/*.ts",
 		"./dist/index.js",
-		"./dist/hermes/index.js",
 		"./dist/moirai/heracles.js",
 		"./dist/harpocrates/index.js",
+		"./dist/hermes/index.js",
+		"./dist/hermes/heracles.js",
 		"./dist/index-*.js"
 	],
 	"dependencies": {

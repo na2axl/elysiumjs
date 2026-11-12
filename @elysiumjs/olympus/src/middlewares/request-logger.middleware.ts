@@ -20,7 +20,7 @@ import { Middleware } from '../middleware';
  * Middleware that logs incoming HTTP requests and their completion time.
  *
  * Uses `this.logger` which is resolved from the service container.
- * If Hermes is installed, structured JSON logs are produced; otherwise,
+ * With `LoggerModule`, structured JSON logs are produced; otherwise,
  * the fallback `ConsoleLogger` is used.
  *
  * @author Axel Nana <ax.lnana@outlook.com>

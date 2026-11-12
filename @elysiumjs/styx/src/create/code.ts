@@ -232,20 +232,19 @@ export const getAppCode = (
 ) => {
 	const choice = RUNTIMES[runtime];
 	const part = partCode(runtime, parts);
-	const hermes =
+	const logger =
 		runtime === 'workers'
-			? "HermesModule.with({ level: 'debug', transport: 'console' })"
-			: "HermesModule.with({ level: 'debug', format: 'pretty', transport: 'pino' })";
+			? "LoggerModule.with({ level: 'debug', transport: 'console' })"
+			: "LoggerModule.with({ level: 'debug', format: 'pretty', transport: 'pino' })";
 	const entries = [
-		hermes,
+		logger,
 		...part.modules,
 		...enabledModules.map((module) => module.expression),
 		...Object.keys(modules).map((module) => `${pascal(module)}Module`)
 	];
 	return /* js */ `import type { ServerError } from '@elysiumjs/olympus';
 
-import { Application, ${parts.database || parts.cache ? 'Env, ' : ''}getLogger } from '@elysiumjs/olympus';
-import { HermesModule } from '@elysiumjs/olympus/hermes';
+import { Application, ${parts.database || parts.cache ? 'Env, ' : ''}getLogger, LoggerModule } from '@elysiumjs/olympus';
 ${runtime === 'workers' ? '' : "import '@elysiumjs/pino';\n"}import { runtime as ${choice.alias} } from '${choice.package}';
 ${[...part.imports, ...enabledModules.map((module) => `import { ${module.import} } from '${module.name}';`)].join('\n')}
 
