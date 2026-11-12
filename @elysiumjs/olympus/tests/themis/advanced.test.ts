@@ -15,12 +15,12 @@
 import type { TestingHttpApp } from '../../src/index';
 import type { PasskeyRecord } from '../../src/themis';
 
-import { Application, Http, Middleware, Module } from '../../src/index';
 import { afterEach, describe, expect, it } from 'bun:test';
 
+import { Jwt } from '../../src/harpocrates';
+import { Application, Http, Middleware, Module } from '../../src/index';
 import {
 	BackupCodes,
-	Jwt,
 	OAuthClient,
 	Passkeys,
 	PasskeyVerificationError,

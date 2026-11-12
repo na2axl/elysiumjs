@@ -22,6 +22,7 @@ import type {
 } from '../transport';
 
 import { ElysiumError, getLogger, ModuleContext } from '../../index';
+import { openJobArgs } from '../encryption';
 import { JobStatus, WithId } from '../job';
 import { Queue } from '../queue';
 import { JobRegistry } from '../registry';
@@ -209,12 +210,22 @@ export class MemoryTransport implements Transport {
 			return;
 		}
 
+		let args: unknown[];
+		try {
+			args = await openJobArgs(registered.jobClass, message.job, message.args);
+		} catch (error) {
+			const reason = error instanceof Error ? error.message : String(error);
+			this.#settle(entry, JobStatus.FAILED, reason);
+			getLogger().error('The arguments of a Heracles job could not be read', {
+				job: message.job,
+				error: reason
+			});
+			return;
+		}
+
 		const job = ModuleContext.run(
 			registered.module,
-			() =>
-				new (WithId(registered.jobClass, message.jobId, message.dispatchId))(
-					...(message.args ?? [])
-				)
+			() => new (WithId(registered.jobClass, message.jobId, message.dispatchId))(...args)
 		);
 		for (let i = 0; i < info.retries; i++) job.incrementRetries();
 		job.queueName = message.queue;

@@ -15,7 +15,6 @@
 import type { Secret } from './secret';
 
 import { Clock, DomainError } from '../index';
-
 import { hmac, verifyHmac } from './crypto';
 import { resolveSecret } from './secret';
 

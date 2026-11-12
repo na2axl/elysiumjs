@@ -12,22 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Clock } from '../../src/index';
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import {
-	ApiKeys,
-	BunPasswordHasher,
 	InvalidSignatureError,
 	InvalidTokenError,
 	Jwt,
 	Password,
+	PasswordHasher,
 	Pbkdf2PasswordHasher,
+	ScryptPasswordHasher,
 	SignedUrl,
 	WeakSecretError
-} from '../../src/themis';
-import { decrypt, encrypt, fromBase64Url, safeEqual, toBase64Url } from '../../src/themis/crypto';
-import { ScryptPasswordHasher } from '../../src/themis/scrypt';
+} from '../../src/harpocrates';
+import {
+	decrypt,
+	encrypt,
+	fromBase64Url,
+	safeEqual,
+	toBase64Url
+} from '../../src/harpocrates/crypto';
+import { Clock } from '../../src/index';
 
 describe('crypto helpers', () => {
 	it('round-trips base64url and compares strings', () => {
@@ -51,12 +56,38 @@ describe('crypto helpers', () => {
 describe('passwords', () => {
 	afterEach(() => Password.reset());
 
-	it('hashes with Argon2id on Bun, and verifies', async () => {
+	it('hashes with scrypt by default, and verifies', async () => {
 		const hash = await Password.hash('correct horse');
-		expect(hash).toStartWith('$argon2id$');
+		expect(hash).toStartWith('$scrypt$N=16384,r=8,p=1$');
 		expect(await Password.verify('correct horse', hash)).toBe(true);
 		expect(await Password.verify('wrong', hash)).toBe(false);
 		expect(Password.needsRehash(hash)).toBe(false);
+		expect(Password.hasher()).toBeInstanceOf(ScryptPasswordHasher);
+	});
+
+	it('registers scrypt and pbkdf2 as drivers of the PasswordHasher port', () => {
+		expect(PasswordHasher.drivers()).toEqual(expect.arrayContaining(['scrypt', 'pbkdf2']));
+		expect(PasswordHasher.for('pbkdf2')).toBeInstanceOf(Pbkdf2PasswordHasher);
+		Password.use('pbkdf2');
+		expect(Password.hasher()).toBeInstanceOf(Pbkdf2PasswordHasher);
+	});
+
+	it('recognises the hashes of every registered driver, without registering them', async () => {
+		const hash = await new Pbkdf2PasswordHasher().hash('pw');
+		expect(await Password.verify('pw', hash)).toBe(true);
+		expect(Password.needsRehash(hash)).toBe(true);
+	});
+
+	it('answers false when a driver throws', async () => {
+		Password.register({
+			prefix: '$broken$',
+			hash: async () => '$broken$',
+			verify: async () => {
+				throw new Error('boom');
+			},
+			needsRehash: () => false
+		});
+		expect(await Password.verify('pw', '$broken$x')).toBe(false);
 	});
 
 	it('hashes with PBKDF2, which every runtime has', async () => {
@@ -81,9 +112,26 @@ describe('passwords', () => {
 		expect(new ScryptPasswordHasher().needsRehash(hash)).toBe(true);
 	});
 
+	it('refuses scrypt hashes with a short key or salt, or costly parameters', async () => {
+		const hasher = new ScryptPasswordHasher({ N: 1024 });
+		const salt = 'A'.repeat(22);
+		const key = 'A'.repeat(43);
+		const hash = (params: string, s = salt, k = key) => `$scrypt$${params}$${s}$${k}`;
+		expect(await hasher.verify('x', hash('N=16384,r=8,p=1', salt, 'A'))).toBe(false);
+		expect(await Password.verify('x', hash('N=16384,r=8,p=1', salt, 'A'))).toBe(false);
+		expect(await hasher.verify('x', hash('N=16384,r=8,p=1', 'AA'))).toBe(false);
+		expect(await hasher.verify('x', hash('N=1000,r=8,p=1'))).toBe(false);
+		expect(await hasher.verify('x', hash(`N=${2 ** 21},r=8,p=1`))).toBe(false);
+		expect(await hasher.verify('x', hash('N=1024,r=64,p=1'))).toBe(false);
+		expect(await hasher.verify('x', hash('N=1024,r=8,p=0'))).toBe(false);
+		expect(hasher.needsRehash(hash('N=1024,r=8,p=1', salt, 'A'))).toBe(true);
+		const strong = new ScryptPasswordHasher({ N: 1024, p: 2 });
+		expect(strong.needsRehash(await hasher.hash('x'))).toBe(true);
+	});
+
 	it('verifies the hashes of other hashers and asks to rehash them', async () => {
 		const old = await new Pbkdf2PasswordHasher({ iterations: 1000 }).hash('pw');
-		Password.use(new BunPasswordHasher({ memoryCost: 4096, timeCost: 2 }));
+		Password.use(new ScryptPasswordHasher({ N: 2048 }));
 		expect(await Password.verify('pw', old)).toBe(true);
 		expect(Password.needsRehash(old)).toBe(true);
 
@@ -116,8 +164,8 @@ describe('JWT', () => {
 		expect(bad.status).toBe(401);
 
 		const expired = await Jwt.sign({}, { secret, expiresIn: -60 });
-		expect(Jwt.verify(expired, { secret })).rejects.toThrow('has expired');
-		expect(Jwt.verify(token, { secret, audience: 'other' })).rejects.toBeInstanceOf(
+		await expect(Jwt.verify(expired, { secret })).rejects.toThrow('has expired');
+		await expect(Jwt.verify(token, { secret, audience: 'other' })).rejects.toBeInstanceOf(
 			InvalidTokenError
 		);
 	});
@@ -134,7 +182,7 @@ describe('JWT', () => {
 			const link = await SignedUrl.sign('https://x.test/a', { secret, expiresIn: 60 });
 			expect(await SignedUrl.verify(link, { secret })).toBe(true);
 			Clock.travel(10 * 60 * 1000);
-			expect(Jwt.verify(token, { secret })).rejects.toThrow('has expired');
+			await expect(Jwt.verify(token, { secret })).rejects.toThrow('has expired');
 			expect(await SignedUrl.verify(link, { secret })).toBe(false);
 		} finally {
 			Clock.reset();
@@ -171,8 +219,8 @@ describe('JWT keys, claims and clock', () => {
 		const keys = [{ secret: current }, { secret: previous }];
 		expect(await Jwt.verify(old, { keys })).toMatchObject({ v: 'old' });
 		const forged = await Jwt.sign({}, { secret: 'f'.repeat(32), expiresIn: 60 });
-		expect(Jwt.verify(forged, { keys })).rejects.toThrow('does not verify');
-		expect(Jwt.verify(old, { keys: [] })).rejects.toBeInstanceOf(InvalidTokenError);
+		await expect(Jwt.verify(forged, { keys })).rejects.toThrow('does not verify');
+		await expect(Jwt.verify(old, { keys: [] })).rejects.toBeInstanceOf(InvalidTokenError);
 	});
 
 	it('does not try the next key for an expired token', async () => {
@@ -187,7 +235,7 @@ describe('JWT keys, claims and clock', () => {
 				}
 			}
 		];
-		expect(Jwt.verify(expired, { keys })).rejects.toThrow('has expired');
+		await expect(Jwt.verify(expired, { keys })).rejects.toThrow('has expired');
 		await Jwt.verify(expired, { keys }).catch(() => undefined);
 		expect(previousRead).toBe(false);
 	});
@@ -204,10 +252,10 @@ describe('JWT keys, claims and clock', () => {
 
 	it('requires an expiry unless told otherwise, and other claims when asked', async () => {
 		const forever = await Jwt.sign({}, { secret: current });
-		expect(Jwt.verify(forever, { secret: current })).rejects.toThrow('"exp"');
+		await expect(Jwt.verify(forever, { secret: current })).rejects.toThrow('"exp"');
 		expect(await Jwt.verify(forever, { secret: current, requiredClaims: [] })).toMatchObject({});
 		const anonymous = await Jwt.sign({}, { secret: current, expiresIn: 60 });
-		expect(
+		await expect(
 			Jwt.verify(anonymous, { secret: current, requiredClaims: ['exp', 'sub'] })
 		).rejects.toThrow('"sub"');
 	});
@@ -221,7 +269,7 @@ describe('JWT keys, claims and clock', () => {
 			iat: issuedAt.getTime() / 1000,
 			exp: issuedAt.getTime() / 1000 + 600
 		});
-		expect(at('2026-01-01T00:10:00Z')).rejects.toThrow('has expired');
+		await expect(at('2026-01-01T00:10:00Z')).rejects.toThrow('has expired');
 
 		const numeric = await Jwt.sign({}, { secret: current, issuedAt, expiresIn: 90 });
 		expect(
@@ -239,16 +287,6 @@ describe('signed URL secrets', () => {
 		const link = await SignedUrl.sign('https://x.test/a?b=1', { secret, expiresIn: 60 });
 		expect(await SignedUrl.verify(link, { secret })).toBe(true);
 		expect(await SignedUrl.verify(link, { secret: () => 't'.repeat(32) })).toBe(false);
-	});
-});
-
-describe('API keys', () => {
-	it('generates prefixed keys, and verifies them against their hash', async () => {
-		const { key, hash } = await ApiKeys.generate({ prefix: 'sk' });
-		expect(key).toMatch(/^sk_[\w-]{43}$/);
-		expect(hash).toMatch(/^[0-9a-f]{64}$/);
-		expect(await ApiKeys.verify(key, hash)).toBe(true);
-		expect(await ApiKeys.verify(`${key}x`, hash)).toBe(false);
 	});
 });
 

@@ -12,16 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { JwtVerifyOptions } from '../harpocrates/jwt';
 import type { ProblemClass } from '../index';
 import type { HttpContext } from './context';
-import type { JwtVerifyOptions } from './jwt';
 
+import { Jwt } from '../harpocrates/jwt';
 import { Http, Metadata, Middleware, Service } from '../index';
-
 import { ApiKeys } from './api-keys';
 import { currentContext, themisConfig } from './context';
 import { UnauthenticatedError, UnknownGuardError } from './errors';
-import { Jwt } from './jwt';
 import { loadSession, Session } from './session';
 
 /**

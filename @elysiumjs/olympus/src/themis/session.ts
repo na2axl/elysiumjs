@@ -14,12 +14,11 @@
 
 import type { HttpContext } from './context';
 
+import { decrypt, encrypt, hmac, randomToken, verifyHmac } from '../harpocrates/crypto';
+import { resolveSecret } from '../harpocrates/secret';
 import { Clock, currentEnvironment, getLogger, Middleware } from '../index';
-
 import { currentContext, readCookie, themisConfig, writeCookie } from './context';
-import { decrypt, encrypt, hmac, randomToken, verifyHmac } from './crypto';
 import { NoSessionError, SessionTooLargeError } from './errors';
-import { resolveSecret } from './secret';
 
 /** The data of a session. */
 export type SessionData = Record<string, unknown>;

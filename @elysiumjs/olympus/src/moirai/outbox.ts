@@ -24,7 +24,6 @@ import {
 	Service
 } from '../index';
 import { UnitOfWork } from '../mnemosyne/index';
-
 import { inboxStore, MOIRAI_OUTBOX_STORE, options, outboxStore } from './config';
 import {
 	MissingStoreError,
@@ -159,11 +158,14 @@ export namespace Outbox {
 	 * Writes effects to the outbox of the current module, in the open unit of work: they happen if
 	 * and only if it commits. Once it has, the effects relay (see the `relayOnCommit` option).
 	 * @author Axel Nana <ax.lnana@outlook.com>
-	 * @param effects The effects.
+	 * @param effects The effects, or promises of them such as the `job()` effect of heracles.
 	 * @returns The ids of the rows, in order.
 	 */
-	export const enqueue = async (...effects: OutboxEffect[]): Promise<string[]> => {
-		if (effects.length === 0) return [];
+	export const enqueue = async (
+		...pending: (OutboxEffect | Promise<OutboxEffect>)[]
+	): Promise<string[]> => {
+		if (pending.length === 0) return [];
+		const effects = await Promise.all(pending);
 		const now = Clock.now();
 		const rows: OutboxRow[] = effects.map((effect) => ({
 			// Ids keep the real time, so that they stay ordered when the clock is moved.

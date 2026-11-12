@@ -15,10 +15,9 @@
 import type { ProblemClass } from '../index';
 import type { HttpContext } from './context';
 
+import { randomToken, safeEqual } from '../harpocrates/crypto';
 import { Middleware } from '../index';
-
 import { themisConfig } from './context';
-import { randomToken, safeEqual } from './crypto';
 import { CsrfTokenMismatchError } from './errors';
 import { loadSession, Session } from './session';
 

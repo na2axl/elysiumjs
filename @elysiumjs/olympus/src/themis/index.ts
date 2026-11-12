@@ -29,22 +29,12 @@ export { type CookieOptions, type HttpContext } from './context';
 export { Csrf, CsrfMiddleware } from './csrf';
 export {
 	CsrfTokenMismatchError,
-	MIN_SECRET_BYTES,
 	MissingThemisConfigError,
 	NoSessionError,
 	SessionTooLargeError,
 	UnauthenticatedError,
-	UnknownGuardError,
-	WeakSecretError
+	UnknownGuardError
 } from './errors';
-export {
-	InvalidTokenError,
-	Jwt,
-	type JwtKey,
-	type JwtSignOptions,
-	type JwtVerifyOptions
-} from './jwt';
-export { BunPasswordHasher, Password, type PasswordHasher, Pbkdf2PasswordHasher } from './password';
 export {
 	commitSession,
 	loadSession,
@@ -68,7 +58,5 @@ export {
 	type PasskeysOptions,
 	PasskeyVerificationError
 } from './passkeys';
-export { type Secret } from './secret';
-export { InvalidSignatureError, SignedUrl } from './signed-url';
 export { ThemisModule } from './themis.module';
 export { type BackupCodeOptions, BackupCodes, Totp, type TotpOptions } from './totp';

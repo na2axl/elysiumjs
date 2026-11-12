@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { CipherDriver } from '../harpocrates/cipher';
 import type { LockDriver, ServiceFactoryDefinition } from '../index';
 import type { QueueOptions } from './queue';
 
 import { Module, runAll } from '../index';
 import { HeraclesCronsCommand, HeraclesListCommand, HeraclesScheduleCommand } from './commands';
 import { Queue } from './queue';
-import { HERACLES_LOCK, JobRegistry, QUEUES_SERVICE } from './registry';
+import { HERACLES_CIPHER, HERACLES_LOCK, JobRegistry, QUEUES_SERVICE } from './registry';
 
 /**
  * Configuration of the {@link HeraclesModule}.
@@ -33,6 +34,13 @@ export type HeraclesModuleConfig = {
 	 * each tick once, such as `Lock.for('redis')`. Without it, every scheduler dispatches every tick.
 	 */
 	lock?: LockDriver;
+
+	/**
+	 * The cipher of the jobs registered with `encrypted: true`, such as
+	 * `Cipher.for('aes-gcm', { keys })` from `@elysiumjs/olympus/harpocrates`. Their arguments are
+	 * encrypted before they reach the transport, and decrypted in the worker.
+	 */
+	cipher?: CipherDriver;
 };
 
 /**
@@ -77,6 +85,8 @@ export class ConfiguredQueues {
 		];
 		const lock = config.lock;
 		if (lock) services.push({ name: HERACLES_LOCK, global: true, factory: () => lock });
+		const cipher = config.cipher;
+		if (cipher) services.push({ name: HERACLES_CIPHER, global: true, factory: () => cipher });
 		return services;
 	}
 })

@@ -14,6 +14,8 @@
 
 import type { Runtime } from '@elysiumjs/olympus';
 
+export { BunPasswordHasher, type BunPasswordHasherOptions } from './password';
+
 const SIGNALS = ['SIGINT', 'SIGTERM'] as const;
 
 /** The server started by `serve`, which knows the peer address of its requests. */

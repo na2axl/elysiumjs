@@ -32,6 +32,7 @@ import {
 	JobOverlapBehavior,
 	JobRegistry,
 	JobStatus,
+	openJobArgs,
 	TransportMode,
 	WithId
 } from '@elysiumjs/olympus/heracles';
@@ -665,10 +666,13 @@ export class RedisWorker extends BaseWorker<RedisTransport> {
 				throw new Error(`Job class not found: ${jobName}`);
 			}
 
+			// Decrypt the arguments of an encrypted job
+			const jobArgs = await openJobArgs(entry.jobClass, jobName, args);
+
 			// Create the job in its owning module's context, and run it there too
 			const job = ModuleContext.run(
 				entry.module,
-				() => new (WithId(entry.jobClass, jobId, dispatchId))(...(args || []))
+				() => new (WithId(entry.jobClass, jobId, dispatchId))(...jobArgs)
 			);
 			jobOwners.set(job, entry.module);
 			job.queueName = queueName;

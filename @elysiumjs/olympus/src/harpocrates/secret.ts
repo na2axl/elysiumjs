@@ -11,7 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-import { assertStrongSecret } from './errors';
+
+import { ElysiumError } from '../index';
 
 /**
  * A secret: its value, or a function that reads it when it is needed, such as from a secrets
@@ -31,4 +32,29 @@ export const resolveSecret = async (secret: Secret, what: string): Promise<strin
 	const value = typeof secret === 'function' ? await secret() : secret;
 	assertStrongSecret(value, what);
 	return value;
+};
+
+/**
+ * Raised when a secret is shorter than 32 bytes, which would let an attacker forge cookies,
+ * tokens or links by brute force.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export class WeakSecretError extends ElysiumError {
+	constructor(what: string) {
+		super(
+			`The ${what} must be at least ${MIN_SECRET_BYTES} bytes long: use a random value kept in an environment secret.`
+		);
+	}
+}
+
+/** The shortest secret accepted, in bytes. */
+export const MIN_SECRET_BYTES = 32;
+
+/**
+ * Throws {@link WeakSecretError} for a secret under {@link MIN_SECRET_BYTES} bytes.
+ * @param secret The secret.
+ * @param what What the secret is for, in the message.
+ */
+export const assertStrongSecret = (secret: string, what: string): void => {
+	if (new TextEncoder().encode(secret).length < MIN_SECRET_BYTES) throw new WeakSecretError(what);
 };

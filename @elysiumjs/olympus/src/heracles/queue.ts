@@ -16,9 +16,10 @@ import type { LifecycleHandler } from '../index';
 import type { JobClass, JobOverlapBehavior } from './job';
 import type { JobStatusInfo, Transport, TransportClass, TransportEvent } from './transport';
 
-import { InteractsWithConsole, Lifecycle } from '../index';
 import { map, uid } from 'radash';
 
+import { InteractsWithConsole, Lifecycle } from '../index';
+import { sealJobArgs } from './encryption';
 import { Job, JobStatus } from './job';
 import { TransportMode } from './transport';
 
@@ -365,6 +366,9 @@ export class Queue extends InteractsWithConsole {
 		// Generate or use provided job ID
 		const jobId = options.jobId ?? job.generateJobId(...args);
 
+		// Encrypt the arguments of an encrypted job before they reach the transport
+		const carried = await sealJobArgs(job, name, args);
+
 		// Generate or use provided dispatch ID
 		const dispatchId = options.dispatchId ?? `dispatch_${Date.now()}_${uid(8)}`;
 
@@ -394,7 +398,7 @@ export class Queue extends InteractsWithConsole {
 				job: name,
 				jobId,
 				dispatchId,
-				args,
+				args: carried,
 				queue: this.name,
 				options: {
 					scheduledFor: options.scheduledFor?.toISOString(),

@@ -43,6 +43,9 @@ export const QUEUES_SERVICE = 'heracles.queues';
 /** Name of the global service holding the lock of `HeraclesModule.with({ lock })`. */
 export const HERACLES_LOCK = 'heracles.lock';
 
+/** Name of the global service holding the cipher of `HeraclesModule.with({ cipher })`. */
+export const HERACLES_CIPHER = 'heracles.cipher';
+
 let entries = new Map<string, JobRegistryEntry>();
 
 /**

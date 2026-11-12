@@ -12,22 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Static, TestingHttpApp } from '../../src/index';
 import type { FlowAnswer, FlowContext, FlowStore } from '../../src/ariadne';
+import type { Static, TestingHttpApp } from '../../src/index';
 
-import {
-	Application,
-	AsyncResult,
-	BadRequestError,
-	ConflictError,
-	Environments,
-	Http,
-	Module,
-	Result,
-	Service,
-	t
-} from '../../src/index';
-import { Auth, Jwt, jwtGuard, ThemisModule } from '../../src/themis/index';
 import { afterEach, describe, expect, expectTypeOf, it } from 'bun:test';
 
 import {
@@ -40,6 +27,20 @@ import {
 	InvalidFlowError,
 	MemoryFlowStore
 } from '../../src/ariadne';
+import { Jwt } from '../../src/harpocrates/index';
+import {
+	Application,
+	AsyncResult,
+	BadRequestError,
+	ConflictError,
+	Environments,
+	Http,
+	Module,
+	Result,
+	Service,
+	t
+} from '../../src/index';
+import { Auth, jwtGuard, ThemisModule } from '../../src/themis/index';
 
 type SignUp = { email?: string; attempts: number; rewound?: number };
 

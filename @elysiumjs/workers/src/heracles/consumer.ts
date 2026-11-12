@@ -16,7 +16,14 @@ import type { TransportProcessMessage } from '@elysiumjs/olympus/heracles';
 import type { WorkersQueueMessage } from '../index';
 
 import { getLogger, ModuleContext, Service } from '@elysiumjs/olympus';
-import { JobRegistry, JobStatus, Queue, QUEUES_SERVICE, WithId } from '@elysiumjs/olympus/heracles';
+import {
+	JobRegistry,
+	JobStatus,
+	openJobArgs,
+	Queue,
+	QUEUES_SERVICE,
+	WithId
+} from '@elysiumjs/olympus/heracles';
 
 import { Workers } from '../index';
 
@@ -103,8 +110,9 @@ const bury = async (dead: DeadJob, options: DeadLetterOptions): Promise<void> =>
  * Runs the Heracles job a queue message carries, in its module's context. A completed job is
  * acked. A failed one is retried after its `retryDelay` while its attempts stay within
  * `maxRetries`; after that it goes to the `deadLetterQueue` of its queue's `transportOptions` and
- * to the `onDead` hook, when set, and is acked. A message for an unknown job is logged and acked. Messages that carry no job are left
- * to the other consumers.
+ * to the `onDead` hook, when set, and is acked. The arguments of an encrypted job that do not
+ * decrypt fail the same way, without running the job. A message for an unknown job is logged and
+ * acked. Messages that carry no job are left to the other consumers.
  * @author Axel Nana <ax.lnana@outlook.com>
  * @param message The queue message.
  * @param options What else happens to the jobs that failed their last retry.
@@ -124,9 +132,46 @@ export const runJobMessage = async (
 		return;
 	}
 
+	// Retries within maxRetries, then goes to the dead letters.
+	const fail = async (error: unknown): Promise<void> => {
+		const maxRetries = Number(body.options?.maxRetries ?? 0);
+		if (message.attempts <= maxRetries) {
+			const delaySeconds = Math.ceil(Number(body.options?.retryDelay ?? 0) / 1000);
+			message.retry(delaySeconds > 0 ? { delaySeconds } : undefined);
+			return;
+		}
+		await bury(
+			{
+				job: body.job,
+				jobId: body.jobId,
+				dispatchId: body.dispatchId,
+				queue: body.queue,
+				attempts: message.attempts,
+				error,
+				message: body
+			},
+			options
+		);
+		message.ack();
+	};
+
+	let args: unknown[];
+	try {
+		args = await openJobArgs(entry.jobClass, body.job, body.args);
+	} catch (error) {
+		// Such as a consumer that has not received the current key yet: retried like a failure.
+		logger.error('The arguments of a Heracles job could not be read', {
+			job: body.job,
+			jobId: body.jobId,
+			error: error instanceof Error ? error.message : String(error)
+		});
+		await fail(error);
+		return;
+	}
+
 	const job = ModuleContext.run(
 		entry.module,
-		() => new (WithId(entry.jobClass, body.jobId, body.dispatchId))(...(body.args ?? []))
+		() => new (WithId(entry.jobClass, body.jobId, body.dispatchId))(...args)
 	);
 	job.queueName = body.queue;
 	await ModuleContext.run(entry.module, () => job.run());
@@ -136,24 +181,5 @@ export const runJobMessage = async (
 		return;
 	}
 
-	const maxRetries = Number(body.options?.maxRetries ?? 0);
-	if (message.attempts <= maxRetries) {
-		const delaySeconds = Math.ceil(Number(body.options?.retryDelay ?? 0) / 1000);
-		message.retry(delaySeconds > 0 ? { delaySeconds } : undefined);
-		return;
-	}
-
-	await bury(
-		{
-			job: body.job,
-			jobId: body.jobId,
-			dispatchId: body.dispatchId,
-			queue: body.queue,
-			attempts: message.attempts,
-			error: job.lastError,
-			message: body
-		},
-		options
-	);
-	message.ack();
+	await fail(job.lastError);
 };
