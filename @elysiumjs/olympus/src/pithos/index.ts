@@ -30,6 +30,8 @@ export { joinUrl, signServedUrl } from './signing';
 export type {
 	ListOptions,
 	ListPage,
+	LocalDiskDriver,
+	LocalDiskOptions,
 	ObjectInfo,
 	PutOptions,
 	SignedUrlOptions,

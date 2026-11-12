@@ -195,8 +195,8 @@ export const objectOf = (info: ObjectInfo, bytes: Uint8Array): StoredObject => (
 
 /**
  * A disk: where objects are stored, under keys such as `avatars/42.webp`. `memory` is built in;
- * runtime packages add others: `local` from `@elysiumjs/node`, `bun` from `@elysiumjs/bun` and
- * `r2` from `@elysiumjs/workers`.
+ * runtime packages add others: `local` from `@elysiumjs/node` or `@elysiumjs/bun`, and `r2` from
+ * `@elysiumjs/workers`.
  * Subclasses implement the storage calls; `exists()` and `move()` have defaults built on them.
  * @author Axel Nana <ax.lnana@outlook.com>
  */
@@ -309,6 +309,25 @@ export class Storage extends Port('storage') {
 		fakes.clear();
 	}
 }
+
+/**
+ * The options of the `local` disk, which keeps objects as files in a folder. The runtime packages
+ * provide it: `@elysiumjs/node` through `node:fs`, `@elysiumjs/bun` through `Bun.file()`. An
+ * application imports one runtime package, so `Storage.for('local', options)` works the same on
+ * either.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export type LocalDiskOptions = {
+	/** The folder that holds the objects. */
+	readonly root: string;
+	/** The base URL of public objects; without it, the disk is not public. */
+	readonly url?: string;
+	/** How it signs URLs that `PithosModule` serves; without it, it cannot sign URLs. */
+	readonly signing?: ServedSigning;
+};
+
+/** The class of a `local` disk, as each runtime package registers it. */
+export type LocalDiskDriver = new (options: LocalDiskOptions) => StorageDriver;
 
 /** The options a faked memory disk takes. */
 type MemoryDiskLike = { readonly url?: string; readonly signing?: ServedSigning };

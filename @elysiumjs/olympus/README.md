@@ -724,7 +724,7 @@ A faked notification records what `channels()` answered for each notifiable, and
 
 `Storage` is a port. A disk stores objects under keys such as `avatars/42.webp`: `put(key, body, { contentType, metadata })`, `get(key)` (a stream with `bytes()` and `text()`), `head`, `exists`, `delete`, `list({ prefix, cursor, limit })`, `copy`, `move`, `url(key)` for a public disk and `signedUrl(key, { method, expiresIn, contentType, contentLength })` for direct downloads and uploads. A key is a relative path: an empty segment, `.`, `..` or a backslash is refused.
 
-The `memory` disk ships here. The runtime packages add the others: `local` from `@elysiumjs/node` (`node:fs`), `bun` from `@elysiumjs/bun` (`Bun.file`), and `r2` from `@elysiumjs/workers`. `PithosModule` gives the disks of the application names, and `Storage.disk(name)` answers them, the default disk without a name:
+The `memory` disk ships here. The runtime packages add the others: `local` from `@elysiumjs/node` (`node:fs`) or from `@elysiumjs/bun` (`Bun.file`), whichever runtime package the application imports, and `r2` from `@elysiumjs/workers`. `PithosModule` gives the disks of the application names, and `Storage.disk(name)` answers them, the default disk without a name:
 
 ```ts
 import '@elysiumjs/node';
@@ -747,7 +747,7 @@ PithosModule.with({
 await Storage.disk().put('reports/2026-01.csv', csv, { contentType: 'text/csv' });
 ```
 
-A disk that cannot sign URLs itself, such as `memory`, `local` or `bun`, signs them with `signing`, and `PithosModule` serves them on `/storage/:disk/*`: `GET` downloads the object and `PUT` uploads it, with the content type and size the URL was signed for: a `PUT` without a `content-length` header answers 411. Downloads are sent with `x-content-type-options: nosniff` and a sandboxing `content-security-policy`, so uploaded content never runs as a page of the application's origin. `signing.url` is that route followed by the name of the disk.
+A disk that cannot sign URLs itself, such as `memory` or `local`, signs them with `signing`, and `PithosModule` serves them on `/storage/:disk/*`: `GET` downloads the object and `PUT` uploads it, with the content type and size the URL was signed for: a `PUT` without a `content-length` header answers 411. Downloads are sent with `x-content-type-options: nosniff` and a sandboxing `content-security-policy`, so uploaded content never runs as a page of the application's origin. `signing.url` is that route followed by the name of the disk.
 
 `Storage.fake(name?)` replaces a disk with an empty memory disk until `Storage.restore()`, which `PithosModule` also calls when the application stops.
 

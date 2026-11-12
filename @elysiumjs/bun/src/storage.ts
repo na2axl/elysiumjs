@@ -15,6 +15,8 @@
 import type {
 	ListOptions,
 	ListPage,
+	LocalDiskDriver,
+	LocalDiskOptions,
 	ObjectInfo,
 	PutOptions,
 	ServedSigning,
@@ -41,22 +43,9 @@ import {
 
 declare module '@elysiumjs/olympus' {
 	interface PortDrivers {
-		'storage:bun': typeof BunDisk;
+		'storage:local': LocalDiskDriver;
 	}
 }
-
-/**
- * The options of a {@link BunDisk}.
- * @author Axel Nana <ax.lnana@outlook.com>
- */
-export type BunDiskOptions = {
-	/** The folder that holds the objects. */
-	readonly root: string;
-	/** The base URL of public objects; without it, the disk is not public. */
-	readonly url?: string;
-	/** How it signs URLs that `PithosModule` serves; without it, it cannot sign URLs. */
-	readonly signing?: ServedSigning;
-};
 
 /**
  * The folder, under the root, that keeps the content type and metadata of each object (in
@@ -71,8 +60,8 @@ type Meta = { contentType?: string; metadata: Record<string, string> };
  * writes streams, so it does not hold large objects in memory itself. Each file is written aside
  * then renamed into place, so a reader never sees half of it. The content type and metadata of
  * each object are kept in a `.pithos` folder, whose keys are refused. As on any file system, a key
- * cannot also be a folder of other keys: `a` and `a/b` cannot both exist. Registered as the `bun` driver of the `Storage` port
- * when `@elysiumjs/bun` is imported.
+ * cannot also be a folder of other keys: `a` and `a/b` cannot both exist. Registered as the `local` driver of the `Storage` port
+ * when `@elysiumjs/bun` is imported; `@elysiumjs/node` registers its own, so import one of them.
  * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
@@ -80,15 +69,15 @@ type Meta = { contentType?: string; metadata: Record<string, string> };
  * import { PithosModule, Storage } from '@elysiumjs/olympus/pithos';
  *
  * PithosModule.with({
- * 	disks: { public: () => Storage.for('bun', { root: './storage/public', url: '/files' }) }
+ * 	disks: { public: () => Storage.for('local', { root: './storage/public', url: '/files' }) }
  * });
  * ```
  */
-@Storage.driver('bun')
+@Storage.driver('local')
 export class BunDisk extends StorageDriver {
 	readonly #root: string;
 
-	constructor(private readonly options: BunDiskOptions) {
+	constructor(private readonly options: LocalDiskOptions) {
 		super();
 		this.#root = resolve(options.root);
 	}
@@ -174,7 +163,7 @@ export class BunDisk extends StorageDriver {
 	}
 
 	public url(key: string): string {
-		if (!this.options.url) throw new DiskNotPublicError('bun');
+		if (!this.options.url) throw new DiskNotPublicError('local');
 		return joinUrl(this.options.url, assertKey(key));
 	}
 
@@ -184,7 +173,7 @@ export class BunDisk extends StorageDriver {
 	}
 
 	public async signedUrl(key: string, options: SignedUrlOptions): Promise<string> {
-		if (!this.options.signing) throw new DiskCannotSignError('bun');
+		if (!this.options.signing) throw new DiskCannotSignError('local');
 		return signServedUrl(this.options.signing, assertKey(key), options);
 	}
 

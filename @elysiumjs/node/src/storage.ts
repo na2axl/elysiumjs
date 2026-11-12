@@ -15,6 +15,8 @@
 import type {
 	ListOptions,
 	ListPage,
+	LocalDiskDriver,
+	LocalDiskOptions,
 	ObjectInfo,
 	PutOptions,
 	ServedSigning,
@@ -45,22 +47,9 @@ import {
 
 declare module '@elysiumjs/olympus' {
 	interface PortDrivers {
-		'storage:local': typeof LocalDisk;
+		'storage:local': LocalDiskDriver;
 	}
 }
-
-/**
- * The options of a {@link LocalDisk}.
- * @author Axel Nana <ax.lnana@outlook.com>
- */
-export type LocalDiskOptions = {
-	/** The folder that holds the objects. */
-	readonly root: string;
-	/** The base URL of public objects; without it, the disk is not public. */
-	readonly url?: string;
-	/** How it signs URLs that `PithosModule` serves; without it, it cannot sign URLs. */
-	readonly signing?: ServedSigning;
-};
 
 /**
  * The folder, under the root, that keeps the content type and metadata of each object (in
@@ -75,7 +64,7 @@ type Meta = { contentType?: string; metadata: Record<string, string> };
  * into place, so a reader never sees half of it, and is read as a stream. The content type and
  * metadata of each object are kept in a `.pithos` folder, whose keys are refused. As on any file
  * system, a key cannot also be a folder of other keys: `a` and `a/b` cannot both exist. Registered as the `local` driver of the
- * `Storage` port when `@elysiumjs/node` is imported.
+ * `Storage` port when `@elysiumjs/node` is imported; `@elysiumjs/bun` registers its own, so import one of them.
  * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts

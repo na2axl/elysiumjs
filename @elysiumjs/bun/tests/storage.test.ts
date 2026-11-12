@@ -41,8 +41,8 @@ diskContract(
 );
 
 describe('BunDisk', () => {
-	it('is the bun driver of the Storage port', () => {
-		expect(Storage.for('bun', { root })).toBeInstanceOf(BunDisk);
+	it('is the local driver of the Storage port', () => {
+		expect(Storage.for('local', { root })).toBeInstanceOf(BunDisk);
 	});
 
 	it('keeps metadata out of listings and out of reach', async () => {

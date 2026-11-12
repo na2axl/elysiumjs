@@ -24,7 +24,7 @@ Uses `process.env`, timers, `process.exit` and `SIGINT`/`SIGTERM` handlers. It s
 
 ## Local disk
 
-Importing the package registers `local`, a disk of the `Storage` port of `@elysiumjs/olympus/pithos` that keeps objects as files in a folder, through `node:fs`:
+Importing the package registers `local`, a disk of the `Storage` port of `@elysiumjs/olympus/pithos` that keeps objects as files in a folder, through `node:fs`. `@elysiumjs/bun` registers its own `local` disk, through `Bun.file()`; an application imports one runtime package, never both:
 
 ```ts
 import '@elysiumjs/node';
