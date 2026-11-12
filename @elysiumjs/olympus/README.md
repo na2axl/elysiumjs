@@ -497,7 +497,7 @@ class SendStatement extends Job {
 
 ## Queued actions
 
-An action runs later, as a Heracles job, when `Moirai.execute()` is given a queue: a queue name, or `true` for the `queue` of `@Action.register()` (`default` when it names none). The call checks the input, `authorize` and the idempotency key right away, as a call that runs now does, then answers once the job is accepted, with the ids of the job and of its dispatch. The job runs the action through the usual path: its unit of work, retries, idempotency and outbox. Without a queue, the call runs now.
+`Moirai.enqueue(action, input, call?)` runs an action later, as a Heracles job, on the queue the call names, else the `queue` of `@Action.register()`, else `default`. The call is checked right away, as `Moirai.execute()` checks it: the input, `authorize`, and that an idempotent action has a key, whose owner is read then. It answers once the job is accepted, with the ids of the job and of its dispatch. The job runs the action through the same path as `execute()`: its unit of work, retries, idempotency and outbox. The call may also set `scheduledFor` and `priority`.
 
 ```ts
 import { ActionJob } from '@elysiumjs/olympus/moirai/heracles';
@@ -512,12 +512,14 @@ class SendDigest extends Action<{ userId: string }> {
 @Module.register({ jobs: [ActionJob] })
 class AppModule extends Module {}
 
-const { jobId } = await Moirai.execute(SendDigest, { userId }, { queue: true }).orThrow();
+const { jobId } = await Moirai.enqueue(SendDigest, { userId }).orThrow();
 ```
 
-List `ActionJob` in the `jobs` of a module, next to `HeraclesModule`; a queued call without it throws `QueuedActionsUnavailableError`. A call made in a unit of work dispatches its job once the unit commits, through the outbox when there is one, and not at all when it rolls back.
+List `ActionJob` in the `jobs` of one module, next to `HeraclesModule`, in the processes that queue actions and in those that run them; the latter must import the actions too. Without it, `enqueue()` throws `QueuedActionsUnavailableError`. A call made in a unit of work dispatches its job once the unit commits, through the outbox when there is one, and not at all when it rolls back.
 
-The job runs without the caller's context, such as the current user: what the handler needs goes in the input, which travels as JSON and in clear. The owner of the idempotency key is read when the call is made. A refusal of the handler ends the job, logged; a thrown error fails it, and Heracles retries it, so give an action that must not run twice an idempotency key.
+The job runs without the caller's context, such as the current user: what the handler needs goes in the input, which travels as JSON, in clear. An input that does not survive JSON, such as a `Date`, is refused with `QueuedInputError`. The job finds the action by its name, so two action classes cannot share one (`DuplicateActionNameError`).
+
+A refusal of the handler ends the job, logged. A thrown error fails it, and Heracles retries it within the `maxRetries` of the queue (never for an action registered with `retry: false`). A job may run more than once, so give an action that must not an idempotency key: a second run replays the stored response. The job trusts its queue: `authorize` ran when the call was queued, so anything that can write to the queue can run any registered action.
 
 ## Services
 

@@ -13,11 +13,10 @@
 // limitations under the License.
 
 import type { TestingApp } from '../../src/index';
-import type { QueuedAction } from '../../src/moirai';
 
-import { afterEach, describe, expect, expectTypeOf, it } from 'bun:test';
+import { afterEach, describe, expect, it, spyOn } from 'bun:test';
 
-import { HeraclesModule, MemoryTransport, Queue } from '../../src/heracles/index';
+import { Heracles, HeraclesModule, MemoryTransport, Queue } from '../../src/heracles/index';
 import {
 	Application,
 	ConflictError,
@@ -26,10 +25,11 @@ import {
 	Module,
 	t
 } from '../../src/index';
-import { UnitOfWork, withUnitOfWork } from '../../src/mnemosyne/index';
+import { withUnitOfWork } from '../../src/mnemosyne/index';
 import {
 	Action,
 	CallForbiddenError,
+	DuplicateActionNameError,
 	IdempotencyKeyRequiredError,
 	InvalidInputError,
 	MemoryIdempotencyStore,
@@ -37,11 +37,15 @@ import {
 	MemoryOutboxStore,
 	Moirai,
 	MoiraiModule,
-	QueuedActionsUnavailableError
+	QueuedActionsUnavailableError,
+	QueuedInputError,
+	UnknownActionError
 } from '../../src/moirai';
 import { ActionJob } from '../../src/moirai/heracles';
 
 const ran: string[] = [];
+
+type GreetInput = { name: string; times?: number };
 
 @Action.register({
 	name: 'queued.greet',
@@ -50,8 +54,8 @@ const ran: string[] = [];
 	authorize: (input) => input.name !== 'mallory',
 	queue: 'mail'
 })
-class Greet extends Action<{ name: string; times: number }> {
-	public handle(input: { name: string; times: number }) {
+class Greet extends Action<GreetInput> {
+	public handle(input: GreetInput) {
 		if (input.name === 'refused') return new ConflictError('no');
 		ran.push(`greet ${input.name} x${input.times}`);
 		return { greeted: input.name };
@@ -71,15 +75,27 @@ class Charge extends Action<{ amount: number }> {
 	}
 }
 
+@Action.register({ name: 'queued.remind', errors: [], input: t.Object({ at: t.Date() }) })
+class Remind extends Action<{ at: Date }> {
+	public handle(_input: { at: Date }) {}
+}
+
+@Action.register({ name: 'queued.once', errors: [], retry: false })
+class Once extends Action {
+	public handle() {
+		ran.push('once');
+	}
+}
+
 @Action.register({ name: 'queued.outer', errors: [] })
 class Outer extends Action {
+	public static fail = false;
+
 	public async handle() {
-		await Moirai.execute(Greet, { name: 'inner' }, { queue: true }).orThrow();
+		await Moirai.enqueue(Greet, { name: 'inner' }).orThrow();
 		ran.push('outer done');
 		if (Outer.fail) throw new Error('rollback');
 	}
-
-	public static fail = false;
 }
 
 @Module.register({ jobs: [ActionJob] })
@@ -88,10 +104,10 @@ class AppModule extends Module {}
 @Module.register({})
 class BareModule extends Module {}
 
-describe('queued actions', () => {
+describe('Moirai.enqueue', () => {
 	let app: TestingApp | undefined;
 
-	const boot = async (modules: (typeof Module)[] = [AppModule]) => {
+	const boot = async (modules: Function[] = [AppModule], lazy = false) => {
 		app = await Application.testing({
 			modules: [
 				HeraclesModule.with({
@@ -106,12 +122,12 @@ describe('queued actions', () => {
 					inbox: () => new MemoryInboxStore(),
 					lock: () => new MemoryLock()
 				}),
-				...modules
+				...(modules as never[])
 			],
 			overrides: {
 				[DATABASE_TRANSACTION_SERVICE]: withUnitOfWork((callback) => callback())
 			},
-			boot: 'eager'
+			boot: lazy ? 'lazy' : 'eager'
 		});
 	};
 
@@ -124,7 +140,7 @@ describe('queued actions', () => {
 
 	it('answers once the job is accepted, and runs the action in the job', async () => {
 		await boot();
-		const queued = await Moirai.execute(Greet, { name: 'ada' }, { queue: 'default' }).orThrow();
+		const queued = await Moirai.enqueue(Greet, { name: 'ada' }, { queue: 'default' }).orThrow();
 		expect(queued).toEqual({
 			jobId: expect.any(String),
 			dispatchId: expect.any(String),
@@ -137,48 +153,93 @@ describe('queued actions', () => {
 		expect((await Queue.get('default').getJobStatus(queued))?.status).toBe('completed');
 	});
 
-	it('uses the queue of the registration for `queue: true`', async () => {
+	it('uses the queue of the registration when the call names none', async () => {
 		await boot();
-		const queued = await Moirai.execute(Greet, { name: 'bob' }, { queue: true }).orThrow();
+		const queued = await Moirai.enqueue(Greet, { name: 'bob' }).orThrow();
 		expect(queued.queue).toBe('mail');
 		await MemoryTransport.settled();
 		expect(ran).toEqual(['greet bob x1']);
 	});
 
-	it('runs now without a queue', async () => {
-		await boot();
-		expect(await Moirai.execute(Greet, { name: 'eve' }).orThrow()).toEqual({ greeted: 'eve' });
-		expect(ran).toEqual(['greet eve x1']);
+	it('works on a lazy boot', async () => {
+		await boot([AppModule], true);
+		await Moirai.enqueue(Greet, { name: 'lazy' }).orThrow();
+		await MemoryTransport.settled();
+		expect(ran).toEqual(['greet lazy x1']);
 	});
 
 	it('checks the input, authorize and the idempotency key when the call is made', async () => {
 		await boot();
-		const invalid = await Moirai.execute(Greet, { name: 1 } as never, { queue: true });
+		const invalid = await Moirai.enqueue(Greet, { name: 1 } as never);
 		expect(invalid.error).toBeInstanceOf(InvalidInputError);
-		const forbidden = await Moirai.execute(Greet, { name: 'mallory' }, { queue: true });
+		const forbidden = await Moirai.enqueue(Greet, { name: 'mallory' });
 		expect(forbidden.error).toBeInstanceOf(CallForbiddenError);
-		const keyless = await Moirai.execute(Charge, { amount: 5 }, { queue: true });
+		const keyless = await Moirai.enqueue(Charge, { amount: 5 });
 		expect(keyless.error).toBeInstanceOf(IdempotencyKeyRequiredError);
 		await MemoryTransport.settled();
 		expect(ran).toEqual([]);
 	});
 
+	it('refuses an input that does not survive JSON', async () => {
+		await boot();
+		await expect(Moirai.enqueue(Remind, { at: new Date() }).orThrow()).rejects.toBeInstanceOf(
+			QueuedInputError
+		);
+	});
+
+	it('refuses an action whose name another class took', async () => {
+		await boot();
+		@Action.register({ name: 'queued.clash', errors: [] })
+		class First extends Action {
+			public handle() {}
+		}
+		@Action.register({ name: 'queued.clash', errors: [] })
+		class Second extends Action {
+			public handle() {}
+		}
+		await expect(Moirai.enqueue(First).orThrow()).rejects.toBeInstanceOf(DuplicateActionNameError);
+		expect(await Moirai.enqueue(Second).orThrow()).toMatchObject({ queue: 'default' });
+	});
+
 	it('replays an idempotent queued call given the same key', async () => {
 		await boot();
-		const call = { queue: true, idempotencyKey: 'k-1', scope: 'user-1' } as const;
-		await Moirai.execute(Charge, { amount: 5 }, call).orThrow();
-		await Moirai.execute(Charge, { amount: 5 }, call).orThrow();
+		const call = { idempotencyKey: 'k-1', scope: 'user-1' };
+		await Moirai.enqueue(Charge, { amount: 5 }, call).orThrow();
+		await Moirai.enqueue(Charge, { amount: 5 }, call).orThrow();
 		await MemoryTransport.settled();
 		expect(ran).toEqual(['charge 5']);
 	});
 
 	it('ends the job of a refused call without retrying it', async () => {
 		await boot();
-		const queued = await Moirai.execute(Greet, { name: 'refused' }, { queue: true }).orThrow();
+		const queued = await Moirai.enqueue(Greet, { name: 'refused' }).orThrow();
 		await MemoryTransport.settled();
 		const status = await Queue.get('mail').getJobStatus(queued);
 		expect(status?.status).toBe('completed');
 		expect(status?.retries).toBe(0);
+	});
+
+	it('dispatches the job of an action registered with retry: false without retries', async () => {
+		await boot();
+		const dispatch = spyOn(Heracles, 'dispatch');
+		try {
+			await Moirai.enqueue(Once).orThrow();
+			expect(dispatch.mock.calls[0]?.[2]).toMatchObject({ maxRetries: 0 });
+		} finally {
+			dispatch.mockRestore();
+		}
+	});
+
+	it('passes the schedule and priority of the call', async () => {
+		await boot();
+		const dispatch = spyOn(Heracles, 'dispatch');
+		const scheduledFor = new Date(Date.now() + 60_000);
+		try {
+			await Moirai.enqueue(Greet, { name: 'later' }, { scheduledFor, priority: 3 }).orThrow();
+			expect(dispatch.mock.calls[0]?.[2]).toMatchObject({ scheduledFor, priority: 3 });
+		} finally {
+			dispatch.mockRestore();
+		}
 	});
 
 	it('dispatches the job of a call made in a unit of work once it commits', async () => {
@@ -192,24 +253,30 @@ describe('queued actions', () => {
 		await expect(Moirai.execute(Outer).orThrow()).rejects.toThrow('rollback');
 		await MemoryTransport.settled();
 		expect(ran).toEqual(['outer done']);
-		expect(UnitOfWork.active()).toBe(false);
+	});
+
+	it('needs a queue that exists', async () => {
+		await boot();
+		await expect(
+			Moirai.enqueue(Greet, { name: 'x' }, { queue: 'nowhere' }).orThrow()
+		).rejects.toThrow('Queue nowhere does not exist');
 	});
 
 	it('needs ActionJob in the jobs of a loaded module', async () => {
 		await boot([BareModule]);
-		await expect(
-			Moirai.execute(Greet, { name: 'ada' }, { queue: true }).orThrow()
-		).rejects.toBeInstanceOf(QueuedActionsUnavailableError);
+		await expect(Moirai.enqueue(Greet, { name: 'ada' }).orThrow()).rejects.toBeInstanceOf(
+			QueuedActionsUnavailableError
+		);
 	});
 
-	it('types a queued call by its call', () => {
-		const queued = () => Moirai.execute(Greet, { name: 'ada', times: 1 }, { queue: 'mail' });
-		expectTypeOf<Awaited<ReturnType<typeof queued>>['value']>().toEqualTypeOf<
-			QueuedAction | undefined
-		>();
-		const now = () => Moirai.execute(Greet, { name: 'ada', times: 1 });
-		expectTypeOf<Awaited<ReturnType<typeof now>>['value']>().toEqualTypeOf<
-			{ greeted: string } | undefined
-		>();
+	it('fails the job of an unknown action', async () => {
+		await boot();
+		const ids = await Heracles.dispatch(ActionJob, [
+			{ action: 'queued.missing', input: undefined, scope: 'anonymous' }
+		]);
+		await MemoryTransport.settled();
+		const status = await Queue.get('default').getJobStatus(ids);
+		expect(status?.status).toBe('failed');
+		expect(status?.error).toContain(new UnknownActionError('queued.missing').message);
 	});
 });

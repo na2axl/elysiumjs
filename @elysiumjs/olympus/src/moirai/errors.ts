@@ -85,7 +85,7 @@ export class CallForbiddenError extends DomainError.for('FORBIDDEN', 403) {
 }
 
 /**
- * Raised when an action is called with a `queue` and nothing runs queued actions: the process
+ * Raised when `Moirai.enqueue()` is called and nothing runs queued actions: the process
  * does not import `@elysiumjs/olympus/moirai/heracles`, or no loaded module lists its `ActionJob`
  * in `jobs`.
  * @author Axel Nana <ax.lnana@outlook.com>
@@ -93,9 +93,45 @@ export class CallForbiddenError extends DomainError.for('FORBIDDEN', 403) {
 export class QueuedActionsUnavailableError extends ElysiumError {
 	constructor(public readonly action: string) {
 		super(
-			`The ${action} action was called with a queue, but nothing runs queued actions: import ` +
+			`The ${action} action was queued, but nothing runs queued actions: import ` +
 				"ActionJob from '@elysiumjs/olympus/moirai/heracles' and list it in the jobs of a module."
 		);
+	}
+}
+
+/**
+ * Raised when `Moirai.enqueue()` is given an action whose name another action class registered
+ * after it: the job finds actions by name, so it would run the other one. Give one of them a
+ * `name` in `@Action.register()`.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export class DuplicateActionNameError extends ElysiumError {
+	constructor(public readonly action: string) {
+		super(
+			`Another action class is registered as ${action}: give one of them a name in @Action.register().`
+		);
+	}
+}
+
+/**
+ * Raised when the input of `Moirai.enqueue()` does not survive JSON, which its job carries, such
+ * as a `Date`: pass its JSON form, such as an ISO string.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export class QueuedInputError extends ElysiumError {
+	constructor(public readonly action: string) {
+		super(`The input of the queued ${action} action does not survive JSON: pass its JSON form.`);
+	}
+}
+
+/**
+ * Raised by the job of a queued call when no action is registered under its name, such as when
+ * the process that runs the job does not import the action.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export class UnknownActionError extends ElysiumError {
+	constructor(public readonly action: string) {
+		super(`No action is registered as ${action}: import it in the process that runs the job.`);
 	}
 }
 
