@@ -85,6 +85,21 @@ export class CallForbiddenError extends DomainError.for('FORBIDDEN', 403) {
 }
 
 /**
+ * Raised when an action is called with a `queue` and nothing runs queued actions: the process
+ * does not import `@elysiumjs/olympus/moirai/heracles`, or no loaded module lists its `ActionJob`
+ * in `jobs`.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export class QueuedActionsUnavailableError extends ElysiumError {
+	constructor(public readonly action: string) {
+		super(
+			`The ${action} action was called with a queue, but nothing runs queued actions: import ` +
+				"ActionJob from '@elysiumjs/olympus/moirai/heracles' and list it in the jobs of a module."
+		);
+	}
+}
+
+/**
  * Raised when moirai needs a store that neither the current module (`Moirai.stores()`) nor
  * `MoiraiModule.with()` set.
  * @author Axel Nana <ax.lnana@outlook.com>

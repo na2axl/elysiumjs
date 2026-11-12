@@ -29,6 +29,11 @@ import { TransportMode } from './transport';
  */
 export type JobDispatchOptions = {
 	/**
+	 * The queue to dispatch to, instead of the queue of the job class. The queue must exist.
+	 */
+	queue?: string;
+
+	/**
 	 * Schedule the job to run at a specific time.
 	 */
 	scheduledFor?: Date;

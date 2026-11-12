@@ -12,13 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Job, JobClass, JobDispatchOptions } from '../heracles/index';
+import type { JobClass, JobDispatchOptions } from '../heracles/index';
+import type { QueuedRun } from './action';
 import type { OutboxEffect } from './stores';
 
-import { Heracles, JobRegistry, sealJobArgs } from '../heracles/index';
-import { DATABASE_TRANSACTION_SERVICE, ElysiumError, ModuleContext, Service } from '../index';
+import { Heracles, Job, JobRegistry, sealJobArgs } from '../heracles/index';
+import {
+	DATABASE_TRANSACTION_SERVICE,
+	ElysiumError,
+	getLogger,
+	ModuleContext,
+	Service
+} from '../index';
 import { UnitOfWork } from '../mnemosyne/index';
-import { Inbox, registerEffect } from './outbox';
+import { Moirai, setActionQueue } from './action';
+import { MOIRAI_ACTION_JOB, MOIRAI_OUTBOX_STORE } from './config';
+import { QueuedActionsUnavailableError } from './errors';
+import { uuidv7 } from './ids';
+import { Inbox, Outbox, registerEffect } from './outbox';
 
 /** The kind of the effects that dispatch a Heracles job. */
 export const HERACLES_JOB_EFFECT = 'heracles.job';
@@ -105,3 +116,60 @@ export const Once =
 				: run());
 		};
 	};
+
+/**
+ * The job that runs the queued calls of actions: `Moirai.execute(action, input, { queue })`
+ * dispatches it, and it runs the action through the same path as a call that runs now, with its
+ * unit of work, retries, idempotency and outbox. List it in the `jobs` of a module, next to
+ * `HeraclesModule`, in the processes that queue actions and in those that run them.
+ *
+ * A refusal of the handler ends the job: it is logged, not retried. A thrown error fails the job,
+ * which Heracles retries; give an action that may run twice an idempotency key, so that a retry
+ * replays the stored response.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ * @example
+ * ```ts
+ * @Module.register({ jobs: [ActionJob] })
+ * class AppModule extends Module {}
+ *
+ * await Moirai.execute(SendDigest, { userId }, { queue: 'mail' });
+ * ```
+ */
+@Job.register({ name: MOIRAI_ACTION_JOB })
+export class ActionJob extends Job {
+	public static override readonly description: string = 'Runs a queued action.';
+
+	constructor(private readonly call: QueuedRun) {
+		super();
+	}
+
+	protected async execute(): Promise<void> {
+		const result = await Moirai.runQueued(this.call);
+		if (!result.check()) {
+			getLogger().warn('A queued action was refused', {
+				action: this.call.action,
+				error: result.error.message
+			});
+		}
+	}
+}
+
+setActionQueue(async (run, queue) => {
+	if (!JobRegistry.all().some((entry) => entry.jobClass === ActionJob)) {
+		throw new QueuedActionsUnavailableError(run.action);
+	}
+	// The ids are known before the dispatch, which may wait for the unit of work to commit.
+	const ids = { jobId: ActionJob.generateJobId(), dispatchId: `dispatch_${uuidv7()}` };
+	const options: JobDispatchOptions = { queue, ...ids };
+	if (!UnitOfWork.active()) {
+		await Heracles.dispatch(ActionJob, [run], options);
+	} else if (Service.get(MOIRAI_OUTBOX_STORE)) {
+		// In a unit of work, the job is dispatched once it commits, and only then.
+		await Outbox.enqueue(job(ActionJob, [run], options));
+	} else {
+		await UnitOfWork.afterCommit(async () => {
+			await Heracles.dispatch(ActionJob, [run], options);
+		});
+	}
+	return ids;
+});

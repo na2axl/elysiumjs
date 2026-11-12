@@ -45,6 +45,7 @@ import {
 	InvalidInputError,
 	LockOutsideUnitOfWorkError,
 	NestedCallRefusedError,
+	QueuedActionsUnavailableError,
 	UndeclaredRefusalError
 } from './errors';
 import { requestHash } from './hash';
@@ -154,7 +155,26 @@ type InputOf<C extends HandlerClass> =
  * How an action or a query is called.
  * @author Axel Nana <ax.lnana@outlook.com>
  */
-export type ActionCall = { idempotencyKey?: string; scope?: string };
+export type ActionCall = {
+	idempotencyKey?: string;
+	scope?: string;
+	/** Runs the action now, as a call without a queue does. */
+	queue?: false;
+};
+
+/**
+ * How an action is called to run later, as a Heracles job: `queue` names the queue, or is `true`
+ * for the `queue` of `@Action.register()` (else `default`).
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export type QueuedActionCall = Omit<ActionCall, 'queue'> & { queue: string | true };
+
+/**
+ * What a queued call of `Moirai.execute()` gives once the job is accepted: the ids of the job and
+ * of its dispatch, for `Queue.get(queue).getJobStatus()`, and its queue.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export type QueuedAction = { jobId: string; dispatchId: string; queue: string };
 
 /**
  * The arguments of `Moirai.execute()` after the action: its input, which may be left out when
@@ -165,6 +185,15 @@ export type ExecuteArgs<C extends ActionClass> =
 	undefined extends InputOf<C>
 		? [input?: InputOf<C>, call?: ActionCall]
 		: [input: InputOf<C>, call?: ActionCall];
+
+/**
+ * The arguments of a queued call of `Moirai.execute()`: the input, then the call with its queue.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export type QueuedExecuteArgs<C extends ActionClass> = [
+	input: InputOf<C> | (undefined extends InputOf<C> ? undefined : never),
+	call: QueuedActionCall
+];
 
 /**
  * The arguments of `Moirai.ask()` after the query: its input, which may be left out when
@@ -198,6 +227,15 @@ type MoiraiRefusal =
  * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ActionErrors<C extends ActionClass> = ErrorsOf<C> | MoiraiRefusal;
+
+/**
+ * The DomainErrors that refuse a queued call before its job is dispatched: an invalid input, a
+ * refused `authorize` and a missing idempotency key. The refusals of the handler happen in the
+ * job.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export type QueuedActionErrors =
+	InvalidInputError | CallForbiddenError | IdempotencyKeyRequiredError;
 
 /**
  * The DomainErrors that refuse a query: those of its handler, an invalid input and a refused call.
@@ -337,6 +375,11 @@ export type ActionOptions<
 	retry?: boolean | ActionRetry;
 	/** Decides whether the call may run, such as with the abilities of the current user. */
 	authorize?: (input: Static<S>) => boolean | Promise<boolean>;
+	/**
+	 * The queue of the calls that ask for one with `queue: true`. Calls without a queue run now.
+	 * Defaults to `default`.
+	 */
+	queue?: string;
 };
 
 /**
@@ -401,7 +444,9 @@ export abstract class Action<
 		const E extends readonly ProblemClass[] = readonly ProblemClass[]
 	>(props: ActionOptions<S, E>) {
 		return <T extends ActionClass>(target: T & ListsErrorsOf<T, E>): void => {
-			Metadata.define(ACTION, { ...props, name: props.name ?? target.name }, target);
+			const name = props.name ?? target.name;
+			Metadata.define(ACTION, { ...props, name }, target);
+			actions.set(name, target);
 		};
 	}
 
@@ -489,6 +534,40 @@ export abstract class Query<
 	public abstract handle(input: TInput, context: HandlerContext): HandlerResult<TResult, TErrors>;
 }
 
+/** The action classes by name, for the jobs of queued calls. */
+const actions = new Map<string, ActionClass>();
+
+/**
+ * A queued call, as its job carries it: the action, its checked input, and the idempotency key
+ * and its owner, known when the call was made.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export type QueuedRun = {
+	action: string;
+	input: unknown;
+	idempotencyKey?: string;
+	scope: string;
+};
+
+/** Dispatches the job of a queued call to a queue, and gives the ids of the job and dispatch. */
+type ActionQueue = (
+	run: QueuedRun,
+	queue: string
+) => Promise<{ jobId: string; dispatchId: string }>;
+
+let actionQueue: ActionQueue | undefined;
+
+/**
+ * Sets what dispatches the jobs of queued calls. Called by `@elysiumjs/olympus/moirai/heracles`.
+ * @internal
+ */
+export const setActionQueue = (queue: ActionQueue): void => {
+	actionQueue = queue;
+};
+
+/** Call options that only the job of a queued call passes. */
+type InternalCall = ActionCall & { authorized?: boolean };
+
 /** The instance of a handler: the registered service, or a new one with its dependencies. */
 const instanceOf = <T>(target: new (...args: any[]) => T): T =>
 	Service.get(target) ?? Service.make(target);
@@ -556,20 +635,96 @@ export namespace Moirai {
 	 * @param args The raw input, left out when `handle()` takes none, and the idempotency key and
 	 * scope of the call.
 	 */
-	export const execute = <C extends ActionClass>(
+	export function execute<C extends ActionClass>(
 		action: C,
-		...[input, call = {}]: ExecuteArgs<C>
-	): Outcome<ResultOf<C>, ActionErrors<C>> =>
-		new Outcome(
+		...args: QueuedExecuteArgs<C>
+	): Outcome<QueuedAction, QueuedActionErrors>;
+	export function execute<C extends ActionClass>(
+		action: C,
+		...args: ExecuteArgs<C>
+	): Outcome<ResultOf<C>, ActionErrors<C>>;
+	export function execute<C extends ActionClass>(
+		action: C,
+		input?: unknown,
+		call: ActionCall | QueuedActionCall = {}
+	): Outcome<unknown, DomainError> {
+		return new Outcome(
 			settle(action, () => {
-				const props = Metadata.get(ACTION, action) as
-					(ActionOptions & { name: string }) | undefined;
-				if (!props) throw new TypeError(`${action.name} is not marked with @Action.register().`);
+				const props = propsOf(action);
 				// The action runs in its module, so that it uses the stores of that module.
-				return inOwnerModule(action, () => run(action, props, input, call));
-			}) as Promise<ActionOutcome<C>>,
+				return inOwnerModule(action, () =>
+					call.queue
+						? enqueue(props, input, call as QueuedActionCall)
+						: run(action, props, input as InputOf<C>, call as ActionCall)
+				);
+			}),
 			action.name
 		);
+	}
+
+	const propsOf = (action: ActionClass): ActionOptions & { name: string } => {
+		const props = Metadata.get(ACTION, action) as (ActionOptions & { name: string }) | undefined;
+		if (!props) throw new TypeError(`${action.name} is not marked with @Action.register().`);
+		return props;
+	};
+
+	/** The owner of the idempotency keys of a call. */
+	const scopeOf = (props: ActionOptions, value: unknown, call: { scope?: string }): string =>
+		call.scope ?? props.scope?.(value) ?? currentUserId() ?? 'anonymous';
+
+	/**
+	 * Checks a queued call as a call that runs now would be checked, then dispatches its job: the
+	 * input, `authorize` and the idempotency key, with the owner of the key read now, since the
+	 * job runs without the caller's context.
+	 */
+	const enqueue = async (
+		props: ActionOptions & { name: string },
+		input: unknown,
+		call: QueuedActionCall
+	): Promise<QueuedAction> => {
+		if (!actionQueue) throw new QueuedActionsUnavailableError(props.name);
+		const value = validate(props.input, input, props.name);
+		if (props.authorize && !(await props.authorize(value))) {
+			throw new CallForbiddenError(props.name);
+		}
+		if (props.idempotent && !call.idempotencyKey) {
+			throw new IdempotencyKeyRequiredError(props.name);
+		}
+		const queue = call.queue === true ? (props.queue ?? 'default') : call.queue;
+		const ids = await actionQueue(
+			{
+				action: props.name,
+				input: value,
+				idempotencyKey: call.idempotencyKey,
+				scope: scopeOf(props, value, call)
+			},
+			queue
+		);
+		return { ...ids, queue };
+	};
+
+	/**
+	 * Runs the call a job carries, through the same path as a call that runs now, without
+	 * `authorize`, which ran when the call was made.
+	 * @internal
+	 */
+	export const runQueued = (queued: QueuedRun): Outcome<unknown, DomainError> => {
+		const action = actions.get(queued.action);
+		if (!action) {
+			throw new TypeError(`No action is registered as ${queued.action}.`);
+		}
+		const call: InternalCall = {
+			idempotencyKey: queued.idempotencyKey,
+			scope: queued.scope,
+			authorized: true
+		};
+		return new Outcome(
+			settle(action, () =>
+				inOwnerModule(action, () => run(action, propsOf(action), queued.input as never, call))
+			),
+			action.name
+		);
+	};
 
 	/**
 	 * Serializes the work that shares a key, from inside a handler, for a key known only once the
@@ -625,20 +780,20 @@ export namespace Moirai {
 		action: C,
 		props: ActionOptions & { name: string },
 		input: InputOf<C> | undefined,
-		call: ActionCall
+		call: InternalCall
 	): Promise<ResultOf<C>> => {
 		const { name, idempotent = false, transactional = true, retry = true } = props;
 		const config = options();
 
 		const value = validate(props.input, input, name);
-		if (props.authorize && !(await props.authorize(value))) throw new CallForbiddenError(name);
+		if (!call.authorized && props.authorize && !(await props.authorize(value))) {
+			throw new CallForbiddenError(name);
+		}
 		const key = call.idempotencyKey;
 		if (idempotent && !key) throw new IdempotencyKeyRequiredError(name);
 		// A key belongs to its owner and its action: another owner presenting it runs on its own.
 		const storedKey = idempotent
-			? [call.scope ?? props.scope?.(value) ?? currentUserId() ?? 'anonymous', name, key!]
-					.map(encodeURIComponent)
-					.join(':')
+			? [scopeOf(props, value, call), name, key!].map(encodeURIComponent).join(':')
 			: undefined;
 
 		const body = async (attempt: number): Promise<ResultOf<C>> => {

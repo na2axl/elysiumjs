@@ -495,6 +495,30 @@ class SendStatement extends Job {
 }
 ```
 
+## Queued actions
+
+An action runs later, as a Heracles job, when `Moirai.execute()` is given a queue: a queue name, or `true` for the `queue` of `@Action.register()` (`default` when it names none). The call checks the input, `authorize` and the idempotency key right away, as a call that runs now does, then answers once the job is accepted, with the ids of the job and of its dispatch. The job runs the action through the usual path: its unit of work, retries, idempotency and outbox. Without a queue, the call runs now.
+
+```ts
+import { ActionJob } from '@elysiumjs/olympus/moirai/heracles';
+
+@Action.register({ input: t.Object({ userId: t.String() }), errors: [], queue: 'mail' })
+class SendDigest extends Action<{ userId: string }> {
+	public async handle(input: { userId: string }) {
+		// ...
+	}
+}
+
+@Module.register({ jobs: [ActionJob] })
+class AppModule extends Module {}
+
+const { jobId } = await Moirai.execute(SendDigest, { userId }, { queue: true }).orThrow();
+```
+
+List `ActionJob` in the `jobs` of a module, next to `HeraclesModule`; a queued call without it throws `QueuedActionsUnavailableError`. A call made in a unit of work dispatches its job once the unit commits, through the outbox when there is one, and not at all when it rolls back.
+
+The job runs without the caller's context, such as the current user: what the handler needs goes in the input, which travels as JSON and in clear. The owner of the idempotency key is read when the call is made. A refusal of the handler ends the job, logged; a thrown error fails it, and Heracles retries it, so give an action that must not run twice an idempotency key.
+
 ## Services
 
 A service is identified by its class. Give it a name with `@Service.register({ name })` to look it up by that string instead. Class names are never used as identifiers, so services resolve the same way after a bundler renames classes (`bun run check:minified` builds a minified app and checks it).

@@ -15,9 +15,9 @@
 import type { Job, JobClass } from './job';
 import type { JobDispatchId, JobDispatchOptions } from './queue';
 
-import { Service } from '../index';
 import { uid } from 'radash';
 
+import { Service } from '../index';
 import { Queue } from './queue';
 import { QUEUES_SERVICE } from './registry';
 import { getJobMetadata } from './utils';
@@ -42,7 +42,8 @@ export namespace Heracles {
 			throw new Error(`Job ${jobClass.name} is not marked with @Job.register() decorator`);
 		}
 
-		if (!metadata.queue) {
+		const queueName = options.queue ?? metadata.queue;
+		if (!queueName) {
 			throw new Error(`Job ${jobClass.name} is not registered with a queue`);
 		}
 
@@ -50,13 +51,13 @@ export namespace Heracles {
 		// initialises HeraclesModule, which works on a lazy boot too.
 		if (Service.exists(QUEUES_SERVICE)) await Service.resolve(QUEUES_SERVICE);
 
-		if (!Queue.exists(metadata.queue)) {
+		if (!Queue.exists(queueName)) {
 			throw new Error(
-				`Queue ${metadata.queue} does not exist. Please create the queue before dispatching the job.`
+				`Queue ${queueName} does not exist. Please create the queue before dispatching the job.`
 			);
 		}
 
-		const queue = Queue.get(metadata.queue);
+		const queue = Queue.get(queueName);
 
 		// Producers don't have to start queues: the first dispatch does, shared across callers.
 		await queue.start();
