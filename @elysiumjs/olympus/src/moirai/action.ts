@@ -677,7 +677,7 @@ export namespace Moirai {
 	 * when it rolls back.
 	 *
 	 * Needs `ActionJob` from `@elysiumjs/olympus/moirai/heracles` in the `jobs` of a loaded
-	 * module. The input travels as JSON, dates included (see `Json`): an input that does not
+	 * module. The input travels as JSON, dates and the values of registered serializers included (see `Json`): an input that does not
 	 * come back from it as it was, such as a `Map` or a class instance, is refused.
 	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param action The action class.

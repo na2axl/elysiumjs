@@ -258,3 +258,11 @@ export { type HttpTransportOptions, HttpTransport } from './logging/transports/h
 export { type LoggedOptions, Logged } from './logging/decorators/logged';
 export { type LogFormat, type LoggerConfig, type TransportConfig } from './logging/types';
 export { Json } from './json';
+export {
+	DateSerializer,
+	DuplicateSerializerError,
+	type RegisteredSerializer,
+	Serializer,
+	type SerializerOptions,
+	UnknownSerializerError
+} from './serializer';

@@ -86,6 +86,7 @@
 	"sideEffects": [
 		"./src/index.ts",
 		"./src/lock.ts",
+		"./src/serializer.ts",
 		"./src/logging/logger.module.ts",
 		"./src/logging/services/json-console.logger.ts",
 		"./src/moirai/heracles.ts",
