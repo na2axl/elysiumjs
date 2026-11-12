@@ -139,9 +139,10 @@ describe.skipIf(!url)('DrizzleFileStore on PostgreSQL', () => {
 		await store.insert(record('d', { status: 'ready', expiresAt: at(3) }));
 		await store.insert(record('e', { status: 'ready', expiresAt: null }));
 		await store.insert(record('f', { status: 'rejected', expiresAt: null }));
+		await store.insert(record('g', { status: 'finishing', createdBy: 'carol', expiresAt: at(4) }));
 		expect(await store.countPending('alice', at(4))).toBe(2);
 		expect(await store.countPending('alice', at(10))).toBe(1);
-		expect((await store.due(at(10), 10)).map((file) => file.id)).toEqual(['d', 'b']);
+		expect((await store.due(at(10), 10)).map((file) => file.id)).toEqual(['d', 'g', 'b']);
 		expect((await store.due(at(10), 1)).map((file) => file.id)).toEqual(['d']);
 	});
 });

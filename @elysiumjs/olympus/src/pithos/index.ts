@@ -59,6 +59,7 @@ export {
 	PITHOS_FILE_DELETED,
 	PITHOS_FILE_READY,
 	PITHOS_FILE_REJECTED,
+	STAGING_PREFIX,
 	stagingKey
 } from './files';
 export { MemoryDisk } from './memory';
@@ -80,6 +81,7 @@ export {
 	DiskCannotSignError,
 	DiskNotPublicError,
 	InvalidObjectKeyError,
+	listLimit,
 	ObjectNotFoundError,
 	objectOf,
 	PITHOS_DISKS,

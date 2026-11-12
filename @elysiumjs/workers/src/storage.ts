@@ -26,10 +26,10 @@ import type {
 
 import {
 	assertKey,
-	DEFAULT_LIST_LIMIT,
 	DiskCannotSignError,
 	DiskNotPublicError,
 	joinUrl,
+	listLimit,
 	ObjectNotFoundError,
 	signServedUrl,
 	Storage,
@@ -39,6 +39,9 @@ import {
 
 import { presignS3Url } from './sigv4';
 import { Workers } from './workers';
+
+/** The longest an S3 presigned URL may last: seven days. */
+const MAX_PRESIGN_SECONDS = 604_800;
 
 declare module '@elysiumjs/olympus' {
 	interface PortDrivers {
@@ -223,7 +226,8 @@ export class R2Disk extends StorageDriver {
 		const page = await this.#bucket().list({
 			prefix: options.prefix,
 			cursor: options.cursor,
-			limit: options.limit ?? DEFAULT_LIST_LIMIT,
+			// R2 answers at most 1000 objects a page.
+			limit: Math.min(listLimit(options), 1000),
 			include: ['httpMetadata', 'customMetadata']
 		});
 		return {
@@ -260,6 +264,12 @@ export class R2Disk extends StorageDriver {
 	public async signedUrl(key: string, options: SignedUrlOptions): Promise<string> {
 		const { s3, signing } = this.options;
 		if (s3) {
+			const { expiresIn } = options;
+			if (!Number.isInteger(expiresIn) || expiresIn < 1 || expiresIn > MAX_PRESIGN_SECONDS) {
+				throw new RangeError(
+					`An R2 presigned URL lasts from 1 to ${MAX_PRESIGN_SECONDS} whole seconds, not ${expiresIn}.`
+				);
+			}
 			const endpoint = s3.endpoint ?? `https://${s3.accountId}.r2.cloudflarestorage.com`;
 			const headers: Record<string, string> = {};
 			if (options.method === 'PUT' && options.contentType) {

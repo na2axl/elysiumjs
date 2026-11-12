@@ -71,7 +71,10 @@ export class StorageController {
 		return new Response(object.body, {
 			headers: {
 				'content-type': object.contentType ?? 'application/octet-stream',
-				'content-length': String(object.size)
+				'content-length': String(object.size),
+				// Uploaded content is served from the application's origin: never as a page that runs.
+				'x-content-type-options': 'nosniff',
+				'content-security-policy': "default-src 'none'; sandbox"
 			}
 		});
 	}
@@ -84,11 +87,10 @@ export class StorageController {
 		const expected = checked.url.searchParams.get('contentType');
 		if (expected !== null && declared !== expected) return new Response(null, { status: 403 });
 		const length = checked.url.searchParams.get('contentLength');
-		// A declared length that differs is refused before the body is read.
+		// The body is read only when it declares the signed length.
 		const sent = ctx.request.headers.get('content-length');
-		if (length !== null && sent !== null && sent !== length) {
-			return new Response(null, { status: 403 });
-		}
+		if (length !== null && sent === null) return new Response(null, { status: 411 });
+		if (length !== null && sent !== length) return new Response(null, { status: 403 });
 		const body = await ctx.request.arrayBuffer();
 		if (length !== null && body.byteLength !== Number(length)) {
 			return new Response(null, { status: 403 });

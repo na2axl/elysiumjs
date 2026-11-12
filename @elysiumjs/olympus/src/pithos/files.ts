@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import type { Result } from '../result';
-import type { SignedUrlOptions } from './storage';
+import type { DiskSource, SignedUrlOptions } from './storage';
 
 import { Clock } from '../clock';
 import { Lifecycle } from '../lifecycle';
@@ -22,7 +22,7 @@ import { Port } from '../port';
 import { Result as R } from '../result';
 import { Service } from '../service';
 import { FileNotReadyError, FilesUnavailableError } from './errors';
-import { Storage } from './storage';
+import { PITHOS_DISKS, Storage } from './storage';
 
 /**
  * Who a file belongs to: a kind of owner, such as `user`, and its id.
@@ -31,12 +31,12 @@ import { Storage } from './storage';
 export type FileOwner = { readonly type: string; readonly id: string };
 
 /**
- * Where a file is in its life: `pending` while it is uploaded, then `ready`, or `rejected` when
- * the uploaded file was not what was declared, `expired` when it was never uploaded, and
- * `deleted` once its object is gone.
+ * Where a file is in its life: `pending` while it is uploaded, `finishing` while `finish()` checks
+ * it, then `ready`, or `rejected` when the uploaded file was not what was declared, `expired` when
+ * it was never finished, and `deleted` once its object is gone.
  * @author Axel Nana <ax.lnana@outlook.com>
  */
-export type FileStatus = 'pending' | 'ready' | 'rejected' | 'expired' | 'deleted';
+export type FileStatus = 'pending' | 'finishing' | 'ready' | 'rejected' | 'expired' | 'deleted';
 
 /**
  * A file: an object of a disk, with what is known of it. One record follows a file from its
@@ -64,8 +64,8 @@ export type FileRecord = {
 	readonly claimedAt: Date | null;
 	readonly releasedAt: Date | null;
 	/**
-	 * When the file is pruned: the end of the upload while `pending`, and the deletion of a `ready`
-	 * file nothing claims. `null` while claimed.
+	 * When the file is pruned: the end of the upload while `pending` or `finishing`, and the
+	 * deletion of a `ready` file nothing claims. `null` while claimed.
 	 */
 	readonly expiresAt: Date | null;
 	readonly deletedAt: Date | null;
@@ -109,7 +109,7 @@ export interface FileStoreDriver {
 	transition(id: string, when: FileCondition, patch: FilePatch): Promise<FileRecord | null>;
 	/** How many uploads of someone are `pending` and not expired at `now`. */
 	countPending(createdBy: string, now: Date): Promise<number>;
-	/** Up to `limit` `pending` or `ready` records whose `expiresAt` is at or before `now`. */
+	/** Up to `limit` `pending`, `finishing` or `ready` records whose `expiresAt` is at or before `now`. */
 	due(now: Date, limit: number): Promise<FileRecord[]>;
 }
 
@@ -129,6 +129,9 @@ declare module '../port' {
  * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class FileStore extends Port('file-store') {}
+
+/** The statuses of the records `due()` answers. */
+export const PRUNABLE: readonly FileStatus[] = ['pending', 'finishing', 'ready'];
 
 /** Whether a record meets a condition. */
 export const meets = (record: FileRecord, when: FileCondition): boolean =>
@@ -177,7 +180,7 @@ export class MemoryFileStore implements FileStoreDriver {
 
 	public async due(now: Date, limit: number): Promise<FileRecord[]> {
 		return [...this.#records.values()]
-			.filter((record) => meets(record, { status: ['pending', 'ready'], due: now }))
+			.filter((record) => meets(record, { status: PRUNABLE, due: now }))
 			.sort((a, b) => a.expiresAt!.getTime() - b.expiresAt!.getTime())
 			.slice(0, limit)
 			.map((record) => ({ ...record }));
@@ -195,6 +198,12 @@ export type FilesOptions = {
 	readonly unclaimedTtl?: number;
 	/** The uploads one person may have in progress at once. Defaults to 10. */
 	readonly maxPending?: number;
+	/**
+	 * The disk uploads are staged on before `finish()` checks them; the disk of the purpose
+	 * without one. Give a private disk when files go to a public one, so that unchecked bytes are
+	 * never served.
+	 */
+	readonly staging?: string;
 };
 
 /** The service holding the file store and options of the application. */
@@ -206,15 +215,15 @@ export const PITHOS_FILES = 'pithos.files';
  */
 export type FilesSource = {
 	readonly store: FileStoreDriver;
-	readonly options: Required<FilesOptions>;
+	readonly options: Required<Omit<FilesOptions, 'staging'>> & Pick<FilesOptions, 'staging'>;
 };
 
 /** The defaults of {@link FilesOptions}. */
-export const FILES_DEFAULTS: Required<FilesOptions> = {
+export const FILES_DEFAULTS = {
 	uploadTtl: 900,
 	unclaimedTtl: 86_400,
 	maxPending: 10
-};
+} as const satisfies FilesOptions;
 
 /** The file store and options; throws without `PithosModule`. */
 export const filesSource = (): FilesSource => {
@@ -229,7 +238,7 @@ export const PITHOS_FILE_READY = 'elysium:pithos:ready';
 /** Emitted when an uploaded file is refused. */
 export const PITHOS_FILE_REJECTED = 'elysium:pithos:rejected';
 
-/** Emitted once a file is deleted, by `Files.delete()` or by pruning. */
+/** Emitted once a file is deleted, by `Files.remove()` or by pruning. */
 export const PITHOS_FILE_DELETED = 'elysium:pithos:deleted';
 
 /**
@@ -250,7 +259,7 @@ export const emitFileEvent = (event: string, file: FileRecord): void => {
 	}
 };
 
-/** Deletes an object, logging a failure: pruning tries again, and a request is not failed. */
+/** Deletes an object, logging a failure instead of failing the request or the job. */
 export const deleteQuietly = async (disk: string, key: string): Promise<void> => {
 	try {
 		await Storage.disk(disk).delete(key);
@@ -263,8 +272,14 @@ export const deleteQuietly = async (disk: string, key: string): Promise<void> =>
 	}
 };
 
+/** The prefix of staged uploads, which no purpose may use. */
+export const STAGING_PREFIX = 'staging/';
+
 /** The key an upload writes to, never the key the file is served from. */
-export const stagingKey = (id: string): string => `staging/${id}`;
+export const stagingKey = (id: string): string => `${STAGING_PREFIX}${id}`;
+
+/** The disk a file of a disk is staged on. */
+export const stagingDisk = (disk: string): string => filesSource().options.staging ?? disk;
 
 const after = (from: Date, seconds: number): Date => new Date(from.getTime() + seconds * 1000);
 
@@ -333,19 +348,32 @@ export namespace Files {
 
 	/**
 	 * Lets a ready file go: it is deleted once `grace` seconds have passed (0 by default), unless it
-	 * is claimed again before. Answers the file, or `null` when it is not ready.
+	 * is claimed again before. A file has one keeper: a feature that shares a file with another
+	 * keeps track of it itself. Answers the file, or `null` when it is not ready or does not meet
+	 * `expect`.
 	 */
-	export const release = async (id: string, grace = 0): Promise<FileRecord | null> => {
+	export const release = async (
+		id: string,
+		options: FileExpectation & { readonly grace?: number } = {}
+	): Promise<FileRecord | null> => {
+		const file = await find(id);
+		if (!file || !fits(file, options)) return null;
 		const now = Clock.now();
 		return filesSource().store.transition(
 			id,
 			{ status: ['ready'] },
-			{ claimedAt: null, releasedAt: now, expiresAt: after(now, grace) }
+			{ claimedAt: null, releasedAt: now, expiresAt: after(now, options.grace ?? 0) }
 		);
 	};
 
-	/** Deletes a ready file and its object now. Answers whether there was one. */
-	export const remove = async (id: string): Promise<boolean> => {
+	/**
+	 * Deletes a ready file and its object now. Answers whether there was one that meets `expect`.
+	 * Inside a unit of work, call it once the work has committed, since the object cannot be put
+	 * back.
+	 */
+	export const remove = async (id: string, expect: FileExpectation = {}): Promise<boolean> => {
+		const found = await find(id);
+		if (!found || !fits(found, expect)) return false;
 		const now = Clock.now();
 		const file = await filesSource().store.transition(
 			id,
@@ -359,15 +387,18 @@ export namespace Files {
 	};
 
 	/**
-	 * Deletes up to `limit` files whose time is over: uploads never finished and ready files
-	 * nothing claims. A file claimed in the meantime is kept. Answers how many were pruned.
+	 * Deletes up to `limit` files whose time is over: uploads never finished (their staged object,
+	 * and their object should a finish have stopped half way) and ready files nothing claims (their
+	 * object). A file claimed in the meantime is kept. Then deletes the staged objects whose upload
+	 * URL has expired, such as one sent again through the URL after the upload finished. Answers how
+	 * many files were pruned.
 	 */
 	export const prune = async (limit = 100): Promise<number> => {
-		const { store } = filesSource();
+		const { store, options } = filesSource();
 		const now = Clock.now();
 		let pruned = 0;
 		for (const file of await store.due(now, limit)) {
-			const expired = file.status === 'pending';
+			const expired = file.status !== 'ready';
 			const done = await store.transition(
 				file.id,
 				{ status: [file.status], due: now },
@@ -377,10 +408,33 @@ export namespace Files {
 			);
 			if (!done) continue;
 			pruned += 1;
-			await deleteQuietly(file.disk, expired ? stagingKey(file.id) : file.key);
+			if (expired) await deleteQuietly(stagingDisk(file.disk), stagingKey(file.id));
+			await deleteQuietly(file.disk, file.key);
 			if (!expired) emitFileEvent(PITHOS_FILE_DELETED, done);
 		}
+		if (pruned < limit) await sweepStaging(after(now, -options.uploadTtl), limit);
 		return pruned;
+	};
+
+	/**
+	 * Deletes staged objects written before `before`. An upload URL works for `uploadTtl` from its
+	 * file's creation, and its object is written after that, so an object older than `uploadTtl`
+	 * belongs to an upload whose URL has expired.
+	 */
+	const sweepStaging = async (before: Date, limit: number): Promise<void> => {
+		const disks = Service.get<DiskSource>(PITHOS_DISKS);
+		const names = new Set((disks?.names() ?? []).map((name) => stagingDisk(name)));
+		for (const name of names) {
+			const disk = Storage.disk(name);
+			let cursor: string | undefined;
+			do {
+				const page = await disk.list({ prefix: STAGING_PREFIX, cursor, limit });
+				for (const object of page.items) {
+					if (object.lastModified <= before) await deleteQuietly(name, object.key);
+				}
+				cursor = page.nextCursor ?? undefined;
+			} while (cursor);
+		}
 	};
 
 	/** The public URL of a file, on a public disk. */

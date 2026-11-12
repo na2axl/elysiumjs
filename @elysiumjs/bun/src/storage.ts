@@ -23,14 +23,16 @@ import type {
 	StoredObject
 } from '@elysiumjs/olympus/pithos';
 
-import { resolve } from 'node:path';
+import { mkdir, rename, rm } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
 
 import {
 	assertKey,
-	DEFAULT_LIST_LIMIT,
 	DiskCannotSignError,
 	DiskNotPublicError,
+	InvalidObjectKeyError,
 	joinUrl,
+	listLimit,
 	ObjectNotFoundError,
 	signServedUrl,
 	Storage,
@@ -56,15 +58,20 @@ export type BunDiskOptions = {
 	readonly signing?: ServedSigning;
 };
 
-/** The folder, under the root, that keeps the content type and metadata of each object. */
+/**
+ * The folder, under the root, that keeps the content type and metadata of each object (in
+ * `meta`, one file per key named by its hash) and the files being written (in `tmp`).
+ */
 const META = '.pithos';
 
 type Meta = { contentType?: string; metadata: Record<string, string> };
 
 /**
- * Keeps objects as files in a folder, through `Bun.file()` and `Bun.write()`: reads and writes
- * stream, so large objects are not held in memory. The content type and metadata of each object are
- * kept next to them, in a `.pithos` folder. Registered as the `bun` driver of the `Storage` port
+ * Keeps objects as files in a folder, through `Bun.file()` and `Bun.write()`: the disk reads and
+ * writes streams, so it does not hold large objects in memory itself. Each file is written aside
+ * then renamed into place, so a reader never sees half of it. The content type and metadata of
+ * each object are kept in a `.pithos` folder, whose keys are refused. As on any file system, a key
+ * cannot also be a folder of other keys: `a` and `a/b` cannot both exist. Registered as the `bun` driver of the `Storage` port
  * when `@elysiumjs/bun` is imported.
  * @author Axel Nana <ax.lnana@outlook.com>
  * @example
@@ -89,8 +96,10 @@ export class BunDisk extends StorageDriver {
 	public async put(key: string, body: StorageBody, options: PutOptions = {}): Promise<ObjectInfo> {
 		const path = this.#path(key);
 		// Bun.write creates the missing folders, and streams a Response to the file.
-		if (body instanceof ReadableStream) await Bun.write(path, new Response(body));
-		else await Bun.write(path, body);
+		const temporary = this.#temporary();
+		if (body instanceof ReadableStream) await Bun.write(temporary, new Response(body));
+		else await Bun.write(temporary, body);
+		await this.#moveInto(temporary, path);
 		await this.#writeMeta(key, {
 			contentType: options.contentType,
 			metadata: { ...options.metadata }
@@ -106,6 +115,7 @@ export class BunDisk extends StorageDriver {
 	}
 
 	public async head(key: string): Promise<ObjectInfo | null> {
+		if (this.#reserved(key)) return null;
 		const stats = await Bun.file(this.#path(key))
 			.stat()
 			.catch(() => null);
@@ -131,7 +141,7 @@ export class BunDisk extends StorageDriver {
 	}
 
 	public async list(options: ListOptions = {}): Promise<ListPage> {
-		const limit = options.limit ?? DEFAULT_LIST_LIMIT;
+		const limit = listLimit(options);
 		const keys: string[] = [];
 		const scan = new Bun.Glob('**').scan({ cwd: this.#root, onlyFiles: true, dot: true });
 		try {
@@ -157,7 +167,9 @@ export class BunDisk extends StorageDriver {
 
 	public async copy(from: string, to: string): Promise<void> {
 		if (!(await this.head(from))) throw new ObjectNotFoundError(from);
-		await Bun.write(this.#path(to), Bun.file(this.#path(from)));
+		const temporary = this.#temporary();
+		await Bun.write(temporary, Bun.file(this.#path(from)));
+		await this.#moveInto(temporary, this.#path(to));
 		await this.#writeMeta(to, await this.#readMeta(from));
 	}
 
@@ -176,15 +188,38 @@ export class BunDisk extends StorageDriver {
 		return signServedUrl(this.options.signing, assertKey(key), options);
 	}
 
+	/** Whether a key is under the `.pithos` folder. */
+	#reserved(key: string): boolean {
+		return key === META || key.startsWith(`${META}/`);
+	}
+
 	/** The file of a key, which stays under the root since the key is checked. */
 	#path(key: string): string {
 		assertKey(key);
-		if (key === META || key.startsWith(`${META}/`)) throw new ObjectNotFoundError(key);
+		if (this.#reserved(key)) throw new InvalidObjectKeyError(key);
 		return `${this.#root}/${key}`;
 	}
 
+	/** The metadata file of a key: one flat file per key, named by its hash, so keys never collide. */
 	#metaPath(key: string): string {
-		return `${this.#root}/${META}/${key}.json`;
+		const hash = new Bun.CryptoHasher('sha256').update(key).digest('hex');
+		return `${this.#root}/${META}/meta/${hash}.json`;
+	}
+
+	/** A new path to write aside, under the root so that renaming it stays on one file system. */
+	#temporary(): string {
+		return `${this.#root}/${META}/tmp/${crypto.randomUUID()}`;
+	}
+
+	/** Moves a written file into place, and removes it should that fail. */
+	async #moveInto(temporary: string, path: string): Promise<void> {
+		try {
+			await mkdir(dirname(path), { recursive: true });
+			await rename(temporary, path);
+		} catch (error) {
+			await rm(temporary, { force: true });
+			throw error;
+		}
 	}
 
 	async #readMeta(key: string): Promise<Meta> {
@@ -193,6 +228,8 @@ export class BunDisk extends StorageDriver {
 	}
 
 	async #writeMeta(key: string, meta: Meta): Promise<void> {
-		await Bun.write(this.#metaPath(key), JSON.stringify(meta));
+		const temporary = this.#temporary();
+		await Bun.write(temporary, JSON.stringify(meta));
+		await this.#moveInto(temporary, this.#metaPath(key));
 	}
 }

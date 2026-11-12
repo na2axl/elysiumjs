@@ -229,7 +229,7 @@ export const files = filesTable(); // or filesTable('files', 'media')
 PithosModule.with({ disks, files: { store: () => FileStore.for('drizzle', { table: files }) } });
 ```
 
-Each change of a record is one conditional `UPDATE`, so only one of two racing requests wins. The table has an index on the owner, a partial index on pending uploads by uploader, which the cap on uploads in progress reads, and a partial index on the files whose time runs out, which pruning reads. Any table with the same columns works, given as `table`, with an optional `connection`.
+Each change of a record is one conditional `UPDATE`, so only one of two racing requests wins. The table has an index on the owner, a partial index on pending uploads by uploader, which the cap on uploads in progress reads, and a partial index on the files whose time runs out (`pending`, `finishing` and `ready`), which pruning reads. Any table with the same columns works, given as `table`, with an optional `connection`.
 
 ## License
 

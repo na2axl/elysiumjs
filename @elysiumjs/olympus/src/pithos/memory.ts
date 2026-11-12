@@ -27,9 +27,9 @@ import { Clock } from '../clock';
 import { joinUrl, signServedUrl } from './signing';
 import {
 	assertKey,
-	DEFAULT_LIST_LIMIT,
 	DiskCannotSignError,
 	DiskNotPublicError,
+	listLimit,
 	ObjectNotFoundError,
 	objectOf,
 	Storage,
@@ -94,7 +94,7 @@ export class MemoryDisk extends StorageDriver {
 	}
 
 	public async list(options: ListOptions = {}): Promise<ListPage> {
-		const limit = options.limit ?? DEFAULT_LIST_LIMIT;
+		const limit = listLimit(options);
 		const keys = [...this.#objects.keys()]
 			.filter((key) => !options.prefix || key.startsWith(options.prefix))
 			.filter((key) => options.cursor === undefined || key > options.cursor)

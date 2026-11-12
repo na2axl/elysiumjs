@@ -131,6 +131,11 @@ describe('R2Disk', () => {
 		expect(url.searchParams.get('X-Amz-SignedHeaders')).toBe('content-length;content-type;host');
 		const get = new URL(await disk.signedUrl('a', { method: 'GET', expiresIn: 60 }));
 		expect(get.searchParams.get('X-Amz-SignedHeaders')).toBe('host');
+		for (const expiresIn of [0, 1.5, 604_801]) {
+			await expect(disk.signedUrl('a', { method: 'GET', expiresIn })).rejects.toBeInstanceOf(
+				RangeError
+			);
+		}
 	});
 
 	it('reads a stream in full before writing it', async () => {

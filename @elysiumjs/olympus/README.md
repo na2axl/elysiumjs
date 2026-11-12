@@ -747,13 +747,13 @@ PithosModule.with({
 await Storage.disk().put('reports/2026-01.csv', csv, { contentType: 'text/csv' });
 ```
 
-A disk that cannot sign URLs itself, such as `memory`, `local` or `bun`, signs them with `signing`, and `PithosModule` serves them on `/storage/:disk/*`: `GET` downloads the object and `PUT` uploads it, with the content type and size the URL was signed for. `signing.url` is that route followed by the name of the disk.
+A disk that cannot sign URLs itself, such as `memory`, `local` or `bun`, signs them with `signing`, and `PithosModule` serves them on `/storage/:disk/*`: `GET` downloads the object and `PUT` uploads it, with the content type and size the URL was signed for: a `PUT` without a `content-length` header answers 411. Downloads are sent with `x-content-type-options: nosniff` and a sandboxing `content-security-policy`, so uploaded content never runs as a page of the application's origin. `signing.url` is that route followed by the name of the disk.
 
 `Storage.fake(name?)` replaces a disk with an empty memory disk until `Storage.restore()`, which `PithosModule` also calls when the application stops.
 
 ### Files
 
-A file is an object of a disk with a record: its purpose, disk, key, content type, size, owner (`{ type, id }`), who uploaded it, and its status. One record follows a file from its upload to its deletion: `pending` while it is uploaded, then `ready`, or `rejected` when the uploaded file is not what was declared, `expired` when it was never uploaded, and `deleted` once its object is gone. The records live in the `FileStore` port: `memory` ships here, and `@elysiumjs/drizzle` adds `drizzle`.
+A file is an object of a disk with a record: its purpose, disk, key, content type, size, owner (`{ type, id }`), who uploaded it, and its status. One record follows a file from its upload to its deletion: `pending` while it is uploaded, `finishing` while `Uploads.finish()` checks it, then `ready`, or `rejected` when the uploaded file is not what was declared, `expired` when it was never uploaded, and `deleted` once its object is gone. The records live in the `FileStore` port: `memory` ships here, and `@elysiumjs/drizzle` adds `drizzle`.
 
 A ready file that nothing claims is deleted after `unclaimedTtl`. A feature keeps a file by claiming it, and lets it go by releasing it:
 
@@ -768,12 +768,13 @@ const claimed = await Files.claim(input.pictureId, {
 if (!claimed.check()) return claimed.error; // FILE_NOT_READY
 
 // ...and lets the previous one go.
-if (profile.pictureId) await Files.release(profile.pictureId);
+if (profile.pictureId)
+	await Files.release(profile.pictureId, { owner: { type: 'user', id: user.id } });
 ```
 
-`Files.ready(id, expect)` makes the same checks without claiming: ready, not past its time and, when given, of the purpose and the owner. `Files.release(id, grace?)` lets the file be deleted after `grace` seconds unless it is claimed again, `Files.remove(id)` deletes a ready file now, and `Files.url(file)` and `Files.signedUrl(file, expiresIn)` answer its URLs. Every change is a transition that applies only while the record still meets its condition, so two requests racing on a file cannot both win.
+`Files.ready(id, expect)` makes the same checks without claiming: ready, not past its time and, when given, of the purpose and the owner. `Files.release(id, { grace, purpose, owner })` lets the file be deleted after `grace` seconds (0 by default) unless it is claimed again, and `Files.remove(id, { purpose, owner })` deletes a ready file now; both do nothing to a file of another purpose or owner than given. A file has one keeper: a feature that shares a file with another keeps track of it itself. `Files.remove()` deletes the object at once, so inside a unit of work call it once the work has committed. `Files.url(file)` and `Files.signedUrl(file, expiresIn)` answer its URLs. Every change is a transition that applies only while the record still meets its condition, so two requests racing on a file cannot both win.
 
-`Files.prune(limit?)` deletes the files whose time is over: uploads never finished (their staged object) and ready files nothing claims (their object). A file claimed in the meantime is kept. Register a subclass of `FilesPruner`, from `@elysiumjs/olympus/pithos/heracles`, on a schedule to run it:
+`Files.prune(limit?)` deletes the files whose time is over: uploads never finished (their staged object) and ready files nothing claims (their object). A file claimed in the meantime is kept. It then deletes the staged objects whose upload URL has expired, such as bytes sent again through a URL after its upload finished. Register a subclass of `FilesPruner`, from `@elysiumjs/olympus/pithos/heracles`, on a schedule to run it:
 
 ```ts
 import { Job, Scheduler } from '@elysiumjs/olympus/heracles';
@@ -793,10 +794,13 @@ PithosModule.with({
 		store: () => FileStore.for('drizzle', { table: files }),
 		uploadTtl: 900, // seconds an upload URL works (default 15 minutes)
 		unclaimedTtl: 86_400, // seconds a ready file nothing claims is kept (default a day)
-		maxPending: 10 // uploads one person may have in progress (default 10)
+		maxPending: 10, // uploads one person may have in progress (default 10)
+		staging: 'staging' // the disk uploads are sent to (the disk of each file without it)
 	}
 });
 ```
+
+Uploads are sent to `staging/<id>` keys, on the disk of the file unless `staging` names another. Staged objects are not checked yet, so on a public disk they can be read by their URL until they are finished or pruned: give a public disk a private staging disk. No purpose may be named `staging`.
 
 The `elysium:pithos:ready`, `elysium:pithos:rejected` and `elysium:pithos:deleted` lifecycle events carry the file.
 
@@ -852,11 +856,11 @@ async finish(@Http.param('id') id: string, @Auth.user() user: AuthUser) {
 }
 ```
 
-`Uploads.open()` checks the request against its purpose (`UPLOAD_PURPOSE_UNKNOWN`, `UPLOAD_TYPE_NOT_ALLOWED` with `types`, `UPLOAD_TOO_LARGE` with `maxBytes`, `FORBIDDEN`, and `UPLOAD_TOO_MANY_PENDING` past `maxPending`), records a `pending` file, and answers a signed `PUT` URL for a staging key, signed for the declared content type and size. The URL never targets the key the file is served from, since a signed URL cannot be taken back.
+`Uploads.open()` checks the request against its purpose (`UPLOAD_PURPOSE_UNKNOWN`, `UPLOAD_TYPE_NOT_ALLOWED` with `types`, `UPLOAD_TOO_LARGE` with `maxBytes`, `FORBIDDEN`, and `UPLOAD_TOO_MANY_PENDING` past `maxPending`; a size below 1 byte answers `BAD_REQUEST`), records a `pending` file, and answers a signed `PUT` URL for a staging key, signed for the declared content type and size. The URL never targets the key the file is served from, since a signed URL cannot be taken back.
 
-`Uploads.finish()` reads the staged object once, and refuses it for good (`UPLOAD_REJECTED`) unless its size, its stored content type and its first bytes, read with `file-type`, all match what was declared. Only then are those same bytes written to the file's key, the file made `ready`, and the staged object deleted, so an upload racing through the still valid URL cannot swap the bytes in between. Nothing uploaded yet answers `UPLOAD_MISSING`, and the client may upload and finish again; a finished upload answers `UPLOAD_NOT_PENDING` and an expired one `UPLOAD_EXPIRED`. A purpose whose types have no signature, such as `text/plain` or `image/svg+xml`, turns the content check off with `get sniff() { return false; }`.
+`Uploads.finish()` reads the staged object once, and refuses it for good (`UPLOAD_REJECTED`) unless its size, its stored content type and its first bytes, read with `file-type`, all match what was declared. Only then are those same bytes written to the file's key, the file made `ready`, and the staged object deleted, so an upload racing through the still valid URL cannot swap the bytes in between. Nothing uploaded yet answers `UPLOAD_MISSING`, and the client may upload and finish again; a finished upload, or one another call is finishing, answers `UPLOAD_NOT_PENDING` and an expired one `UPLOAD_EXPIRED`. A purpose whose types have no signature, such as `text/plain` or `image/svg+xml`, turns the content check off with `get sniff() { return false; }`.
 
-A ready file is served from `<purpose>/<id>` by default, so a new file is a new key and a served file can be cached for good; a purpose may override `key(file)`. `finish()` holds the file in memory while it checks it, so keep `maxBytes` to what a request may hold.
+A ready file is served from `<purpose>/<id>` by default, so a new file is a new key and a served file can be cached for good. A purpose may override `key(file)`, as long as the key holds the id of the file, so two files never share an object, and does not start with `staging/`. `finish()` holds the file in memory while it checks it, so keep `maxBytes` to what a request may hold.
 
 ## Services
 

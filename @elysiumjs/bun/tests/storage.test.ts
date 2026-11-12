@@ -51,7 +51,18 @@ describe('BunDisk', () => {
 		await disk.put('a', 'x', { contentType: 'text/plain' });
 		expect((await disk.list()).items.map((item) => item.key)).toEqual(['a']);
 		expect(await readdir(folder)).toContain('.pithos');
-		await expect(disk.get('.pithos/a.json')).rejects.toBeInstanceOf(ObjectNotFoundError);
+		expect(await disk.get('.pithos/tmp')).toBeNull();
+		expect(await disk.head('.pithos')).toBeNull();
+		await expect(disk.put('.pithos/x', 'y')).rejects.toBeInstanceOf(InvalidObjectKeyError);
+	});
+
+	it('keeps the metadata of keys apart from other keys', async () => {
+		const disk = new BunDisk({ root: join(root, 'apart') });
+		await disk.put('foo', 'a', { contentType: 'text/plain' });
+		await disk.put('foo.json', '{}', { contentType: 'application/json' });
+		expect((await disk.head('foo'))?.contentType).toBe('text/plain');
+		expect((await disk.head('foo.json'))?.contentType).toBe('application/json');
+		expect((await disk.list()).items.map((item) => item.key)).toEqual(['foo', 'foo.json']);
 	});
 
 	it('lists nothing before the first write', async () => {

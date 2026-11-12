@@ -43,7 +43,7 @@ import {
 	UploadTooManyPendingError,
 	UploadTypeNotAllowedError
 } from '../../src/pithos/index';
-import { ForbiddenError, NotFoundError } from '../../src/problem';
+import { BadRequestError, ForbiddenError, NotFoundError } from '../../src/problem';
 
 /** A 1x1 PNG. */
 const PNG = Uint8Array.from(
@@ -116,16 +116,21 @@ describe('Files and uploads', () => {
 	let uploads: MemoryDisk;
 	const events: { event: string; file: FileRecord }[] = [];
 
-	const boot = async (files: { maxPending?: number } = {}) => {
+	let staged: MemoryDisk;
+
+	const boot = async (files: { maxPending?: number; staging?: string } = {}) => {
 		store = new MemoryFileStore();
 		uploads = new MemoryDisk({
 			url: 'https://cdn.example.com',
 			signing: { url: 'http://localhost/storage/uploads', secret: 'x'.repeat(32) }
 		});
+		staged = new MemoryDisk({
+			signing: { url: 'http://localhost/storage/staged', secret: 'y'.repeat(32) }
+		});
 		@Application.register({
 			modules: [
 				PithosModule.with({
-					disks: { uploads },
+					disks: { uploads, staged },
 					files: { store, uploadTtl: 600, unclaimedTtl: 3600, ...files }
 				}),
 				MediaModule
@@ -219,6 +224,7 @@ describe('Files and uploads', () => {
 		expect(large).toBeInstanceOf(UploadTooLargeError);
 		expect(large?.extension()).toMatchObject({ maxBytes: 1024 });
 		expect((await open({ user: 'bob' })).error).toBeInstanceOf(ForbiddenError);
+		expect((await open({ size: 0 })).error).toBeInstanceOf(BadRequestError);
 		expect((await open({})).check()).toBe(true);
 		expect((await open({})).error).toBeInstanceOf(UploadTooManyPendingError);
 	});
@@ -233,6 +239,60 @@ describe('Files and uploads', () => {
 		expect((await Uploads.finish('nope')).error).toBeInstanceOf(NotFoundError);
 		Clock.travel(601_000);
 		expect((await Uploads.finish(ticket.file.id)).error).toBeInstanceOf(UploadExpiredError);
+	});
+
+	it('lets one finish of an upload through at a time', async () => {
+		await boot();
+		const ticket = await openAvatar();
+		await put(ticket.url, PNG, 'image/png');
+		const [first, second] = await Promise.all([
+			Uploads.finish(ticket.file.id),
+			Uploads.finish(ticket.file.id)
+		]);
+		expect([first.check(), second.check()].sort()).toEqual([false, true]);
+		expect(first.error ?? second.error).toBeInstanceOf(UploadNotPendingError);
+		expect(events.map((event) => event.event)).toEqual([PITHOS_FILE_READY]);
+	});
+
+	it('stages uploads on the staging disk when one is set', async () => {
+		await boot({ staging: 'staged' });
+		const ticket = await openAvatar();
+		expect(new URL(ticket.url).pathname).toStartWith('/storage/staged/');
+		expect((await put(ticket.url, PNG, 'image/png')).status).toBe(204);
+		expect(await staged.exists(stagingKey(ticket.file.id))).toBe(true);
+		const file = (await Uploads.finish(ticket.file.id)).orThrow();
+		expect(await uploads.exists(file.key)).toBe(true);
+		expect(await staged.exists(stagingKey(file.id))).toBe(false);
+	});
+
+	it('sweeps staged objects sent again after their upload finished', async () => {
+		await boot();
+		const ticket = await openAvatar();
+		await put(ticket.url, PNG, 'image/png');
+		(await Uploads.finish(ticket.file.id)).orThrow();
+		// The URL still works until it expires, and nothing would delete what it writes.
+		expect((await put(ticket.url, PNG, 'image/png')).status).toBe(204);
+		expect(await uploads.exists(stagingKey(ticket.file.id))).toBe(true);
+		Clock.travel(300_000);
+		await Files.prune();
+		expect(await uploads.exists(stagingKey(ticket.file.id))).toBe(true);
+		Clock.travel(301_000);
+		await Files.prune();
+		expect(await uploads.exists(stagingKey(ticket.file.id))).toBe(false);
+	});
+
+	it('refuses a key that leaves out the id of the file', async () => {
+		@Upload.purpose('shared-key')
+		class SharedKeyUpload extends NoteUpload {
+			public override key() {
+				return 'notes/latest';
+			}
+		}
+		void SharedKeyUpload;
+		await boot();
+		await expect(
+			Uploads.open({ purpose: 'shared-key', contentType: 'text/plain', size: 5, owner: alice })
+		).rejects.toThrow(TypeError);
 	});
 
 	it('refuses a file whose content is not its declared type', async () => {
@@ -289,13 +349,15 @@ describe('Files and uploads', () => {
 		Clock.travel(7200_000);
 		expect(await Files.prune()).toBe(0);
 
-		const released = await Files.release(id, 60);
+		expect(await Files.release(id, { purpose: 'cover', grace: 60 })).toBeNull();
+		const released = await Files.release(id, { purpose: 'avatar', grace: 60 });
 		expect(released).toMatchObject({ claimedAt: null });
 		expect(released!.expiresAt!.getTime() - Clock.epochMs()).toBe(60_000);
 		expect(Files.url(released!)).toBe(`https://cdn.example.com/avatar/${id}`);
 		expect(new URL(await Files.signedUrl(released!, 60)).searchParams.get('method')).toBe('GET');
 
-		expect(await Files.remove(id)).toBe(true);
+		expect(await Files.remove(id, { owner: { type: 'user', id: 'bob' } })).toBe(false);
+		expect(await Files.remove(id, { owner: alice })).toBe(true);
 		expect(await Files.remove(id)).toBe(false);
 		expect(await uploads.exists(`avatar/${id}`)).toBe(false);
 		expect((await Files.claim(id)).error).toBeInstanceOf(FileNotReadyError);
@@ -355,6 +417,7 @@ describe('Files and uploads', () => {
 			DuplicateUploadPurposeError
 		);
 		expect(() => Upload.purpose('Not Kebab')).toThrow(TypeError);
+		expect(() => Upload.purpose('staging')).toThrow(TypeError);
 		expect(Storage.defaultDisk()).toBe('default');
 	});
 });

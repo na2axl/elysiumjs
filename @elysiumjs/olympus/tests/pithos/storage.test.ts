@@ -122,6 +122,8 @@ describe('PithosModule', () => {
 		const downloaded = await testing!.http.get(path(get)).send();
 		expect(downloaded.status).toBe(200);
 		expect(downloaded.headers.get('content-type')).toBe('text/plain');
+		expect(downloaded.headers.get('x-content-type-options')).toBe('nosniff');
+		expect(downloaded.headers.get('content-security-policy')).toContain('sandbox');
 		expect(await downloaded.text()).toBe('hello');
 		expect((await testing!.http.get(path(get).replace('a.txt', 'b.txt')).send()).status).toBe(403);
 		expect((await testing!.http.get('/storage/public/a').send()).status).toBe(404);
@@ -141,6 +143,7 @@ describe('PithosModule', () => {
 				.put(put.pathname + put.search)
 				.body(body)
 				.send();
+		expect((await testing!.http.put(put.pathname + put.search).send()).status).toBe(411);
 		expect((await send('too long')).status).toBe(403);
 		expect(await uploads.exists('staging/sized.txt')).toBe(false);
 		expect((await send('fives')).status).toBe(204);

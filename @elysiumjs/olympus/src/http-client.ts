@@ -62,6 +62,15 @@ const toTestResponse = (response: Response): TestResponse =>
 		}
 	}) as TestResponse;
 
+/** The length in bytes of a body, when it is known before it is read. */
+const lengthOf = (body: BodyInit | undefined): number | undefined => {
+	if (typeof body === 'string') return new TextEncoder().encode(body).byteLength;
+	if (body instanceof ArrayBuffer || ArrayBuffer.isView(body)) return body.byteLength;
+	if (body instanceof Blob) return body.size;
+	if (body instanceof URLSearchParams) return new TextEncoder().encode(body.toString()).byteLength;
+	return undefined;
+};
+
 /**
  * A request being built by the HTTP test client. Send it with `send()`, or await it directly.
  * @author Axel Nana <ax.lnana@outlook.com>
@@ -120,8 +129,15 @@ export class TestRequest implements PromiseLike<TestResponse> {
 		return this;
 	}
 
-	/** Builds the `Request` this builder describes, without sending it. */
+	/**
+	 * Builds the `Request` this builder describes, without sending it. A body of known length gets
+	 * a `content-length` header, as an HTTP client sends one.
+	 */
 	public toRequest(): Request {
+		const length = lengthOf(this.#body);
+		if (length !== undefined && !this.#headers.has('content-length')) {
+			this.#headers.set('content-length', String(length));
+		}
 		const init: RequestInit & { duplex?: 'half' } = {
 			method: this.#method,
 			headers: this.#headers,

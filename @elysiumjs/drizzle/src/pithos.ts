@@ -80,7 +80,7 @@ export const filesTable = (name = 'files', schema?: string) => {
 			// Pruning reads the files whose time is over.
 			index(`${name}_due_idx`)
 				.on(t.expiresAt)
-				.where(sql`${t.status} in ('pending', 'ready') and ${t.expiresAt} is not null`)
+				.where(sql`${t.status} in ('pending', 'finishing', 'ready') and ${t.expiresAt} is not null`)
 		]
 	);
 };
@@ -149,7 +149,7 @@ export class DrizzleFileStore implements FileStoreDriver {
 		const [row] = await this.db
 			.select({ total: count() })
 			.from(t)
-			.where(and(eq(t.createdBy, createdBy), eq(t.status, 'pending'), gt(t.expiresAt, now)));
+			.where(and(eq(t.createdBy, createdBy), sql`${t.status} = 'pending'`, gt(t.expiresAt, now)));
 		return Number(row?.total ?? 0);
 	}
 
@@ -159,7 +159,12 @@ export class DrizzleFileStore implements FileStoreDriver {
 			.select()
 			.from(t)
 			.where(
-				and(inArray(t.status, ['pending', 'ready']), isNotNull(t.expiresAt), lte(t.expiresAt, now))
+				// Literal statuses, written as the partial index is, so that it serves the query.
+				and(
+					sql`${t.status} in ('pending', 'finishing', 'ready')`,
+					isNotNull(t.expiresAt),
+					lte(t.expiresAt, now)
+				)
 			)
 			.orderBy(asc(t.expiresAt))
 			.limit(limit);

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { ServedSigning } from './signing';
+
 import { ElysiumError } from '../errors';
 import { Port } from '../port';
 import { Service } from '../service';
@@ -100,6 +102,10 @@ export type SignedUrlOptions = {
 
 /** The default size of a listing page. */
 export const DEFAULT_LIST_LIMIT = 1000;
+
+/** The size of a listing page: the limit asked, at least 1, else {@link DEFAULT_LIST_LIMIT}. */
+export const listLimit = (options: ListOptions): number =>
+	Math.max(1, Math.floor(options.limit ?? DEFAULT_LIST_LIMIT));
 
 /**
  * Thrown by `url()` on a disk that is not public.
@@ -289,7 +295,7 @@ export class Storage extends Port('storage') {
 	/**
 	 * Replaces a disk with an empty memory disk until `restore()`, for tests.
 	 * @param name The name of the disk; the default disk without one.
-	 * @param options The options of the memory disk, such as its URL.
+	 * @param options The options of the memory disk, such as its URL and its signing.
 	 */
 	public static fake(name?: string, options: MemoryDiskLike = {}): StorageDriver {
 		const wanted = name ?? Storage.defaultDisk();
@@ -305,7 +311,7 @@ export class Storage extends Port('storage') {
 }
 
 /** The options a faked memory disk takes. */
-type MemoryDiskLike = { readonly url?: string };
+type MemoryDiskLike = { readonly url?: string; readonly signing?: ServedSigning };
 
 /** The service holding the disks of the application. */
 export const PITHOS_DISKS = 'pithos.disks';
