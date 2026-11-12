@@ -979,6 +979,25 @@ describe('Moirai.lock', () => {
 		expect(order.indexOf('c in')).toBeLessThan(order.indexOf('a out'));
 	});
 
+	it('takes the lock for lockTtl and lets it go once the unit of work commits', async () => {
+		const calls: string[] = [];
+		class SpyLock extends MemoryLock {
+			public override async acquire(key: string, ttl: number, opts?: { wait?: number }) {
+				calls.push(`acquire ${key} ${ttl}`);
+				return super.acquire(key, ttl, opts);
+			}
+			public override async release(handle: { key: string; token: string }) {
+				calls.push(`release ${handle.key} after ${log.at(-1)}`);
+				return super.release(handle);
+			}
+		}
+		Service.remove(MOIRAI_ACTION_LOCK);
+		Service.instance(MOIRAI_ACTION_LOCK, new SpyLock());
+		setOptions({ lockTtl: 1_234 });
+		await UnitOfWork.run(() => Moirai.lock('wallet:9'));
+		expect(calls).toEqual(['acquire wallet:9 1234', 'release wallet:9 after COMMIT']);
+	});
+
 	it('locks from an action handler, on a key read in the handler', async () => {
 		const seen: string[] = [];
 		@Action.register({ errors: [], input: t.Object({ id: t.String() }) })

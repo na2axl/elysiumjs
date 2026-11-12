@@ -1,18 +1,18 @@
 # @elysiumjs/themis-redis
 
-A Redis session store for [`@elysiumjs/olympus/themis`](../olympus). It works with any Redis connection of [`@elysiumjs/redis`](../olympus), Upstash included.
+A Redis session store for [`@elysiumjs/olympus/themis`](../olympus). It works with any Redis connection of [`@elysiumjs/redis`](../redis), Upstash included.
 
 ## Installation
 
 ```bash
-bun add @elysiumjs/olympus @elysiumjs/themis-redis
+bun add @elysiumjs/olympus @elysiumjs/redis @elysiumjs/themis-redis
 ```
 
 ## Usage
 
 ```ts
-import { Redis } from '@elysiumjs/redis';
 import { ThemisModule } from '@elysiumjs/olympus/themis';
+import { Redis } from '@elysiumjs/redis';
 import { RedisSessionStore } from '@elysiumjs/themis-redis';
 
 ThemisModule.with({

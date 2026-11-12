@@ -45,16 +45,26 @@ class SendJob extends Job {
 	}
 }
 
-@Module.register({ services: [Mailbox], jobs: [SendJob] })
+@Job.register({ name: 'MemoryBrokenJob' })
+class BrokenJob extends Job {
+	constructor() {
+		super();
+		throw new Error('cannot build');
+	}
+
+	protected async execute(): Promise<void> {}
+}
+
+@Module.register({ services: [Mailbox], jobs: [SendJob, BrokenJob] })
 class MailModule extends Module {}
 
 describe('MemoryTransport', () => {
 	let app: Awaited<ReturnType<typeof Application.testing>> | undefined;
 
-	const boot = async () => {
+	const boot = async (queue: { maxRetries?: number; retryDelay?: number } = {}) => {
 		app = await Application.testing({
 			modules: [
-				HeraclesModule.with({ queues: { default: { transport: MemoryTransport } } }),
+				HeraclesModule.with({ queues: { default: { transport: MemoryTransport, ...queue } } }),
 				MailModule
 			],
 			boot: 'eager'
@@ -112,5 +122,71 @@ describe('MemoryTransport', () => {
 		expect(runs).toEqual(['late@example.com']);
 		const status = await Queue.get('default').getJobStatus(cancelled);
 		expect(status?.status).toBe(JobStatus.CANCELLED);
+	});
+
+	it('falls back to the retries of the queue', async () => {
+		await boot({ maxRetries: 1, retryDelay: 1 });
+		failuresLeft = 1;
+		const id = await Heracles.dispatch(SendJob, ['queue@example.com']);
+		await MemoryTransport.settled();
+		expect(runs).toEqual(['queue@example.com', 'queue@example.com']);
+		expect((await Queue.get('default').getJobStatus(id))?.status).toBe(JobStatus.COMPLETED);
+	});
+
+	it('fails a job that no module registers', async () => {
+		await boot();
+		const id = await Queue.get('default').dispatch(SendJob, 'MemoryUnknownJob', ['x@example.com']);
+		await MemoryTransport.settled();
+		expect(runs).toEqual([]);
+		const status = await Queue.get('default').getJobStatus(id);
+		expect(status?.status).toBe(JobStatus.FAILED);
+		expect(status?.error).toContain('MemoryUnknownJob');
+	});
+
+	it('fails a job whose constructor throws, and keeps running others', async () => {
+		await boot();
+		const broken = await Heracles.dispatch(BrokenJob, []);
+		await Heracles.dispatch(SendJob, ['ok@example.com']);
+		await MemoryTransport.settled();
+		const status = await Queue.get('default').getJobStatus(broken);
+		expect(status?.status).toBe(JobStatus.FAILED);
+		expect(status?.error).toBe('cannot build');
+		expect(runs).toEqual(['ok@example.com']);
+	});
+
+	it('cancels every waiting job of a queue', async () => {
+		await boot();
+		const later = () => ({ scheduledFor: new Date(Date.now() + 1000) });
+		const first = await Heracles.dispatch(SendJob, ['a@example.com'], later());
+		const second = await Heracles.dispatch(SendJob, ['b@example.com'], later());
+		await Queue.get('default').cancelAllJobs();
+		await MemoryTransport.settled();
+		expect(runs).toEqual([]);
+		expect((await Queue.get('default').getJobStatus(first))?.status).toBe(JobStatus.CANCELLED);
+		expect((await Queue.get('default').getJobStatus(second))?.status).toBe(JobStatus.CANCELLED);
+	});
+
+	it('holds waiting jobs while stopped and runs them on start', async () => {
+		const transport = new MemoryTransport();
+		const results: string[] = [];
+		transport.onMessage((message) => {
+			if (message.type === 'job:result') results.push(message.status);
+		});
+		transport.send({
+			type: 'job:process',
+			job: 'MemorySendJob',
+			jobId: 'held',
+			dispatchId: 'd-1',
+			args: ['held@example.com'],
+			queue: 'default',
+			options: { scheduledFor: new Date(Date.now() + 20).toISOString() }
+		});
+		transport.stop();
+		await new Promise((resolve) => setTimeout(resolve, 40));
+		expect(results).toEqual([]);
+		expect((await transport.getJobStatus('held', 'd-1', 'default')).status).toBe(JobStatus.PENDING);
+		transport.start();
+		await MemoryTransport.settled();
+		expect(results.length).toBe(1);
 	});
 });

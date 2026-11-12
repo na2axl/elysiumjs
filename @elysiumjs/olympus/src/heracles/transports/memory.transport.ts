@@ -23,6 +23,7 @@ import type {
 
 import { ElysiumError, getLogger, ModuleContext } from '../../index';
 import { JobStatus, WithId } from '../job';
+import { Queue } from '../queue';
 import { JobRegistry } from '../registry';
 
 /** A job the transport holds: waiting for its time, running, or done. */
@@ -37,11 +38,18 @@ type Entry = {
 /** The transports with jobs that are waiting or running, for {@link MemoryTransport.settled}. */
 const busy = new Set<MemoryTransport>();
 
+/** The longest a timer can wait: longer delays overflow and fire at once. */
+const MAX_TIMER = 2 ** 31 - 1;
+
+/** How many finished jobs each transport keeps for `getJobStatus`. */
+const KEPT_FINISHED = 1000;
+
 /**
  * Runs the jobs of a queue in the process that dispatches them, for development and tests: no
  * worker and no backend are needed. A job runs once its `scheduledFor` time comes, in the context
- * of the module that declares it, and a failed job is retried after its `retryDelay` while its
- * attempts stay within `maxRetries`. Jobs are lost when the process stops.
+ * of the module that declares it. A failed job is retried after its `retryDelay` while its retries
+ * stay within `maxRetries`, taken from the dispatch, then the job, then the queue options. The
+ * last 1,000 finished jobs keep their status. Jobs are lost when the process stops.
  * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
@@ -71,7 +79,17 @@ export class MemoryTransport implements Transport {
 	}
 
 	public start(): void {
+		if (this.#running) return;
 		this.#running = true;
+		// The jobs a stop left waiting run again.
+		for (const entry of this.#jobs.values()) {
+			if (entry.info.status === JobStatus.PENDING && !entry.timer && !entry.run) {
+				const at = entry.message.options?.scheduledFor
+					? Date.parse(entry.message.options.scheduledFor)
+					: Date.now();
+				this.#schedule(entry, at - Date.now());
+			}
+		}
 	}
 
 	public stop(): void {
@@ -156,15 +174,28 @@ export class MemoryTransport implements Transport {
 	}
 
 	#schedule(entry: Entry, delay: number): void {
+		const wait = Math.max(0, delay);
 		entry.timer = setTimeout(
 			() => {
 				entry.timer = undefined;
-				entry.run = this.#run(entry).finally(() => {
-					entry.run = undefined;
-					this.#update();
-				});
+				// Past the longest timer, wait again for the rest.
+				if (wait > MAX_TIMER) return this.#schedule(entry, wait - MAX_TIMER);
+				entry.run = this.#run(entry)
+					.catch((error: unknown) => {
+						this.#settle(
+							entry,
+							JobStatus.FAILED,
+							error instanceof Error ? error.message : String(error)
+						);
+						getLogger().error('A Heracles job could not run', { job: entry.message.job, error });
+					})
+					.finally(() => {
+						entry.run = undefined;
+						entry.job = undefined;
+						this.#update();
+					});
 			},
-			Math.max(0, delay)
+			Math.min(wait, MAX_TIMER)
 		);
 		this.#update();
 	}
@@ -190,18 +221,18 @@ export class MemoryTransport implements Transport {
 		entry.job = job;
 		Object.assign(info, { status: JobStatus.RUNNING, startedAt: new Date().toISOString() });
 		await ModuleContext.run(registered.module, () => job.run());
-		entry.job = undefined;
 
 		if (job.status !== JobStatus.FAILED) {
 			this.#settle(entry, job.status, undefined);
 			return;
 		}
 
-		const maxRetries = Number(message.options?.maxRetries ?? 0);
+		const queue = Queue.exists(message.queue) ? Queue.get(message.queue).getOptions() : undefined;
+		const maxRetries = Number(message.options?.maxRetries ?? queue?.maxRetries ?? 0);
 		if (info.retries < maxRetries && this.#running) {
 			info.retries++;
 			Object.assign(info, { status: JobStatus.PENDING, error: job.lastError?.message });
-			this.#schedule(entry, Number(message.options?.retryDelay ?? 0));
+			this.#schedule(entry, Number(message.options?.retryDelay ?? queue?.retryDelay ?? 0));
 			return;
 		}
 		this.#settle(entry, JobStatus.FAILED, job.lastError?.message);
@@ -210,6 +241,7 @@ export class MemoryTransport implements Transport {
 	#settle(entry: Entry, status: string, error: string | undefined): void {
 		const now = new Date().toISOString();
 		Object.assign(entry.info, { status, error, completedAt: now, updatedAt: now });
+		this.#prune();
 		void this.#handler?.({
 			type: 'job:result',
 			jobId: entry.info.jobId,
@@ -233,7 +265,20 @@ export class MemoryTransport implements Transport {
 		this.#update();
 	}
 
-	/** The runs in flight, and a marker for the jobs still waiting on their timer. */
+	/** Forgets the oldest finished jobs past {@link KEPT_FINISHED}. */
+	#prune(): void {
+		let finished = 0;
+		for (const entry of this.#jobs.values()) if (entry.info.completedAt) finished++;
+		for (const [key, entry] of this.#jobs) {
+			if (finished <= KEPT_FINISHED) break;
+			if (entry.info.completedAt && !entry.timer && !entry.run) {
+				this.#jobs.delete(key);
+				finished--;
+			}
+		}
+	}
+
+	/** The runs in flight. */
 	#pending(): Promise<void>[] {
 		return [...this.#jobs.values()].flatMap((entry) => (entry.run ? [entry.run] : []));
 	}

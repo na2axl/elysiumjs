@@ -21,10 +21,15 @@ import { Heracles } from '../../src/heracles/heracles';
 import { HeraclesModule } from '../../src/heracles/heracles.module';
 import { Job } from '../../src/heracles/job';
 import { Queue } from '../../src/heracles/queue';
-import { DuplicateJobError, JobRegistry, QUEUES_SERVICE } from '../../src/heracles/registry';
+import {
+	DuplicateJobError,
+	HERACLES_LOCK,
+	JobRegistry,
+	QUEUES_SERVICE
+} from '../../src/heracles/registry';
 import { clearSchedulers, Scheduler } from '../../src/heracles/schedule';
 import { MemoryTransport } from '../../src/heracles/transports/memory.transport';
-import { Application, Background, Module, Service } from '../../src/index';
+import { Application, Background, Lock, Module, Service } from '../../src/index';
 
 @Service.register({ global: false })
 class Secret {
@@ -384,5 +389,14 @@ describe('HeraclesModule', () => {
 
 	it('boots the whole app before the schedule command runs', () => {
 		expect(HeraclesScheduleCommand.boot).toBe(true);
+	});
+
+	it('offers the configured lock to the scheduler, and none by default', async () => {
+		const lock = Lock.for('memory');
+		app = await Application.testing({ modules: [HeraclesModule.with({ lock })], boot: 'eager' });
+		expect(await Service.resolve(HERACLES_LOCK)).toBe(lock);
+		await app.shutdown();
+		app = await Application.testing({ modules: [HeraclesModule], boot: 'eager' });
+		expect(Service.exists(HERACLES_LOCK)).toBe(false);
 	});
 });

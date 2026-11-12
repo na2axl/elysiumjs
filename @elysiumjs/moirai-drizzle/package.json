@@ -50,7 +50,10 @@
 		"dist",
 		"CHANGELOG.md"
 	],
-	"sideEffects": false,
+	"sideEffects": [
+		"./dist/index.js",
+		"./src/index.ts"
+	],
 	"dependencies": {
 		"drizzle-orm": "^1.0.0-rc.5"
 	},

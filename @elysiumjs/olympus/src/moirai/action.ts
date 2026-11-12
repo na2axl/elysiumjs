@@ -13,7 +13,14 @@
 // limitations under the License.
 
 import type { Static, TSchema } from 'typebox';
-import type { Failed, Passed, ProblemClass, ServiceDefinition } from '../index';
+import type {
+	Failed,
+	LockDriver,
+	LockHandle,
+	Passed,
+	ProblemClass,
+	ServiceDefinition
+} from '../index';
 import type { MoiraiStores } from './moirai.module';
 
 import Value from 'typebox/value';
@@ -24,6 +31,7 @@ import {
 	currentUserId,
 	DATABASE_TRANSACTION_SERVICE,
 	DomainError,
+	getLogger,
 	Metadata,
 	Result,
 	Service
@@ -49,6 +57,24 @@ const QUERY = Symbol.for('elysium:moirai:query');
  * What an action or a query handler receives besides its input.
  * @author Axel Nana <ax.lnana@outlook.com>
  */
+
+/**
+ * Lets go of a lock once the current unit of work commits or rolls back, or now outside one. A
+ * failed release is logged: the lock then ends with its time to live.
+ */
+const releaseWhenDone = async (lock: LockDriver, handle: LockHandle): Promise<void> => {
+	const release = async () => {
+		try {
+			await lock.release(handle);
+		} catch (error) {
+			getLogger().error('Could not release a moirai lock', { key: handle.key, error });
+		}
+	};
+	if (!UnitOfWork.active()) return release();
+	await UnitOfWork.afterCommit(release);
+	UnitOfWork.afterRollback(release);
+};
+
 export type HandlerContext = {
 	/** The name of the action or the query. */
 	name: string;
@@ -567,9 +593,7 @@ export namespace Moirai {
 		const lock = actionLock();
 		const handle = await lock.acquire(key, options().lockTtl, { wait: Infinity });
 		if (!handle) return;
-		const release = () => void lock.release(handle);
-		await UnitOfWork.afterCommit(release);
-		UnitOfWork.afterRollback(release);
+		await releaseWhenDone(lock, handle);
 	};
 
 	/**
@@ -646,7 +670,9 @@ export namespace Moirai {
 				});
 				return response;
 			} finally {
-				if (lock && handle) await lock.release(handle);
+				// In a unit of work, the lock lasts until it commits or rolls back, so that the next
+				// holder reads what this call wrote.
+				if (lock && handle) await releaseWhenDone(lock, handle);
 			}
 		};
 

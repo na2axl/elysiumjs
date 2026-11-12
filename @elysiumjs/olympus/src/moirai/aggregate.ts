@@ -94,17 +94,17 @@ const evolve = (aggregate: Aggregate, state: unknown, event: StoredEvent): unkno
  * @example
  * ```ts
  * @Aggregate.register({ name: 'wallet' })
- * class Wallet extends Aggregate<{ klaps: bigint }> {
- * 	static override initialState = { klaps: 0n };
+ * class Wallet extends Aggregate<{ credits: bigint }> {
+ * 	static override initialState = { credits: 0n };
  *
- * 	spend(spendId: string, klaps: bigint) {
- * 		if (klaps > this.state.klaps) return new InsufficientKlaps(klaps - this.state.klaps);
- * 		this.record(new KlapsSpent({ spendId, klaps }));
+ * 	spend(spendId: string, credits: bigint) {
+ * 		if (credits > this.state.credits) return new InsufficientCredits(credits - this.state.credits);
+ * 		this.record(new CreditsSpent({ spendId, credits }));
  * 	}
  *
- * 	@Aggregate.evolve(KlapsSpent)
- * 	protected spent(state: { klaps: bigint }, event: KlapsSpent) {
- * 		return { klaps: state.klaps - event.data.klaps };
+ * 	@Aggregate.evolve(CreditsSpent)
+ * 	protected spent(state: { credits: bigint }, event: CreditsSpent) {
+ * 		return { credits: state.credits - event.data.credits };
  * 	}
  * }
  * ```
@@ -151,9 +151,9 @@ export abstract class Aggregate<TState = unknown> {
 	 * @param id The id of the aggregate. Defaults to `aggregate`.
 	 * @example
 	 * ```ts
-	 * Wallet.given([new KlapsToppedUp({ klaps: 100n })])
+	 * Wallet.given([new CreditsToppedUp({ credits: 100n })])
 	 * 	.when((wallet) => wallet.spend('s-1', 30n))
-	 * 	.assertRecorded(new KlapsSpent({ spendId: 's-1', klaps: 30n }));
+	 * 	.assertRecorded(new CreditsSpent({ spendId: 's-1', credits: 30n }));
 	 * ```
 	 */
 	public static given<A extends Aggregate>(

@@ -343,9 +343,10 @@ declare module '@elysiumjs/olympus' {
 
 /**
  * Takes Postgres advisory locks in the current transaction: a lock lasts until the transaction
- * ends, so `release` and `extend` do nothing and the time to live is an upper bound only. Use it
- * inside a unit of work, such as for the `serializeBy` key of an action; outside a transaction,
- * a lock ends with its own statement.
+ * ends, whatever its time to live, so `release` and `extend` do nothing. Use it inside a unit of
+ * work only, such as for the `serializeBy` key of an action or `Moirai.lock()`. Outside a
+ * transaction, the lock ends with its own statement and excludes nobody, so it does not suit the
+ * scheduler of `HeraclesModule`.
  * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts

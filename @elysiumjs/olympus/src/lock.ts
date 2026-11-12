@@ -55,8 +55,9 @@ export abstract class LockDriver {
 	/**
 	 * Takes the lock of a key.
 	 * @param key The key, such as `invoice:42`.
-	 * @param ttl How long the lock lasts at most, in milliseconds. Some drivers hold it for less,
-	 * such as a Postgres advisory lock, which ends with its transaction.
+	 * @param ttl How long the lock lasts, in milliseconds, unless it is released first. A driver
+	 * may end it on its own terms instead: a Postgres advisory lock lasts until its transaction
+	 * ends, whatever the time to live.
 	 * @param options How long to wait for another holder.
 	 * @returns The handle of the lock, or `null` when another holder kept it for the whole wait.
 	 */
@@ -123,7 +124,9 @@ declare module './port' {
 
 /**
  * The lock port. Pick a driver with `Lock.for(name, options)`: `memory` here, and others from
- * backend packages, such as `redis` from `@elysiumjs/redis`.
+ * backend packages, such as `redis` from `@elysiumjs/redis`. Each call builds a new driver; two
+ * `memory` drivers hold separate locks, so share one instance between the code that must exclude
+ * each other.
  * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
@@ -134,15 +137,23 @@ export class Lock extends Port('lock') {}
 
 type Held = { token: string; expiresAt: number };
 
+/** The longest a timer can wait: longer delays overflow and fire at once. */
+const MAX_TIMER = 2 ** 31 - 1;
+
+/** How many takes between two sweeps of the expired locks. */
+const SWEEP_EVERY = 256;
+
 /**
- * Holds locks in the process, for tests and apps that run in one process. Waiters take the lock
- * in the order they asked for it.
+ * Holds locks in the process, for tests and apps that run in one process. When a holder releases
+ * a lock, the waiter that asked first takes it; a lock that expires goes to the first waiter to
+ * check it again.
  * @author Axel Nana <ax.lnana@outlook.com>
  */
 @Lock.driver('memory')
 export class MemoryLock extends LockDriver {
 	readonly #held = new Map<string, Held>();
 	readonly #waiters = new Map<string, Array<() => void>>();
+	#takes = 0;
 
 	constructor(_options?: Record<string, never>) {
 		super();
@@ -158,6 +169,7 @@ export class MemoryLock extends LockDriver {
 			const now = Date.now();
 			const held = this.#held.get(key);
 			if (!held || held.expiresAt <= now) {
+				if (++this.#takes % SWEEP_EVERY === 0) this.#sweep(now);
 				const token = crypto.randomUUID();
 				this.#held.set(key, { token, expiresAt: now + ttl });
 				return { key, token };
@@ -194,9 +206,16 @@ export class MemoryLock extends LockDriver {
 				if (waiters.length === 0 && this.#waiters.get(key) === waiters) this.#waiters.delete(key);
 				resolve();
 			};
-			const timer = setTimeout(done, Math.max(0, ms));
+			const timer = setTimeout(done, Math.min(MAX_TIMER, Math.max(0, ms)));
 			waiters.push(done);
 		});
+	}
+
+	/** Forgets the locks that expired without a release, such as scheduler ticks. */
+	#sweep(now: number): void {
+		for (const [key, held] of this.#held) {
+			if (held.expiresAt <= now) this.#held.delete(key);
+		}
 	}
 
 	/** Wakes the first waiter of a key. */

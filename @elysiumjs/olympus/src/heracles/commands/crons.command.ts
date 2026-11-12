@@ -13,7 +13,6 @@
 // limitations under the License.
 
 import { Command, CommandArgumentType, Runtime } from '../../index';
-
 import { JobRegistry } from '../registry';
 import { Scheduler } from '../schedule';
 import { parseJsonc } from '../utils';
@@ -106,7 +105,6 @@ export class HeraclesCronsCommand extends Command {
 	private async checkWrangler(path: string): Promise<void> {
 		let targets: WranglerTriggers[];
 		try {
-			// portability-allow: a CLI command, run on the host where the wrangler file lives
 			const { readFile } = await import('node:fs/promises');
 			targets = wranglerTriggers(parseJsonc(await readFile(path, 'utf8')), this.env);
 		} catch (error) {

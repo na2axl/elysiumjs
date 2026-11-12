@@ -48,36 +48,36 @@ import {
 	UnregisteredStreamClassError
 } from './exports';
 
-const Klaps = t
+const Credits = t
 	.Codec(t.String({ pattern: '^-?[0-9]+$' }))
 	.Decode((value) => BigInt(value))
 	.Encode((value: bigint) => value.toString());
 
-const KlapsToppedUpData = t.Object({ topUpId: t.String(), klaps: Klaps });
-@StoredEvent.register({ name: 'KlapsToppedUp', schema: KlapsToppedUpData })
-class KlapsToppedUp extends StoredEvent<Static<typeof KlapsToppedUpData>> {}
+const CreditsToppedUpData = t.Object({ topUpId: t.String(), credits: Credits });
+@StoredEvent.register({ name: 'CreditsToppedUp', schema: CreditsToppedUpData })
+class CreditsToppedUp extends StoredEvent<Static<typeof CreditsToppedUpData>> {}
 
-const KlapsSpentData = t.Object({
+const CreditsSpentData = t.Object({
 	spendId: t.String(),
 	purpose: t.Union([t.Literal('access'), t.Literal('gift')]),
 	sellerId: t.String(),
-	klaps: Klaps,
+	credits: Credits,
 	ref: t.Record(t.String(), t.String())
 });
-type KlapsSpentV1 = { spendId: string; klaps: string; ref: Record<string, string> };
-type KlapsSpentV2 = KlapsSpentV1 & { purpose: 'access' | 'gift' };
+type CreditsSpentV1 = { spendId: string; credits: string; ref: Record<string, string> };
+type CreditsSpentV2 = CreditsSpentV1 & { purpose: 'access' | 'gift' };
 
-@StoredEvent.register({ name: 'KlapsSpent', version: 3, schema: KlapsSpentData })
-class KlapsSpent extends StoredEvent<Static<typeof KlapsSpentData>> {
+@StoredEvent.register({ name: 'CreditsSpent', version: 3, schema: CreditsSpentData })
+class CreditsSpent extends StoredEvent<Static<typeof CreditsSpentData>> {
 	/** Version 1 only had gifts. */
 	@StoredEvent.upcast(1)
-	static fromV1(data: KlapsSpentV1): KlapsSpentV2 {
+	static fromV1(data: CreditsSpentV1): CreditsSpentV2 {
 		return { ...data, purpose: 'gift' };
 	}
 
 	/** Version 2 kept the seller in `ref`. */
 	@StoredEvent.upcast(2)
-	static fromV2({ ref: { sellerId, ...ref }, ...data }: KlapsSpentV2) {
+	static fromV2({ ref: { sellerId, ...ref }, ...data }: CreditsSpentV2) {
 		return { ...data, sellerId, ref };
 	}
 }
@@ -85,39 +85,39 @@ class KlapsSpent extends StoredEvent<Static<typeof KlapsSpentData>> {
 @StoredEvent.register()
 class Unrecorded extends StoredEvent<{ note: string }> {}
 
-class InsufficientKlaps extends DomainError.for('INSUFFICIENT_KLAPS', 422) {
+class InsufficientCredits extends DomainError.for('INSUFFICIENT_CREDITS', 422) {
 	constructor(public readonly missing: bigint) {
-		super(`${missing} klaps are missing.`);
+		super(`${missing} credits are missing.`);
 	}
 }
 
-type WalletState = { klaps: bigint; spends: number };
+type WalletState = { credits: bigint; spends: number };
 
 @Aggregate.register({ name: 'wallet' })
 class Wallet extends Aggregate<WalletState> {
-	static override initialState: WalletState = { klaps: 0n, spends: 0 };
+	static override initialState: WalletState = { credits: 0n, spends: 0 };
 
 	get balance(): bigint {
-		return this.state.klaps;
+		return this.state.credits;
 	}
 
-	topUp(topUpId: string, klaps: bigint) {
-		this.record(new KlapsToppedUp({ topUpId, klaps }));
+	topUp(topUpId: string, credits: bigint) {
+		this.record(new CreditsToppedUp({ topUpId, credits }));
 	}
 
-	spend(spendId: string, klaps: bigint, sellerId = 'seller-1') {
-		if (klaps > this.state.klaps) return new InsufficientKlaps(klaps - this.state.klaps);
-		this.record(new KlapsSpent({ spendId, purpose: 'gift', sellerId, klaps, ref: {} }));
+	spend(spendId: string, credits: bigint, sellerId = 'seller-1') {
+		if (credits > this.state.credits) return new InsufficientCredits(credits - this.state.credits);
+		this.record(new CreditsSpent({ spendId, purpose: 'gift', sellerId, credits, ref: {} }));
 	}
 
 	/** Two spends in one command, the second checked against the state after the first. */
-	spendTwice(klaps: bigint) {
-		this.spend('a', klaps);
-		return this.spend('b', klaps);
+	spendTwice(credits: bigint) {
+		this.spend('a', credits);
+		return this.spend('b', credits);
 	}
 
 	mutate() {
-		(this.state as { klaps: bigint }).klaps = 1_000n;
+		(this.state as { credits: bigint }).credits = 1_000n;
 	}
 
 	recordUnregistered() {
@@ -125,18 +125,18 @@ class Wallet extends Aggregate<WalletState> {
 		this.record(new Loose({}));
 	}
 
-	@Aggregate.evolve(KlapsToppedUp)
-	protected toppedUp(state: WalletState, event: KlapsToppedUp): WalletState {
-		return { ...state, klaps: state.klaps + event.data.klaps };
+	@Aggregate.evolve(CreditsToppedUp)
+	protected toppedUp(state: WalletState, event: CreditsToppedUp): WalletState {
+		return { ...state, credits: state.credits + event.data.credits };
 	}
 
-	@Aggregate.evolve(KlapsSpent)
-	private spent(state: WalletState, event: KlapsSpent): WalletState {
-		return { klaps: state.klaps - event.data.klaps, spends: state.spends + 1 };
+	@Aggregate.evolve(CreditsSpent)
+	private spent(state: WalletState, event: CreditsSpent): WalletState {
+		return { credits: state.credits - event.data.credits, spends: state.spends + 1 };
 	}
 }
 
-const movements: { id: string; user: string; klaps: bigint; replay: boolean }[] = [];
+const movements: { id: string; user: string; credits: bigint; replay: boolean }[] = [];
 const published: { event: string; payload: unknown }[] = [];
 let failProjection = false;
 
@@ -144,36 +144,36 @@ class WalletMovementModel {}
 
 @Projection.inline({ name: 'wallet-movements', version: 2, models: [WalletMovementModel] })
 class WalletMovements {
-	@Projection.on(KlapsToppedUp)
-	protected toppedUp(event: KlapsToppedUp, meta: StoredEventMeta) {
+	@Projection.on(CreditsToppedUp)
+	protected toppedUp(event: CreditsToppedUp, meta: StoredEventMeta) {
 		movements.push({
 			id: event.data.topUpId,
 			user: meta.aggregateId,
-			klaps: event.data.klaps,
+			credits: event.data.credits,
 			replay: meta.replay
 		});
 	}
 
-	@Projection.on(KlapsSpent)
-	protected spent(event: KlapsSpent, meta: StoredEventMeta) {
+	@Projection.on(CreditsSpent)
+	protected spent(event: CreditsSpent, meta: StoredEventMeta) {
 		if (failProjection) throw new Error('projection failed');
 		movements.push({
 			id: event.data.spendId,
 			user: meta.aggregateId,
-			klaps: -event.data.klaps,
+			credits: -event.data.credits,
 			replay: meta.replay
 		});
 	}
 }
 
 class GiftReactor {
-	@Reactor.on(KlapsSpent, { when: (event) => event.data.purpose === 'gift' })
-	protected async gifted(event: KlapsSpent, meta: StoredEventMeta) {
-		await Event.publish('KlapsGifted', {
+	@Reactor.on(CreditsSpent, { when: (event) => event.data.purpose === 'gift' })
+	protected async gifted(event: CreditsSpent, meta: StoredEventMeta) {
+		await Event.publish('CreditsGifted', {
 			buyerId: meta.aggregateId,
-			klaps: event.data.klaps.toString()
+			credits: event.data.credits.toString()
 		});
-		published.push({ event: 'KlapsGifted', payload: { buyerId: meta.aggregateId } });
+		published.push({ event: 'CreditsGifted', payload: { buyerId: meta.aggregateId } });
 	}
 }
 
@@ -245,7 +245,7 @@ afterEach(() => {
 describe('StoredEvent', () => {
 	it('refuses two classes with the same name', () => {
 		expect(() => {
-			@StoredEvent.register({ name: 'KlapsSpent' })
+			@StoredEvent.register({ name: 'CreditsSpent' })
 			class Twice extends StoredEvent<{}> {}
 			return Twice;
 		}).toThrow(DuplicateStreamNameError);
@@ -254,9 +254,9 @@ describe('StoredEvent', () => {
 	it('encodes the data with its schema, and decodes it back', async () => {
 		await Streams.act(Wallet, 'u-1', (wallet) => wallet.topUp('t-1', 100n));
 		expect(events.records[0]).toMatchObject({
-			type: 'KlapsToppedUp',
+			type: 'CreditsToppedUp',
 			schemaVersion: 1,
-			data: { topUpId: 't-1', klaps: '100' }
+			data: { topUpId: 't-1', credits: '100' }
 		});
 		expect((await Streams.retrieve(Wallet, 'u-1')).balance).toBe(100n);
 	});
@@ -277,25 +277,25 @@ describe('StoredEvent', () => {
 				...base,
 				aggregateId: 'u-1',
 				version: 1,
-				type: 'KlapsToppedUp',
+				type: 'CreditsToppedUp',
 				schemaVersion: 1,
-				data: { topUpId: 't', klaps: '50' }
+				data: { topUpId: 't', credits: '50' }
 			},
 			{
 				...base,
 				aggregateId: 'u-1',
 				version: 2,
-				type: 'KlapsSpent',
+				type: 'CreditsSpent',
 				schemaVersion: 1,
-				data: { spendId: 's-1', klaps: '10', ref: { sellerId: 'x' } }
+				data: { spendId: 's-1', credits: '10', ref: { sellerId: 'x' } }
 			},
 			{
 				...base,
 				aggregateId: 'u-1',
 				version: 3,
-				type: 'KlapsSpent',
+				type: 'CreditsSpent',
 				schemaVersion: 2,
-				data: { spendId: 's-2', purpose: 'access', klaps: '5', ref: { sellerId: 'y', item: 'i' } }
+				data: { spendId: 's-2', purpose: 'access', credits: '5', ref: { sellerId: 'y', item: 'i' } }
 			}
 		]);
 		const wallet = await Streams.retrieve(Wallet, 'u-1');
@@ -309,7 +309,7 @@ describe('StoredEvent', () => {
 				aggregateId: 'u-1',
 				aggregateType: 'wallet',
 				version: 1,
-				type: 'KlapsSpent',
+				type: 'CreditsSpent',
 				schemaVersion: 4,
 				data: {},
 				metadata: {},
@@ -320,39 +320,41 @@ describe('StoredEvent', () => {
 	});
 
 	it('freezes its data in development and test', () => {
-		const event = new KlapsToppedUp({ topUpId: 't', klaps: 1n });
-		expect(() => ((event.data as { klaps: bigint }).klaps = 2n)).toThrow(TypeError);
+		const event = new CreditsToppedUp({ topUpId: 't', credits: 1n });
+		expect(() => ((event.data as { credits: bigint }).credits = 2n)).toThrow(TypeError);
 	});
 });
 
 describe('Aggregate', () => {
 	it('records events and applies them at once', () => {
-		Wallet.given([new KlapsToppedUp({ topUpId: 't', klaps: 100n })])
+		Wallet.given([new CreditsToppedUp({ topUpId: 't', credits: 100n })])
 			.when((wallet) => wallet.spendTwice(40n))
 			.assertRecorded(
-				new KlapsSpent({
+				new CreditsSpent({
 					spendId: 'a',
 					purpose: 'gift',
 					sellerId: 'seller-1',
-					klaps: 40n,
+					credits: 40n,
 					ref: {}
 				}),
-				KlapsSpent
+				CreditsSpent
 			);
 	});
 
 	it('returns the DomainError that refuses a command', () => {
-		const scenario = Wallet.given([new KlapsToppedUp({ topUpId: 't', klaps: 10n })])
+		const scenario = Wallet.given([new CreditsToppedUp({ topUpId: 't', credits: 10n })])
 			.when((wallet) => wallet.spend('s', 30n))
-			.assertRefused(InsufficientKlaps);
-		expect((scenario.outcome as InsufficientKlaps).missing).toBe(20n);
+			.assertRefused(InsufficientCredits);
+		expect((scenario.outcome as InsufficientCredits).missing).toBe(20n);
 	});
 
 	it('fails an assertion that does not hold', () => {
 		const scenario = Wallet.given().when((wallet) => wallet.topUp('t', 1n));
 		expect(() => scenario.assertNothingRecorded()).toThrow('Expected the events []');
-		expect(() => scenario.assertRecorded(new KlapsToppedUp({ topUpId: 't', klaps: 2n }))).toThrow();
-		expect(() => scenario.assertRefused(InsufficientKlaps)).toThrow();
+		expect(() =>
+			scenario.assertRecorded(new CreditsToppedUp({ topUpId: 't', credits: 2n }))
+		).toThrow();
+		expect(() => scenario.assertRefused(InsufficientCredits)).toThrow();
 	});
 
 	it('freezes its state in development and test', () => {
@@ -385,23 +387,23 @@ describe('Streams.act', () => {
 
 		expect(outcome.aggregate.balance).toBe(40n);
 		expect(outcome.aggregate.version).toBe(3);
-		expect(outcome.of(KlapsSpent).map((event) => event.data.spendId)).toEqual(['a', 'b']);
+		expect(outcome.of(CreditsSpent).map((event) => event.data.spendId)).toEqual(['a', 'b']);
 		expect(events.records.map((record) => [record.type, record.version])).toEqual([
-			['KlapsToppedUp', 1],
-			['KlapsSpent', 2],
-			['KlapsSpent', 3]
+			['CreditsToppedUp', 1],
+			['CreditsSpent', 2],
+			['CreditsSpent', 3]
 		]);
 		expect(events.records[1]!.metadata).toEqual({
 			actor: 'user:1',
 			correlationId: 'req-1',
 			causationId: 'c-1'
 		});
-		expect(movements.map((m) => [m.id, m.klaps])).toEqual([
+		expect(movements.map((m) => [m.id, m.credits])).toEqual([
 			['t-1', 100n],
 			['a', -30n],
 			['b', -30n]
 		]);
-		expect(outbox.rows).toHaveLength(0); // no handler of KlapsGifted is registered
+		expect(outbox.rows).toHaveLength(0); // no handler of CreditsGifted is registered
 		expect(published).toHaveLength(2);
 		expect(transactions).toEqual(['BEGIN', 'COMMIT', 'BEGIN', 'COMMIT']);
 	});
@@ -409,22 +411,22 @@ describe('Streams.act', () => {
 	it('appends nothing when the command is refused, and fails with its error', async () => {
 		const outcome = await Streams.act(Wallet, 'u-1', (wallet) => wallet.spend('s', 5n));
 		expect(outcome.check()).toBe(false);
-		expect(outcome.error).toBeInstanceOf(InsufficientKlaps);
+		expect(outcome.error).toBeInstanceOf(InsufficientCredits);
 		expect(events.records).toHaveLength(0);
 		expect(movements).toHaveLength(0);
 	});
 
 	it('takes a Result from the command', async () => {
 		await Streams.act(Wallet, 'u-1', (wallet) => wallet.topUp('t-1', 100n));
-		const spend = (wallet: Wallet, klaps: bigint) =>
-			Result.of(wallet.spend(`s-${klaps}`, klaps)).map(() => wallet.balance);
+		const spend = (wallet: Wallet, credits: bigint) =>
+			Result.of(wallet.spend(`s-${credits}`, credits)).map(() => wallet.balance);
 
 		const passed = await Streams.act(Wallet, 'u-1', (wallet) => spend(wallet, 30n));
 		expect(passed.check() && passed.result.value).toBe(70n);
 		expect(events.records).toHaveLength(2);
 
 		const failed = await Streams.act(Wallet, 'u-1', (wallet) => spend(wallet, 500n));
-		expect(failed.error).toBeInstanceOf(InsufficientKlaps);
+		expect(failed.error).toBeInstanceOf(InsufficientCredits);
 		expect(events.records).toHaveLength(2);
 	});
 
@@ -452,7 +454,7 @@ describe('Streams.act', () => {
 		};
 		let attempts = 0;
 
-		@Action.register({ errors: [InsufficientKlaps], name: 'wallet.spend' })
+		@Action.register({ errors: [InsufficientCredits], name: 'wallet.spend' })
 		class SpendAction extends Action<undefined, bigint> {
 			override async handle() {
 				attempts++;
@@ -483,9 +485,9 @@ describe('Streams.act', () => {
 describe('Projection.project', () => {
 	it('runs the handlers of a projection for given events', async () => {
 		await Projection.project(WalletMovements, [
-			[new KlapsToppedUp({ topUpId: 't', klaps: 5n }), { aggregateId: 'u-9', replay: true }]
+			[new CreditsToppedUp({ topUpId: 't', credits: 5n }), { aggregateId: 'u-9', replay: true }]
 		]);
-		expect(movements).toEqual([{ id: 't', user: 'u-9', klaps: 5n, replay: true }]);
+		expect(movements).toEqual([{ id: 't', user: 'u-9', credits: 5n, replay: true }]);
 	});
 });
 
@@ -495,16 +497,16 @@ describe('Projection.rebuild', () => {
 		await Streams.act(Wallet, 'u-2', (wallet) => wallet.topUp('t-2', 50n));
 		await Streams.act(Wallet, 'u-1', (wallet) => wallet.spend('s-1', 30n));
 		published.length = 0;
-		movements.push({ id: 'stale', user: 'u-0', klaps: 1n, replay: false });
+		movements.push({ id: 'stale', user: 'u-0', credits: 1n, replay: false });
 
 		expect(await Projection.stale()).toEqual(['wallet-movements']);
 		expect(await Projection.rebuild('wallet-movements', { batch: 2 })).toBe(3);
 
 		expect(resets).toEqual([[WalletMovementModel]]);
 		expect(movements).toEqual([
-			{ id: 't-1', user: 'u-1', klaps: 100n, replay: true },
-			{ id: 't-2', user: 'u-2', klaps: 50n, replay: true },
-			{ id: 's-1', user: 'u-1', klaps: -30n, replay: true }
+			{ id: 't-1', user: 'u-1', credits: 100n, replay: true },
+			{ id: 't-2', user: 'u-2', credits: 50n, replay: true },
+			{ id: 's-1', user: 'u-1', credits: -30n, replay: true }
 		]);
 		expect(published).toHaveLength(0);
 		expect(await storage.version('wallet-movements')).toBe(2);

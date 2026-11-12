@@ -14,9 +14,9 @@
 
 import type { TSchema } from 'typebox';
 
-import { Environments } from '../index';
 import Value from 'typebox/value';
 
+import { Environments } from '../index';
 import {
 	DuplicateStreamNameError,
 	UnknownStoredEventError,
@@ -102,13 +102,13 @@ export const freezes = (): boolean => Environments.includes(Environments.local);
  * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
- * const KlapsSpentData = t.Object({ spendId: t.String(), klaps: t.String(), sellerId: t.String() });
+ * const CreditsSpentData = t.Object({ spendId: t.String(), credits: t.String(), sellerId: t.String() });
  *
- * @StoredEvent.register({ name: 'KlapsSpent', version: 2, schema: KlapsSpentData })
- * class KlapsSpent extends StoredEvent<Static<typeof KlapsSpentData>> {
+ * @StoredEvent.register({ name: 'CreditsSpent', version: 2, schema: CreditsSpentData })
+ * class CreditsSpent extends StoredEvent<Static<typeof CreditsSpentData>> {
  * 	// Version 1 kept the seller in `ref`.
  * 	@StoredEvent.upcast(1)
- * 	static fromV1({ ref, ...data }: { spendId: string; klaps: string; ref: { sellerId: string } }) {
+ * 	static fromV1({ ref, ...data }: { spendId: string; credits: string; ref: { sellerId: string } }) {
  * 		return { ...data, sellerId: ref.sellerId };
  * 	}
  * }

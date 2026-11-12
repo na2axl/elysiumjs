@@ -304,6 +304,26 @@ const run = await lock.run('report:daily', 60_000, () => buildReport(), { wait: 
 if (run.acquired) console.log(run.value);
 ```
 
+The locks of `serializeBy` and `Moirai.lock()` are let go when their unit of work commits or rolls back. In case their holder dies first, they also end after `lockTtl` milliseconds (`MoiraiModule.with({ lockTtl: 30_000 })`, 60 seconds by default): keep it longer than your slowest unit of work.
+
+## Jobs in tests
+
+`MemoryTransport` runs the jobs of a queue in the process, with no worker or backend. In a test, `MemoryTransport.settled()` waits until every dispatched job, its retries included, has finished:
+
+```ts
+import { Heracles, HeraclesModule, MemoryTransport } from '@elysiumjs/olympus/heracles';
+
+const app = await Application.testing({
+	modules: [
+		HeraclesModule.with({ queues: { default: { transport: MemoryTransport } } }),
+		MailModule
+	]
+});
+
+await Heracles.dispatch(SendWelcomeMail, ['ada@example.com']);
+await MemoryTransport.settled();
+```
+
 ## Services
 
 A service is identified by its class. Give it a name with `@Service.register({ name })` to look it up by that string instead. Class names are never used as identifiers, so services resolve the same way after a bundler renames classes (`bun run check:minified` builds a minified app and checks it).

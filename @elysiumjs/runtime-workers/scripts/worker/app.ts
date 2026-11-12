@@ -104,7 +104,6 @@ class JobsModule extends Module {}
 		WorkersModule.with({ bindings: ['JOBS'] }),
 		MnemosyneModule.with({
 			cache: {
-				redis: false,
 				memory: false,
 				stores: { kv: () => new KeyvWorkersKV({ binding: 'CACHE' }) }
 			}
