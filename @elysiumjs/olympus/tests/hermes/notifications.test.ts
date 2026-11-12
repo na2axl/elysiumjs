@@ -705,14 +705,14 @@ describe('Notification', () => {
 				UnitOfWork.run(async () => {
 					await Notification.send(
 						new User('u1'),
-						new InvoiceQueued({ invoiceId: new Map() as never })
+						new InvoiceQueued({ invoiceId: new WeakMap() as never })
 					);
 				})
 			).rejects.toBeInstanceOf(QueuedNotificationDataError);
 			const fake = Notification.fake();
 			try {
 				await expect(
-					Notification.send(new User('u1'), new InvoiceQueued({ invoiceId: new Map() as never }))
+					Notification.send(new User('u1'), new InvoiceQueued({ invoiceId: new WeakMap() as never }))
 				).rejects.toBeInstanceOf(QueuedNotificationDataError);
 				fake.assertNothingSent();
 			} finally {
@@ -799,7 +799,7 @@ describe('Notification', () => {
 		it('refuses data that does not survive JSON', async () => {
 			await boot();
 			await expect(
-				Notification.send(new User('u1'), new InvoiceQueued({ invoiceId: new Map() as never }))
+				Notification.send(new User('u1'), new InvoiceQueued({ invoiceId: new WeakMap() as never }))
 			).rejects.toBeInstanceOf(QueuedNotificationDataError);
 		});
 
