@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,13 +29,13 @@ export type HttpContext = {
 
 /**
  * The context of the current request.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const currentContext = (): HttpContext | undefined => Http.currentContext<HttpContext>();
 
 /**
  * The configuration of ThemisModule.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const themisConfig = (): ThemisConfig => {
 	const config = Service.exists(THEMIS_CONFIG) ? Service.get<ThemisConfig>(THEMIS_CONFIG) : null;
@@ -63,7 +63,7 @@ export const readCookie = (request: Request, name: string): string | undefined =
 
 /**
  * The attributes of a cookie.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type CookieOptions = {
 	name?: string;

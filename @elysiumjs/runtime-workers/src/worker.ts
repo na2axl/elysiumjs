@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -216,7 +216,7 @@ const dispatchQueue = async (handlers: Handler[], batch: WorkersMessageBatch): P
  * ```
  * @param app The application to serve.
  * @returns The `fetch`, `queue` and `scheduled` handlers, and the root Elysia app.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const createWorker = async <Env = Record<string, unknown>>(
 	app: Application

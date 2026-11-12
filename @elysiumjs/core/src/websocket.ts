@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ import { nextTick, Symbols } from './utils';
 
 /**
  * The options of the websocket server, shared by every runtime.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type WebSocketHandlerOptions = {
 	/** Seconds of inactivity after which a connection is closed. */
@@ -45,7 +45,7 @@ export type WebSocketHandlerOptions = {
 
 /**
  * A websocket connection, as seen by controllers. Structural, so that it fits every runtime.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @template TData Data stored in the connection.
  */
 export type ElysiumWebSocket<TData = unknown> = {
@@ -67,7 +67,7 @@ export type ElysiumWebSocket<TData = unknown> = {
 
 /**
  * The websocket connection instance.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @template TData Additional data stored in the websocket connection.
  */
 export type WS<TData = unknown> = ElysiumWebSocket<
@@ -82,7 +82,7 @@ export type WS<TData = unknown> = ElysiumWebSocket<
 
 /**
  * The data generated when an error occurs in a websocket connection.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type WSError = ErrorContext & { error: Readonly<Error> };
 
@@ -94,7 +94,7 @@ export namespace Websocket {
 	 * and `onBeforeHandle` can refuse the connection by returning a response. `onAfterHandle` and
 	 * `onAfterResponse` run once the socket is upgraded: there is no response to read or replace.
 	 *
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param path The path of the websocket route.
 	 * @param options The options of the websocket server.
 	 * @example
@@ -155,7 +155,7 @@ export namespace Websocket {
 	 * This decorator should be used on a websocket controller method. Only one "open" event handler
 	 * can be defined per websocket controller.
 	 *
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	export const onOpen = (): MethodDecorator => {
 		return function (target, _, descriptor) {
@@ -171,7 +171,7 @@ export namespace Websocket {
 	 * This decorator should be used on a websocket controller method. Only one "close" event handler
 	 * can be defined per websocket controller.
 	 *
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	export const onClose = (): MethodDecorator => {
 		return function (target, _, descriptor) {
@@ -187,7 +187,7 @@ export namespace Websocket {
 	 * This decorator should be used on a websocket controller method. Only one "message" event handler
 	 * can be defined per websocket controller.
 	 *
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 *
 	 * @param schema The schema of the message body.
 	 */
@@ -206,7 +206,7 @@ export namespace Websocket {
 	 * This decorator should be used on a websocket controller method. Only one "drain" event handler
 	 * can be defined per websocket controller.
 	 *
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	export const onDrain = (): MethodDecorator => {
 		return function (target, _, descriptor) {
@@ -222,7 +222,7 @@ export namespace Websocket {
 	 * This decorator should be used on a websocket controller method. Only one "error" event handler
 	 * can be defined per websocket controller.
 	 *
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	export const onError = (): MethodDecorator => {
 		return function (target, _, descriptor) {

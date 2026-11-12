@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -46,7 +46,7 @@ const serializable = (value: unknown): unknown => {
  * (`level`, `time`, `name`, `msg` and the context), through the console of the runtime: the
  * standard streams on Bun and Node.js (warnings and errors on stderr), and the console method of
  * each level on Cloudflare Workers, where Workers Logs index the fields and keep the level.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class JsonConsoleLogger implements LoggerInterface {
 	readonly #console = new InteractsWithConsole();

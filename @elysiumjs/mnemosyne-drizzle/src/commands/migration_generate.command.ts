@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -62,7 +62,7 @@ const loadTables = async (exports: SchemaExport[]): Promise<PgTable[]> => {
  * creates each marked table. The schema is the one of the app: every table, Postgres schema, enum,
  * sequence, view, role and policy that the project files it loads export, directly or as a value
  * of an exported object (like the tables `moiraiTables()` builds).
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 @Command.register()
 export class MigrationGenerateCommand extends Command {

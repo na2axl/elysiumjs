@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -58,7 +58,7 @@ const fromBase32 = (text: string): Uint8Array<ArrayBuffer> => {
 /**
  * The parameters of TOTP codes. The defaults (6 digits, 30 seconds, SHA-1) are the ones every
  * authenticator app supports.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type TotpOptions = {
 	digits?: number;
@@ -104,13 +104,13 @@ const defaults = (options: TotpOptions = {}): Required<TotpOptions> => ({
 export namespace Totp {
 	/**
 	 * Generates a TOTP secret: 20 random bytes as base32, as authenticator apps expect.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	export const generateSecret = (bytes = 20): string => toBase32(randomBytes(bytes));
 
 	/**
 	 * The `otpauth://` URI of a secret, to show as a QR code.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param options The secret, the issuer (the app name) and the account (such as the email).
 	 */
 	export const uri = (
@@ -130,7 +130,7 @@ export namespace Totp {
 
 	/**
 	 * The code of a secret at a time (RFC 6238).
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param secret The base32 secret.
 	 * @param options The parameters, and the time in milliseconds (now by default).
 	 */
@@ -149,7 +149,7 @@ export namespace Totp {
 	/**
 	 * Whether a code is the one of the current period, or of `window` periods around it, to allow
 	 * for clock drift. Compare the returned counter with the last one used to refuse a replay.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param code The code the user typed.
 	 * @param secret The base32 secret.
 	 * @param options The parameters, the window (1 by default) and the time.
@@ -182,7 +182,7 @@ const normalize = (code: string): string => code.toLowerCase().replace(/[\s-]/g,
 
 /**
  * The options of {@link BackupCodes.generate} and {@link BackupCodes.consume}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type BackupCodeOptions = {
 	/**
@@ -201,7 +201,7 @@ export namespace BackupCodes {
 	/**
 	 * Generates one-time backup codes, such as `k3m9q-x7t2p`. Show the codes once and store only
 	 * their hashes.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param count The number of codes. Defaults to 10.
 	 * @param options The key of the hashes, if any.
 	 * @returns The codes, and their hashes in the same order.
@@ -220,7 +220,7 @@ export namespace BackupCodes {
 	/**
 	 * Uses a backup code: checks it against the stored hashes, and returns the hashes left once it
 	 * is used up. Case, spaces and dashes do not matter.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param code The code the user typed.
 	 * @param hashes The stored hashes.
 	 * @param options The key the hashes were made with, if any.

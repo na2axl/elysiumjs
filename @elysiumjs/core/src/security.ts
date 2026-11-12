@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import { Runtime } from './runtime';
 
 /**
  * Cross-origin resource sharing options.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type CorsOptions = {
 	/**
@@ -43,7 +43,7 @@ export type CorsOptions = {
 /**
  * Security response headers. `true` sends the default of a header, `false` or omitting it sends
  * nothing, and a string sends that value.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type SecurityHeadersOptions = {
 	/** No default: an API serving JSON rarely needs one. */
@@ -64,7 +64,7 @@ export type SecurityHeadersOptions = {
 
 /**
  * The HTTP options of an application, set with `http` on `@Application.register()`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type HttpOptions = {
 	/** Cross-origin resource sharing. Off unless set. */
@@ -88,7 +88,7 @@ export const DEFAULT_BODY_LIMIT = 1024 * 1024;
 
 /**
  * Raised when a request body is larger than the body limit. Rendered as a 413 problem.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class PayloadTooLargeError extends DomainError.for('PAYLOAD_TOO_LARGE', 413) {
 	constructor(public readonly limit: number) {
@@ -98,7 +98,7 @@ export class PayloadTooLargeError extends DomainError.for('PAYLOAD_TOO_LARGE', 4
 
 /**
  * Thrown at startup when CORS allows every origin with credentials, which browsers refuse.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class InvalidCorsOptionsError extends ElysiumError {
 	constructor() {
@@ -132,7 +132,7 @@ const headerValue = (
 
 /**
  * The client address of a request, from the trusted proxy headers or the runtime.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param request The request.
  * @param trustProxy Which proxies to trust.
  */
@@ -220,7 +220,7 @@ const LIMITED_TYPES =
 /**
  * Registers the HTTP security hooks of an application on its root Elysia app: CORS, security
  * headers, the body limit and the client address (`ctx.ip`).
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param app The root Elysia app.
  * @param options The `http` option of the application.
  * @throws {InvalidCorsOptionsError} When CORS allows every origin with credentials.

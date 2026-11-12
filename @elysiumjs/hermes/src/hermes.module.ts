@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ const defaultTransport = (): 'pino' | 'console' =>
  * Provides the {@link HermesLogger} as global services, by its class and as `logger`
  * (the same instance), built from the module config. With `transport: 'console'` (the default
  * on Cloudflare Workers), `logger` is a {@link JsonConsoleLogger} instead.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 @Module.register<HermesConfig>({
 	services: (config) => [

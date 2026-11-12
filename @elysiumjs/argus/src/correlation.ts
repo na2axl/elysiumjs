@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import { trace } from '@opentelemetry/api';
  * // Output: { msg: "Processing request", userId: "123", traceId: "abc...", spanId: "def..." }
  * ```
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param ctx The base context to enrich.
  * @returns The context with `traceId` and `spanId` injected if an active span exists.
  */

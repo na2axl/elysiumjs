@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import { StoredEvents } from './stored-event';
 
 /**
  * The options of a projection.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ProjectionOptions = {
 	/** The name of the projection. Defaults to the class name. */
@@ -57,7 +57,7 @@ export const handlerInstance = (owner: Owner): Record<PropertyKey, Function> =>
  * work that appends the events, so a read right after a command sees what it did, and its failure
  * rolls the command back. Its handlers, marked with `@Projection.on()`, run in the module that
  * registers the class, with its dependencies, and may be protected or private.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
  * @Projection.inline({ name: 'wallet-movements', models: [WalletMovementModel] })
@@ -74,7 +74,7 @@ export const handlerInstance = (owner: Owner): Record<PropertyKey, Function> =>
 export namespace Projection {
 	/**
 	 * Marks a class as an inline projection.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param options The name, version and models of the projection.
 	 * @throws {DuplicateStreamNameError} When another projection has the same name.
 	 */
@@ -94,7 +94,7 @@ export namespace Projection {
 
 	/**
 	 * Marks a method of a projection as the handler of a stored event.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param event The stored event class.
 	 */
 	export const on =
@@ -115,7 +115,7 @@ export namespace Projection {
 	 * handles through its handlers in the order of the log, then records its version. On a
 	 * transactional storage, readers see the previous read model until the rebuild commits. The
 	 * projection runs in the module that registers it, with the stores of that module.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param projection The projection class, or its name.
 	 * @param options How many events a read gives, 500 by default.
 	 * @returns The number of events replayed.
@@ -161,7 +161,7 @@ export namespace Projection {
 	/**
 	 * The projections whose `version` differs from the one they were last built with, or that
 	 * were never built.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	export const stale = async (): Promise<string[]> => {
 		const names: string[] = [];
@@ -176,14 +176,14 @@ export namespace Projection {
 
 	/**
 	 * The registered projections, with their name and version.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	export const all = (): { name: string; version: number; target: Owner }[] =>
 		[...PROJECTIONS.values()].map(({ name, version, target }) => ({ name, version, target }));
 
 	/**
 	 * Runs the handlers of a projection for events, without a store, such as in a test.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param projection The projection class.
 	 * @param events The events, each with the meta its handler receives.
 	 */

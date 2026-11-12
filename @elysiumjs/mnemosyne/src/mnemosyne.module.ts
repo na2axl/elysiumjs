@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ import { KeyvRedis } from './keyv-redis';
 
 /**
  * Configuration of the {@link MnemosyneModule}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type MnemosyneModuleConfig = {
 	cache: {
@@ -64,7 +64,7 @@ export type MnemosyneModuleConfig = {
  * Provides the caches as the global services `mnemosyne.cache.redis`,
  * `mnemosyne.cache.memory` and `mnemosyne.cache.store.<name>`, and the `db:seed` command. Tenancy
  * config and strategy, and database connections, are registered by the database driver modules.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 @Module.register<MnemosyneModuleConfig>({
 	commands: [DbSeedCommand],

@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import { t } from 'elysia';
 
 /**
  * Options of {@link ModelResource}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @template TKey The column names of the model.
  */
 export type ModelResourceOptions<TKey extends string = string> = {
@@ -38,7 +38,7 @@ export type ModelResourceOptions<TKey extends string = string> = {
  * The response schema of a model: its select schema, with hidden, picked and omitted columns
  * applied. Use it as a route's `response`: the handler can return model rows as they are, and
  * the response holds only the exposed fields, with dates as ISO strings.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param model The model class.
  * @param options The columns to hide, pick or omit, and extra fields.
  * @example

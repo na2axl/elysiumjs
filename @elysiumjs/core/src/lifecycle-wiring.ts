@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import { ModuleContext } from './module-context';
 
 /**
  * A listener the kernel added to the event bus.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type WiredListener = {
 	readonly event: string;
@@ -58,7 +58,7 @@ const handlerFor = (
  * @param services The subset of `owned` registered as services in the module.
  * @returns The listeners added, so they can be removed on shutdown.
  * @throws {LifecycleListenerNotSupportedError} For an instance listener on a non-service class.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export function wireLifecycleListeners(
 	node: ModuleNode,

@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ import { Symbols } from './utils';
 /**
  * The context an interceptor receives: the Elysia context of the request (`request`, `set`,
  * `params`, `query`, `body`, ...).
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type InterceptorContext = {
 	request: Request;
@@ -42,7 +42,7 @@ export type InterceptorContext = {
  * Interceptors run inside the request scope, the module context and the transaction of the
  * route, after the `onBeforeHandle` middlewares and before the `onAfterHandle` ones. Streaming
  * routes (generators and server-sent events) do not run them.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface Interceptor {
 	intercept(ctx: InterceptorContext, next: () => Promise<unknown>): Promise<unknown>;
@@ -53,7 +53,7 @@ export interface Interceptor {
  * OpenAPI document, the validation and the serialization of a route describe the body the client
  * receives. It must make the same choice as the interceptor: a schema the interceptor leaves as it
  * is gives itself back.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ResponseSchemaHook = (schema: TSchema) => TSchema;
 
@@ -63,7 +63,7 @@ export type ResponseSchemaHook = (schema: TSchema) => TSchema;
  *
  * An interceptor that changes the shape of results gives `responseSchema`, applied to the success
  * schemas of the routes it wraps. One that answers with problems of its own lists them in `errors`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type InterceptorClass = Class<Interceptor> & {
 	readonly responseSchema?: ResponseSchemaHook;
@@ -72,7 +72,7 @@ export type InterceptorClass = Class<Interceptor> & {
 
 /**
  * One level of interceptors (app, module, controller or route) and the module they run in.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type InterceptorLevel = { interceptors: InterceptorClass[]; node: ModuleNode | null };
 
@@ -97,7 +97,7 @@ const build = (level: InterceptorLevel, cls: InterceptorClass): Interceptor => {
 /**
  * Runs a handler through interceptors, the first one outermost. Each interceptor runs in its
  * module's context.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param levels The levels, outermost first (app, module, controller, route).
  * @param ctx The request context.
  * @param handler Runs the handler.
@@ -129,7 +129,7 @@ export const runInterceptors = (
 /**
  * Adds a `Server-Timing` entry with the duration of the handler and of the interceptors inside
  * this one: `handler;dur=12.3`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class TimingInterceptor implements Interceptor {
 	public async intercept(ctx: InterceptorContext, next: () => Promise<unknown>): Promise<unknown> {
@@ -146,7 +146,7 @@ export class TimingInterceptor implements Interceptor {
 
 /**
  * The options of {@link TransformInterceptor.with}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type TransformOptions = {
 	/**
@@ -159,7 +159,7 @@ export type TransformOptions = {
 
 /**
  * Builds interceptors that transform the result of handlers.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export abstract class TransformInterceptor {
 	/**
@@ -196,7 +196,7 @@ export abstract class TransformInterceptor {
  * The success schema of a route as the client receives it: the schema of the handler's result,
  * passed through the `responseSchema` of each interceptor in the order results go through them,
  * from the innermost (route) to the outermost (application).
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param levels The levels, outermost first (app, module, controller, route).
  * @param schema The schema of the handler's result.
  */

@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ class AbilityMiddleware extends Middleware<
 export namespace Cerberus {
 	/**
 	 * Allows to run the request only if the requester has the given ability.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param ability The required ability the requester needs to have before to execute the request.
 	 */
 	export const can = (ability: Ability): MethodDecorator & ClassDecorator => {
@@ -49,7 +49,7 @@ export namespace Cerberus {
 
 	/**
 	 * Allows to run the request only if the requester DOESN'T HAVE the given ability
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param ability The required ability the request needs to NOT have before the execute the request.
 	 */
 	export const cannot = (ability: Ability): MethodDecorator & ClassDecorator => {

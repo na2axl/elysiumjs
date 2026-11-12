@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import { TransportMode } from './transport';
 
 /**
  * Options for dispatching a job to a queue.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type JobDispatchOptions = {
 	/**
@@ -78,7 +78,7 @@ export type JobDispatchOptions = {
 
 /**
  * Configuration options for a Queue.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type QueueOptions = {
 	/**
@@ -124,7 +124,7 @@ export type QueueOptions = {
 
 /**
  * Generated ID when dispatching jobs in queues.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type JobDispatchId = {
 	/**
@@ -140,7 +140,7 @@ export type JobDispatchId = {
 
 /**
  * Queue class for dispatching jobs to workers.
- * @author Axel Nana <axel.nana@icloud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class Queue extends InteractsWithConsole {
 	/**

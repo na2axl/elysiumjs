@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -42,7 +42,7 @@ type StoreOption<T> = T | (() => T);
 
 /**
  * Stores, each an instance or a function that builds it once, and options.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type MoiraiStores = Partial<MoiraiOptions> & {
 	idempotency?: StoreOption<IdempotencyStore>;
@@ -55,7 +55,7 @@ export type MoiraiStores = Partial<MoiraiOptions> & {
 
 /**
  * The configuration of {@link MoiraiModule}: the stores of the application and the options.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type MoiraiModuleConfig = MoiraiStores;
 
@@ -95,7 +95,7 @@ export const moduleStores = (config: MoiraiStores): ServiceDefinition[] =>
  * the app uses: the memory ones (`MemoryIdempotencyStore`, ...) for tests, the Postgres ones of
  * `@elysiumjs/moirai-drizzle` in production. A module that needs stores of its own, such as the
  * outbox and inbox tables of a domain, lists them with `Moirai.stores()` in its services.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
  * MoiraiModule.with({

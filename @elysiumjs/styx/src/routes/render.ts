@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@ import type { HttpRouteDescription, HttpRouteTypes } from '@elysiumjs/core';
 
 /**
  * A controller whose routes go in the generated types.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ControllerRoutes = {
 	/**
@@ -47,7 +47,7 @@ export const CONTROLLER = '__Controller__';
 
 /**
  * A module whose controllers go in the generated types.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ModuleRoutes = {
 	/** The id of the module. */
@@ -112,7 +112,7 @@ const renderRoute = (
  * The file is type-only: it declares one Elysia chain per module, built from the controller
  * routes, whose parameter, query, body and response types come from the controller method
  * signatures. Nothing in it runs.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param modules The modules with controllers, in mounting order.
  */
 export const renderRoutes = (modules: ModuleRoutes[]): string => {

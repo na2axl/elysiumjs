@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -44,7 +44,7 @@ import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions';
  * });
  * ```
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class ArgusSDK {
 	private static instance: ArgusSDK | undefined;
@@ -54,7 +54,7 @@ export class ArgusSDK {
 
 	/**
 	 * Whether {@link ArgusSDK.initialize} has already been called.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	public static isInitialized(): boolean {
 		return ArgusSDK.instance !== undefined;
@@ -63,7 +63,7 @@ export class ArgusSDK {
 	/**
 	 * Initializes the OpenTelemetry SDK.
 	 * Can only be called once — subsequent calls are ignored with a warning.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param config The tracing configuration.
 	 */
 	public static initialize(config: TracingConfig): void {
@@ -93,7 +93,7 @@ export class ArgusSDK {
 
 	/**
 	 * Creates the appropriate trace exporter based on the config.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param config The tracing configuration.
 	 * @returns A span exporter instance.
 	 */
@@ -111,7 +111,7 @@ export class ArgusSDK {
 
 	/**
 	 * Shuts down the OpenTelemetry SDK gracefully.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	public static async shutdown(): Promise<void> {
 		if (ArgusSDK.instance?.sdk) {

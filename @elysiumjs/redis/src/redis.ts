@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,13 +20,13 @@ import { bunRedis } from './adapters/bun';
 
 /**
  * Properties used to create a new redis connection.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type RedisConnectionProps = { url: string } & Record<string, unknown>;
 
 /**
  * Configuration of the {@link RedisModule}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type RedisModuleConfig = {
 	/** The name of the connection that `default` resolves to. */
@@ -45,7 +45,7 @@ export type RedisModuleConfig = {
 export namespace Redis {
 	/**
 	 * Creates a service name for a redis connection.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param name The name of the connection.
 	 * @returns A service name for the connection.
 	 */
@@ -55,7 +55,7 @@ export namespace Redis {
 
 	/**
 	 * Retrieves the client for a redis connection declared by the {@link RedisModule}.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param name The name of the connection.
 	 * @returns The {@link RedisConnection} for the connection with the given name.
 	 * @throws {ServiceNotFoundError} If no connection with that name is declared.
@@ -68,7 +68,7 @@ export namespace Redis {
 
 	/**
 	 * Checks if a redis connection with the given name exists.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param name The name of the connection to check.
 	 * @returns `true` if the connection exists, `false` otherwise.
 	 */
@@ -78,7 +78,7 @@ export namespace Redis {
 
 	/**
 	 * Retrieves the default redis connection.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @returns The default redis connection.
 	 */
 	export const getDefaultConnection = () => {
@@ -89,7 +89,7 @@ export namespace Redis {
 /**
  * Declares redis connections as global services named `redis.connection.{name}`, plus
  * `redis.connection.default` aliasing the configured default. Clients are created on first use.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 @Module.register<RedisModuleConfig>({
 	services: (config) => {

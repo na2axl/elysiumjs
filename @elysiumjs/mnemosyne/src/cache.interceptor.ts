@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ import { Cache } from './cache';
 
 /**
  * Options of {@link CacheInterceptor.with}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type CacheInterceptorOptions = {
 	/** How long a response stays cached, in milliseconds. */
@@ -49,7 +49,7 @@ const defaultKey = (ctx: InterceptorContext): string => {
 
 /**
  * Builds interceptors that cache handler results.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export abstract class CacheInterceptor {
 	/**

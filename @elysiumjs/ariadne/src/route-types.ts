@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ import { Flow } from './flow';
 /**
  * What `POST /flows/{flow}` answers: the key of the new flow, the owner token of a guest flow,
  * and the steps it may run first.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type FlowStart = {
 	flowKey: string;
@@ -41,7 +41,7 @@ export type FlowStart = {
 
 /**
  * What `GET /flows/{flow}` answers: where the flow stands, and the last answer.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type FlowStatus = {
 	flowKey: string;
@@ -58,7 +58,7 @@ type Given<R> = R extends Passed<infer T> ? T : R extends Failed<any> ? never : 
  * The answer of a step, from what its method returns: the `answer` of {@link Flow.advance}, or
  * the value it returns that keeps the state, or the value of a passed `Result`. A refusal, a
  * returned error and a failed `Result` are problems.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type FlowAnswer<R> =
 	Exclude<Given<Awaited<R>>, FlowRefusal<any> | DomainError> extends infer V
@@ -71,7 +71,7 @@ export type FlowAnswer<R> =
 
 /**
  * What `POST /flows/{flow}/{step}` answers, for a step method returning `R`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type FlowStepReply<R> = {
 	answer: FlowAnswer<R>;
@@ -87,7 +87,7 @@ const types = (response: string, name: string): HttpRouteTypes => ({
 /**
  * Types the routes of flow controllers for `styx routes:generate`: the start and state routes
  * the flow adds, and the replies of its steps. Active in development only.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 @Service.register({ tags: [Http.RouteTypes], global: true, env: Environments.local })
 export class FlowRouteTypes implements HttpRouteTypesContributor {

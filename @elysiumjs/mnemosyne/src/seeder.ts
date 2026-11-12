@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ const SEEDER = Symbol('elysium:mnemosyne:seeder');
 
 /**
  * A seeder class.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type SeederClass = abstract new () => Seeder;
 
@@ -45,7 +45,7 @@ type SeederList = readonly SeederClass[] | (() => readonly SeederClass[]);
 
 /**
  * Properties of `@Seeder.register()`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type SeederProps = {
 	/**
@@ -73,7 +73,7 @@ export type SeederProps = {
 
 /**
  * The options given to `styx db:seed`, read by seeders through `this.input`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type SeederInput = {
 	/** The file given with `--file`, if any. */
@@ -87,7 +87,7 @@ type SeederMetadata = Omit<SeederProps, 'after'> & { after: () => readonly Seede
 
 /**
  * A seeder, as `styx db:seed` plans it.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type PlannedSeeder = {
 	/** The name of the seeder. */
@@ -108,7 +108,7 @@ export type PlannedSeeder = {
 
 /**
  * Thrown when two seeders have the same name.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class DuplicateSeederError extends ElysiumError {
 	constructor(name: string, modules: readonly string[]) {
@@ -118,7 +118,7 @@ export class DuplicateSeederError extends ElysiumError {
 
 /**
  * Thrown when a seeder is named, or listed in `after`, but no active module declares it.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class UnknownSeederError extends ElysiumError {
 	constructor(name: string, from?: string) {
@@ -132,7 +132,7 @@ export class UnknownSeederError extends ElysiumError {
 
 /**
  * Thrown when seeders run after each other in a cycle.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class SeederCycleError extends ElysiumError {
 	constructor(names: readonly string[]) {
@@ -164,7 +164,7 @@ const metadataOf = (seeder: SeederClass): SeederMetadata | undefined =>
  * 	}
  * }
  * ```
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export abstract class Seeder extends InteractsWithConsole {
 	#input: SeederInput = { args: {} };

@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ export { DATABASE_TRANSACTION_SERVICE } from '@elysiumjs/core';
 /**
  * Creates a cache storage instance tagged for database use.
  * Drivers can use this to build their cache backends.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param config The database cache configuration.
  * @returns A cache interface tagged with 'database'.
  */
@@ -44,7 +44,7 @@ export const createDatabaseCacheStorage = (
  * Retrieves named database connections using a driver. Connections are registered as
  * global services `db.connection.{name}` by the driver modules.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @template TConnection The connection type managed by the driver.
  * @template TConnectionConfig The configuration used to create a connection.
  */
@@ -57,7 +57,7 @@ export abstract class AbstractDatabase<TConnection, TConnectionConfig> {
 	/**
 	 * Creates a service name for a database connection. Driver modules register their
 	 * connections (and the `default` alias) under this name.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param name The name of the connection.
 	 * @returns A service name for the connection.
 	 */
@@ -74,7 +74,7 @@ export abstract class AbstractDatabase<TConnection, TConnectionConfig> {
 	 * aliases) sees them.
 	 * @throws {ServiceNotFoundError} If no connection with that name is registered.
 	 *
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param name The connection name.
 	 * @returns The connection with the given name, or its open transaction.
 	 */
@@ -92,7 +92,7 @@ export abstract class AbstractDatabase<TConnection, TConnectionConfig> {
 	 * Retrieves the connection with the given name, ignoring any open transaction.
 	 * @throws {ServiceNotFoundError} If no connection with that name is registered.
 	 *
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param name The connection name.
 	 * @returns The connection registered under the given name.
 	 */
@@ -106,7 +106,7 @@ export abstract class AbstractDatabase<TConnection, TConnectionConfig> {
 
 	/**
 	 * Checks whether a transaction is open on the given connection in the current async context.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param name The connection name.
 	 * @returns `true` if a transaction is open on the connection, `false` otherwise.
 	 */
@@ -120,7 +120,7 @@ export abstract class AbstractDatabase<TConnection, TConnectionConfig> {
 	 * The transaction is registered in the async context for the duration of the callback, so that
 	 * {@link getConnection} (and the repositories using it) returns it for that connection. When a
 	 * transaction is already open on the connection, the callback joins it.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @template T The return type of the callback.
 	 * @param callback The function to run in the transaction. Receives the transaction handle.
 	 * @param name The connection name.
@@ -144,7 +144,7 @@ export abstract class AbstractDatabase<TConnection, TConnectionConfig> {
 	 *
 	 * The current context store is copied, never modified. Drivers and tenancy strategies that open
 	 * transactions themselves use it to make the transaction visible to {@link getConnection}.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @template T The return type of the callback.
 	 * @param connection The connection the transaction runs on.
 	 * @param tx The transaction handle.
@@ -167,7 +167,7 @@ export abstract class AbstractDatabase<TConnection, TConnectionConfig> {
 
 	/**
 	 * Gets the transaction open on a connection in the current async context.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param connection The connection, as returned by {@link getBaseConnection}.
 	 * @returns The transaction handle, or `undefined` if none is open.
 	 */
@@ -187,7 +187,7 @@ export abstract class AbstractDatabase<TConnection, TConnectionConfig> {
 
 	/**
 	 * Checks if a connection with the given name exists.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param name The name of the connection to check.
 	 * @returns `true` if the connection exists, `false` otherwise.
 	 */
@@ -197,7 +197,7 @@ export abstract class AbstractDatabase<TConnection, TConnectionConfig> {
 
 	/**
 	 * Retrieves the default connection.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @returns The default connection.
 	 */
 	public getDefaultConnection(): TConnection {
@@ -206,7 +206,7 @@ export abstract class AbstractDatabase<TConnection, TConnectionConfig> {
 
 	/**
 	 * Returns the raw underlying client for the given connection.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param name The connection name.
 	 * @returns The raw client instance.
 	 */

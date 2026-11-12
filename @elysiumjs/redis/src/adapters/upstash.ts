@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import { RedisFeatureNotSupportedError } from '../errors';
 
 /**
  * Options of {@link upstash}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type UpstashOptions = {
 	/** The REST URL of the database. Defaults to the connection URL. */
@@ -102,7 +102,7 @@ class UpstashConnection implements RedisConnection {
 /**
  * Plugs Upstash Redis into the Redis port over its REST API, for Cloudflare Workers and other
  * runtimes without TCP sockets. Every command is one HTTP request; pub/sub is not supported.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param options The REST token, and the REST URL when the connection URL is not it.
  * @example
  * ```ts

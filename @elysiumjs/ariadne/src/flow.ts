@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -72,7 +72,7 @@ const STEP_HEADERS = t.Object({
 
 /**
  * What a step learns about its flow, through {@link Flow.context}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type FlowContext = {
 	/** The name of the flow. */
@@ -88,7 +88,7 @@ export type FlowContext = {
 
 /**
  * A step that moves the flow forward, built with {@link Flow.advance}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type FlowAdvance<S, A = unknown> = {
 	readonly '~flow': 'advance';
@@ -98,7 +98,7 @@ export type FlowAdvance<S, A = unknown> = {
 
 /**
  * A refused step that leaves a trace, built with {@link Flow.refuse}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type FlowRefusal<S> = {
 	readonly '~flow': 'refuse';
@@ -110,7 +110,7 @@ export type FlowRefusal<S> = {
 /**
  * The options of {@link Flow.controller}. The other options of `@Http.controller()` (scope, tags,
  * filters, interceptors, ...) apply too.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type FlowControllerOptions = Omit<HttpControllerProps, 'path'> & {
 	/** The path of the flow's routes. Defaults to `/flows/{name}`. */
@@ -129,7 +129,7 @@ export type FlowControllerOptions = Omit<HttpControllerProps, 'path'> & {
 /**
  * The options of {@link Flow.step}. The other options of the `@Http.*()` route decorators
  * (response, operationId, description, transactional, ...) apply too.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type FlowStepOptions<S = any> = Omit<RequestHandlerDecoratorProps, 'method' | 'path'> & {
 	/**
@@ -150,7 +150,7 @@ export type FlowStepOptions<S = any> = Omit<RequestHandlerDecoratorProps, 'metho
 
 /**
  * One step, as the engine runs it.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type FlowStepDescription = {
 	name: string;
@@ -163,7 +163,7 @@ export type FlowStepDescription = {
 
 /**
  * A flow controller, as the engine runs it.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type FlowDescription = {
 	name: string;
@@ -187,14 +187,14 @@ export type FlowStepRun = { state: unknown; ctx: FlowContext };
 /**
  * Multi-step flows, as controllers: each step is a route, and the state of the flow stays on the
  * server between steps.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export namespace Flow {
 	/**
 	 * Declares a flow controller: an `@Http.controller()` with a route that starts the flow
 	 * (`POST /flows/{name}`), one that tells where it stands (`GET /flows/{name}`), and one route per
 	 * `@Flow.step()`.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param name The name of the flow, in kebab-case.
 	 * @param options The options of the flow.
 	 * @example
@@ -274,7 +274,7 @@ export namespace Flow {
 	 *
 	 * The step returns {@link advance}, {@link refuse}, or an answer that keeps the state. A
 	 * returned or thrown error commits nothing, and the client may retry the same step id.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param name The name of the step, and the last segment of its path. Defaults to the method
 	 * name, and can be left out: `@Flow.step({ next: ['code'] })`.
 	 * @param options The options of the step.
@@ -333,7 +333,7 @@ export namespace Flow {
 	/**
 	 * Marks the method that builds the state before the first step. It receives the
 	 * {@link FlowContext} of the first step. Without one, the state starts as `{}`.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	export const initial = (): MethodDecorator => {
 		return (target, key) => {
@@ -343,7 +343,7 @@ export namespace Flow {
 
 	/**
 	 * Injects the state of the flow, as the step finds it, in a step parameter.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	export const state = (): ParameterDecorator => {
 		return (target, key, index) => {
@@ -353,7 +353,7 @@ export namespace Flow {
 
 	/**
 	 * Injects the {@link FlowContext} (flow, key, step id, owner) in a step parameter.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	export const context = (): ParameterDecorator => {
 		return (target, key, index) => {
@@ -365,7 +365,7 @@ export namespace Flow {
 	 * Moves the flow forward: `state` is what the next step receives, and `answer` what the client
 	 * receives, replayed for a repeated step id. The flow ends when the `next` of the step gives no
 	 * step for `state`.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	export const advance = <S, A = null>(state: S, answer: A = null as A): FlowAdvance<S, A> => ({
 		'~flow': 'advance',
@@ -376,7 +376,7 @@ export namespace Flow {
 	/**
 	 * Refuses a step with `error` and keeps `state`, such as one more wrong attempt. With `end`, the
 	 * flow is deleted, and its next call answers that it expired.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	export const refuse = <S>(
 		state: S,

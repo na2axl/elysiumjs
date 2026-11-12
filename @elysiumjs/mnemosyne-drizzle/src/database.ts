@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -38,7 +38,7 @@ export { DEFAULT_CACHE_TTL, DrizzleDatabaseCache } from './cache';
  * Extends `DrizzleConfig` with the driver and optional caching. Without `driver`, `connection`
  * or `client` connect with Bun SQL, on Bun only.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @template TSchema The Drizzle schema type.
  */
 export type DrizzleConnectionProps<
@@ -54,14 +54,14 @@ export type DrizzleConnectionProps<
 
 /**
  * A Drizzle database connection, whatever its driver.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type DrizzleConnection = PgAsyncDatabase<DrizzleQueryResultHKT, any> & { $client: any };
 
 /**
  * The query results of a {@link DrizzleConnection}: rows, for `returning()` and selects. What
  * `execute()` resolves to depends on the driver.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface DrizzleQueryResultHKT extends PgQueryResultHKT {
 	type: this['row'][];
@@ -97,7 +97,7 @@ const defaultDriver = (props: Record<string, unknown>, name: string): DrizzleDri
 /**
  * The driver of a connection.
  * @internal
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param connection The connection.
  */
 export const getConnectionDriver = (connection: DrizzleConnection): DrizzleDriver | undefined =>
@@ -106,7 +106,7 @@ export const getConnectionDriver = (connection: DrizzleConnection): DrizzleDrive
 /**
  * Closes the client of a connection through its driver.
  * @internal
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param connection The connection.
  */
 export const closeConnection = async (connection: DrizzleConnection): Promise<void> => {
@@ -126,7 +126,7 @@ export const closeConnection = async (connection: DrizzleConnection): Promise<vo
  *
  * A transaction is bound to the tenant set when it is opened, for its whole life. Work for another
  * tenant must run outside the transaction, or in its own `withRLS()` before the transaction opens.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class TenantMismatchError extends ElysiumError {
 	/**
@@ -151,7 +151,7 @@ const transactionTenants = new WeakMap<object, string>();
 /**
  * Binds a transaction to a tenant: sets the RLS tenant variable for the rest of the transaction.
  * @internal
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param tx The transaction, just opened.
  * @param tenant The tenant identifier.
  */
@@ -167,7 +167,7 @@ export const bindTransactionTenant = async (
 /**
  * Checks that work for a tenant may join an open transaction: it must be bound to that tenant.
  * @internal
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param tx The open transaction.
  * @param tenant The tenant of the work.
  * @throws {TenantMismatchError} If the transaction is bound to another tenant, or to none.
@@ -187,7 +187,7 @@ export const assertTransactionTenant = (tx: DrizzleConnection, tenant: string): 
  * Implements the abstract database class with a driver that creates
  * Drizzle connections through the {@link DrizzleDriver} of each connection.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 class DrizzleDatabase extends AbstractDatabase<DrizzleConnection, DrizzleConnectionProps> {
 	/**
@@ -195,7 +195,7 @@ class DrizzleDatabase extends AbstractDatabase<DrizzleConnection, DrizzleConnect
 	 *
 	 * In RLS mode, an open transaction bound to a tenant is only returned to work for that tenant,
 	 * the current one (or `public`).
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param name The connection name.
 	 * @returns The connection, or its open transaction.
 	 * @throws {TenantMismatchError} If the open transaction is bound to another tenant.
@@ -213,7 +213,7 @@ class DrizzleDatabase extends AbstractDatabase<DrizzleConnection, DrizzleConnect
 	 *
 	 * In RLS mode, a new transaction is bound to the current tenant (or `public`), and an open one
 	 * is only joined when it is bound to the current tenant.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param callback The function to run with the transaction.
 	 * @param name The connection name.
 	 * @returns The return value of the callback.
@@ -233,7 +233,7 @@ class DrizzleDatabase extends AbstractDatabase<DrizzleConnection, DrizzleConnect
 	/**
 	 * Creates a Drizzle connection from its properties. Used by the `DrizzleModule` to build
 	 * the `db.connection.{name}` services.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param props The connection properties.
 	 * @param name The name of the connection, which scopes its query cache.
 	 * @returns A new connection.
@@ -310,6 +310,6 @@ class DrizzleDatabase extends AbstractDatabase<DrizzleConnection, DrizzleConnect
 
 /**
  * Singleton Drizzle database manager.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const Database = new DrizzleDatabase();

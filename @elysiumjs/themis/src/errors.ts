@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ export { UnauthenticatedError } from '@elysiumjs/core';
 /**
  * Raised when an unsafe request of a cookie session carries no valid CSRF token. Rendered as a 403
  * problem.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class CsrfTokenMismatchError extends DomainError.for('CSRF_TOKEN_MISMATCH', 403) {
 	constructor() {
@@ -29,7 +29,7 @@ export class CsrfTokenMismatchError extends DomainError.for('CSRF_TOKEN_MISMATCH
 
 /**
  * Raised when Themis is used without ThemisModule.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class MissingThemisConfigError extends ElysiumError {
 	constructor() {
@@ -39,7 +39,7 @@ export class MissingThemisConfigError extends ElysiumError {
 
 /**
  * Raised when the session is read outside a request, or without SessionMiddleware.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class NoSessionError extends ElysiumError {
 	constructor() {
@@ -51,7 +51,7 @@ export class NoSessionError extends ElysiumError {
 
 /**
  * Raised when `@Auth()` names a guard that ThemisModule does not configure.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class UnknownGuardError extends ElysiumError {
 	constructor(name: string) {
@@ -62,7 +62,7 @@ export class UnknownGuardError extends ElysiumError {
 /**
  * Raised when a secret is shorter than 32 bytes, which would let an attacker forge cookies,
  * tokens or links by brute force.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class WeakSecretError extends ElysiumError {
 	constructor(what: string) {
@@ -87,7 +87,7 @@ export const assertStrongSecret = (secret: string, what: string): void => {
 /**
  * Raised when a cookie session grows past what browsers keep (about 4 KB), which would silently
  * lose it. Keep large data in a session store instead.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class SessionTooLargeError extends ElysiumError {
 	constructor(size: number) {

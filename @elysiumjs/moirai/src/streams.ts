@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import { StoredEvents } from './stored-event';
 
 /**
  * How {@link Streams.act} records events.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ActOptions = {
 	/** Metadata added to the `eventMetadata` of the module, on each event of this command. */
@@ -37,7 +37,7 @@ export type ActOptions = {
 
 /**
  * What a command run by {@link Streams.act} gave, when it was not refused.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type Acted<A extends Aggregate, R> = {
 	/** The aggregate after the command, at the version it appended. */
@@ -53,7 +53,7 @@ export type Acted<A extends Aggregate, R> = {
 /**
  * The result of a command run by {@link Streams.act}: what it gave, or the DomainError it returned
  * (or the error of the `Result` it returned).
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ActOutcome<A extends Aggregate, R> = Result<Acted<A, ValueOf<R>>, ErrorOf<R>>;
 
@@ -124,12 +124,12 @@ const apply = async <A extends Aggregate, R>(
 /**
  * Event streams: load an aggregate from its stream and run its commands. The streams are kept by
  * the `events` store of the current module, else of `MoiraiModule`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export namespace Streams {
 	/**
 	 * Loads an aggregate from its stream, to read its state.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param aggregate The aggregate class.
 	 * @param id The id of the aggregate.
 	 */
@@ -145,7 +145,7 @@ export namespace Streams {
 	 * A command that returns a DomainError, or a failed `Result`, appends nothing, and the result
 	 * fails with the error. When another writer appended to the stream meanwhile,
 	 * the append rejects with a `ConcurrencyConflictError`, which an action retries.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param aggregate The aggregate class.
 	 * @param id The id of the aggregate.
 	 * @param command Runs the command on the loaded aggregate.

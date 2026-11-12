@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import { FlowRouteTypes } from './route-types';
  * Configures where flows live. The flows themselves are `@Flow.controller()` classes, listed in
  * the `controllers` of a module like any controller. In development, it also registers
  * {@link FlowRouteTypes}, which types the flow routes for `styx routes:generate`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
  * @Module.register({ controllers: [SignUpFlow] })

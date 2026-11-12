@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ export namespace ApiKeys {
 	/**
 	 * Generates an API key: a prefix, then 32 random bytes. Show the key once and store only its
 	 * hash.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param options The prefix, which tells the keys apart in logs and secret scanners.
 	 * @returns The key, and its hash to store.
 	 */
@@ -32,13 +32,13 @@ export namespace ApiKeys {
 	/**
 	 * The hash of a key, to look the key up: the hex SHA-256. Keys carry enough entropy for an
 	 * unsalted hash.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	export const hash = (key: string): Promise<string> => sha256(key);
 
 	/**
 	 * Whether a presented key matches a stored hash, compared in constant time.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	export const verify = async (key: string, storedHash: string): Promise<boolean> =>
 		safeEqual(await hash(key), storedHash);

@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ import { Session } from './session';
 
 /**
  * A passkey the app keeps for a user.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type PasskeyRecord = {
 	/** The credential id, base64url. */
@@ -51,7 +51,7 @@ export type PasskeyRecord = {
 
 /**
  * Where the app keeps passkeys.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface PasskeyRepository {
 	forUser(userId: string): Promise<PasskeyRecord[]>;
@@ -66,7 +66,7 @@ export interface PasskeyRepository {
 
 /**
  * Raised when a passkey registration or sign-in does not verify. Rendered as a 400 problem.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class PasskeyVerificationError extends DomainError.for('PASSKEY_VERIFICATION_FAILED', 400) {
 	constructor(reason: string) {
@@ -76,7 +76,7 @@ export class PasskeyVerificationError extends DomainError.for('PASSKEY_VERIFICAT
 
 /**
  * The options of {@link Passkeys}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type PasskeysOptions = {
 	/** The name of the app, shown by the authenticator. */
@@ -105,7 +105,7 @@ export type PasskeysOptions = {
 
 /**
  * A challenge the app kept itself (`challenges: 'caller'`), passed back to a verify method.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type PasskeyChallenge = {
 	/** The `challenge` of the options the client answered. */
@@ -133,7 +133,7 @@ const AUTHENTICATION = '_passkey:authentication';
  * Registers passkeys and signs users in with them (WebAuthn), through @simplewebauthn/server. The
  * challenges live in the session, or with the app (`challenges: 'caller'`); the passkeys in the
  * app's {@link PasskeyRepository}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class Passkeys {
 	constructor(private readonly options: PasskeysOptions) {}

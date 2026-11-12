@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ import { currentEnvironment } from './utils';
 /**
  * Where the time comes from. The system clock is the default; an app may plug another one, such
  * as a clock synchronised with a time server.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface ClockSource {
 	/** The current time. */
@@ -28,13 +28,13 @@ export interface ClockSource {
 
 /**
  * The clock of the machine.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const SystemClock: ClockSource = { now: () => new Date() };
 
 /**
  * Raised when the clock is frozen or moved outside `development` and `test`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class ClockAdjustmentRefusedError extends ElysiumError {
 	constructor(environment: string) {
@@ -60,7 +60,7 @@ const toTime = (at: Date | number | string): number =>
  * The time of the application. Code that decides on time (expiries, schedules, the instants it
  * records) reads it from here instead of `new Date()`, so that tests and development can freeze or
  * move it. Durations that only measure the machine, such as request timings, keep the real time.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
  * const expiresAt = new Date(Clock.now().getTime() + ttl * 1000);

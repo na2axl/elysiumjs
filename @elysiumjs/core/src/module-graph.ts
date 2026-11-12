@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ const APP_SITE = '<app>';
 
 /**
  * A configuration given to a module from one import site.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ConfigSource = {
 	readonly site: string;
@@ -47,7 +47,7 @@ export type ConfigSource = {
 
 /**
  * A module in the graph.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ModuleNode = {
 	readonly id: string;
@@ -63,7 +63,7 @@ type Collectable = keyof ModuleCollections;
 
 /**
  * The resolved module graph.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ModuleGraph = {
 	/** Active modules, imports first. */
@@ -203,7 +203,7 @@ const isModuleClass = (value: unknown): value is ModuleClass =>
  * @throws {ModuleCycleError} On an import cycle.
  * @throws {DuplicateModuleNameError} When two different module classes share a name.
  * @throws {DuplicateCommandError} When two modules register the same command.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export function buildModuleGraph(
 	rootModules: Entry[],
@@ -293,7 +293,7 @@ export function buildModuleGraph(
  * Function-form configs are not compared here.
  *
  * @throws {ConflictingModuleConfigError} When two different object configs tie.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export function selectConfig(node: ModuleNode): ConfigSource | undefined {
 	if (node.configSources.length === 0) return undefined;

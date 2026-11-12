@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import { runJobMessage } from './consumer';
 
 /**
  * Configuration of the {@link HeraclesWorkersModule}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type HeraclesWorkersConfig = {
 	/** Called with each job that failed its last retry, such as to alert. A failing hook is logged. */
@@ -37,7 +37,7 @@ const configOf = (): HeraclesWorkersConfig =>
 /**
  * Consumes the Heracles jobs of every queue, and dispatches the scheduled jobs of each cron
  * trigger.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 @Service.register()
 export class HeraclesWorkersHandlers {
@@ -73,7 +73,7 @@ export class HeraclesWorkersHandlers {
  * expression is the cron of a trigger (`scheduled` handler). Declare each consumer queue and each
  * cron expression in the wrangler config. A queue keeps the jobs that failed their last retry with
  * the `deadLetterQueue` of its `transportOptions`; `.with({ onDead })` also hands each one to a hook.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
  * @Application.register({

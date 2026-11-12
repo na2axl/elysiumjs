@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ export type SessionData = Record<string, unknown>;
 
 /**
  * Where server-side sessions live, by id.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface SessionStore {
 	load(id: string): Promise<SessionData | null>;
@@ -36,7 +36,7 @@ export interface SessionStore {
 
 /**
  * Keeps sessions in the memory of the process, for tests and single-process apps.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class MemorySessionStore implements SessionStore {
 	readonly #sessions = new Map<string, { data: string; expiresAt: number }>();
@@ -93,7 +93,7 @@ const MAX_COOKIE_SESSION = 4000;
  * The session of a request: data kept between the requests of one client, behind a cookie. Read
  * it with `Session.current()` in handlers and services; SessionMiddleware loads it and saves it
  * once the handler has run.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class Session {
 	#data: SessionData;
@@ -194,7 +194,7 @@ const COOKIE_PURPOSE = 'session-cookie';
 /**
  * Loads the session of a request once, from its cookie. A cookie that does not verify gives a new
  * session.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const loadSession = async (context: HttpContext): Promise<Session> => {
 	const loaded = context[SESSION] as Session | undefined;
@@ -227,7 +227,7 @@ export const loadSession = async (context: HttpContext): Promise<Session> => {
 
 /**
  * Saves the session of a request, and sets or clears its cookie.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const commitSession = async (context: HttpContext): Promise<void> => {
 	const session = context[SESSION] as Session | undefined;
@@ -268,7 +268,7 @@ export const commitSession = async (context: HttpContext): Promise<void> => {
 /**
  * Loads the session before the handler, and saves it after, also when the request ends with a
  * client error. Register it on the application, or on the controllers that use sessions.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
  * @Application.register({ modules: [ThemisModule.with({ secret: env.APP_SECRET })] })

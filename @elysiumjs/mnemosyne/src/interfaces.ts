@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import type { TSchema } from '@elysiumjs/core';
  * A database driver is responsible for creating connections, managing
  * transactions, and exposing the raw underlying client.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @template TConnection The connection type managed by the driver.
  * @template TConnectionConfig The configuration used to create a connection.
  */
@@ -66,7 +66,7 @@ export interface DatabaseDriver<TConnection = unknown, TConnectionConfig = unkno
  * Provides an ORM-agnostic description of a column's name, type,
  * nullability, default status, and primary key status.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface ColumnMetadata {
 	/**
@@ -111,7 +111,7 @@ export interface ColumnMetadata {
  * A model adapter translates between the ORM's internal table
  * representation and the normalized metadata used by the framework.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @template TTable The ORM-specific table type.
  */
 export interface ModelAdapter<TTable = unknown> {
@@ -148,7 +148,7 @@ export interface ModelAdapter<TTable = unknown> {
  * A tenancy strategy determines how tables and connections are
  * scoped to a specific tenant.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @template TTable The ORM-specific table type.
  * @template TConnection The connection type used by the strategy.
  */
@@ -186,7 +186,7 @@ export interface TenancyStrategy<TTable = unknown, TConnection = unknown> {
  * Implementations are responsible for storing, retrieving, and
  * invalidating cached query results.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface DatabaseCacheStrategy {
 	/**
@@ -214,7 +214,7 @@ export interface DatabaseCacheStrategy {
 
 /**
  * Configuration for database query caching.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface DatabaseCacheConfig {
 	/**
@@ -256,14 +256,14 @@ export interface DatabaseCacheConfig {
 
 /**
  * Database primary column type.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type IdType = number | string;
 
 /**
  * What identifies a row: the value of its primary key, or an object of the values of its key
  * columns when the key spans several columns.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type RowKey = IdType | Readonly<Record<string, unknown>>;
 
@@ -273,7 +273,7 @@ export type RowKey = IdType | Readonly<Record<string, unknown>>;
  * Provides a standard interface for common database operations
  * regardless of the underlying ORM implementation.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @template TSelect The type returned by select queries.
  * @template TInsert The type needed by insert queries.
  * @template TUpdate The type needed by update queries.
@@ -362,7 +362,7 @@ export interface RepositoryInterface<TSelect, TInsert, TUpdate, TId extends RowK
  * Describes the static interface that a model class must expose,
  * including inferred types, table metadata, and validation schemas.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @template TSelect The type returned by select queries.
  * @template TInsert The type needed by insert queries.
  * @template TUpdate The type needed by update queries.
@@ -442,7 +442,7 @@ export type ModelClass<
  * Describes the static interface that a repository class must expose,
  * including the associated model and connection name.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @template TModel The model class type wrapped by the repository.
  */
 export type RepositoryClass<TModel extends ModelClass = ModelClass> = {

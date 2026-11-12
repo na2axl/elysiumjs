@@ -383,9 +383,7 @@ TODO
 
 ## Contributing
 
-This project is built primarily to meet requirements for internal projects at [Workbud Technologies Inc.](https://www.workbud.com)
-
-Feel free to open issues for any bugs or questions you may have. Pull requests are also welcome, but they will be reviewed to ensure they align with our internal project's goals and standards.
+Issues for bugs and questions are welcome on [GitHub](https://github.com/na2axl/elysiumjs/issues). Pull requests are welcome too; they are reviewed to keep the framework consistent with its design.
 
 ## License
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ const ENVIRONMENTS = Symbol.for('elysium:Environments');
 /**
  * An environment name, the value of `NODE_ENV`. Elysium knows `development`, `test` and
  * `production`; apps may use their own, such as `staging`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type Environment = 'development' | 'test' | 'production' | (string & {});
 
@@ -28,7 +28,7 @@ export type Environment = 'development' | 'test' | 'production' | (string & {});
  * The environments (`NODE_ENV` values) in which a service, controller, command or job is active,
  * as a module's `env` does for a whole module. A class without any is active everywhere; one
  * inactive in the current environment is left out when its module loads.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export namespace Environments {
 	/** The environments that run on a developer's machine: `development` and `test`. */

@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -47,7 +47,7 @@ const QUERY = Symbol.for('elysium:moirai:query');
 
 /**
  * What an action or a query handler receives besides its input.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type HandlerContext = {
 	/** The name of the action or the query. */
@@ -61,7 +61,7 @@ export type HandlerContext = {
 /**
  * What `handle()` gives: the result or one of the DomainErrors that refuse the call, or a
  * `Result` of them, or a promise of either.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type HandlerResult<TResult, TErrors extends DomainError = DomainError> =
 	| TResult
@@ -74,7 +74,7 @@ type IsAny<T> = 0 extends 1 & T ? true : false;
 /**
  * The value side of what a handler or a command gives: the value of a `Result`, or the members
  * of a `T | DomainError` union that are not DomainErrors.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ValueOf<V> =
 	IsAny<V> extends true
@@ -88,7 +88,7 @@ export type ValueOf<V> =
 /**
  * The error side of what a handler or a command gives: the error of a `Result`, or the
  * DomainErrors of a `T | DomainError` union.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ErrorOf<V> =
 	IsAny<V> extends true
@@ -101,7 +101,7 @@ export type ErrorOf<V> =
 
 /**
  * An action class.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ActionClass<
 	TInput = any,
@@ -111,7 +111,7 @@ export type ActionClass<
 
 /**
  * A query class.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type QueryClass<
 	TInput = any,
@@ -126,14 +126,14 @@ type InputOf<C extends HandlerClass> =
 
 /**
  * How an action or a query is called.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ActionCall = { idempotencyKey?: string; scope?: string };
 
 /**
  * The arguments of `Moirai.execute()` after the action: its input, which may be left out when
  * `handle()` takes none (or an optional one), and how it is called.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ExecuteArgs<C extends ActionClass> =
 	undefined extends InputOf<C>
@@ -143,7 +143,7 @@ export type ExecuteArgs<C extends ActionClass> =
 /**
  * The arguments of `Moirai.ask()` after the query: its input, which may be left out when
  * `handle()` takes none (or an optional one).
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type AskArgs<C extends QueryClass> =
 	undefined extends InputOf<C> ? [input?: InputOf<C>] : [input: InputOf<C>];
@@ -169,13 +169,13 @@ type MoiraiRefusal =
 
 /**
  * The DomainErrors that refuse an action: those of its handler, and those of moirai itself.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ActionErrors<C extends ActionClass> = ErrorsOf<C> | MoiraiRefusal;
 
 /**
  * The DomainErrors that refuse a query: those of its handler, an invalid input and a refused call.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type QueryErrors<C extends QueryClass> =
 	ErrorsOf<C> | InvalidInputError | CallForbiddenError;
@@ -183,13 +183,13 @@ export type QueryErrors<C extends QueryClass> =
 /**
  * The result of `Moirai.execute()`: the value of the handler, or the DomainError that refused the
  * call, from the handler or from moirai itself.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ActionOutcome<C extends ActionClass> = Result<ResultOf<C>, ActionErrors<C>>;
 
 /**
  * The result of `Moirai.ask()`: the value of the handler, or the DomainError that refused the call.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type QueryOutcome<C extends QueryClass> = Result<ResultOf<C>, QueryErrors<C>>;
 
@@ -206,7 +206,7 @@ const MOIRAI_REFUSALS = [
  * callers where a refusal is a bug, such as a job or an event handler (inside a handler, a
  * refusal the caller's `errors` do not list becomes an `UndeclaredRefusalError`); `errorOr(transform)`
  * resolves to the error or the transformed value, as a handler returns it.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
  * const wallet = await Moirai.execute(OpenWallet, { userId }).orThrow();
@@ -247,7 +247,7 @@ export class Outcome<T, E extends DomainError = DomainError> extends AsyncResult
 
 /**
  * How an action retries a transient failure.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ActionRetry = {
 	/** The attempts, the first included. Defaults to `maxAttempts` of the module. */
@@ -261,7 +261,7 @@ export type ActionRetry = {
 
 /**
  * The options of an action.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ActionOptions<
 	S extends TSchema = TSchema,
@@ -315,7 +315,7 @@ export type ActionOptions<
 
 /**
  * The options of a query.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type QueryOptions<
 	S extends TSchema = TSchema,
@@ -344,7 +344,7 @@ export type QueryOptions<
  * An action: a write, validated, run in a unit of work, retried on transient failures, and
  * idempotent when asked. Mark the class with `@Action.register()` and run it with
  * {@link Moirai.execute}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
  * @Action.register({ input: t.Object({ amount: t.Integer({ minimum: 1 }) }), idempotent: true })
@@ -415,7 +415,7 @@ export abstract class Action<
 /**
  * A query: a read, validated and run without a transaction. Mark the class with
  * `@Query.register()` and run it with {@link Moirai.ask}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export abstract class Query<
 	TInput = any,
@@ -525,7 +525,7 @@ export namespace Moirai {
 	 * of moirai's own (an invalid input, a refused `authorize`, a missing or reused idempotency
 	 * key). The unit of work rolls back and nothing is stored for idempotency. A route that returns
 	 * the outcome answers its value, or its problem.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param action The action class.
 	 * @param args The raw input, left out when `handle()` takes none, and the idempotency key and
 	 * scope of the call.
@@ -553,7 +553,7 @@ export namespace Moirai {
 	 *
 	 * Take the locks of one unit of work in the same order everywhere, and do not take a key twice
 	 * in one unit of work with `MemoryActionLock`, which is not reentrant.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param key The key, such as `wallet:${walletId}`.
 	 * @throws {LockOutsideUnitOfWorkError} Outside a unit of work.
 	 * @example
@@ -576,7 +576,7 @@ export namespace Moirai {
 	 * the ones of `MoiraiModule`; a store left out is the one of `MoiraiModule`, and an option left
 	 * out is the one of `MoiraiModule`. Like any service, they are visible to the modules that
 	 * import the module when it exports them.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param stores The stores, each an instance or a function that builds it once, and options.
 	 * @example
 	 * ```ts
@@ -671,7 +671,7 @@ export namespace Moirai {
 	 * runs the handler with the services of that module. The call gives an {@link Outcome}, which
 	 * awaits to its `Result`. A refusal fails it: the DomainError the handler returns or throws
 	 * (or the error of the `Result` it returns), an invalid input, or a refused `authorize`.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param query The query class.
 	 * @param args The raw input, left out when `handle()` takes none.
 	 */
@@ -697,7 +697,7 @@ export namespace Moirai {
 	/**
 	 * The DomainErrors the handler of an action or a query gives, without those of moirai itself
 	 * (invalid input, refused call, idempotency keys), for a caller that passes them on.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @example
 	 * ```ts
 	 * type ProfileEffectError = Moirai.ErrorsOf<typeof UnblockCreatorProfile>;

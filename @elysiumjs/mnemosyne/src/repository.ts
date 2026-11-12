@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import type { ModelClass, RepositoryInterface, RowKey } from './interfaces';
  * All CRUD methods are abstract and must be implemented by driver-specific
  * subclasses.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @template TModel The type of the model class wrapped by the repository.
  * @template TConnection The database connection type.
  * @param model The model class wrapped by the repository.

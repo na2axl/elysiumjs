@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@
  * - `handoff`: run the project's own Styx, so the project's versions are used.
  * - `app`: load the project's app and run the command there (`serve`, the app's commands).
  * - `error`: say why the command cannot run here.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type Route =
 	| { kind: 'version' }
@@ -65,7 +65,7 @@ const withPositionalName = (argv: string[]): string[] => {
 
 /**
  * Decides what `styx` does with its arguments.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param argv The arguments, without the executable and script.
  * @param context Where the command runs.
  */

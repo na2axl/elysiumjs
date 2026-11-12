@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ import { fromBase64Url, randomBytes, safeEqual, toBase64Url, utf8 } from './cryp
 /**
  * Hashes and verifies passwords. A hash is a self-describing string (`$argon2id$...`,
  * `$pbkdf2-sha256$...`, `$scrypt$...`), so that a hasher recognises its own hashes.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface PasswordHasher {
 	/** The prefix of the hashes this hasher makes, such as `$pbkdf2-sha256$`. */
@@ -36,7 +36,7 @@ const onWorkers = (): boolean => globalThis.navigator?.userAgent === 'Cloudflare
 /**
  * Hashes passwords with PBKDF2-HMAC-SHA256 through WebCrypto, which every runtime has. The
  * iterations default to 600,000, and to 100,000 on Cloudflare Workers, which cap PBKDF2 there.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class Pbkdf2PasswordHasher implements PasswordHasher {
 	public readonly prefix = '$pbkdf2-sha256$';
@@ -105,7 +105,7 @@ const bunPassword = (): BunPassword | undefined =>
 
 /**
  * Hashes passwords with Argon2id through `Bun.password`. Only available on Bun.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class BunPasswordHasher implements PasswordHasher {
 	public readonly prefix = '$argon2id$';
@@ -151,7 +151,7 @@ export namespace Password {
 	/**
 	 * Sets the hasher that makes new hashes. Hashes of the other known hashers still verify, and
 	 * `needsRehash()` tells when to replace them.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param hasher The hasher.
 	 */
 	export const use = (hasher: PasswordHasher): void => {
@@ -161,7 +161,7 @@ export namespace Password {
 
 	/**
 	 * Adds a hasher that `verify()` recognises by its prefix, such as the one of older hashes.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	export const register = (hasher: PasswordHasher): void => {
 		const index = known.findIndex((entry) => entry.prefix === hasher.prefix);
@@ -174,7 +174,7 @@ export namespace Password {
 
 	/**
 	 * Hashes a password with the current hasher.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	export const hash = (password: string): Promise<string> => defaultHasher().hash(password);
 
@@ -191,7 +191,7 @@ export namespace Password {
 	/**
 	 * Verifies a password against a hash of any known hasher. An unknown or malformed hash does
 	 * not verify.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	export const verify = async (password: string, hash: string): Promise<boolean> =>
 		(await hasherOf(hash)?.verify(password, hash)) ?? false;
@@ -199,7 +199,7 @@ export namespace Password {
 	/**
 	 * Whether a hash should be replaced by a new one, after a successful login: it comes from
 	 * another hasher, or from weaker parameters.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	export const needsRehash = (hash: string): boolean => {
 		const current = defaultHasher();

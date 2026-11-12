@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@ import type { RedisClientFactory, RedisConnection } from '../connection';
 
 /**
  * The parts of an ioredis client the adapter uses. An `ioredis` `Redis` instance fits it.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface IoredisLike {
 	readonly status: string;
@@ -117,7 +117,7 @@ class IoredisConnection implements RedisConnection {
  * Plugs an ioredis client into the Redis port, for Node.js. Pass a function that creates the
  * client; the module passes each connection's URL and options to it. Create it with
  * `lazyConnect: true` so that it connects on `connect()`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param create Creates an ioredis client.
  * @example
  * ```ts

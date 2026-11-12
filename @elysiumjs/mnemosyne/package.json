@@ -4,7 +4,7 @@
 	"license": "Apache-2.0",
 	"description": "Database and caching for Elysium.js applications",
 	"private": false,
-	"author": "Workbud Technologies Inc.",
+	"author": "Axel Nana <ax.lnana@outlook.com>",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/na2axl/elysiumjs.git",

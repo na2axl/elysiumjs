@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import { DomainError } from './problem';
 /**
  * What a store answers for a hit: the count of the key in its current window, or, for stores that
  * only decide (such as the Cloudflare rate limiting binding), whether the hit is over the limit.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type RateLimitHit =
 	| {
@@ -40,7 +40,7 @@ export type RateLimitHit =
  * counts anywhere; `MemoryRateLimitStore` keeps them in the process, `RedisRateLimitStore`
  * (`@elysiumjs/redis`) in Redis, and `WorkersRateLimitStore` (`@elysiumjs/runtime-workers`) uses
  * a Cloudflare rate limiting binding.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface RateLimitStore {
 	/**
@@ -54,7 +54,7 @@ export interface RateLimitStore {
 /**
  * Keeps rate limit counts in the memory of the process. Counts are not shared between
  * processes or Worker isolates: use another store when the app runs on several.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class MemoryRateLimitStore implements RateLimitStore {
 	readonly #windows = new Map<string, { count: number; resetAt: number }>();
@@ -85,7 +85,7 @@ export class MemoryRateLimitStore implements RateLimitStore {
 
 /**
  * What a rate limit key is built from.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type RateLimitKeyContext = {
 	request: Request;
@@ -99,7 +99,7 @@ export type RateLimitKeyContext = {
 
 /**
  * A rate limit of a route, a controller or the app.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type RateLimitOptions = {
 	/** The length of a window, in milliseconds. */
@@ -120,13 +120,13 @@ export type RateLimitOptions = {
 /**
  * The rate limit options of an application: the store of every limit, and a limit for every
  * route that sets none.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type AppRateLimitOptions = Partial<RateLimitOptions>;
 
 /**
  * Raised when a client goes over a rate limit. Rendered as a 429 problem, with `Retry-After`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class TooManyRequestsError extends DomainError.for('RATE_LIMITED', 429, {
 	extensions: { retryAfter: t.Integer({ description: 'Seconds until the client may retry.' }) }
@@ -149,7 +149,7 @@ const RATE_LIMIT = Symbol.for('elysium:RateLimit');
  * after the `onBeforeHandle` middlewares of the application ran. A middleware that is costly for a
  * client over the limit (a database lookup, say) runs on the routes that need it, not on the
  * application.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param limit The limit, or `false` for none.
  * @example
  * ```ts
@@ -170,7 +170,7 @@ export const RateLimit =
 
 /**
  * The limit `@RateLimit()` sets on a route, else on its controller.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param controller The controller class.
  * @param method The name of the route method.
  */
@@ -186,7 +186,7 @@ const defaultStore = new MemoryRateLimitStore();
 /**
  * Counts a hit against a limit, sets the `RateLimit-*` headers, and throws once the limit is
  * exceeded.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param limit The limit.
  * @param appStore The store of the application, used when the limit sets none.
  * @param context The request: its context, client address and route.

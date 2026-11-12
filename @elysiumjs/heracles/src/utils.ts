@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -50,7 +50,7 @@ export namespace Symbols {
 
 /**
  * Get job metadata from a job class
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param jobClass The job class
  * @returns The job metadata or null if not found
  */
@@ -67,7 +67,7 @@ const COMMENTS = /^(?:\s|\/\/[^\n]*|\/\*[\s\S]*?\*\/)*/;
 
 /**
  * Parses JSON with comments and trailing commas, such as a `wrangler.jsonc` file.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param text The text.
  * @returns The parsed value.
  * @throws {SyntaxError} When the text is not valid JSON once comments are removed.

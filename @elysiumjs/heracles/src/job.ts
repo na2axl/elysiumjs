@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ const JOB_NAME_PREFIX = 'elysium.heracles.job.';
 
 /**
  * Defines how a job should behave when multiple instances with the same ID are dispatched.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export enum JobOverlapBehavior {
 	/**
@@ -42,7 +42,7 @@ export enum JobOverlapBehavior {
 
 /**
  * Represents job metadata when registered.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface JobMetadata {
 	/**
@@ -88,7 +88,7 @@ export interface JobMetadata {
 
 /**
  * Properties required when declaring a job using the `@Job.register()` decorator.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type JobProps = {
 	/**
@@ -143,7 +143,7 @@ export type JobProps = {
 
 /**
  * Type for any job classes.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type JobClass<T extends Job = Job, TClass extends Class<T> = Class<T>> = {
 	/**
@@ -162,7 +162,7 @@ export type JobClass<T extends Job = Job, TClass extends Class<T> = Class<T>> = 
 /**
  * The constructor arguments of a job class; any arguments for `JobClass<any, any>`, so that
  * every job class fits it whatever its constructor takes.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 type JobArgs<TClass> = 0 extends 1 & TClass
 	? any[]
@@ -176,7 +176,7 @@ type JobArgs<TClass> = 0 extends 1 & TClass
  * Jobs are classes that can be executed in the background. They provide
  * an abstract execute method that serves as the entry point for the job.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export abstract class Job extends InteractsWithConsole {
 	#startedAt?: Date;
@@ -188,7 +188,7 @@ export abstract class Job extends InteractsWithConsole {
 
 	/**
 	 * Marks a class as a job.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param options The decorator options.
 	 */
 	public static register(options: JobProps = {}) {
@@ -411,7 +411,7 @@ export abstract class Job extends InteractsWithConsole {
 
 /**
  * Wraps a Job class to assign a specific ID to all instances.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @internal
  * @param J The Job class.
  * @param id The ID to assign to the job.
@@ -436,7 +436,7 @@ export const WithId = <T extends Job, TClass extends Class<T> = Class<T>>(
 
 /**
  * Possible statuses for a job.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export enum JobStatus {
 	/**

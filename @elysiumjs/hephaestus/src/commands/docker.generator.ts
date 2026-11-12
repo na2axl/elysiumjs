@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,14 +23,14 @@ import { join } from 'node:path';
  * The runtime stage uses Alpine (not Bun) because the compiled binary
  * is self-contained. Healthcheck uses `wget` (available in Alpine base).
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class DockerGenerator {
 	constructor(private config: HephaestusConfig) {}
 
 	/**
 	 * Generates the Dockerfile and writes it to the output directory.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param outputDir The directory to write the Dockerfile to.
 	 */
 	public generate(outputDir: string): void {

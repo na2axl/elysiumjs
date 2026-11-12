@@ -96,4 +96,4 @@ Versions and changelogs come from [Changesets](https://github.com/changesets/cha
 
 ## License
 
-[Apache 2.0](./LICENSE), Workbud Technologies Inc.
+[Apache 2.0](./LICENSE), Axel Nana

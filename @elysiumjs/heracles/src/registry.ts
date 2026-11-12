@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import { getJobMetadata } from './utils';
 
 /**
  * Thrown when two modules declare jobs with the same name.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class DuplicateJobError extends ElysiumError {
 	constructor(
@@ -34,7 +34,7 @@ export class DuplicateJobError extends ElysiumError {
 
 /**
  * A job class with the module that declares it.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type JobRegistryEntry = { jobClass: JobClass<Job>; module: ModuleNode };
 
@@ -46,7 +46,7 @@ let entries = new Map<string, JobRegistryEntry>();
 /**
  * The jobs declared by the loaded modules, keyed by job service name. Filled by
  * `HeraclesModule` on init and cleared on destroy.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export namespace JobRegistry {
 	/** Replaces the registry contents. */

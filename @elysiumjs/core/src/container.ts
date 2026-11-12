@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -41,7 +41,7 @@ import { Symbols } from './utils';
 
 /**
  * A service registered in the container.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ContainerEntry = {
 	/** The token the service is registered under: its name, or its class. */
@@ -83,7 +83,7 @@ export type ContainerEntry = {
 
 /**
  * Supplies the visibility rules of the module graph to the container.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type VisibilityResolver = {
 	/** The modules whose exports `node` can see. */
@@ -357,7 +357,7 @@ const entryValueAsync = async (
  * The scoped service container: a global scope plus one scope per module.
  * Visibility between module scopes is supplied by the module graph.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export namespace Container {
 	/**

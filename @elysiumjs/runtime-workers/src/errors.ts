@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@ import { ElysiumError } from '@elysiumjs/core';
 
 /**
  * Thrown when a binding is read outside a Worker invocation.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class OutsideInvocationError extends ElysiumError {
 	constructor(public readonly what: string) {
@@ -28,7 +28,7 @@ export class OutsideInvocationError extends ElysiumError {
 
 /**
  * Thrown when the Worker has no binding with the requested name.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class BindingNotFoundError extends ElysiumError {
 	constructor(public readonly binding: string) {
@@ -38,7 +38,7 @@ export class BindingNotFoundError extends ElysiumError {
 
 /**
  * Thrown when a queue batch or a scheduled event reaches the Worker and no service handles it.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class NoWorkersHandlerError extends ElysiumError {
 	constructor(
@@ -57,7 +57,7 @@ export class NoWorkersHandlerError extends ElysiumError {
  * Thrown when the Worker is created and two service methods consume the same queue. A queue has
  * one consumer, so that every message is acked or retried by one decision; `*` handlers are not
  * counted.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class DuplicateQueueConsumerError extends ElysiumError {
 	constructor(

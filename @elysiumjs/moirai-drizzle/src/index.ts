@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -54,7 +54,7 @@ const xid8 = customType<{ data: string }>({ dataType: () => 'xid8' });
 
 /**
  * How `moiraiTables()` builds the tables.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type MoiraiTablesOptions = {
 	/**
@@ -70,7 +70,7 @@ export type MoiraiTablesOptions = {
  * Builds the tables of the moirai stores: `idempotency_keys`, `outbox`, `inbox` and `events`, in a schema
  * when one is given (one set of tables per domain schema, for example). Export them from the
  * Drizzle schema so that `migration:generate` creates them.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param schema The Postgres schema of the tables. Defaults to the search path.
  * @param options How the tables are built.
  */
@@ -160,7 +160,7 @@ export type MoiraiTables = ReturnType<typeof moiraiTables>;
 
 /**
  * Where a Drizzle store works: its table, and the connection whose open transaction it joins.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type DrizzleStoreOptions<T> = { table: T; connection?: string };
 
@@ -168,7 +168,7 @@ export type DrizzleStoreOptions<T> = { table: T; connection?: string };
  * A table a store accepts: any Postgres table, in any schema, with the columns of the moirai table
  * `T` under the same property names, such as a table of a domain schema whose key also spans the
  * partition column.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type StoreTable<T extends PgTable> = PgTable & { [K in keyof T['_']['columns']]: PgColumn };
 
@@ -188,7 +188,7 @@ const isUniqueViolation = (error: unknown): boolean => {
 
 /**
  * Keeps idempotency records in a Postgres table, in the action's transaction.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class DrizzleIdempotencyStore implements IdempotencyStore {
 	constructor(
@@ -223,7 +223,7 @@ export class DrizzleIdempotencyStore implements IdempotencyStore {
 /**
  * Keeps the outbox in a Postgres table. Claims lock the rows (`FOR UPDATE SKIP LOCKED`) until the
  * relay's transaction ends, so that concurrent relays share the work.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class DrizzleOutboxStore implements OutboxStore {
 	constructor(private readonly options: DrizzleStoreOptions<StoreTable<MoiraiTables['outbox']>>) {}
@@ -300,7 +300,7 @@ export class DrizzleOutboxStore implements OutboxStore {
 
 /**
  * Keeps the inbox in a Postgres table: one row per message and consumer.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class DrizzleInboxStore implements InboxStore {
 	constructor(private readonly options: DrizzleStoreOptions<StoreTable<MoiraiTables['inbox']>>) {}
@@ -338,7 +338,7 @@ export class DrizzleInboxStore implements InboxStore {
 /**
  * Serializes actions with a Postgres advisory lock taken in the action's transaction, and
  * released when it ends.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class PgAdvisoryLock implements ActionLock {
 	constructor(private readonly options: { connection?: string } = {}) {}
@@ -368,7 +368,7 @@ const toRecord = (row: MoiraiTables['events']['$inferSelect']): StoredEventRecor
  * ends right before the first appended version, so a stale writer gets a
  * `ConcurrencyConflictError` even when the unique key of the table spans more columns, such as a
  * partition key. `position` and `transaction_id` are given by Postgres.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class DrizzleEventStore implements EventStore {
 	constructor(private readonly options: DrizzleStoreOptions<StoreTable<MoiraiTables['events']>>) {}
@@ -466,7 +466,7 @@ const tableOf = (model: object): PgTable => {
  * Resets the tables of Drizzle models for projection rebuilds, and keeps the version each
  * projection was built with in a Postgres table. The reset deletes the rows in the open
  * transaction, so readers see them until the rebuild commits.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class DrizzleProjectionStorage implements ProjectionStorage {
 	constructor(

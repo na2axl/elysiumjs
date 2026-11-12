@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import { Runtime, RuntimeNotSupportedError } from './runtime';
 
 /**
  * ANSI color codes and styles for console output.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export enum ConsoleFormat {
 	BLACK,
@@ -47,7 +47,7 @@ const loadReadline = () => import('node:readline');
 
 /**
  * A map of console format codes to ANSI escape codes.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 const formatMap: Record<ConsoleFormat, string> = {
 	[ConsoleFormat.BLACK]: '\x1b[30m',
@@ -69,13 +69,13 @@ const RESET = '\x1b[0m';
 
 /**
  * The kinds of messages the level shortcuts of {@link InteractsWithConsole} write.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ConsoleTag = 'debug' | 'info' | 'success' | 'warning' | 'error';
 
 /**
  * The tag written before a message: its label and the styles of the label.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ConsoleTagStyle = { label: string; styles: ConsoleFormat[] };
 
@@ -120,7 +120,7 @@ const rendered = (): Record<ConsoleTag, string> =>
 
 /**
  * A utility class for console IO with various formatting options.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class InteractsWithConsole {
 	protected static readonly SPACE_WIDTH = 60;
@@ -129,7 +129,7 @@ export class InteractsWithConsole {
 	 * Changes the tags the level shortcuts write before their messages, for every console. A tag
 	 * is a label, or a label and its styles; the tags left out keep their defaults (`[D]`, `[I]`,
 	 * `[S]`, `[W]` and `[E]`, in gray, blue, green, yellow and red).
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @example
 	 * ```ts
 	 * InteractsWithConsole.useTags({ info: '[INFO]', error: { label: '[ERR]', styles: [ConsoleFormat.RED, ConsoleFormat.BOLD] } });

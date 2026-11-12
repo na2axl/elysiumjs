@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,14 +17,14 @@ import { ElysiumError } from './errors';
 /**
  * Sends a request to an application and returns its response, e.g. `(r) => elysia.handle(r)` or a
  * Worker's `fetch`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type RequestHandler = (request: Request) => Promise<Response>;
 
 /**
  * Raised by `TestResponse.expectStatus()` when the response has another status. The message holds
  * the response body, so a failing test shows why the request failed.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class UnexpectedStatusError extends ElysiumError {
 	constructor(
@@ -39,7 +39,7 @@ export class UnexpectedStatusError extends ElysiumError {
 
 /**
  * A response from the HTTP test client.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type TestResponse = Response & {
 	/** Parses the body as JSON. */
@@ -64,7 +64,7 @@ const toTestResponse = (response: Response): TestResponse =>
 
 /**
  * A request being built by the HTTP test client. Send it with `send()`, or await it directly.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class TestRequest implements PromiseLike<TestResponse> {
 	readonly #handle: RequestHandler;
@@ -146,7 +146,7 @@ export class TestRequest implements PromiseLike<TestResponse> {
 
 /**
  * An HTTP client that drives an application in memory, without a server.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type HttpTestClient = {
 	get(path: string): TestRequest;
@@ -164,7 +164,7 @@ export type HttpTestClient = {
 
 /**
  * Creates an HTTP test client on top of a request handler.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param handle Sends a request to the application, e.g. `(r) => elysia.handle(r)`.
  * @param baseUrl The origin relative paths resolve against. Defaults to `http://localhost`.
  */

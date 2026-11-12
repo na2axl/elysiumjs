@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import { ElysiumError } from './errors';
  * The validated environment variables of the application, by name. Empty in core: the app and
  * its modules add their variables by augmenting it next to their schemas, so that `Env.get()`
  * knows each name and the type of its value.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
  * export const env = t.Object({ PORT: t.Number({ default: 3000 }) });
@@ -59,7 +59,7 @@ let pending = false;
 
 /**
  * Raised when `Env` is read before the application validated its environment.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class EnvironmentNotReadyError extends ElysiumError {
 	constructor(name: string) {
@@ -71,7 +71,7 @@ export class EnvironmentNotReadyError extends ElysiumError {
 
 /**
  * Initializes the environment variables.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param vars The environment variables to initialize.
  */
 export const initEnv = (vars: Record<string, unknown>) => {
@@ -85,7 +85,7 @@ export const initEnv = (vars: Record<string, unknown>) => {
  * Empties the environment variables until the next {@link initEnv}: reading them in between
  * throws {@link EnvironmentNotReadyError}. The application calls it when it declares a schema,
  * so that no raw value is read as a validated one.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const awaitEnv = () => {
 	env.clear();
@@ -96,7 +96,7 @@ export namespace Env {
 	/**
 	 * The validated type of an environment schema, for augmenting {@link AppEnv}: the static type
 	 * of the schema, with a `Secret` for each property made by `Secret.schema()`.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	export type Infer<TEnv extends TSchema> =
 		TEnv extends TObject<infer TProps extends TProperties>
@@ -105,7 +105,7 @@ export namespace Env {
 
 	/**
 	 * Gets the value of an environment variable.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param name The name of the environment variable.
 	 * @param defaultValue The value to return when the variable is not set.
 	 * @returns The value of the environment variable.
@@ -123,7 +123,7 @@ export namespace Env {
 
 	/**
 	 * Checks if an environment variable exists.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param name The name of the environment variable.
 	 * @returns `true` if the environment variable exists, `false` otherwise.
 	 * @throws {EnvironmentNotReadyError} When read before the application validated its environment.
@@ -135,7 +135,7 @@ export namespace Env {
 
 	/**
 	 * Clears the environment variables.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	export const clear = () => {
 		env.clear();

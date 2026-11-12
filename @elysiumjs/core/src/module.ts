@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,13 +28,13 @@ import { deepMerge, Symbols } from './utils';
 
 /**
  * Type for a module class.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ModuleClass = Class<Module>;
 
 /**
  * A module bound to a configuration, as returned by `Module.with()`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ConfiguredModule<TConfig> = {
 	readonly [Symbols.configuredModule]: true;
@@ -53,7 +53,7 @@ export type ConfiguredModule<TConfig> = {
  * 	}
  * }
  * ```
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface ModuleCollections {
 	/** The controllers provided by the module. */
@@ -68,7 +68,7 @@ export interface ModuleCollections {
 
 /**
  * Properties used when declaring a module with `@Module.register()`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ModuleProps<TConfig = unknown> = ModuleCollections & {
 	/** Modules (or configured modules) whose exports this module can use. */
@@ -107,7 +107,7 @@ export type ModuleProps<TConfig = unknown> = ModuleCollections & {
 
 /**
  * Checks whether a value is a configured module.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export function isConfiguredModule(value: unknown): value is ConfiguredModule<unknown> {
 	return (
@@ -120,7 +120,7 @@ export function isConfiguredModule(value: unknown): value is ConfiguredModule<un
 /**
  * Reads the props a module class was declared with.
  * @throws {InvalidModuleError} When the class is not decorated with `@Module.register()`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export function getModuleProps(cls: ModuleClass): ModuleProps {
 	const props = Metadata.get(Symbols.module, cls);
@@ -132,12 +132,12 @@ export function getModuleProps(cls: ModuleClass): ModuleProps {
 
 /**
  * Base class for all modules.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export abstract class Module {
 	/**
 	 * Marks a class as a module. Only stores metadata.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	public static register<TConfig = any>(props: ModuleProps<TConfig> = {}) {
 		return function (target: ModuleClass) {
@@ -147,7 +147,7 @@ export abstract class Module {
 
 	/**
 	 * Creates a base class for modules that accept configuration.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	public static configurable<TConfig extends object>(
 		options: { defaults?: Partial<TConfig>; required?: (keyof TConfig)[] } = {}

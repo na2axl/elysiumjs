@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import { deepFreeze, freezes, StoredEvent, StoredEvents } from './stored-event';
 
 /**
  * The options of an aggregate.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type AggregateOptions = {
 	/**
@@ -32,7 +32,7 @@ export type AggregateOptions = {
 
 /**
  * An aggregate class.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type AggregateClass<A extends Aggregate = Aggregate> = (new () => A) & {
 	initialState: unknown;
@@ -90,7 +90,7 @@ const evolve = (aggregate: Aggregate, state: unknown, event: StoredEvent): unkno
  *
  * Run commands with {@link Streams.act}, which loads the stream, runs the command, and appends what
  * it records; test them with {@link Aggregate.given}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
  * @Aggregate.register({ name: 'wallet' })
@@ -203,7 +203,7 @@ export abstract class Aggregate<TState = unknown> {
 /**
  * The outcome of a command run by {@link Aggregate.given}, with assertions that throw an `Error`
  * when they fail.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class AggregateScenario<A extends Aggregate, R> {
 	constructor(
@@ -273,7 +273,7 @@ const stringify = (value: unknown): string =>
 
 /**
  * @internal Builds aggregates and reads what they recorded.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export namespace Aggregates {
 	/** The name of an aggregate class. */

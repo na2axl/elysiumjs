@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ import type { ServiceToken } from './token';
 /**
  * Base class of every error thrown by the Elysium framework.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class ElysiumError extends Error {
 	constructor(message: string) {
@@ -30,7 +30,7 @@ export class ElysiumError extends Error {
 /**
  * Thrown when the module graph contains an import cycle.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class ModuleCycleError extends ElysiumError {
 	constructor(public readonly path: string[]) {
@@ -41,7 +41,7 @@ export class ModuleCycleError extends ElysiumError {
 /**
  * Thrown when a class used as a module is not decorated with `@Module`.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class InvalidModuleError extends ElysiumError {
 	constructor(public readonly className: string) {
@@ -52,7 +52,7 @@ export class InvalidModuleError extends ElysiumError {
 /**
  * Thrown when two modules declare the same global service.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class DuplicateGlobalServiceError extends ElysiumError {
 	constructor(
@@ -66,7 +66,7 @@ export class DuplicateGlobalServiceError extends ElysiumError {
 /**
  * Thrown when two services of an extension point (`Service.extension()`) have the same name.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class DuplicateExtensionError extends ElysiumError {
 	constructor(
@@ -83,7 +83,7 @@ export class DuplicateExtensionError extends ElysiumError {
 /**
  * Thrown when a class has no options of an extension point (`Service.extension()`).
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class NotAnExtensionError extends ElysiumError {
 	constructor(
@@ -97,7 +97,7 @@ export class NotAnExtensionError extends ElysiumError {
 /**
  * Thrown when two modules register the same command.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class DuplicateCommandError extends ElysiumError {
 	constructor(
@@ -111,7 +111,7 @@ export class DuplicateCommandError extends ElysiumError {
 /**
  * Thrown when a module is configured from two conflicting sites.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class ConflictingModuleConfigError extends ElysiumError {
 	constructor(
@@ -127,7 +127,7 @@ export class ConflictingModuleConfigError extends ElysiumError {
 /**
  * Thrown when a module requires configuration that was never provided.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class MissingModuleConfigError extends ElysiumError {
 	constructor(
@@ -141,7 +141,7 @@ export class MissingModuleConfigError extends ElysiumError {
 /**
  * Thrown when a module's configuration is present but invalid.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class InvalidModuleConfigError extends ElysiumError {
 	constructor(
@@ -156,7 +156,7 @@ export class InvalidModuleConfigError extends ElysiumError {
 /**
  * Thrown when a service is requested from a module that cannot see it.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class ServiceNotVisibleError extends ElysiumError {
 	constructor(
@@ -174,7 +174,7 @@ export class ServiceNotVisibleError extends ElysiumError {
 /**
  * Thrown when a service is not registered anywhere.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class ServiceNotFoundError extends ElysiumError {
 	constructor(public readonly service: string) {
@@ -185,7 +185,7 @@ export class ServiceNotFoundError extends ElysiumError {
 /**
  * Thrown when a service is requested before it has been initialized.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class ServiceNotReadyError extends ElysiumError {
 	/**
@@ -208,7 +208,7 @@ export class ServiceNotReadyError extends ElysiumError {
 /**
  * Thrown when services depend on each other in a cycle.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class CircularDependencyError extends ElysiumError {
 	constructor(public readonly path: string[]) {
@@ -219,7 +219,7 @@ export class CircularDependencyError extends ElysiumError {
 /**
  * Thrown when two different module classes share the same name.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class DuplicateModuleNameError extends ElysiumError {
 	constructor(public readonly moduleName: string) {
@@ -232,7 +232,7 @@ export class DuplicateModuleNameError extends ElysiumError {
 /**
  * Thrown when a service lives in a module skipped for the current environment.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class EnvironmentSkippedModuleError extends ElysiumError {
 	constructor(
@@ -250,7 +250,7 @@ export class EnvironmentSkippedModuleError extends ElysiumError {
 /**
  * Thrown when a service is not active in the current environment (its own `env`).
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class EnvironmentSkippedServiceError extends ElysiumError {
 	constructor(
@@ -268,7 +268,7 @@ export class EnvironmentSkippedServiceError extends ElysiumError {
 /**
  * Thrown when a class listed in a module's `controllers` is not a decorated controller.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class InvalidControllerError extends ElysiumError {
 	constructor(
@@ -284,7 +284,7 @@ export class InvalidControllerError extends ElysiumError {
 /**
  * Thrown when an instance method of a class that is not a service is declared an event listener.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class LifecycleListenerNotSupportedError extends ElysiumError {
 	constructor(
@@ -301,7 +301,7 @@ export class LifecycleListenerNotSupportedError extends ElysiumError {
 /**
  * Thrown when a request-scoped service is resolved outside a request.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class OutsideRequestScopeError extends ElysiumError {
 	constructor(public readonly service: string) {
@@ -314,7 +314,7 @@ export class OutsideRequestScopeError extends ElysiumError {
 /**
  * Thrown when a singleton service depends on a request-scoped one.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class ScopeMismatchError extends ElysiumError {
 	constructor(
@@ -330,7 +330,7 @@ export class ScopeMismatchError extends ElysiumError {
 /**
  * Thrown when an interceptor calls `next()` more than once, which would run the handler twice.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class InterceptorNextCalledTwiceError extends ElysiumError {
 	constructor(public readonly interceptor: string) {

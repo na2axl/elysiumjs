@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -59,13 +59,13 @@ import { deepMerge, Symbols } from './utils';
 
 /**
  * An application plugin, consisting of a function that returns an Elysia instance.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ElysiumPlugin = (app: Application) => Promise<AnyElysia>;
 
 /**
  * Properties required when declaring an app using the `@Application.register()` decorator.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type AppProps = {
 	/**
@@ -146,7 +146,7 @@ type ElysiaConfig = NonNullable<ConstructorParameters<typeof Elysia>[0]>;
 /**
  * An error raised while handling a request, as given to the Elysia error hook. `code` is set for
  * the errors Elysia raises ('validation', 'not-found', ...).
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ServerError = ErrorContext & { code?: string; error: any };
 
@@ -160,7 +160,7 @@ export type ServerError = ErrorContext & { code?: string; error: any };
  *   prefer `db:transactions`.
  * - `uow:frame`: the outermost unit of work, which collects the hooks run after it commits or
  *   rolls back (`@elysiumjs/mnemosyne`).
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type AppContext = AsyncLocalStorage<
 	Map<'tenant' | 'http:context' | 'db:transactions' | 'db:tx' | 'uow:frame', unknown>
@@ -171,7 +171,7 @@ const fallbackContext: AppContext = new AsyncLocalStorage();
 
 /**
  * Base class for the application main entry.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export abstract class Application extends InteractsWithConsole {
 	// @ts-expect-error The property is not initialized in the constructor.
@@ -289,7 +289,7 @@ export abstract class Application extends InteractsWithConsole {
 
 	/**
 	 * Creates the application and runs it.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	public static start<T extends Application>(this: new () => T): Promise<void> {
 		return new this().run();
@@ -300,7 +300,7 @@ export abstract class Application extends InteractsWithConsole {
 	 * drives it in memory (`http.get('/x').send()`). Given `modules`, boots a module graph without a
 	 * CLI or an HTTP server.
 	 * @param options The application or the modules, service overrides, environment and boot mode.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	public static testing(options: TestingAppOptions): Promise<TestingHttpApp>;
 	public static testing(options: TestingOptions): Promise<TestingApp>;
@@ -365,7 +365,7 @@ export abstract class Application extends InteractsWithConsole {
 	 * Runs the CLI action given in `argv`: describe, `list`, `help`, `serve` or a command.
 	 * Prints any error and exits with a non-zero code.
 	 * @param argv The command line arguments, without the executable and script.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	public async run(argv: readonly string[] = Runtime.get().argv()): Promise<void> {
 		this.installSignalHandlers();
@@ -386,7 +386,7 @@ export abstract class Application extends InteractsWithConsole {
 	/**
 	 * Builds the module graph of an application class without creating or booting anything.
 	 * Used by tools that read the app's structure, such as the route type generator.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param environment The environment to build the graph for. Defaults to the current one.
 	 */
 	public static moduleGraph(environment?: Environment): ModuleGraph {

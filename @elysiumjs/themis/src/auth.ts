@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import { loadSession, Session } from './session';
 /**
  * Finds the user of a request, or answers `undefined` when the request does not carry what the
  * guard reads. A guard throws to refuse a request that carries invalid credentials.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface Guard {
 	authenticate(context: HttpContext): Promise<unknown> | unknown;
@@ -36,7 +36,7 @@ export interface Guard {
 /**
  * A guard class, built once through the service container, so that its constructor gets its
  * services injected like a middleware or a filter.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
  * class DeviceGuard implements Guard {
@@ -69,7 +69,7 @@ const SESSION_USER = 'auth:user';
 
 /**
  * A guard that reads the user id kept in the session at login (`Auth.login()`).
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param options Loads the user of an id. Without it, the user is the id.
  */
 export const sessionGuard = (options: { user?: (id: string) => unknown } = {}): Guard => ({
@@ -89,7 +89,7 @@ const bearer = (request: Request): string | undefined => {
 
 /**
  * A guard that verifies a JSON Web Token from the `Authorization: Bearer` header.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param options The key and the claims the token must carry, and a loader of the user from the
  * claims. Without it, the user is the claims.
  */
@@ -107,7 +107,7 @@ export const jwtGuard = (
 /**
  * A guard that finds the user of an API key, from a header (`x-api-key` by default) or the
  * `Authorization: Bearer` header.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param options Finds the user of a key from its hash (`ApiKeys.hash()`), and the header.
  */
 export const apiKeyGuard = (options: {
@@ -134,7 +134,7 @@ export const apiKeyGuard = (options: {
 /**
  * The user that the guards put in a request, as `Auth.currentUser()` and `@Auth.user()` give it.
  * It is empty until the app declares it, once, for all its guards.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
  * declare module '@elysiumjs/themis' {
@@ -150,7 +150,7 @@ export interface AuthUser {}
 
 /**
  * The options of `@Auth()`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type AuthOptions = {
 	/** The guards to try, in order, by their names in ThemisModule. Defaults to all of them. */
@@ -167,7 +167,7 @@ const OPTIONAL = Symbol.for('elysium:themis:auth-optional');
  * read with `getSubject: (ctx) => ctx.currentUser`).
  *
  * It tries the guards named with `AuthMiddleware.guards([...])`, in order, or all of them.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
  * @Middleware.register(AuthMiddleware.guards(['jwt']))
@@ -198,7 +198,7 @@ export class AuthMiddleware extends Middleware {
 /**
  * Authenticates a controller or a route with {@link AuthMiddleware}: `guards` names the guards
  * to try, and `optional` lets requests without a user through.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export function Auth(options: AuthOptions = {}): ClassDecorator & MethodDecorator {
 	const base = (

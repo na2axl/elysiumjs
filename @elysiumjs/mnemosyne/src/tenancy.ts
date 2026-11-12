@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,13 +25,13 @@ import { Application, Middleware, Service } from '@elysiumjs/core';
  * The tenancy mode for the application.
  * - `schema`: Each tenant has their own Postgres schema.
  * - `rls`: Row-Level Security with a shared schema and a tenant column.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type TenancyMode = 'schema' | 'rls';
 
 /**
  * Global tenancy configuration for the application.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface TenancyConfig {
 	/**
@@ -70,7 +70,7 @@ export interface TenancyConfig {
 /**
  * Per-model tenancy configuration, used to control how a specific model
  * interacts with the tenancy system.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface ModelTenancyConfig {
 	/**
@@ -110,7 +110,7 @@ export const TENANCY_STRATEGY_SERVICE = 'mnemosyne.tenancy.strategy';
  * Reads the global service `mnemosyne.tenancy.config`. Returns a default
  * configuration if none is registered.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @returns The current tenancy configuration.
  */
 export const getTenancyConfig = (): TenancyConfig => {
@@ -120,7 +120,7 @@ export const getTenancyConfig = (): TenancyConfig => {
 /**
  * Gets the tenancy strategy registered by the driver module as the global service
  * `mnemosyne.tenancy.strategy`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @returns The current tenancy strategy, or `null` if none is registered.
  */
 export const getTenancyStrategy = (): TenancyStrategy<unknown, unknown> | null => {
@@ -133,7 +133,7 @@ export const getTenancyStrategy = (): TenancyStrategy<unknown, unknown> | null =
 
 /**
  * Gets the current tenant from the async context.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @returns The current tenant identifier, or `null` if not set.
  */
 export const getCurrentTenant = (): string | null => {
@@ -145,7 +145,7 @@ export const getCurrentTenant = (): string | null => {
 
 /**
  * Runs a callback within the context of a specific tenant.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param tenant The tenant identifier to set.
  * @param callback The function to execute within the tenant context.
  * @returns The return value of the callback.
@@ -168,14 +168,14 @@ export const withTenant = <T>(tenant: string, callback: () => T): T => {
  * Tenant identifiers become PostgreSQL schema names in schema mode, and 63 bytes is the PostgreSQL
  * identifier limit. The pattern leaves out quotes, dots, spaces and other characters that would
  * need escaping or change how an identifier is read, and the names of PostgreSQL system schemas.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const TENANT_ID_PATTERN = /^(?!pg_)(?!information_schema$)[a-z0-9_-]{1,63}$/i;
 
 /**
  * Checks that a tenant identifier is well-formed (see {@link TENANT_ID_PATTERN}). This does not
  * check that the tenant exists.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param tenant The tenant identifier.
  * @returns `true` if the identifier is well-formed, `false` otherwise.
  */
@@ -205,7 +205,7 @@ export const isValidTenantId = (tenant: string): boolean => TENANT_ID_PATTERN.te
  * }
  * ```
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export abstract class TenantMiddleware extends Middleware {
 	/**
@@ -228,7 +228,7 @@ export abstract class TenantMiddleware extends Middleware {
 	 *
 	 * Rejects every tenant by default: override it to check the tenant against your data store.
 	 * Only identifiers matching {@link TENANT_ID_PATTERN} reach this method.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param _tenant The tenant identifier to validate.
 	 * @returns `true` if the tenant is valid, `false` otherwise.
 	 */
@@ -238,7 +238,7 @@ export abstract class TenantMiddleware extends Middleware {
 
 	/**
 	 * Hook called after a tenant has been successfully resolved.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param _tenant The resolved tenant identifier.
 	 * @param _ctx The request context.
 	 */
@@ -247,7 +247,7 @@ export abstract class TenantMiddleware extends Middleware {
 	/**
 	 * Called when the tenant cannot be determined or is invalid.
 	 * Throws an appropriate error by default.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param reason Whether the tenant is 'missing' or 'invalid'.
 	 * @param _ctx The request context.
 	 */
@@ -261,7 +261,7 @@ export abstract class TenantMiddleware extends Middleware {
 
 	/**
 	 * Extracts and validates the tenant from the incoming request.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param ctx The request context.
 	 */
 	public async onRequest(ctx: Context): Promise<any> {
@@ -288,13 +288,13 @@ export abstract class TenantMiddleware extends Middleware {
 /**
  * A simple tenant middleware that allows public access by default. Requests naming a tenant are
  * rejected until `validateTenant` is overridden.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class SimpleTenantMiddleware extends TenantMiddleware {}
 
 /**
  * A strict tenant middleware that rejects requests without a tenant ID.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class StrictTenantMiddleware extends TenantMiddleware {
 	protected allowPublic = false;

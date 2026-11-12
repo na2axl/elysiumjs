@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import { getJobMetadata } from './utils';
 export namespace Heracles {
 	/**
 	 * Dispatch a job to be executed asynchronously.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param jobClass The job class to dispatch. Should extend the base {@link Job} class and have the {@link Job.register} decorator set.
 	 * @param args The arguments to pass to the job constructor.
 	 * @param options Additional options for the job dispatch.

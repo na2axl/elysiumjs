@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ import { DrizzleRLSTenancy, DrizzleSchemaTenancy } from './tenancy';
 
 /**
  * Configuration of the {@link DrizzleModule}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type DrizzleModuleConfig = {
 	/** The name of the connection that `default` resolves to. */
@@ -49,7 +49,7 @@ export type DrizzleModuleConfig = {
  * Declares Drizzle connections as global services named `db.connection.{name}`, plus
  * `db.connection.default` aliasing the configured default, `db.transaction` (used by
  * `@transactional` handlers), and registers the tenancy config and strategy. Connections are created on first use. Also provides the migration commands.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 @Module.register<DrizzleModuleConfig>({
 	imports: [MnemosyneModule],

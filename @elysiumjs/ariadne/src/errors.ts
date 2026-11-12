@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ import { DomainError, ElysiumError } from '@elysiumjs/core';
 /**
  * Raised when a flow controller is declared wrong: no steps, a name that is not kebab-case, a TTL
  * that is not positive, or an unknown step in `start` or `back`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class InvalidFlowError extends ElysiumError {
 	constructor(flow: string, reason: string) {
@@ -29,7 +29,7 @@ export class InvalidFlowError extends ElysiumError {
 
 /**
  * The flow does not exist, or it expired: a 410 problem.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class FlowExpiredError extends DomainError.for('FLOW_EXPIRED', 410) {
 	constructor() {
@@ -39,7 +39,7 @@ export class FlowExpiredError extends DomainError.for('FLOW_EXPIRED', 410) {
 
 /**
  * The flow is finished: a 410 problem.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class FlowCompletedError extends DomainError.for('FLOW_COMPLETED', 410) {
 	constructor() {
@@ -50,7 +50,7 @@ export class FlowCompletedError extends DomainError.for('FLOW_COMPLETED', 410) {
 /**
  * The step is not one the flow accepts now: a 409 problem that lists the next and back steps,
  * and the last answer.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class FlowUnexpectedStepError extends DomainError.for('FLOW_UNEXPECTED_STEP', 409) {
 	constructor(step: string, position: { next: string[]; back: string[] }, answer: unknown) {
@@ -62,7 +62,7 @@ export class FlowUnexpectedStepError extends DomainError.for('FLOW_UNEXPECTED_ST
 
 /**
  * Another request is running the same step: a 409 problem. Retry shortly.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class FlowStepInProgressError extends DomainError.for('FLOW_STEP_IN_PROGRESS', 409) {
 	constructor() {
@@ -72,7 +72,7 @@ export class FlowStepInProgressError extends DomainError.for('FLOW_STEP_IN_PROGR
 
 /**
  * The caller does not own the flow: a 403 problem.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class FlowForbiddenError extends DomainError.for('FORBIDDEN', 403) {
 	constructor() {
@@ -82,7 +82,7 @@ export class FlowForbiddenError extends DomainError.for('FORBIDDEN', 403) {
 
 /**
  * A user flow called without a signed-in user: a 401 problem.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class FlowUserRequiredError extends DomainError.for('UNAUTHENTICATED', 401) {
 	constructor() {
@@ -93,7 +93,7 @@ export class FlowUserRequiredError extends DomainError.for('UNAUTHENTICATED', 40
 /**
  * A flow request without its `x-flow-key` or `x-flow-step` header: a 400 `BAD_REQUEST` problem
  * with one entry per missing header.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class InvalidFlowRequestError extends DomainError.for('BAD_REQUEST', 400) {
 	constructor(errors: ProblemValidationError[]) {
@@ -103,7 +103,7 @@ export class InvalidFlowRequestError extends DomainError.for('BAD_REQUEST', 400)
 
 /**
  * Raised when a flow route runs before `AriadneModule.with()` set a store.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class MissingFlowStoreError extends ElysiumError {
 	constructor() {

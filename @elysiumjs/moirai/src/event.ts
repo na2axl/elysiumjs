@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import { Inbox, Outbox, registerEffect } from './outbox';
 /**
  * The events of the application and their payloads. Extend it to type `Event.publish()` and
  * `@Event.on()`; while it is empty, any name and payload are accepted.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
  * declare module '@elysiumjs/moirai' {
@@ -48,7 +48,7 @@ export type EventPayload<E extends string> = E extends keyof EventCatalogue
 
 /**
  * What a handler receives besides the payload.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type EventMeta = {
 	/** The id of the event, the same for every handler. */
@@ -63,7 +63,7 @@ export type EventMeta = {
 
 /**
  * Options of {@link Event.on}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type EventHandlerOptions = {
 	/**
@@ -132,13 +132,13 @@ export const clearEventHandlers = (): void => CONSUMERS.clear();
  * so it retries and fails on its own, and records the events it handled in the inbox, in the
  * unit of work of its own writes. Delivery needs the `outbox` and `inbox` stores of
  * `MoiraiModule`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export namespace Event {
 	/**
 	 * Marks a method as a handler of an event. Static methods are called on the class; instance
 	 * methods run on the registered service, or on a new instance with its dependencies.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param event The name of the event.
 	 * @param options The name of the handler and its attempts.
 	 * @throws {DuplicateEventConsumerError} When another handler has the same `consumer`.
@@ -180,7 +180,7 @@ export namespace Event {
 	 * Publishes an event in the open unit of work, through the outbox of the current module: each
 	 * handler of the event gets it once the unit
 	 * commits, and never when it rolls back.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param event The name of the event.
 	 * @param payload The JSON-safe payload.
 	 * @returns The id of the event.
@@ -210,7 +210,7 @@ export namespace Event {
 
 	/**
 	 * The consumers of an event.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param event The name of the event.
 	 */
 	export const consumersOf = (event: string): string[] =>

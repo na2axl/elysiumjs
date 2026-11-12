@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import { Session } from './session';
 /**
  * Raised when an OAuth callback does not check out: a wrong state, an error from the provider, or
  * a failed code exchange. Rendered as a 400 problem.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class OAuthCallbackError extends DomainError.for('OAUTH_CALLBACK_FAILED', 400) {
 	constructor(reason: string) {
@@ -38,7 +38,7 @@ export class OAuthCallbackError extends DomainError.for('OAUTH_CALLBACK_FAILED',
 
 /**
  * The options of an OAuth 2.0 / OpenID Connect client.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type OAuthClientOptions = {
 	/** The name of the client, when the app has several providers. Defaults to `default`. */
@@ -61,7 +61,7 @@ export type OAuthClientOptions = {
 /**
  * What a successful callback gives: the tokens, and for OpenID Connect the claims of the ID token
  * and the user info.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type OAuthResult = {
 	tokens: TokenEndpointResponse;
@@ -74,7 +74,7 @@ type Pending = { state: string; verifier: string; nonce?: string };
 /**
  * Signs users in with an OAuth 2.0 or OpenID Connect provider, with the authorization code flow
  * and PKCE, through oauth4webapi. The state, the PKCE verifier and the nonce live in the session.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
  * const google = new OAuthClient({

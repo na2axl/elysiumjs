@@ -2,7 +2,7 @@ import { Command, CommandArgumentType } from '@elysiumjs/core';
 
 /**
  * A command that demonstrates the use of the progress bar for operations with known steps.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 @Command.register()
 export class ProgressDemoCommand extends Command {

@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -54,7 +54,7 @@ const runHooks = async (hooks: Hook[], phase: string): Promise<void> => {
  * collects the `afterCommit` and `afterRollback` hooks of everything it calls, and runs them once
  * it has committed or rolled back. Inner runs join it. Driver modules register the result as the
  * `db.transaction` service, which `transactional` routes and {@link UnitOfWork.run} use.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param transaction Runs a callback in a transaction, joining an open one.
  */
 export const withUnitOfWork =
@@ -93,7 +93,7 @@ export namespace UnitOfWork {
 	 * A callback that returns a `DomainError` rolls the work back, like one that throws, and the
 	 * error is returned. A joined callback hands it to the one that opened the unit of work, which
 	 * rolls back when it returns it too.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param callback The work to run.
 	 * @param options The connection of the transaction. Defaults to `default`.
 	 * @throws {Error} When no database module provides the `db.transaction` service.
@@ -118,7 +118,7 @@ export namespace UnitOfWork {
 	/**
 	 * Runs a callback once the current unit of work has committed, such as publishing the events
 	 * of an outbox. Outside a unit of work, it runs right away. A failing hook is logged.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param hook The callback.
 	 */
 	export const afterCommit = async (hook: Hook): Promise<void> => {
@@ -130,7 +130,7 @@ export namespace UnitOfWork {
 	/**
 	 * Runs a callback if the current unit of work rolls back, such as deleting an uploaded file.
 	 * Outside a unit of work, it never runs.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param hook The callback.
 	 */
 	export const afterRollback = (hook: Hook): void => {
@@ -141,7 +141,7 @@ export namespace UnitOfWork {
 /**
  * Runs a method in a unit of work (see {@link UnitOfWork.run}): a new transaction, or the one
  * already open. A method that returns a `DomainError` rolls back.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param options The connection of the transaction. Defaults to `default`.
  * @example
  * ```ts

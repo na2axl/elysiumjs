@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,13 +23,13 @@ import type {
 
 /**
  * A step reservation, as a store keeps it.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type FlowLease = { stepId: string; step: string; expiresAt: number };
 
 /**
  * What one flow holds in a store: its record and its live reservation.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type FlowSlot = { record: FlowRecord | null; lease: FlowLease | null };
 
@@ -39,7 +39,7 @@ const live = (lease: FlowLease | null, now: number): FlowLease | null =>
 /**
  * The rules every flow store follows, on a snapshot of one flow, so that the memory store and the
  * Durable Object store answer alike. Each function returns the result and the slot to keep.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export namespace FlowRules {
 	/** A new flow of `owner`. */

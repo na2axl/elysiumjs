@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ import { join } from 'node:path';
  * The versions of the `@elysiumjs/*` packages of the workspace Styx is built in, by name. Import
  * it as a macro (`with { type: 'macro' }`): the map is read when Styx is bundled, so the published
  * CLI writes the versions it was released with.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const elysiumVersions = (): Record<string, string> => {
 	const packages = join(import.meta.dir, '..', '..', '..');

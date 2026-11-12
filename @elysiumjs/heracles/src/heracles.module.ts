@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import { JobRegistry, QUEUES_SERVICE } from './registry';
 
 /**
  * Configuration of the {@link HeraclesModule}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type HeraclesModuleConfig = {
 	/** The queues to create, by name. */
@@ -38,7 +38,7 @@ export type HeraclesModuleConfig = {
 /**
  * The queues created from the module configuration. Built on first use; stops and removes
  * the queues it created when the app shuts down.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class ConfiguredQueues {
 	public readonly queues: readonly Queue[];
@@ -63,7 +63,7 @@ export class ConfiguredQueues {
 /**
  * Collects the jobs that loaded modules declare in their `jobs` lists, runs each job inside
  * its owning module's context, and provides the Heracles commands.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 @Module.register<HeraclesModuleConfig>({
 	commands: [

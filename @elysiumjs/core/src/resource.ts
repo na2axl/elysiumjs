@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -67,7 +67,7 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> => {
 
 /**
  * The response schemas of a route: one schema, or one per status code.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ResponseSchemas = TSchema | Record<number, TSchema>;
 
@@ -81,7 +81,7 @@ export namespace Resource {
 	/**
 	 * Marks a field of a response schema as hidden: it is dropped from responses and from the
 	 * OpenAPI document, even when the handler returns it.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param schema The schema of the field.
 	 * @example
 	 * ```ts
@@ -98,7 +98,7 @@ export namespace Resource {
 	/**
 	 * The schema clients see: hidden fields removed, and codecs replaced by the schema of their
 	 * encoded value, since responses are serialized before they are validated.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param schema The response schema.
 	 */
 	export const project = <S extends TSchema>(schema: S): S =>
@@ -106,7 +106,7 @@ export namespace Resource {
 
 	/**
 	 * Projects every schema of a route's `response` option.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param response The `response` option: one schema, or one per status code.
 	 */
 	export const projectResponse = (response: ResponseSchemas): ResponseSchemas => {
@@ -121,7 +121,7 @@ export namespace Resource {
 	/**
 	 * The schema of the successful response: the schema itself, or the 200 (else the first 2xx)
 	 * one of a status map.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param response The `response` option of a route.
 	 */
 	export const successSchema = (response: ResponseSchemas): TSchema | undefined => {
@@ -136,7 +136,7 @@ export namespace Resource {
 
 	/**
 	 * Options of {@link serialize}.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	export type SerializeOptions = {
 		/**
@@ -153,7 +153,7 @@ export namespace Resource {
 	 * - a `Date` becomes an ISO string (`YYYY-MM-DD` when the schema's format is `date`), and an
 	 *   object with a `toJSON()` method, such as a luxon `DateTime`, becomes what it returns;
 	 * - `fields` keeps only the selected fields.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param schema The response schema.
 	 * @param value The handler result.
 	 * @param options The sparse fieldset.
@@ -326,7 +326,7 @@ const serializeNode = (schema: SchemaNode | undefined, value: unknown): unknown 
 /**
  * Whether a handler result is a body to serialize, rather than a response the handler built
  * itself (a `Response`, a thrown or returned status, a stream).
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const isSerializable = (value: unknown): boolean =>
 	!(value instanceof Response) &&
@@ -337,7 +337,7 @@ export const isSerializable = (value: unknown): boolean =>
 
 /**
  * Reads a sparse fieldset from a query: `fields=id,title` (or repeated `fields`).
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const readFields = (query: Record<string, unknown> | undefined): string[] | undefined => {
 	const raw = query?.fields;

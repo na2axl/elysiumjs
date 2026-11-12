@@ -4,7 +4,7 @@ import { Http } from '@elysiumjs/core';
 
 /**
  * Extracts the controller instance from the context.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const co = Http.decorate((c: Context) => {
 	return c.controller;
@@ -12,7 +12,7 @@ export const co = Http.decorate((c: Context) => {
 
 /**
  * Extracts the module instance from the context.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const mo = Http.decorate((c: Context) => {
 	return c.module;

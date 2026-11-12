@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 
 /**
  * What a flow store keeps about one flow.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type FlowRecord = {
 	/** The user id, or the guest token, that owns the flow. */
@@ -31,7 +31,7 @@ export type FlowRecord = {
 
 /**
  * Reserves a step before it runs.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type FlowClaim = {
 	stepId: string;
@@ -45,7 +45,7 @@ export type FlowClaim = {
 /**
  * Why a claim was refused, or the answer to replay. Returned, never thrown, since an error loses
  * its class across a Durable Object call.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type FlowClaimResult =
 	| {
@@ -59,7 +59,7 @@ export type FlowClaimResult =
 
 /**
  * Commits a claimed step.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type FlowCommit = {
 	stepId: string;
@@ -74,7 +74,7 @@ export type FlowCommit = {
 
 /**
  * The result of a commit.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type FlowCommitResult =
 	| { ok: true; replayed: boolean; answer: unknown }
@@ -82,7 +82,7 @@ export type FlowCommitResult =
 
 /**
  * Keeps the state of a refused step, or ends the flow, under the claim of `stepId`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type FlowAmend = {
 	stepId: string;
@@ -98,7 +98,7 @@ export type FlowAmend = {
  * A finished flow keeps its last answer replayable for up to 10 minutes (or its TTL when shorter).
  * Then only its owner and end time stay, for its TTL, so that a late call learns that the flow is
  * finished and not that it expired.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface FlowStore {
 	/** Creates a flow for its owner. An existing flow is left as it is. */

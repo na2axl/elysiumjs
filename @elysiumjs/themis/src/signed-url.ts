@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import { resolveSecret } from './secret';
 
 /**
  * Raised when a signed URL was tampered with or has expired. Rendered as a 403 problem.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class InvalidSignatureError extends DomainError.for('INVALID_SIGNATURE', 403) {
 	constructor(expired: boolean) {
@@ -42,7 +42,7 @@ export namespace SignedUrl {
 	 * Signs a URL with HMAC-SHA256: adds `expires` (when asked) and `signature` parameters. The
 	 * path and every parameter are signed; the origin is not, so that the link works behind any
 	 * host name.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param url The URL.
 	 * @param options The secret, and how long the link lives, in seconds.
 	 * @example
@@ -69,7 +69,7 @@ export namespace SignedUrl {
 
 	/**
 	 * Whether a URL carries a valid signature and has not expired.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	export const verify = async (
 		url: string | URL,
@@ -85,7 +85,7 @@ export namespace SignedUrl {
 
 	/**
 	 * Checks the signature of a URL, such as `request.url` in a handler.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @throws {InvalidSignatureError} When the URL was tampered with or has expired (403).
 	 */
 	export const assert = async (url: string | URL, options: { secret: Secret }): Promise<void> => {

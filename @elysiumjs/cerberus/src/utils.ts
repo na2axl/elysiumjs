@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import type { Context } from '@elysiumjs/core';
  * Can be a requester (usually, an `User` object), or any resource (e.g. `Article`, `Post`, `Order`, etc.).
  * The subject needs to expose an `id` field of type `string`.
  *
- * @author Axel Nana <axel.nana@workud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type Subject = {
 	/**
@@ -54,7 +54,7 @@ export type Subject = {
  * }
  * ```
  *
- * @author Axel Nana <axel.nana@workud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type Ability = {
 	/**
@@ -75,7 +75,7 @@ export type Ability = {
 
 /**
  * Cerberus Configuration.
- * @author Axel Nana <axel.nana@workud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type CerberusConfig = {
 	/**

@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,14 +22,14 @@ import { Symbols } from './utils';
  *
  * A class registered without a name is identified by the class itself, never by the class name,
  * so services resolve the same way in minified builds, where bundlers rename classes.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ServiceToken = string | Class<any>;
 
 /**
  * The token a service is registered under: a string as given, and for a class the name declared
  * with `@Service.register({ name })`, or else the class itself.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param service The service name or class.
  */
 export const tokenOf = (service: ServiceToken): ServiceToken =>
@@ -39,7 +39,7 @@ export const tokenOf = (service: ServiceToken): ServiceToken =>
 
 /**
  * A readable label for a token, for messages only: it must never be used to look a service up.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param token The service token.
  */
 export const tokenLabel = (token: ServiceToken): string =>
@@ -48,7 +48,7 @@ export const tokenLabel = (token: ServiceToken): string =>
 /**
  * A tag that groups services: every service registered with it is injected together with
  * `@Service.injectAll(tag)`, or retrieved with `Service.getAll(tag)`. Tags are matched by name.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @template T The type every tagged service implements.
  */
 export type ServiceTag<T = unknown> = {
@@ -61,7 +61,7 @@ export type ServiceTag<T = unknown> = {
 
 /**
  * Creates a tag.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @template T The type every tagged service implements.
  * @param name The name of the tag, unique in the application.
  */
@@ -69,7 +69,7 @@ export const serviceTag = <T>(name: string): ServiceTag<T> => Object.freeze({ ta
 
 /**
  * Checks whether a value is a service tag.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param value The value to check.
  */
 export const isServiceTag = (value: unknown): value is ServiceTag =>
@@ -80,7 +80,7 @@ export const isServiceTag = (value: unknown): value is ServiceTag =>
 /**
  * What a constructor or handler parameter receives from the container: one service by its token,
  * or every service of a tag.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type Injection =
 	| { readonly token: ServiceToken; readonly index: number }

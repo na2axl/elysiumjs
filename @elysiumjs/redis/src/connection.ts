@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 /**
  * The surface of a Redis client that the Elysium packages rely on. Any Redis client can be
  * plugged in by adapting it to this interface; everything else goes through {@link send}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface RedisConnection {
 	/** Whether the connection is currently established. */
@@ -67,6 +67,6 @@ export interface RedisConnection {
 
 /**
  * Creates the connection to a Redis server.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type RedisClientFactory = (url: string, options: Record<string, unknown>) => RedisConnection;

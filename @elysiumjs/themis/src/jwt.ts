@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,14 +25,14 @@ import { resolveSecret } from './secret';
  * The key of a token: a shared secret (HS256), or a key of an asymmetric algorithm such as EdDSA
  * or ES256, with its algorithm. A secret can be a function that reads it when the token is signed
  * or verified, such as from a secrets store bound to the request.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type JwtKey =
 	{ secret: Secret } | { key: CryptoKey | KeyObject | Uint8Array; algorithm: string };
 
 /**
  * The options of a signed token.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type JwtSignOptions = JwtKey & {
 	/** How long the token lives, such as `15m` or `7d`, or a number of seconds. */
@@ -51,7 +51,7 @@ export type JwtSignOptions = JwtKey & {
 
 /**
  * What a token must carry to verify.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type JwtVerifyOptions = (JwtKey | { keys: readonly JwtKey[] }) & {
 	issuer?: string | string[];
@@ -70,7 +70,7 @@ export type JwtVerifyOptions = (JwtKey | { keys: readonly JwtKey[] }) & {
 /**
  * Raised when a token does not verify: a bad signature, an expired token, or a wrong issuer or
  * audience. Rendered as a 401 problem.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class InvalidTokenError extends DomainError.for('UNAUTHENTICATED', 401) {
 	constructor(reason: string) {
@@ -119,7 +119,7 @@ const reasonOf = (error: unknown): string => {
 export namespace Jwt {
 	/**
 	 * Signs a JSON Web Token with jose, which runs on WebCrypto, so on every runtime.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param claims The claims of the token.
 	 * @param options The key, the lifetime and the registered claims.
 	 * @example
@@ -155,7 +155,7 @@ export namespace Jwt {
 	 * Verifies a token and returns its claims. With `keys`, each key is tried in order until one
 	 * verifies the signature, so that tokens signed with the previous key still verify during a
 	 * rotation.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param token The token.
 	 * @param options The key or keys, and the claims the token must carry.
 	 * @example

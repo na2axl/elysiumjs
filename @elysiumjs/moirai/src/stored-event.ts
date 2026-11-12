@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import {
 
 /**
  * The options of a stored event.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type StoredEventOptions = {
 	/**
@@ -45,7 +45,7 @@ export type StoredEventOptions = {
 
 /**
  * What projections and reactors receive besides the event.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type StoredEventMeta = {
 	/** The id of the aggregate whose stream holds the event. */
@@ -64,7 +64,7 @@ export type StoredEventMeta = {
 
 /**
  * A stored event class.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type StoredEventClass<E extends StoredEvent = StoredEvent> = new (data: any) => E;
 
@@ -99,7 +99,7 @@ export const freezes = (): boolean => Environments.includes(Environments.local);
  * `StoredEvent` with its data, marked with `@StoredEvent.register()`. The data of a stored event
  * changes shape with upcasters, so the events already stored keep loading: bump `version`, and
  * give the class a static method marked with `@StoredEvent.upcast()` for the version before.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
  * const KlapsSpentData = t.Object({ spendId: t.String(), klaps: t.String(), sellerId: t.String() });
@@ -169,7 +169,7 @@ export abstract class StoredEvent<TData = unknown> {
 
 /**
  * @internal Reads and writes stored events.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export namespace StoredEvents {
 	/** The definition of a stored event class. */

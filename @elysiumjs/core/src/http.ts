@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -51,25 +51,25 @@ import { nextTick, Symbols } from './utils';
 
 /**
  * A route is a string that starts with a forward slash.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type Route = `/${string}`;
 
 /**
  * An HTTP method name.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type HTTPMethod = string;
 
 /**
  * A function computing a value from the request context, used by custom parameter decorators.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 type Handler = (c: Context) => unknown;
 
 /**
  * A class for validating data against a schema.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ValidatorClass<T extends TSchema = TSchema> = {
 	/** The problems the validator answers with besides failed validation, for the OpenAPI document. */
@@ -101,7 +101,7 @@ export type ValidatorClass<T extends TSchema = TSchema> = {
 
 /**
  * A function that handles an HTTP request.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 type HttpRequestHandler = <TResult = unknown, TArgs extends any[] = unknown[]>(
 	...args: TArgs
@@ -109,7 +109,7 @@ type HttpRequestHandler = <TResult = unknown, TArgs extends any[] = unknown[]>(
 
 /**
  * Stores metadata for an HTTP request handler.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 type HttpRequestHandlerMetadata = {
 	/**
@@ -224,13 +224,13 @@ type HttpRequestHandlerMetadata = {
 /**
  * How a route parses the request body before its handler runs. `none` leaves the body unread, so
  * the handler reads the request itself (a webhook checking a signature over the exact bytes).
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type HttpBodyParser = 'none' | 'text' | 'json' | 'formdata' | 'urlencoded' | 'arrayBuffer';
 
 /**
  * Parameters for registering an HTTP request handler.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 type HttpRequestHandlerRegistrationProps = Pick<
 	HttpRequestHandlerMetadata,
@@ -255,7 +255,7 @@ type HttpRequestHandlerRegistrationProps = Pick<
 
 /**
  * Metadata for the HTTP context.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type Singleton<TController = unknown, TModule extends Module = Module> = MergeDeep<
 	AppHttpContext,
@@ -285,7 +285,7 @@ export type Singleton<TController = unknown, TModule extends Module = Module> = 
 
 /**
  * The Elysia context with the controller injected.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type Context<
 	TBody = unknown,
@@ -419,7 +419,7 @@ async function* iterateInScope<T>(
 /**
  * Name of the global service running a callback in a database transaction, used by
  * `@transactional` handlers. Provided by database modules such as `DrizzleModule`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const DATABASE_TRANSACTION_SERVICE = 'db.transaction';
 
@@ -519,7 +519,7 @@ const registerHttpRequestHandler = (props: HttpRequestHandlerRegistrationProps) 
 
 /**
  * The scope of an HTTP controller.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export enum HttpControllerScope {
 	/**
@@ -535,7 +535,7 @@ export enum HttpControllerScope {
 
 /**
  * Options of `@Http.controller()`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type HttpControllerOptions = {
 	/**
@@ -576,7 +576,7 @@ export type HttpControllerOptions = {
 
 /**
  * What an HTTP controller records: its path and its options.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type HttpControllerProps = HttpControllerOptions & {
 	/** The path of the controller. */
@@ -585,7 +585,7 @@ export type HttpControllerProps = HttpControllerOptions & {
 
 /**
  * Options of the route decorators, such as `@Http.get()`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type HttpRouteOptions = {
 	/**
@@ -679,7 +679,7 @@ export type HttpRouteOptions = {
 
 /**
  * What a route decorator records: its method, its path and its options.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type RequestHandlerDecoratorProps = HttpRouteOptions & {
 	/** The HTTP method of the handler. */
@@ -690,7 +690,7 @@ export type RequestHandlerDecoratorProps = HttpRouteOptions & {
 
 /**
  * A route of an HTTP controller, as `Http.describe()` reports it.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type HttpRouteDescription = {
 	/** The name of the controller method handling the route. */
@@ -715,7 +715,7 @@ export type HttpRouteDescription = {
 
 /**
  * An HTTP controller, as `Http.describe()` reports it.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type HttpControllerDescription = {
 	/** The path of the controller. */
@@ -727,7 +727,7 @@ export type HttpControllerDescription = {
 /**
  * The types of a route in the generated route types, as TypeScript type text. A part left out
  * keeps the type the route type generator reads from the controller method.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type HttpRouteTypes = {
 	/** The type of the URL parameters, an object type such as `{ id: string }`. */
@@ -746,7 +746,7 @@ export type HttpRouteTypes = {
  * How the generated route types can refer to a controller method. Both are `undefined` when the
  * controller class cannot be imported (it is not exported by a file of the project), and then
  * the contributor gives every type of the route.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type HttpRouteTypeRef = {
 	/** The method type, such as `SignUpFlow['email']`. */
@@ -759,7 +759,7 @@ export type HttpRouteTypeRef = {
  * Types the routes of the controllers it supports in the generated route types, when the
  * controller method signature does not give them, such as routes a decorator adds. Register it
  * with the {@link Http.RouteTypes} tag.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface HttpRouteTypesContributor {
 	/** Whether it types routes of `controller`. */
@@ -934,7 +934,7 @@ export namespace Http {
 	/**
 	 * The tag of the route types contributors, read by `styx routes:generate`. Register a
 	 * contributor as a global service active in development only:
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @example
 	 * ```ts
 	 * @Service.register({ tags: [Http.RouteTypes], global: true, env: Environments.local })
@@ -957,7 +957,7 @@ export namespace Http {
 	 * The context of the HTTP request being handled, for code outside the handler such as a
 	 * service or a repository: its request, its `set`, and what middlewares put in it (such as
 	 * `currentUser`). `undefined` outside a request.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @example
 	 * ```ts
 	 * const ip = Http.currentContext()?.request.headers.get('cf-connecting-ip');
@@ -970,7 +970,7 @@ export namespace Http {
 	 * Describes the routes of an HTTP controller, for tools such as the route type generator.
 	 * Route decorators register their routes on the next tick, so call it after importing the
 	 * controller and awaiting a tick.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param controller The controller class.
 	 * @returns The description, or `undefined` when the class is not an HTTP controller.
 	 */
@@ -999,7 +999,7 @@ export namespace Http {
 
 	/**
 	 * Marks a class as an HTTP controller.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param path The path of the controller. Defaults to `/`.
 	 * @param options The options of the controller.
 	 * @example
@@ -1422,7 +1422,7 @@ export namespace Http {
 
 	/**
 	 * Marks a method as an HTTP "server-sent events" request handler.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param path The path of the route, relative to the controller path. Defaults to `/`.
 	 * @param options The options of the route.
 	 */
@@ -1431,7 +1431,7 @@ export namespace Http {
 
 	/**
 	 * Marks a method as an HTTP "get" request handler.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param path The path of the route, relative to the controller path. Defaults to `/`.
 	 * @param options The options of the route.
 	 * @example
@@ -1445,7 +1445,7 @@ export namespace Http {
 
 	/**
 	 * Marks a method as an HTTP "post" request handler.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param path The path of the route, relative to the controller path. Defaults to `/`.
 	 * @param options The options of the route.
 	 */
@@ -1454,7 +1454,7 @@ export namespace Http {
 
 	/**
 	 * Marks a method as an HTTP "put" request handler.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param path The path of the route, relative to the controller path. Defaults to `/`.
 	 * @param options The options of the route.
 	 */
@@ -1463,7 +1463,7 @@ export namespace Http {
 
 	/**
 	 * Marks a method as an HTTP "delete" request handler.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param path The path of the route, relative to the controller path. Defaults to `/`.
 	 * @param options The options of the route.
 	 */
@@ -1472,7 +1472,7 @@ export namespace Http {
 
 	/**
 	 * Marks a method as an HTTP "patch" request handler.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param path The path of the route, relative to the controller path. Defaults to `/`.
 	 * @param options The options of the route.
 	 */
@@ -1481,7 +1481,7 @@ export namespace Http {
 
 	/**
 	 * Marks a method as an HTTP "head" request handler.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param path The path of the route, relative to the controller path. Defaults to `/`.
 	 * @param options The options of the route.
 	 */
@@ -1490,7 +1490,7 @@ export namespace Http {
 
 	/**
 	 * Marks a method as an HTTP "options" request handler.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param path The path of the route, relative to the controller path. Defaults to `/`.
 	 * @param options The options of the route.
 	 */
@@ -1499,7 +1499,7 @@ export namespace Http {
 
 	/**
 	 * Marks a method as an HTTP "trace" request handler.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param path The path of the route, relative to the controller path. Defaults to `/`.
 	 * @param options The options of the route.
 	 */
@@ -1508,7 +1508,7 @@ export namespace Http {
 
 	/**
 	 * Marks a method as an HTTP request handler with a custom method.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param method The HTTP method.
 	 * @param path The path of the route, relative to the controller path. Defaults to `/`.
 	 * @param options The options of the route.
@@ -1534,7 +1534,7 @@ export namespace Http {
 
 	/**
 	 * Marks a method as the callback for the request handler.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	export const onRequest = (): MethodDecorator => {
 		return function (target, _, descriptor) {
@@ -1546,7 +1546,7 @@ export namespace Http {
 
 	/**
 	 * Resolves the context for the current request in the annotated parameter.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	export const context = (): ParameterDecorator => {
 		return function (target, propertyKey, parameterIndex) {
@@ -1556,7 +1556,7 @@ export namespace Http {
 
 	/**
 	 * Resolves the value of a URL parameter in the annotated parameter.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param slug The slug of the parameter.
 	 * @param schema The schema of the parameter.
 	 */
@@ -1572,7 +1572,7 @@ export namespace Http {
 	 * Resolves the value of a request header in the annotated parameter. The header is validated
 	 * with the route's other headers (a 400 `BAD_REQUEST` problem when it does not match) and
 	 * documented in OpenAPI.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param name The name of the header, in any case.
 	 * @param schema The schema of the header. Defaults to a required string; wrap it in
 	 * `t.Optional()` for a header the request may leave out.
@@ -1596,7 +1596,7 @@ export namespace Http {
 
 	/**
 	 * Resolves the value of a query parameter in the annotated parameter.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param schema The schema of the query parameter.
 	 */
 	export const query = (schema?: TSchema): ParameterDecorator => {
@@ -1607,7 +1607,7 @@ export namespace Http {
 
 	/**
 	 * Resolves the value of the request body in the annotated parameter.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param schema The schema of the request body.
 	 */
 	export const body = (schema?: TSchema | ValidatorClass): ParameterDecorator => {
@@ -1627,7 +1627,7 @@ export namespace Http {
 
 	/**
 	 * Executes a custom function to resolve the value of the parameter from the context.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param handler The custom function that will return the value for the parameter.
 	 */
 	export const decorate = (handler: Handler): (() => ParameterDecorator) => {

@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import { Container } from './container';
  * - `LoggerInterface`: structured application logging (machine-parseable, sent to transports)
  * - `InteractsWithConsole`: CLI user output (colors, spinners, formatted for humans)
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface LoggerInterface {
 	trace(msg: string, ctx?: Record<string, unknown>): void;
@@ -37,7 +37,7 @@ export interface LoggerInterface {
  * Default logger implementation using console.* APIs.
  * Used as fallback when @elysiumjs/hermes is not installed.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class ConsoleLogger implements LoggerInterface {
 	private context: Record<string, unknown>;
@@ -77,7 +77,7 @@ export class ConsoleLogger implements LoggerInterface {
 
 /**
  * The name of the global service holding the application logger.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const LOGGER_SERVICE = 'logger';
 
@@ -86,7 +86,7 @@ export const LOGGER_SERVICE = 'logger';
  * (e.g. by `@elysiumjs/hermes`), a {@link ConsoleLogger} otherwise or when it cannot be built
  * or fails to create the child logger. Only the global scope is searched, so a module's own
  * `logger` service never replaces the application logger.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param context Optional context bound to the returned logger, as a child logger.
  * @returns The application logger, or a child of it when `context` is given.
  */

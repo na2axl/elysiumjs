@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import { Workers, WORKERS_CONTEXT_SERVICE, WORKERS_ENV_SERVICE } from './workers
 
 /**
  * Configuration of the {@link WorkersModule}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type WorkersModuleConfig = {
 	/** The bindings to provide as services, injected with `@Workers.inject(name)`. */
@@ -31,7 +31,7 @@ export type WorkersModuleConfig = {
  * Provides the Worker's env (`workers.env`), the execution context (`workers.context`) and
  * each listed binding (`workers.binding.<name>`) as global request-scoped services: they hold
  * the values of the invocation being handled, never values kept across invocations.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 @Module.register<WorkersModuleConfig>({
 	services: (config) => {

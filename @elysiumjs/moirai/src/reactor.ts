@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ import { handlerInstance } from './projection';
 
 /**
  * Options of {@link Reactor.on}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ReactorOptions<E extends StoredEvent> = {
 	/** Reacts only to the events it accepts. */
@@ -44,7 +44,7 @@ const REACTORS: Registered[] = [];
  * so its effects commit with the event; it never runs when events are replayed. Reactor methods
  * belong to any service; they run in the module that registers it, and may be protected or
  * private.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
  * @Service.register()
@@ -59,7 +59,7 @@ const REACTORS: Registered[] = [];
 export namespace Reactor {
 	/**
 	 * Marks a method as a reactor to a stored event.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param event The stored event class.
 	 * @param options The filter of the events it reacts to.
 	 */

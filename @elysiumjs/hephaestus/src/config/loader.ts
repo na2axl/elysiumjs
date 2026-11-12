@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ const CONFIG_FILENAMES = ['hephaestus.config.ts', 'hephaestus.config.js', 'hepha
 
 /**
  * Loads and validates the Hephaestus build configuration from the project root.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param cwd The working directory to search for config files.
  * @param options With `optional`, a project without a config gets the defaults, named after its
  * folder.

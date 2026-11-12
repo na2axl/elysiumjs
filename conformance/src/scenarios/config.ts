@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -52,7 +52,7 @@ const make = async (): Promise<Application> => {
 /**
  * The environment schemas of the app and its modules are merged and validated through the
  * runtime, with defaults applied and secrets redacted.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const config: Scenario = {
 	name: 'config: merged environment schemas with defaults and secrets',

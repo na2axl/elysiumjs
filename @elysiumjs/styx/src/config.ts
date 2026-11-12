@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import { getProjectPath } from './utils';
 
 /**
  * Describes the Elysium project's configuration.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface ProjectConfig {
 	/**
@@ -50,7 +50,7 @@ export interface ProjectConfig {
 
 /**
  * Parses the Elysium project's configuration file.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @throws If the Elysium config file is not found.
  * @returns The Elysium project's configuration.
  */
@@ -65,7 +65,7 @@ export const parseProjectConfig = async (): Promise<ProjectConfig> => {
 
 /**
  * Writes the Elysium project's configuration file.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param config The Elysium project's configuration.
  */
 export const writeProjectConfig = async (config: ProjectConfig) => {
@@ -75,7 +75,7 @@ export const writeProjectConfig = async (config: ProjectConfig) => {
 
 /**
  * Checks if the Elysium project is a mono-module project.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @returns Whether the Elysium project is a mono module.
  */
 export const isMonoModule = async () => {
@@ -85,7 +85,7 @@ export const isMonoModule = async () => {
 
 /**
  * Gets the path of a module.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param moduleName The name of the module.
  * @returns The path of the module.
  */
@@ -107,7 +107,7 @@ export const getModulePath = async (moduleName: string) => {
 
 /**
  * Builds the hint telling the user which module list a generated class must be added to.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param list The module list to add the class to.
  * @param className The generated class name.
  * @param moduleName The module the class was generated in, if any.
@@ -130,7 +130,7 @@ export const addToModuleHint = async (
 
 /**
  * Checks if a module exists.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param moduleName The name of the module.
  * @returns Whether the module exists.
  */

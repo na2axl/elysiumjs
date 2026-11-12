@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ export const cacheStoreService = (name: string): string => `mnemosyne.cache.stor
 
 /**
  * Interface for a cache storage.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface CacheInterface {
 	/**
@@ -128,7 +128,7 @@ export interface CacheInterface {
  * Keyv writes its namespace on the store adapter it wraps, so adapters cannot be shared between
  * namespaces: the last namespace would win for every Keyv using the adapter, and `clear()` would
  * wipe the other namespaces. The base cache and each tagged cache therefore get their own adapter.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param createStore Creates a new store adapter, called once per namespace.
  * @returns A new `CacheInterface`.
  */
@@ -165,12 +165,12 @@ const getCache = (name: string): CacheInterface => {
 
 /**
  * Static access to the caches provided by the `MnemosyneModule`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export abstract class Cache {
 	/**
 	 * A weak cache storage for simple non-intrusive caching of data.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	public static readonly weak = Object.seal({
 		/**
@@ -200,7 +200,7 @@ export abstract class Cache {
 
 	/**
 	 * Redis-based cache storage.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @throws {ServiceNotFoundError} If the `MnemosyneModule` is not loaded or has no redis cache.
 	 */
 	public static get redis(): CacheInterface {
@@ -209,7 +209,7 @@ export abstract class Cache {
 
 	/**
 	 * Memory-based cache storage.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @throws {ServiceNotFoundError} If the `MnemosyneModule` is not loaded or has no memory cache.
 	 */
 	public static get memory(): CacheInterface {
@@ -219,7 +219,7 @@ export abstract class Cache {
 	/**
 	 * A cache over a store given in `MnemosyneModule.with({ cache: { stores } })`, such as
 	 * Workers KV.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param name The store name.
 	 * @throws {ServiceNotFoundError} If the `MnemosyneModule` has no store with that name.
 	 */

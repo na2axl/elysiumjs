@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import { Symbols } from './utils';
 
 /**
  * Supported command argument types.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export enum CommandArgumentType {
 	/**
@@ -55,7 +55,7 @@ export enum CommandArgumentType {
 
 /**
  * Properties required when declaring a command argument.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  *
  * These properties are used to define command arguments using the `@arg()` decorator. The
  * values of these properties are used to generate the help message for the command.
@@ -99,7 +99,7 @@ export type CommandArgumentProps = {
 
 /**
  * Metadata for storing command arguments.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 type CommandArgumentMetadata = CommandArgumentProps & {
 	/**
@@ -110,7 +110,7 @@ type CommandArgumentMetadata = CommandArgumentProps & {
 
 /**
  * Type for a command class.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type CommandClass<T extends Command = Command> = Class<T> & {
 	/**
@@ -131,7 +131,7 @@ export type CommandClass<T extends Command = Command> = Class<T> & {
 
 /**
  * Options of `@Command.register()`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type CommandRegisterOptions = {
 	/** The name the command is invoked by. Defaults to the static `command`. */
@@ -148,7 +148,7 @@ export type CommandRegisterOptions = {
  * Gets the name a command is invoked by: the `name` given to `@Command.register()`,
  * or else the static `command`.
  * @param cls The command class.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export function getCommandName(cls: Class<any>): string {
 	const options: { name?: string } | undefined = Metadata.get(Symbols.command, cls);
@@ -161,7 +161,7 @@ export function getCommandName(cls: Class<any>): string {
  * Commands are classes that can be executed through the CLI. They can have arguments
  * that can be passed to them using the `--` syntax.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export abstract class Command extends InteractsWithConsole {
 	//#region Command Interface
@@ -192,7 +192,7 @@ export abstract class Command extends InteractsWithConsole {
 	 * listed in the `commands` of a module to be available in the CLI.
 	 *
 	 * @param options Optional registration options.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	public static register(options: CommandRegisterOptions = {}): ClassDecorator {
 		return function (target) {
@@ -203,7 +203,7 @@ export abstract class Command extends InteractsWithConsole {
 
 	/**
 	 * Decorator for registering a command argument.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param name The name of the argument.
 	 * @param props Additional options for the argument.
 	 */
@@ -583,7 +583,7 @@ export abstract class Command extends InteractsWithConsole {
 
 /**
  * A class for managing and displaying a progress bar in the console.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 class CommandProgressBar extends InteractsWithConsole {
 	/**
@@ -776,7 +776,7 @@ class CommandProgressBar extends InteractsWithConsole {
 
 /**
  * A class for displaying a spinner in the console for indeterminate operations.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class CommandSpinner extends InteractsWithConsole {
 	/**

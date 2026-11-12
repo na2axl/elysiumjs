@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import { Cache as DrizzleCache } from 'drizzle-orm/cache/core';
 
 /**
  * Default time to live of cached query results, in seconds.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const DEFAULT_CACHE_TTL = 60;
 
@@ -87,7 +87,7 @@ const toArray = <T>(value: T | T[] | undefined): T[] =>
  * in a transaction (including RLS-scoped repository calls) are invalidated after the commit and
  * are not affected.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class DrizzleDatabaseCache extends DrizzleCache {
 	#storageEngine: 'redis' | 'memory';
@@ -150,7 +150,7 @@ export class DrizzleDatabaseCache extends DrizzleCache {
 	/**
 	 * Runs a transaction so that the cache is bypassed inside it, and the tables it mutates are
 	 * invalidated once it commits.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param run Opens and runs the transaction.
 	 * @returns The return value of `run`.
 	 */

@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ import { Http } from '@elysiumjs/core';
 
 /**
  * A route that declares no schema for its success response.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type RouteWithoutResponse = {
 	/** The id of the module of the controller. */
@@ -42,7 +42,7 @@ const join = (...parts: (string | undefined)[]): string =>
 /**
  * Finds the routes of an app that declare no schema for their success response. Server-sent
  * events routes and routes answering 204 have no response body, and are left out.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param app The application class. Its modules are read, not booted.
  */
 export const routesWithoutResponse = async (

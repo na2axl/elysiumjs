@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ import { Service } from '@elysiumjs/core';
 /**
  * Where `migration:run` runs SQL: a transaction, or the connection outside of one. Every driver
  * gives one through `DrizzleDriver.migrations()`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface MigrationDatabase {
 	/**
@@ -38,7 +38,7 @@ export interface MigrationDatabase {
 
 /**
  * The connection `migration:run` works on, from the driver of a Drizzle connection.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface MigrationConnection extends MigrationDatabase {
 	/**
@@ -51,7 +51,7 @@ export interface MigrationConnection extends MigrationDatabase {
 
 /**
  * A run of `migration:run`, as its hooks see it.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type MigrationRun = {
 	/** The transaction of the run. */
@@ -75,7 +75,7 @@ export type MigrationRun = {
 
 /**
  * One migration of a run, as the hooks see it.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type MigrationStep = {
 	/** The transaction of the run. */
@@ -94,7 +94,7 @@ export type MigrationStep = {
 /**
  * Runs SQL around the migrations of `migration:run`, inside its transaction and after its lock:
  * what fails rolls the whole run back. Every method is optional.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface MigrationHook {
 	/**
@@ -124,7 +124,7 @@ export interface MigrationHook {
 
 /**
  * Migrations: the hooks that `migration:run` calls around them.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export namespace Migration {
 	/**
@@ -144,7 +144,7 @@ export namespace Migration {
 	 * 	}
 	 * }
 	 * ```
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param props The service options.
 	 */
 	export const hook = (props: Parameters<typeof Service.register>[0] = {}) =>

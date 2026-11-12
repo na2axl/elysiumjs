@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ const ELYSIUM_VERSIONS = elysiumVersions();
  * The version range written to the `package.json` of a new project for a package: a caret range
  * on the version released with Styx for `@elysiumjs/*` (each package has its own version), a
  * known range for the tools features add.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param name The package name.
  * @throws When no version is known for the package.
  */
@@ -123,7 +123,7 @@ export type AppParts = {
 
 /**
  * The packages the app of a runtime needs for its parts.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param runtime The runtime key.
  * @param parts The parts of the app.
  */
@@ -283,7 +283,7 @@ export class App extends Application {
 /**
  * The environment schema of a project, with the declaration that types `Env.get()` from it. A
  * `.ts` file, so that the compiler checks it even with `skipLibCheck`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const getEnvCode = (
 	runtime: keyof typeof RUNTIMES = 'bun',
@@ -323,7 +323,7 @@ declare module '@elysiumjs/core' {
 
 /**
  * The scripts of a project, per runtime and package manager.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param runtime The runtime key.
  */
 export const getScripts = (runtime: keyof typeof RUNTIMES): Record<string, string> => {
@@ -366,7 +366,7 @@ export default worker;
 
 /**
  * The wrangler config of a Cloudflare Workers project.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param projectName The project name.
  * @param parts The parts of the app, for the bindings they need.
  */

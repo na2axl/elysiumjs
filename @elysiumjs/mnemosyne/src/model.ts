@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import { getCurrentTenant, getTenancyStrategy } from './tenancy';
 
 /**
  * Creates a validation schema from normalized column metadata.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param columns The column metadata to create the schema from.
  * @param options The schema generation options.
  * @returns A validation schema based on the given columns.
@@ -56,7 +56,7 @@ export const createSchemaFromModel = (
 
 /**
  * Creates a validation schema from a column's metadata.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param column The column metadata.
  * @returns A validation schema based on the given column.
  */
@@ -95,7 +95,7 @@ const parseColumnType = (column: ColumnMetadata) => {
 
 /**
  * Mixin used to create a new abstract model class.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @template TTable The ORM-specific table type.
  * @template TColumns The table columns configuration type.
  * @param tableName The name of the table.

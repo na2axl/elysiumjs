@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import { status as httpStatus } from 'http-status';
 /**
  * An error response in the RFC 9457 "problem details" format, sent as
  * `application/problem+json`. Extension members sit at the top level, next to the standard ones.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ProblemDetails = {
 	/** A URI reference that identifies the problem type: the slug of its code, under `typeBase`. */
@@ -42,7 +42,7 @@ export type ProblemDetails = {
 
 /**
  * One invalid value of a request, in the `errors` member of a validation problem.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ProblemValidationError = {
 	/** A JSON Pointer (RFC 6901) to the value, rooted at the request part: `/body/email`. */
@@ -55,7 +55,7 @@ export type ProblemValidationError = {
 
 /**
  * Options of the problem details rendering, set with `problems` on `@Application.register()`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ProblemOptions = {
 	/**
@@ -80,7 +80,7 @@ export const PROBLEM_CONTENT_TYPE = 'application/problem+json';
 
 /**
  * The standard reason phrase of an HTTP status, used as the default problem title.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param status The HTTP status code.
  */
 export const statusTitle = (status: number): string => {
@@ -93,7 +93,7 @@ export const statusTitle = (status: number): string => {
  * The problem codes of the application, declared by merging into this interface: one key per code.
  * Once it has keys, `DomainError.for()` takes only those codes and the ones of the framework
  * ({@link ElysiumProblemCode}); while it has none, any string is a code.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
  * declare module '@elysiumjs/core' {
@@ -110,7 +110,7 @@ export interface ProblemCatalogue {}
 /**
  * The problem codes the framework packages answer with. An application that keeps its own
  * catalogue lists them too, so that its clients know every code.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const ELYSIUM_PROBLEM_CODES = {
 	/** 400: a request that cannot be read, such as a malformed body or invalid query. */
@@ -155,14 +155,14 @@ export const ELYSIUM_PROBLEM_CODES = {
 
 /**
  * A problem code of the framework.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ElysiumProblemCode = keyof typeof ELYSIUM_PROBLEM_CODES;
 
 /**
  * A problem code: one of {@link ProblemCatalogue} or of the framework, or any string while the
  * catalogue is empty.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ProblemCode = [keyof ProblemCatalogue] extends [never]
 	? string
@@ -171,7 +171,7 @@ export type ProblemCode = [keyof ProblemCatalogue] extends [never]
 /**
  * The `type` of a problem code: its kebab-case slug, under the base when one is set.
  * `INSUFFICIENT_FUNDS` gives `insufficient-funds`, or `https://api.example.com/problems/insufficient-funds`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param code The problem code.
  * @param base The `typeBase` of the application.
  */
@@ -182,7 +182,7 @@ export const problemType = (code: string, base?: string): string => {
 
 /**
  * The options of a {@link DomainError}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @template X The extension members, typed from the `extensions` schema of `DomainError.for()`.
  */
 export type DomainErrorOptions<X = Readonly<Record<string, unknown>>> = {
@@ -200,7 +200,7 @@ export type DomainErrorOptions<X = Readonly<Record<string, unknown>>> = {
 
 /**
  * What `DomainError.for()` takes besides the code and the status.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @template E The schemas of the extension members.
  */
 export type DomainErrorDefinition<E extends TProperties = {}> = {
@@ -215,7 +215,7 @@ export type DomainErrorDefinition<E extends TProperties = {}> = {
 
 /**
  * The extension members of a problem class: typed from its schemas, or any record without them.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ProblemExtensions<E extends TProperties> = [keyof E] extends [never]
 	? Readonly<Record<string, unknown>>
@@ -224,7 +224,7 @@ export type ProblemExtensions<E extends TProperties> = [keyof E] extends [never]
 /**
  * A class of {@link DomainError}, with its code, status and the schema of its problem, as
  * `DomainError.for()` makes them. Routes list the ones they answer with in `errors`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @template T The error the class makes.
  */
 export type ProblemClass<T extends DomainError = DomainError> = (abstract new (
@@ -269,7 +269,7 @@ const validationErrorSchema = () =>
 
 /**
  * The extension schemas of problems that list invalid values: `errors`, one per mistake.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const validationExtensions = () => ({
 	errors: t.Optional(t.Array(validationErrorSchema()))
@@ -284,7 +284,7 @@ export const validationExtensions = () => ({
  * the same problem, roll back the unit of work, and commit nothing. A returned error joins the
  * route's response type under its literal status, so typed clients see it. `message` is the
  * detail shown to the client.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @template C The problem code.
  * @template S The HTTP status.
  * @example
@@ -393,13 +393,13 @@ export abstract class DomainError<
 
 /**
  * Checks whether a value is a {@link DomainError}, such as the result of a command.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const isDomainError = (value: unknown): value is DomainError => value instanceof DomainError;
 
 /**
  * A request that cannot be read: a 400 problem.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class BadRequestError extends DomainError.for('BAD_REQUEST', 400, {
 	extensions: validationExtensions()
@@ -407,7 +407,7 @@ export class BadRequestError extends DomainError.for('BAD_REQUEST', 400, {
 
 /**
  * Request values that do not match their schema: a 422 problem with one entry per mistake.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class ValidationFailedError extends DomainError.for('VALIDATION_FAILED', 422, {
 	extensions: validationExtensions()
@@ -419,7 +419,7 @@ export class ValidationFailedError extends DomainError.for('VALIDATION_FAILED', 
 
 /**
  * A request without valid credentials: a 401 problem.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class UnauthenticatedError extends DomainError.for('UNAUTHENTICATED', 401) {
 	constructor(detail = 'Authentication is required.') {
@@ -429,26 +429,26 @@ export class UnauthenticatedError extends DomainError.for('UNAUTHENTICATED', 401
 
 /**
  * A caller that may not do this: a 403 problem.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class ForbiddenError extends DomainError.for('FORBIDDEN', 403) {}
 
 /**
  * A resource that does not exist: a 404 problem.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class NotFoundError extends DomainError.for('NOT_FOUND', 404) {}
 
 /**
  * A request that conflicts with the current state: a 409 problem.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class ConflictError extends DomainError.for('CONFLICT', 409) {}
 
 /**
  * An unexpected failure: a 500 problem. Anything thrown that is not a DomainError is sent as one,
  * with its detail and stack only in development and test.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class InternalError extends DomainError.for('INTERNAL_ERROR', 500, {
 	extensions: { stack: t.Optional(t.Array(t.String(), { description: 'In development and test only.' })) }
@@ -457,7 +457,7 @@ export class InternalError extends DomainError.for('INTERNAL_ERROR', 500, {
 /**
  * The schema of the problems request validation answers with, at the `validationStatus` of the
  * application.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param status The status of validation errors: 422 or 400.
  */
 export const validationProblemSchema = (status: number): TObject =>
@@ -469,7 +469,7 @@ export const validationProblemSchema = (status: number): TObject =>
 
 /**
  * Checks whether a value is a problem details object: a `status` number and a `title` string.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const isProblemDetails = (value: unknown): value is ProblemDetails =>
 	typeof value === 'object' &&
@@ -483,7 +483,7 @@ export const isProblemDetails = (value: unknown): value is ProblemDetails =>
  * Elysia wraps anything thrown while parsing the body (such as a body over the size limit) in a
  * parse error. Returns the wrapped error when it is a {@link DomainError}, so that it keeps its
  * own status, and the error itself otherwise.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param error The thrown value.
  */
 export const unwrapParseError = (error: unknown): unknown => {
@@ -503,7 +503,7 @@ const pointerOf = (part: string, path: string | undefined, child?: string): stri
 /**
  * Turns the errors of an Elysia validation error into problem `errors`, one per invalid value.
  * A missing required property is reported at the property's own pointer.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param part The request part: `body`, `query`, `params`, `headers` or `cookie`.
  * @param errors The validator errors (`ValidationError.all`).
  */
@@ -538,7 +538,7 @@ export const validationErrors = (part: string, errors: unknown[]): ProblemValida
 
 /**
  * The context {@link toProblem} needs about the request and the application.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ProblemContext = Omit<ProblemOptions, 'requestId'> & {
 	/** The request path, used as `instance`. */
@@ -555,7 +555,7 @@ const requestIds = new WeakMap<Request, string>();
 /**
  * The id of a request: the one `make` gives, a valid `x-request-id` header, or a random UUID.
  * The same request always gets the same id.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param request The request.
  * @param make The `requestId` option of the application.
  */
@@ -581,7 +581,7 @@ export const requestIdOf = (request: Request, make?: (request: Request) => strin
  *   `BAD_REQUEST` (400).
  * - Anything else is an `INTERNAL_ERROR` (500) whose detail and stack are only shown in
  *   development and test.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param error The thrown or returned value.
  * @param context The request and the application's problem options.
  */
@@ -658,7 +658,7 @@ export const toProblem = (error: unknown, context: ProblemContext): ProblemDetai
 
 /**
  * Builds the `application/problem+json` response of a problem.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param problem The problem details.
  * @param headers Extra headers, such as `Retry-After`.
  */
@@ -673,7 +673,7 @@ export const problemResponse = (
 
 /**
  * The OpenAPI schema of problem details, referenced by the default error responses of each route.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const ProblemDetailsSchema = t.Object(
 	{

@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -64,12 +64,12 @@ const find = (key: MetadataKey, target: object, propertyKey: PropertyKey): Found
  *
  * Reads walk the prototype chain, so a subclass sees the metadata of its parents. When another
  * library has loaded `reflect-metadata`, values stored there are read as well.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export namespace Metadata {
 	/**
 	 * Sets a metadata value on a class, or on one of its members.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param key The metadata key.
 	 * @param value The value to store.
 	 * @param target The class, or the prototype holding the member.
@@ -90,7 +90,7 @@ export namespace Metadata {
 
 	/**
 	 * Gets a metadata value set on the target itself, ignoring its parents.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param key The metadata key.
 	 * @param target The class, or the prototype holding the member.
 	 * @param propertyKey The member name, when the metadata belongs to a member.
@@ -103,7 +103,7 @@ export namespace Metadata {
 
 	/**
 	 * Gets a metadata value from the target or its nearest parent that has one.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param key The metadata key.
 	 * @param target The class, or the prototype holding the member.
 	 * @param propertyKey The member name, when the metadata belongs to a member.
@@ -117,7 +117,7 @@ export namespace Metadata {
 	/**
 	 * Checks whether the target or one of its parents has the key, even when its value is
 	 * `undefined`.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param key The metadata key.
 	 * @param target The class, or the prototype holding the member.
 	 * @param propertyKey The member name, when the metadata belongs to a member.

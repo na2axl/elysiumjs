@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ const FOLDER_MIGRATION_FILE = 'migration.sql';
 /**
  * Gets the name under which a migration file is tracked. Drizzle Kit 1.0 stores each migration
  * as `<folder>/migration.sql`, in which case the folder name identifies the migration.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param path The path of the migration file.
  */
 export const getMigrationName = (path: string): string =>
@@ -65,7 +65,7 @@ const folderTime = (name: string): number | undefined => {
  * generated. An applied record whose flat file is gone is matched, in order, to a folder with
  * the same `<name>` generated before the record was applied; that folder is not run again and
  * the record is renamed. Folders generated later are new migrations and run.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param files The paths of the migration files.
  * @param applied The applied migrations.
  */
@@ -154,7 +154,7 @@ const endOfVerbatim = (sql: string, i: number): number => {
  * Only identifier qualifiers are changed: string literals, dollar-quoted bodies (functions, `DO`
  * blocks), comments and other quoted identifiers are kept as is. Qualifiers inside a `DO` block
  * are therefore kept: such blocks are not rewritten, since their contents are not parsed here.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param sql The migration SQL.
  * @returns The SQL without the public schema qualifiers.
  */

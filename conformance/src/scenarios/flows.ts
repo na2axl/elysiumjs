@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -82,7 +82,7 @@ const step =
 /**
  * A guest flow starts, runs a step, replays it for the same step id, refuses an unexpected step
  * (409) and another owner (403), and ends; then it is gone (410).
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const flows: Scenario = {
 	name: 'flows: guest flow with replay and unexpected step',

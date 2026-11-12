@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
  * or `OPTIONS`) that carry a valid session cookie need the session's token in the `x-csrf-token`
  * header or the `_csrf` body field. Requests without one, such as those of bearer tokens, are not
  * checked. Register it after SessionMiddleware.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class CsrfMiddleware extends Middleware {
 	/** The problems it answers with, documented on the routes it protects. */

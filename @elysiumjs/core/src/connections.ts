@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ const DEFAULT = 'default';
 
 /**
  * Checks the `default` and `connections` keys of a connection module's config.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param module The module name, for error messages.
  * @param config The resolved config.
  * @returns Whether a separate alias entry is needed for the default connection.
@@ -48,7 +48,7 @@ export function needsDefaultAlias(
 
 /**
  * Runs every task even if some fail, then rethrows: the single error, or an `AggregateError`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export async function runAll(tasks: (() => unknown)[]): Promise<void> {
 	const results = await Promise.allSettled(tasks.map(async (task) => task()));

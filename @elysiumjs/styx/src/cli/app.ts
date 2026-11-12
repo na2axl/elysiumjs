@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ import { CreateCommand } from '../create/create.command';
 
 /**
  * The commands Styx runs itself: `create`, the code generators, `routes:check` and `routes:generate`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 @Module.register({
 	commands: [
@@ -60,7 +60,7 @@ export class StyxCliModule extends Module {}
 
 /**
  * Runs a command of the global `styx` CLI, without loading any project.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param argv The command and its arguments.
  * @param tools Modules of build tools found in the project (such as Hephaestus).
  */

@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -56,7 +56,7 @@ const buildWorkerInChildProcess = async (
  * Command used to build the project into a standalone binary (`--target binary`, the default), a
  * Cloudflare Worker bundle compiled ahead of time (`--target workers`), or an ES module bundle for
  * Node.js (`--target node`).
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 @Command.register()
 export class HephaestusBuildCommand extends Command {

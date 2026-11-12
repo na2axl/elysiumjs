@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,13 +18,13 @@ import { ElysiumError } from './errors';
 
 /**
  * The process signals the application shuts down on.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ShutdownSignal = 'SIGINT' | 'SIGTERM';
 
 /**
  * A server started by {@link Runtime.serve}, closed when the application shuts down.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ServeHandle = {
 	/** Stops accepting connections and resolves once the server is closed. */
@@ -40,11 +40,11 @@ export type ServeHandle = {
  * or with {@link Runtime.use}.
  *
  * The runtime is process-wide: the last application constructed wins.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 /**
  * The level of a line written to the console.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type OutputLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
 
@@ -113,7 +113,7 @@ export interface Runtime {
 
 /**
  * An interactive terminal, as exposed by a runtime.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface RuntimeTerminal {
 	/** The stream user input is read from. */
@@ -144,7 +144,7 @@ export interface RuntimeTerminal {
 
 /**
  * Thrown when a feature needs a host API the current runtime does not have.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class RuntimeNotSupportedError extends ElysiumError {
 	public constructor(feature: string, runtime: string, hint?: string) {
@@ -154,7 +154,7 @@ export class RuntimeNotSupportedError extends ElysiumError {
 
 /**
  * Thrown when the framework needs the runtime before one was set.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class RuntimeNotConfiguredError extends ElysiumError {
 	public constructor() {
@@ -169,7 +169,7 @@ let current: Runtime | undefined;
 export namespace Runtime {
 	/**
 	 * Gets the runtime in use.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @throws {RuntimeNotConfiguredError} When no runtime was set.
 	 */
 	export const get = (): Runtime => {
@@ -179,14 +179,14 @@ export namespace Runtime {
 
 	/**
 	 * Gets the runtime in use, or `undefined` when none was set.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	export const find = (): Runtime | undefined => current;
 
 	/**
 	 * Sets the runtime to use. The runtime is process-wide: when several applications are
 	 * constructed, the last one to set a runtime wins.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param runtime The runtime to use.
 	 */
 	export const use = (runtime: Runtime): void => {
@@ -195,7 +195,7 @@ export namespace Runtime {
 
 	/**
 	 * Forgets the runtime in use.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	export const reset = (): void => {
 		current = undefined;

@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ const cronsOf = (triggers: { crons?: unknown } | undefined): string[] | undefine
 /**
  * The cron triggers of a wrangler configuration: those at the top level, and those of each
  * environment that sets its own (an environment without `triggers` inherits the top level).
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param config The parsed configuration.
  * @param environment Only this environment, with the triggers it sets or inherits.
  * @returns The triggers per environment; `environment` is `null` for the top level.
@@ -61,7 +61,7 @@ export const wranglerTriggers = (config: unknown, environment?: string): Wrangle
  * wrangler configuration. It reads the jobs from the module graph without booting the
  * application, so it runs for an application whose services need a runtime it is not in, such as
  * a Cloudflare Worker.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 @Command.register()
 export class HeraclesCronsCommand extends Command {

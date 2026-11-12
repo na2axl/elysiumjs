@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ const make = async (): Promise<Application> => {
 
 /**
  * A server-sent events route streams events. The expected `text` is the first two events.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const sse: Scenario = {
 	name: 'sse: two events read from a streamed body',
@@ -90,7 +90,7 @@ const makeDisposal = async (): Promise<Application> => {
 /**
  * The request scope of a streamed response lives as long as its body: nothing is disposed while
  * events are sent, and the scope is disposed once, after the client cancels the stream.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const sseDisposal: Scenario = {
 	name: 'sse: the request scope is disposed when the stream ends',

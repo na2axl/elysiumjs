@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,13 +23,13 @@ import { nodePostgresMigrations } from '../migration-clients';
 
 /**
  * Options of {@link nodePostgres}: a connection URL or pool options, or a pool.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type NodePostgresDriverOptions = { connection: string | PoolConfig } | { client: Pool };
 
 /**
  * Connects with node-postgres (`pg`), on Node.js and Bun.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param options The connection URL or pool options, or a pool.
  * @example
  * ```ts

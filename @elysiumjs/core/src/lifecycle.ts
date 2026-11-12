@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import { Symbols } from './utils';
 /**
  * Internal event bus used by the framework.
  * @internal
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class LifecycleBus extends EventEmitter {
 	static readonly instance = new LifecycleBus();
@@ -43,7 +43,7 @@ export class LifecycleBus extends EventEmitter {
 
 /**
  * Stores the event data with the source.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type LifecycleEvent<TData, TSource = null> = {
 	/**
@@ -59,7 +59,7 @@ export type LifecycleEvent<TData, TSource = null> = {
 
 /**
  * Lifecycle handler function.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type LifecycleHandler<TData, TSource = any> = (
 	event: LifecycleEvent<TData, TSource>
@@ -67,7 +67,7 @@ export type LifecycleHandler<TData, TSource = any> = (
 
 /**
  * Properties required when declaring a method as an event listener.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ListenProps = {
 	/**
@@ -92,7 +92,7 @@ export type ListenProps = {
 
 /**
  * A listener recorded on a class by `@Lifecycle.on` / `@Lifecycle.once`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type LifecycleListenerMeta = {
 	readonly event: string;
@@ -104,7 +104,7 @@ export type LifecycleListenerMeta = {
 
 /**
  * Gets the listeners recorded on a class by the `@Lifecycle.on` / `@Lifecycle.once` decorators.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param cls The class to inspect.
  */
 export function getLifecycleListeners(cls: object): readonly LifecycleListenerMeta[] {
@@ -132,7 +132,7 @@ const recordListener = (
 export namespace Lifecycle {
 	/**
 	 * Emits an event with the provided data and source.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param event The event name.
 	 * @param data The emitted data.
 	 * @param source The source of the event. Defaults to `null`.
@@ -154,7 +154,7 @@ export namespace Lifecycle {
 	 *
 	 * Static methods are called on the class. Instance methods require a class registered as a
 	 * service: they run on the instance the container resolves.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param event The event name.
 	 * @param options Whether the listener goes first (`prepend`).
 	 * @example
@@ -167,7 +167,7 @@ export namespace Lifecycle {
 
 	/**
 	 * Registers an event listener for the specified event.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param event The event name.
 	 * @param handler The event handler function.
 	 */
@@ -192,7 +192,7 @@ export namespace Lifecycle {
 	/**
 	 * Marks a method as an event listener that listens for the event only once.
 	 * Like {@link Lifecycle.on}, the decorator is metadata-only and the kernel wires it per module.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param event The event name.
 	 * @param options Whether the listener goes first (`prepend`).
 	 */
@@ -203,7 +203,7 @@ export namespace Lifecycle {
 
 	/**
 	 * Registers an event listener for the specified event that listens for the event only once.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param event The event name.
 	 * @param handler The event handler function.
 	 */
@@ -227,7 +227,7 @@ export namespace Lifecycle {
 
 	/**
 	 * Removes all event listeners for the specified event.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param event The event name.
 	 */
 	export const off = (event: string): void => {
@@ -236,7 +236,7 @@ export namespace Lifecycle {
 
 	/**
 	 * Removes all event listeners.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	export const clear = () => {
 		LifecycleBus.instance.removeAllListeners();

@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ declare const SECRET_SCHEMA: unique symbol;
 
 /**
  * The type of a schema made by {@link Secret.schema}: `Env.Infer` reads its value as a `Secret`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type SecretSchema<S extends TSchema = TSchema> = S & { readonly [SECRET_SCHEMA]: S };
 
@@ -43,7 +43,7 @@ const REDACTED = '[secret]';
 /**
  * A value that must not leak: it prints as `[secret]` in logs, `JSON.stringify`, string
  * conversion and error messages. Read it with `reveal()`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @template T The type of the value.
  */
 export class Secret<T = string> {
@@ -93,14 +93,14 @@ export class Secret<T = string> {
 
 /**
  * One missing or invalid environment variable.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type EnvironmentIssue = { key: string; message: string };
 
 /**
  * Thrown at boot when environment variables are missing or invalid. It lists every issue, and
  * never the values.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class InvalidEnvironmentError extends ElysiumError {
 	constructor(public readonly issues: EnvironmentIssue[]) {
@@ -112,7 +112,7 @@ export class InvalidEnvironmentError extends ElysiumError {
 
 /**
  * Thrown when two schemas declare the same environment variable differently.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class ConflictingEnvironmentSchemaError extends ElysiumError {
 	constructor(
@@ -127,7 +127,7 @@ export class ConflictingEnvironmentSchemaError extends ElysiumError {
 
 /**
  * Merges the environment schema of the app with those of the active modules (`envSchema`).
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param appSchema The `env` option of the application.
  * @param graph The module graph, or `null` for the app schema alone.
  * @throws {ConflictingEnvironmentSchemaError} When two schemas declare a key differently.
@@ -161,7 +161,7 @@ export const mergeEnvironmentSchemas = (
 /**
  * Validates environment variables against a schema: applies defaults, converts strings to the
  * declared types, keeps only the declared keys and wraps secrets.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param schema The merged schema.
  * @param raw The variables from the runtime.
  * @returns The validated variables.

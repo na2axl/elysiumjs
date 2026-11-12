@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ import { uuidv7 } from './ids';
 
 /**
  * What an outbox handler gets besides the payload and the row.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type OutboxContext = {
 	/**
@@ -56,7 +56,7 @@ export const effectHandler = (kind: string): EffectHandler | undefined => EFFECT
 
 /**
  * Registers the handler of a kind of effect with a function, for packages that ship effects.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param kind The kind of effect.
  * @param handler Gets the payload and the row; throwing retries the row later.
  * @param policy `attempts` gives the attempts of a row, when they differ from `maxRelayAttempts`.
@@ -76,7 +76,7 @@ const MAX_DELAY_MS = 3_600_000;
 
 /**
  * The delay before the next attempt of an outbox row: 5 s, 10 s, 20 s, ... up to 1 h.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param attempts The failed attempts so far.
  */
 export const backoffMs = (attempts: number): number =>
@@ -84,13 +84,13 @@ export const backoffMs = (attempts: number): number =>
 
 /**
  * What one relay did.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type RelaySummary = { dispatched: number; retried: number; dead: number };
 
 /**
  * Narrows and sizes one relay.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type RelayOptions = {
 	/** Relay only the rows of these kinds. */
@@ -137,7 +137,7 @@ export namespace Outbox {
 	 * 	context.replacePayload({ ...payload, code: null });
 	 * }
 	 * ```
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param kind The kind of effect.
 	 */
 	export const handle =
@@ -158,7 +158,7 @@ export namespace Outbox {
 	/**
 	 * Writes effects to the outbox of the current module, in the open unit of work: they happen if
 	 * and only if it commits. Once it has, the effects relay (see the `relayOnCommit` option).
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param effects The effects.
 	 * @returns The ids of the rows, in order.
 	 */
@@ -205,7 +205,7 @@ export namespace Outbox {
 	 * The claim, each row (its handler and its mark) and each failure run in units of work of their
 	 * own, so a handler whose statement fails rolls back alone and its failure is still recorded.
 	 * Call it outside a unit of work.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param relayOptions The rows to relay.
 	 */
 	export const relay = (relayOptions: RelayOptions = {}): Promise<RelaySummary> =>
@@ -271,7 +271,7 @@ export namespace Outbox {
 	 * dispatches nothing. With `module`, it relays the outbox of that module; without it, the
 	 * outbox of `MoiraiModule` and the one of each module that lists its own with
 	 * `Moirai.stores()`.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param relayOptions The kinds to relay, the batch size and the module.
 	 */
 	export const sweep = async (
@@ -302,7 +302,7 @@ export namespace Inbox {
 	/**
 	 * Runs work unless this consumer already processed the message, as recorded in the inbox of the
 	 * current module. Call it in the consumer's unit of work, so that a failure rolls the record back and the redelivery runs the work again.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param message The id of the message and the name of the consumer.
 	 * @param work The work.
 	 * @returns Whether the work ran.

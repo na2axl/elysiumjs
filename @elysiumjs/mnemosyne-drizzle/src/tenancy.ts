@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -52,7 +52,7 @@ const assertTenantId = (tenant: string): void => {
 
 /**
  * Returns the Drizzle `PgSchema` for the given tenant, creating it if needed.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param tenant The tenant identifier.
  * @returns The tenant's PostgreSQL schema.
  * @throws {Error} If the tenant identifier is malformed.
@@ -64,7 +64,7 @@ export const getTenantSchema = (tenant: string): PgSchema => {
 
 /**
  * Registers a new tenant schema in the registry.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param tenant The tenant identifier.
  * @returns The newly registered (or existing) `PgSchema`.
  * @throws {Error} If the tenant identifier is malformed.
@@ -85,7 +85,7 @@ export const registerTenantSchema = (tenant: string): PgSchema => {
  * For the `'public'` tenant, returns a standard `pgTable`.
  * For other tenants, creates a schema-qualified table and caches it.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param tenant The tenant identifier.
  * @param tableName The table name.
  * @param columns The column definitions.
@@ -128,7 +128,7 @@ export const wrapTenantSchema = <
  * `Database.getConnection()` use it inside the callback. When a transaction is already open on the
  * connection, the callback joins it if it is bound to the same tenant. Work for several tenants
  * (such as an admin fan-out) must use one `withRLS()` per tenant, outside any transaction.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param tenant The tenant identifier (or `null` for 'public').
  * @param callback The function to execute within the transaction.
  * @param connectionName The database connection name.
@@ -151,7 +151,7 @@ export const withRLS = async <T>(
 /**
  * Reads the current tenant from the PostgreSQL tenant variable, on the open transaction when
  * there is one.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param connectionName The database connection name.
  * @returns The current tenant identifier, or `null`.
  */
@@ -171,7 +171,7 @@ export const getSessionTenant = async (
 
 /**
  * Creates an RLS policy for tenant isolation on a table.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param tableName The table name.
  * @param columnName The tenant column name (defaults to config or 'tenant_id').
  * @param policyName The policy name (defaults to `{tableName}_tenant_isolation`).
@@ -201,7 +201,7 @@ export const createRLSPolicy = (tableName: string, columnName?: string, policyNa
  * Each tenant gets its own PostgreSQL schema. Table resolution maps
  * the base table to a schema-qualified equivalent.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class DrizzleSchemaTenancy implements TenancyStrategy<PgTable, DrizzleConnection> {
 	readonly mode = 'schema';
@@ -234,7 +234,7 @@ export class DrizzleSchemaTenancy implements TenancyStrategy<PgTable, DrizzleCon
  * All tenants share the same schema. Isolation is achieved via
  * PostgreSQL RLS policies and a session variable set in each transaction.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class DrizzleRLSTenancy implements TenancyStrategy<PgTable, DrizzleConnection> {
 	readonly mode = 'rls';
@@ -251,7 +251,7 @@ export class DrizzleRLSTenancy implements TenancyStrategy<PgTable, DrizzleConnec
 	 * for the connection, and the tenant set as the current tenant, for the duration of the
 	 * callback. When a transaction is already open on the connection, the callback joins it, which
 	 * is only allowed when that transaction is bound to the same tenant.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param connection The base connection (see `Database.getBaseConnection`).
 	 * @param tenant The tenant identifier.
 	 * @param callback The function to execute within the isolated context.

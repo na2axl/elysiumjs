@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ const statusOf = (error: unknown): number => {
  * the status, the duration in milliseconds, the client address and the `x-request-id` header when
  * present. Server errors are logged at `error`, client errors at `warn`, the rest at `info`. Use it
  * as an app interceptor; streaming routes do not run interceptors.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
  * @Application.register({ modules: [HermesModule], interceptors: [RequestLogInterceptor] })

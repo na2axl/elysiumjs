@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ const MODULE_NAME = /^[a-z][a-z0-9-]*$/;
 
 /**
  * Thrown when a project or module name given to `styx create` is not usable.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class InvalidNameError extends ElysiumError {
 	/**
@@ -43,7 +43,7 @@ export class InvalidNameError extends ElysiumError {
 
 /**
  * Checks a project name, which must be a lower-case npm package name, optionally scoped.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param name The project name.
  * @returns The name of the project directory: the name without its scope.
  * @throws {InvalidNameError} When the name is not a valid package name.
@@ -64,7 +64,7 @@ export const validateProjectName = (name: string): string => {
 
 /**
  * Checks a module name.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param name The module name.
  * @returns The name, unchanged.
  * @throws {InvalidNameError} When the name does not start with a lower-case letter followed by
@@ -83,7 +83,7 @@ export const validateModuleName = (name: string): string => {
 
 /**
  * Resolves the directory of a new project, which must lie strictly inside `base`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param base The folder the project is created in.
  * @param directory The project directory, from {@link validateProjectName}.
  * @returns The absolute project path.

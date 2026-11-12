@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ const CATCH = Symbol('elysium:Catch');
 /**
  * The context an exception filter receives: the request, the response being built (`set`), the
  * route and its parameters, as Elysia's error hook gives them.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type FilterContext = {
 	request: Request;
@@ -43,7 +43,7 @@ export type FilterContext = {
  * Turns some errors into responses. Return a value to send it (a body, a `Response`, or problem
  * details, sent as `application/problem+json`), or `undefined` to pass the error to the next
  * level. Filters are services: they can inject other services of their module.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @template TError The errors the filter handles.
  */
 export interface ExceptionFilter<TError = any> {
@@ -52,14 +52,14 @@ export interface ExceptionFilter<TError = any> {
 
 /**
  * A class of exception filter.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type FilterClass = Class<ExceptionFilter>;
 
 /**
  * Declares which errors an exception filter handles, by class (`instanceof`). Without arguments,
  * the filter handles every error. Only records metadata.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param errors The error classes handled by the filter.
  * @example
  * ```ts
@@ -79,7 +79,7 @@ export const Catch =
 
 /**
  * One level of filters (route, controller, module or app) and the module they run in.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type FilterLevel = { filters: FilterClass[]; node: ModuleNode | null };
 
@@ -118,7 +118,7 @@ const instanceOf = (level: FilterLevel, cls: FilterClass): ExceptionFilter => {
  * Runs the filters of each level in order, and returns the response of the first one that
  * returns a value. Each filter runs in its module's context and in the request scope. A filter
  * that throws is logged, and the original error goes on to the next filter.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param levels The levels, most specific first.
  * @param error The error to handle.
  * @param ctx The error context of the request.

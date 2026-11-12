@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ import { Service } from './service';
 
 /**
  * Options of {@link Application.testing}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type TestingOptions = {
 	/** The modules to boot. */
@@ -50,7 +50,7 @@ export type TestingOptions = {
 
 /**
  * A booted module graph, for tests.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type TestingApp = {
 	/** The kernel running the graph. */
@@ -71,7 +71,7 @@ export type TestingApp = {
  * Empties the service container and clears its overrides, module visibility rules, module
  * init hook and skipped-module lookup. The container is global to the process: call this
  * between tests or scenarios that each boot their own application.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const resetContainer = (): void => {
 	Container.reset();
@@ -83,7 +83,7 @@ export const resetContainer = (): void => {
 
 /**
  * Options of {@link Application.testing} for a whole application, driven over HTTP.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type TestingAppOptions = {
 	/** The application class to build. It must not be started. */
@@ -98,7 +98,7 @@ export type TestingAppOptions = {
 
 /**
  * A built application under test, with an HTTP client that drives it in memory.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type TestingHttpApp = TestingApp & {
 	/** The application instance. */
@@ -118,7 +118,7 @@ const applyOverrides = (overrides: Record<string, unknown> | Map<ServiceToken, u
  * Builds an application, as a host that owns the server would (`app.build()`), and returns an
  * HTTP client for it. Modules boot on the first request.
  * @param options See {@link TestingAppOptions}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export async function createTestingHttpApp(options: TestingAppOptions): Promise<TestingHttpApp> {
 	const { app: App, overrides = {} } = options;
@@ -155,7 +155,7 @@ export async function createTestingHttpApp(options: TestingAppOptions): Promise<
 /**
  * Boots a module graph without a CLI or an HTTP server.
  * @param options See {@link TestingOptions}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export async function createTestingApp(options: TestingOptions): Promise<TestingApp> {
 	const { modules, overrides = {}, environment = 'test', boot = 'lazy' } = options;

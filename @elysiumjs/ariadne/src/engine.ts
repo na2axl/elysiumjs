@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ import { FLOW_KEY_HEADER, FLOW_OWNER_HEADER, FLOW_STEP_HEADER } from './store';
 
 /**
  * The Elysia context the flow routes read.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type FlowHttpContext = {
 	request: Request;
@@ -43,7 +43,7 @@ export type FlowHttpContext = {
 
 /**
  * How flows are served, set by `AriadneModule.with()`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type FlowOptions = {
 	/** Where flows live. */
@@ -87,7 +87,7 @@ const engines = new WeakMap<FlowDescription, FlowEngine>();
 
 /**
  * Starts flows, reads where they stand and runs their steps, for one flow controller.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class FlowEngine {
 	/** The engine of a flow. */

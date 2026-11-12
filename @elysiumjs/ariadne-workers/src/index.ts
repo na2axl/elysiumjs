@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ type Phase = 'active' | 'tombstone' | 'marker';
  *
  * Each commit pushes the expiry alarm to its TTL. A finished flow keeps its answer for up to 10
  * minutes, then only its owner and end time for its TTL, then deletes itself.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
  * // worker.ts
@@ -134,7 +134,7 @@ export class FlowStoreObject extends DurableObject {
 
 /**
  * The RPC surface of {@link FlowStoreObject}, as a binding's stub exposes it.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type FlowStoreStub = {
 	init(owner: string, ttlSeconds: number): Promise<void>;
@@ -147,7 +147,7 @@ export type FlowStoreStub = {
 
 /**
  * The slice of a Durable Object namespace binding that {@link durableFlowStore} uses.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type FlowStoreNamespace = {
 	idFromName(name: string): unknown;
@@ -156,7 +156,7 @@ export type FlowStoreNamespace = {
 
 /**
  * A flow store over the {@link FlowStoreObject} binding: one object per flow.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param binding The binding, or a function that returns it, such as
  * `() => Workers.env().FLOWS`.
  * @example

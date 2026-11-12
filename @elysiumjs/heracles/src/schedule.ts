@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ const SCHEDULES = Symbol.for('elysium:heracles:Schedules');
 
 /**
  * Options of {@link Scheduler.job}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ScheduleOptions = {
 	/** The arguments the job is dispatched with. */
@@ -43,7 +43,7 @@ export type ScheduleOptions = {
 
 /**
  * Raised when two scheduler classes have the same name.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class DuplicateSchedulerError extends ElysiumError {
 	constructor(name: string) {
@@ -53,7 +53,7 @@ export class DuplicateSchedulerError extends ElysiumError {
 
 /**
  * A schedule of a job class, or of a scheduler class that fans out its job.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type JobSchedule = {
 	readonly cron: CronSchedule;
@@ -65,7 +65,7 @@ export type JobSchedule = {
 
 /**
  * The schedules of a job class.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param jobClass The job class.
  */
 export const schedulesOf = (jobClass: Function): readonly JobSchedule[] =>
@@ -74,14 +74,14 @@ export const schedulesOf = (jobClass: Function): readonly JobSchedule[] =>
 /**
  * A scheduled job, with one of its schedules. For a scheduler class, `name` is the name of the
  * scheduler.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ScheduledJob = { name: string; jobClass: JobClass<any, any>; schedule: JobSchedule };
 
 /**
  * A job a scheduler dispatches: the key that names it in its dispatch id, and the arguments of
  * the job.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type FanOutCase<TJob extends JobClass<any, any> = JobClass<any, any>> = {
 	key: string;
@@ -90,7 +90,7 @@ export type FanOutCase<TJob extends JobClass<any, any> = JobClass<any, any>> = {
 
 /**
  * Properties of {@link Scheduler.register}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type SchedulerProps<TJob extends JobClass<any, any> = JobClass<any, any>> = {
 	/** The cron expression (5 fields, or an alias such as `@daily`), in UTC. */
@@ -103,7 +103,7 @@ export type SchedulerProps<TJob extends JobClass<any, any> = JobClass<any, any>>
 
 /**
  * A scheduler class.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type SchedulerClass<TJob extends JobClass<any, any> = JobClass<any, any>> = new (
 	...args: any[]
@@ -123,7 +123,7 @@ export const clearSchedulers = (): void => SCHEDULERS.clear();
  *
  * The static methods run the schedules of the application: {@link ScheduleRunner} and
  * `HeraclesWorkersModule` call them.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
  * @Scheduler.register({ cron: '0 6 * * *', job: BillInvoice })
@@ -146,7 +146,7 @@ export abstract class Scheduler<TJob extends JobClass<any, any> = JobClass<any, 
 	 * `HeraclesWorkersModule` (`@elysiumjs/heracles-workers`) dispatches the jobs whose expression is
 	 * the one of the cron trigger, so list the same expression in the wrangler config. A job can have
 	 * several schedules. To dispatch one job per case due at a tick, extend {@link Scheduler}.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param cron The cron expression (5 fields, or an alias such as `@daily`).
 	 * @param options The arguments of the dispatch.
 	 * @throws {InvalidCronError} When the expression is not valid.
@@ -188,7 +188,7 @@ export abstract class Scheduler<TJob extends JobClass<any, any> = JobClass<any, 
 	/**
 	 * The scheduled jobs of the application: the jobs of the registry marked with `@Scheduler.job()`,
 	 * and the scheduler classes.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	public static jobs(): ScheduledJob[] {
 		const scheduled: ScheduledJob[] = JobRegistry.all().flatMap(({ name, jobClass }) =>
@@ -207,7 +207,7 @@ export abstract class Scheduler<TJob extends JobClass<any, any> = JobClass<any, 
 	/**
 	 * The distinct cron expressions of the scheduled jobs, sorted: the cron triggers a Cloudflare
 	 * Worker needs, since a trigger runs the jobs whose expression is exactly its own.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	public static crons(): string[] {
 		return [...new Set(Scheduler.jobs().map(({ schedule }) => schedule.cron.expression))].sort();
@@ -216,7 +216,7 @@ export abstract class Scheduler<TJob extends JobClass<any, any> = JobClass<any, 
 	/**
 	 * Compares declared cron triggers, such as the `triggers.crons` of a `wrangler.jsonc`, with
 	 * the cron expressions of the scheduled jobs.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param declared The declared cron triggers.
 	 * @returns The expressions no trigger runs (`missing`) and the triggers no job uses (`extra`).
 	 */
@@ -231,7 +231,7 @@ export abstract class Scheduler<TJob extends JobClass<any, any> = JobClass<any, 
 	/**
 	 * The scheduled jobs whose expression is exactly the given one, such as the cron of a
 	 * Cloudflare cron trigger.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param cron The cron expression.
 	 */
 	public static jobsFor(cron: string): ScheduledJob[] {
@@ -240,7 +240,7 @@ export abstract class Scheduler<TJob extends JobClass<any, any> = JobClass<any, 
 
 	/**
 	 * Dispatches a scheduled job: once, or once per case its scheduler selects.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param job The scheduled job.
 	 * @param at The tick. Defaults to now; it is taken to the minute, in UTC.
 	 * @returns The number of jobs dispatched.
@@ -277,7 +277,7 @@ export abstract class Scheduler<TJob extends JobClass<any, any> = JobClass<any, 
 
 	/**
 	 * The dispatch id of a job of a scheduler: the same for one scheduler, case and tick.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param scheduler The name of the scheduler.
 	 * @param key The key of the case.
 	 * @param tick The tick.
@@ -296,7 +296,7 @@ export abstract class Scheduler<TJob extends JobClass<any, any> = JobClass<any, 
 
 /**
  * Options of the {@link ScheduleRunner}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ScheduleRunnerOptions = {
 	/**
@@ -314,7 +314,7 @@ const MAX_WAIT = 24 * 60 * 60 * 1000;
 /**
  * Dispatches the scheduled jobs at their times, with in-process timers. With a Redis connection,
  * each tick takes a lock first, so that running it in several processes dispatches each tick once.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class ScheduleRunner {
 	readonly #options: ScheduleRunnerOptions;
@@ -332,7 +332,7 @@ export class ScheduleRunner {
 
 	/**
 	 * Plans the next tick of every scheduled job.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @returns The scheduled jobs.
 	 */
 	public start(): ScheduledJob[] {

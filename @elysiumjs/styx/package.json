@@ -4,7 +4,7 @@
   "license": "Apache-2.0",
   "description": "The command line tool of the Elysium.js framework: creates projects, generates code and runs app commands.",
   "private": false,
-  "author": "Workbud Technologies Inc.",
+  "author": "Axel Nana <ax.lnana@outlook.com>",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/na2axl/elysiumjs.git",

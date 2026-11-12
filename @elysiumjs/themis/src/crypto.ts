@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -49,7 +49,7 @@ export const randomToken = (bytes = 32): string => toBase64Url(randomBytes(bytes
 /**
  * Compares two strings in a time that does not depend on where they differ. Their lengths are not
  * secret.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const safeEqual = (a: string, b: string): boolean => {
 	const left = utf8(a);
@@ -130,7 +130,7 @@ const aesKey = (secret: string, purpose: string): Promise<CryptoKey> => {
 /**
  * Encrypts and authenticates a string with AES-256-GCM, under a key derived from a secret for a
  * purpose. The result is base64url: the 12-byte IV, then the ciphertext and its tag.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const encrypt = async (
 	secret: string,
@@ -154,7 +154,7 @@ export const encrypt = async (
 /**
  * Decrypts a value of {@link encrypt}, or answers `null` when it was tampered with or sealed under
  * another secret.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const decrypt = async (
 	secret: string,

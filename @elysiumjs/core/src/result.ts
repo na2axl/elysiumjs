@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@ import { DomainError } from './problem';
 
 /**
  * A result that passed: its value.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class Passed<T> {
 	public constructor(public readonly result: T) {}
@@ -59,7 +59,7 @@ export class Passed<T> {
 
 /**
  * A result that failed: the DomainError that says why.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class Failed<E extends DomainError> {
 	public constructor(public readonly error: E) {}
@@ -106,7 +106,7 @@ export class Failed<E extends DomainError> {
  * error; `errorOr(transform)` gives the error or the transformed value, as a handler returns it.
  *
  * A handler may return a `Result`: a passed one answers its value, a failed one its problem.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
  * const mayBuy = (account: Account): Result<Buyer, ForbiddenError> =>
@@ -163,7 +163,7 @@ export namespace Result {
  * {@link Result}; its methods mirror those of a result and chain without awaiting first.
  *
  * `Result` itself is not a thenable: awaiting would unwrap it. `AsyncResult` is the promise of one.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
  * const wallet = await AsyncResult.from(wallets.open(userId)).orThrow();

@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -44,7 +44,7 @@ const columnOf = (table: PgTableWithColumns<any>, column: string): PgColumn => {
 
 /**
  * Compiles one filter of a parsed query to a Drizzle condition.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param table The table queried.
  * @param filter The filter.
  */
@@ -78,7 +78,7 @@ export const compileFilter = (table: PgTableWithColumns<any>, filter: ParsedFilt
 /**
  * Compiles the condition that keeps the rows after the cursor, in sort order: a keyset condition
  * over every sort key, the row key last.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param table The table queried.
  * @param query The parsed query, with `after` set.
  */
@@ -100,7 +100,7 @@ export const compileAfter = (
 
 /**
  * Compiles a parsed query: the `where` condition (filters and cursor) and the `order by`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param table The table queried.
  * @param query The parsed query.
  */

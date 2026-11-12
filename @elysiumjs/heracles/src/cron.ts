@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@ import { ElysiumError } from '@elysiumjs/core';
 
 /**
  * Raised when a cron expression cannot be parsed.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class InvalidCronError extends ElysiumError {
 	constructor(
@@ -54,7 +54,7 @@ const ALIASES: Record<string, string> = {
 /**
  * A parsed cron expression: the values each field allows, and whether the day of the month and
  * the day of the week were restricted (when both are, a day matching either one matches).
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type CronSchedule = {
 	readonly expression: string;
@@ -108,7 +108,7 @@ export namespace Cron {
 	 * Parses a 5-field cron expression (minute, hour, day of month, month, day of week), with
 	 * lists, ranges, steps, month and day names, and the `@hourly`, `@daily`, `@weekly`,
 	 * `@monthly` and `@yearly` aliases. Times are UTC, as in Cloudflare cron triggers.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param expression The expression.
 	 * @throws {InvalidCronError} When the expression is not valid.
 	 */
@@ -134,7 +134,7 @@ export namespace Cron {
 
 	/**
 	 * Whether a minute matches a schedule.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param schedule The parsed schedule.
 	 * @param date The minute, read in UTC.
 	 */
@@ -152,7 +152,7 @@ export namespace Cron {
 
 	/**
 	 * The first minute after `from` that matches a schedule.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param schedule The parsed schedule.
 	 * @param from The time to start after.
 	 * @throws {InvalidCronError} When no minute matches within 5 years (such as `0 0 31 2 *`).

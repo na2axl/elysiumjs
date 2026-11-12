@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ import { nextTick, Symbols } from './utils';
 
 /**
  * Options used to register a WAMP RPC for invocation.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type WampRegistrationOptions = {
 	/**
@@ -50,13 +50,13 @@ export type WampRegistrationOptions = {
 
 /**
  * Options used to subscribe to a WAMP topic.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type WampSubscriptionOptions = Omit<WampRegistrationOptions, 'invoke'>;
 
 /**
  * Properties required when declaring a WAMP controller using the `@wamp()` decorator.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type WampProps = {
 	/**
@@ -68,7 +68,7 @@ export type WampProps = {
 
 /**
  * Properties required when declaring a WAMP client in the application properties.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type WampClientProps = {
 	/**
@@ -141,13 +141,13 @@ export type WampClientProps = {
 
 /**
  * The WAMP client, as provided by Wampy.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type WampClient = Wampy;
 
 /**
  * Data sent to a WAMP RPC.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type WampRegistrationHandlerArgs<TList = any[], TDict = any> = {
 	/**
@@ -183,7 +183,7 @@ export type WampRegistrationHandlerArgs<TList = any[], TDict = any> = {
 
 /**
  * Data sent to a WAMP subscription.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type WampSubscriptionHandlerArgs = Omit<
 	WampRegistrationHandlerArgs,
@@ -192,21 +192,21 @@ export type WampSubscriptionHandlerArgs = Omit<
 
 /**
  * The WAMP RPC handler function.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param data The data sent to the handler.
  */
 export type WampRegistrationHandler = <T = any>(data: WampRegistrationHandlerArgs) => T;
 
 /**
  * The WAMP subscription handler function.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param data The data sent to the handler.
  */
 export type WampSubscriptionHandler = <T = any>(data: WampSubscriptionHandlerArgs) => T;
 
 /**
  * Metadata for a WAMP RPC.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 type WampRegistration = {
 	/**
@@ -227,7 +227,7 @@ type WampRegistration = {
 
 /**
  * Metadata for a WAMP subscription.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 type WampSubscription = {
 	/**
@@ -249,7 +249,7 @@ type WampSubscription = {
 export namespace Wamp {
 	/**
 	 * Creates a service name for a WAMP connection.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param name The name of the connection.
 	 * @returns A service name for the connection.
 	 */
@@ -259,7 +259,7 @@ export namespace Wamp {
 
 	/**
 	 * Retrieves the client for a WAMP connection declared by the {@link WampModule}.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param name The name of the connection.
 	 * @returns The Wampy client for the connection with the given name.
 	 * @throws {ServiceNotFoundError} If no connection with that name is declared.
@@ -272,7 +272,7 @@ export namespace Wamp {
 
 	/**
 	 * Checks if a WAMP connection with the given name exists.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param name The name of the connection.
 	 * @returns `true` if the connection exists, `false` otherwise.
 	 */
@@ -282,7 +282,7 @@ export namespace Wamp {
 
 	/**
 	 * Retrieves the default WAMP connection.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @returns The default WAMP connection.
 	 */
 	export const getDefaultConnection = () => {
@@ -291,7 +291,7 @@ export namespace Wamp {
 
 	/**
 	 * Creates a WAMP client and starts connecting it, retrying on failure.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	export const createClient = (name: string, config: WampClientProps): WampClient => {
 		const client = new Wampy(config.url, {
@@ -374,7 +374,7 @@ export namespace Wamp {
 
 	/**
 	 * Marks a class as a WAMP controller.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param options The decorator options.
 	 */
 	export const controller = (options: WampProps) => {
@@ -456,7 +456,7 @@ export namespace Wamp {
 
 	/**
 	 * Registers a method as a WAMP RPC.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param topic The RPC topic to register.
 	 * @param options The registration options.
 	 */
@@ -477,7 +477,7 @@ export namespace Wamp {
 
 	/**
 	 * Subscribes to a WAMP topic.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param topic The topic to subscribe to.
 	 * @param options The subscription options.
 	 */
@@ -499,7 +499,7 @@ export namespace Wamp {
 
 /**
  * Configuration of the {@link WampModule}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type WampModuleConfig = {
 	/** The name of the connection that `default` resolves to. */
@@ -512,7 +512,7 @@ export type WampModuleConfig = {
 /**
  * Declares WAMP connections as global services named `wamp.connection.{name}`, plus
  * `wamp.connection.default` aliasing the configured default. Clients are created on first use.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 @Module.register<WampModuleConfig>({
 	services: (config) => {

@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -41,7 +41,7 @@ registerEffect(HERACLES_JOB_EFFECT, async (payload) => {
 /**
  * An outbox effect that dispatches a Heracles job once the action commits, with the retries of
  * the outbox until the job is queued.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param jobClass The job class, registered in a module's `jobs`.
  * @param args The arguments of the job, JSON-safe.
  * @param options The dispatch options.
@@ -62,7 +62,7 @@ export const job = <TClass extends JobClass<any>>(
 
 /**
  * Raised when `@Once()` goes on a class without an `execute()` method.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class InvalidOnceJobError extends ElysiumError {
 	constructor(name: string) {
@@ -75,7 +75,7 @@ export class InvalidOnceJobError extends ElysiumError {
  * record of the dispatch id, so a delivery that comes again, or a tick handled twice, does nothing.
  * Made for the jobs of a `Scheduler`, whose dispatch id names the scheduler, the case and the
  * tick. Without a database module, the record and the work run without a transaction.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * The record goes to the inbox of the module that registers the job.
  * @param options The inbox consumer. Defaults to the job name.
  * @example

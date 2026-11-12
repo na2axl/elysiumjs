@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ const canonical = (value: unknown): unknown => {
 /**
  * The fingerprint of an action input: the hex SHA-256 of its canonical JSON, so that the same input
  * gives the same hash whatever the order of its keys.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param input The validated input.
  */
 export const requestHash = async (input: unknown): Promise<string> => {

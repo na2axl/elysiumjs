@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ import { z } from 'zod';
 
 /**
  * Supported compilation target platforms.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const PlatformTargetSchema = z.enum([
 	'linux-x64',
@@ -31,13 +31,13 @@ export const PlatformTargetSchema = z.enum([
 
 /**
  * A supported compilation target platform.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type PlatformTarget = z.infer<typeof PlatformTargetSchema>;
 
 /**
  * Hephaestus build configuration schema.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const HephaestusConfigSchema = z.object({
 	entry: z.string().default('./src/index.ts'),
@@ -118,6 +118,6 @@ export const HephaestusConfigSchema = z.object({
 
 /**
  * Hephaestus build configuration.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type HephaestusConfig = z.infer<typeof HephaestusConfigSchema>;

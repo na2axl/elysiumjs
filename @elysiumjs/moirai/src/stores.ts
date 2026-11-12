@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ import { ConcurrencyConflictError, IdempotencyConflictError } from './errors';
 /**
  * What an idempotency store keeps of an action call: its response, replayed when the key comes
  * back with the same request.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface IdempotencyRecord {
 	key: string;
@@ -34,7 +34,7 @@ export interface IdempotencyRecord {
 /**
  * Where idempotent actions keep their responses. `put` runs in the action's unit of work, and
  * throws {@link IdempotencyConflictError} when another call stored the key first.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface IdempotencyStore {
 	get(key: string): Promise<IdempotencyRecord | undefined>;
@@ -44,7 +44,7 @@ export interface IdempotencyStore {
 /**
  * Serializes the actions that share a key (`serializeBy`): `lock` waits for the other holders,
  * and the lock lasts until the unit of work ends, or until the returned release runs.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface ActionLock {
 	lock(key: string): Promise<(() => void) | void>;
@@ -53,7 +53,7 @@ export interface ActionLock {
 /**
  * A side effect an action asks for. It is written to the outbox in the action's unit of work,
  * so it happens if and only if the action commits.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface OutboxEffect {
 	/** The kind, which picks the `@Outbox.handle()` handler. */
@@ -66,7 +66,7 @@ export interface OutboxEffect {
 
 /**
  * A row of the outbox.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface OutboxRow {
 	id: string;
@@ -83,7 +83,7 @@ export interface OutboxRow {
 /**
  * Narrows the rows a relay claims. Both fields must match when both are set; an empty list
  * matches nothing.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface OutboxClaimFilter {
 	kinds?: readonly string[];
@@ -92,7 +92,7 @@ export interface OutboxClaimFilter {
 
 /**
  * Claims due outbox rows for one relay.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface OutboxClaim extends OutboxClaimFilter {
 	now: Date;
@@ -106,7 +106,7 @@ export interface OutboxClaim extends OutboxClaimFilter {
  * whose `availableAt` has passed, oldest first, and moves their `availableAt` to `leaseUntil` in
  * the same statement, so that other relays leave them alone while this one handles them. Each
  * row is then handled and marked in a transaction of its own.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface OutboxStore {
 	insert(rows: readonly OutboxRow[]): Promise<void>;
@@ -131,7 +131,7 @@ export interface OutboxStore {
 /**
  * Where consumers remember the messages they processed. `record` answers `true` when the pair of
  * the message and the consumer is new.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface InboxStore {
 	record(messageId: string, consumer: string): Promise<boolean>;
@@ -139,7 +139,7 @@ export interface InboxStore {
 
 /**
  * Keeps idempotency records in memory, for tests and single-process apps.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class MemoryIdempotencyStore implements IdempotencyStore {
 	readonly #records = new Map<string, IdempotencyRecord>();
@@ -157,7 +157,7 @@ export class MemoryIdempotencyStore implements IdempotencyStore {
 
 /**
  * Serializes actions in the process, one holder per key at a time.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class MemoryActionLock implements ActionLock {
 	readonly #tails = new Map<string, Promise<void>>();
@@ -178,7 +178,7 @@ export class MemoryActionLock implements ActionLock {
 
 /**
  * Keeps outbox rows in memory, for tests and single-process apps.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class MemoryOutboxStore implements OutboxStore {
 	readonly #rows = new Map<string, OutboxRow>();
@@ -244,7 +244,7 @@ export class MemoryOutboxStore implements OutboxStore {
 
 /**
  * Keeps inbox records in memory, for tests and single-process apps.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class MemoryInboxStore implements InboxStore {
 	readonly #seen = new Set<string>();
@@ -261,7 +261,7 @@ export class MemoryInboxStore implements InboxStore {
 
 /**
  * One event of a stream, as an {@link EventStore} keeps it.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface StoredEventRecord {
 	/** The place of the event in the whole log, given by the store. Absent before it is appended. */
@@ -286,7 +286,7 @@ export interface StoredEventRecord {
 
 /**
  * Keeps the event streams of aggregates.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface EventStore {
 	/**
@@ -311,7 +311,7 @@ export interface EventStore {
 
 /**
  * Which events {@link EventStore.readAll} reads.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type EventReadFilter = {
 	/** Only these types of events. */
@@ -325,7 +325,7 @@ export type EventReadFilter = {
 /**
  * Resets the read models of projections for their rebuild, and keeps the version each projection
  * was last built with.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface ProjectionStorage {
 	/**
@@ -349,7 +349,7 @@ export interface ProjectionStorage {
 
 /**
  * Keeps event streams in memory, for tests and single-process apps.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class MemoryEventStore implements EventStore {
 	readonly #records: StoredEventRecord[] = [];
@@ -406,7 +406,7 @@ export class MemoryEventStore implements EventStore {
 /**
  * Keeps projection versions in memory, and resets models with a function, for tests and
  * single-process apps.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class MemoryProjectionStorage implements ProjectionStorage {
 	readonly #versions = new Map<string, number>();

@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import { Seeder } from '../seeder';
  * Runs the seeders of the active modules, in order, each in its own transaction. The app boots
  * lazily: only the services the seeders take are built, so services that need a host (such as
  * the bindings of a Worker) do not stop a seed run.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 @Command.register()
 export class DbSeedCommand extends Command {

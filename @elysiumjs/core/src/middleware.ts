@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ import { Symbols } from './utils';
 
 /**
  * Execute a chain of middlewares, stopping on the first return or throw.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param middlewares The list of middleware instances to execute.
  * @param context The context to pass to each middleware.
  * @param method The method to call on each middleware.
@@ -68,13 +68,13 @@ export const executeMiddlewareChain = (
 
 /**
  * The status responses thrown by middlewares to stop a request. They are responses, not errors.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const middlewareStops = new WeakSet<object>();
 
 /**
  * Builds middleware instances in the context of a module.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param middlewares The middleware classes.
  * @param node The owning module, or `null` to build them with global visibility only.
  */
@@ -91,7 +91,7 @@ export const makeMiddlewares = (
 
 /**
  * Apply a list of middlewares to an Elysia plugin.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param middlewares The list of middlewares to apply.
  * @param plugin The Elysia plugin instance.
  * @param node The module the middlewares belong to, or `null` for application-level middlewares.
@@ -102,7 +102,7 @@ type Enlisted = { middlewares: Middleware[]; node: ModuleNode | null };
 
 /**
  * Remembers the middlewares a request went through, so that their onError runs if it fails.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const enlist = (context: any, middlewares: Middleware[], node: ModuleNode | null): void => {
 	const list: Enlisted[] = (context[ERROR_HOOKS] ??= []);
@@ -112,7 +112,7 @@ export const enlist = (context: any, middlewares: Middleware[], node: ModuleNode
 /**
  * Runs the `onError` hook of the middlewares a failed request went through, innermost first.
  * Called by the error handler before it builds the response; a failing hook is logged.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param context The context of the failed request, with its `error`.
  */
 export const runErrorMiddlewares = async (context: any): Promise<void> => {
@@ -194,13 +194,13 @@ export const applyMiddlewares = (
 
 /**
  * Base class for middleware.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @template TGuards The list of guards for the middleware.
  */
 export abstract class Middleware<TGuards extends string[] = string[]> {
 	/**
 	 * Registers a list of middlewares to be applied on a controller or endpoint.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param middlewares The list of middlewares to apply.
 	 */
 	public static register(...middlewares: Class<Middleware>[]): ClassDecorator & MethodDecorator {
@@ -223,7 +223,7 @@ export abstract class Middleware<TGuards extends string[] = string[]> {
 
 	/**
 	 * Creates a guarded version of the middleware.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param guards The list of guards for the middleware.
 	 * @returns A middleware class decorated with guards.
 	 */
@@ -236,7 +236,7 @@ export abstract class Middleware<TGuards extends string[] = string[]> {
 	/**
 	 * Structured application logger resolved from the service container, falling back to a
 	 * `ConsoleLogger`. Returns a child logger with the middleware class name in context.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 */
 	protected get logger(): LoggerInterface {
 		return getLogger({ middleware: this.constructor.name });

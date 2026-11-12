@@ -89,7 +89,7 @@ Expected: FAIL - module not found
 
 ```typescript
 // src/table.ts
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -272,7 +272,7 @@ Expected: FAIL - signature mismatch
 
 ```typescript
 // src/model.ts - Rewrite with new signature
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -338,7 +338,7 @@ const mapDrizzleDataType = (col: PgColumn): ColumnMetadata['dataType'] => {
  * Bridges Drizzle's `PgTableWithColumns` to the framework's
  * normalized model metadata.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const drizzleAdapter: ModelAdapter<PgTableWithColumns<any>> = {
 	getTableName(table) {
@@ -380,7 +380,7 @@ export const drizzleAdapter: ModelAdapter<PgTableWithColumns<any>> = {
  * This is a convenience wrapper around `createSchemaFromModel` that
  * automatically extracts column metadata via the `drizzleAdapter`.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param table The Drizzle table to generate schemas for.
  * @param opts Schema generation options.
  * @returns An Elysia validation schema.
@@ -414,7 +414,7 @@ export interface DrizzleModelOptions {
 /**
  * Creates a model class backed by a Drizzle pgTable.
  *
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param table The Drizzle table (created with enhanced pgTable).
  * @param options Model configuration options.
  * @returns A model class with Drizzle-backed static metadata.
@@ -468,7 +468,7 @@ git commit -m "feat(mnemosyne-drizzle): simplify DrizzleModel to single table si
 
 ```typescript
 // src/index.ts
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.

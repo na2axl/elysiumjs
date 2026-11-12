@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ export const isJobMessage = (body: unknown): body is TransportProcessMessage =>
 
 /**
  * A job that failed its last retry.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type DeadJob = {
 	/** The job name. */
@@ -104,7 +104,7 @@ const bury = async (dead: DeadJob, options: DeadLetterOptions): Promise<void> =>
  * `maxRetries`; after that it goes to the `deadLetterQueue` of its queue's `transportOptions` and
  * to the `onDead` hook, when set, and is acked. A message for an unknown job is logged and acked. Messages that carry no job are left
  * to the other consumers.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @param message The queue message.
  * @param options What else happens to the jobs that failed their last retry.
  */

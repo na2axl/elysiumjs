@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ import { Service } from './service';
 /**
  * A unit of background work: what runs outside a request, such as a job, an event handler or an
  * outbox handler.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type BackgroundWork = {
 	/** What runs, such as `job`, `event` or `outbox`. */
@@ -32,7 +32,7 @@ export type BackgroundWork = {
 /**
  * Wraps every unit of background work, the way interceptors wrap requests: it sets what the work
  * needs around it, such as a config or an actor scope.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface BackgroundScope {
 	/**
@@ -49,7 +49,7 @@ const BACKGROUND_SCOPES = Service.tag<BackgroundScope>('elysium.background.scope
 /**
  * Background work: the scopes that wrap it, and the runner that the job, event and outbox
  * packages call.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export namespace Background {
 	/**
@@ -64,7 +64,7 @@ export namespace Background {
 	 * 	}
 	 * }
 	 * ```
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param props The service options.
 	 */
 	export const scope = (props: ServiceProps = {}) =>
@@ -72,7 +72,7 @@ export namespace Background {
 
 	/**
 	 * Runs a unit of background work inside every background scope.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param work What runs.
 	 * @param fn The work.
 	 * @returns What the work returns.

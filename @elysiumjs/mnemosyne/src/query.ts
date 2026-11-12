@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,20 +25,20 @@ import { t } from 'elysia';
  * - `in`: one of a comma-separated list.
  * - `contains`, `startsWith`: case-insensitive text matches.
  * - `isNull`: `true` or `false`.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type FilterOperator =
 	'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'contains' | 'startsWith' | 'isNull';
 
 /**
  * The type of a filtered or sorted field, which decides how its query values are read.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type QueryFieldType = 'string' | 'number' | 'boolean' | 'date' | 'uuid';
 
 /**
  * A filterable field.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type QueryFilterSpec<TOperator extends FilterOperator = FilterOperator> = {
 	/** The operators the field accepts. The first one is used by `filter[field]=value`. */
@@ -51,7 +51,7 @@ export type QueryFilterSpec<TOperator extends FilterOperator = FilterOperator> =
 
 /**
  * The filterable fields of a spec, each with its operators or its {@link QueryFilterSpec}.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type QueryFilters = Record<string, QueryFilterSpec | readonly FilterOperator[]>;
 
@@ -62,7 +62,7 @@ export type QueryFilters = Record<string, QueryFilterSpec | readonly FilterOpera
  *   are added, and each page costs the same: the choice for feeds and long listings.
  * - `offset`: `page` numbers the pages from 1, and each page tells the total. The choice for
  *   tables that jump to a page; deep pages cost more, and added rows shift them.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type QueryPagination = 'cursor' | 'offset';
 
@@ -71,7 +71,7 @@ export type QueryPagination = 'cursor' | 'offset';
  *
  * The type parameters keep the names of the filters and the sortable fields and the pagination,
  * so that {@link Listing.Params} and {@link Listing.schema} can type the query string.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type QuerySpec<
 	TFilters extends QueryFilters = QueryFilters,
@@ -98,7 +98,7 @@ export type QuerySpec<
 
 /**
  * One filter of a parsed query.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ParsedFilter = {
 	field: string;
@@ -109,7 +109,7 @@ export type ParsedFilter = {
 
 /**
  * One sort key of a parsed query.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ParsedSort = { field: string; column: string; direction: 'asc' | 'desc' };
 
@@ -124,7 +124,7 @@ type ParsedQueryBase = {
 /**
  * A query string, validated against a {@link QuerySpec}, that repositories run: with `after` for
  * cursor pagination, or `page` for offset pagination.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  * @template P The pagination of the spec.
  */
 export type ParsedQuery<P extends QueryPagination = QueryPagination> = P extends 'offset'
@@ -141,7 +141,7 @@ export type ParsedQuery<P extends QueryPagination = QueryPagination> = P extends
 
 /**
  * A page of rows from cursor pagination.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type CursorPage<T> = {
 	data: T[];
@@ -151,7 +151,7 @@ export type CursorPage<T> = {
 
 /**
  * A page of rows from offset pagination.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type OffsetPage<T> = {
 	data: T[];
@@ -165,13 +165,13 @@ export type OffsetPage<T> = {
 
 /**
  * A page of rows, from either pagination.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type Page<T> = CursorPage<T> | OffsetPage<T>;
 
 /**
  * The pagination of a spec.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type PaginationOf<TSpec> = TSpec extends QuerySpec<any, any, infer P> ? P : QueryPagination;
 
@@ -190,7 +190,7 @@ type FilterKeysOf<TFilters> = {
 
 /**
  * The parameter names of the query string of a spec.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type QueryParamKeys<TSpec> =
 	TSpec extends QuerySpec<infer TFilters, infer TSort, infer TPagination>
@@ -203,13 +203,13 @@ export type QueryParamKeys<TSpec> =
 
 /**
  * The query string of a spec, as Elysia parses it: every parameter is an optional string.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type QueryParams<TSpec> = { [K in QueryParamKeys<TSpec>]?: string };
 
 /**
  * The properties of the query schema of a spec.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type QuerySchemaProperties<TSpec> = { [K in QueryParamKeys<TSpec>]: TOptional<TString> };
 
@@ -288,7 +288,7 @@ export namespace Listing {
 	/**
 	 * Builds a query spec for a model: the types of the filtered and sorted fields are read from
 	 * the model's select schema.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param model The model class.
 	 * @param spec The filters, sorts and page size.
 	 * @example
@@ -334,7 +334,7 @@ export namespace Listing {
 
 	/**
 	 * The query string of a spec, for the parameter that `@Http.query()` decorates.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @example
 	 * ```ts
 	 * @Http.get('/posts')
@@ -349,7 +349,7 @@ export namespace Listing {
 	 * The query schema of a spec, for `@Http.query()`: it documents the filters, `sort`, `cursor`
 	 * (or `page` for offset pagination), `limit` and `fields` parameters in OpenAPI. Its static type is {@link Listing.Params}, and other
 	 * parameters are let through.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param spec The query spec.
 	 */
 	export const schema = <TSpec extends QuerySpec>(
@@ -392,7 +392,7 @@ export namespace Listing {
 
 	/**
 	 * Validates a query string against a spec.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param spec The query spec.
 	 * @param query The query, as Elysia parses it (`filter[status]` keys stay flat).
 	 * @returns The parsed query, for a repository's `list()`.
@@ -521,7 +521,7 @@ export namespace Listing {
 
 	/**
 	 * Builds the cursor that points after a row.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param query The parsed query, for its sort keys.
 	 * @param row The last row of a page.
 	 */
@@ -548,7 +548,7 @@ export namespace Listing {
 	/**
 	 * Builds a page from rows fetched with one more row than the limit: the extra row only tells
 	 * that a next page exists.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param query The parsed query.
 	 * @param rows Up to `limit + 1` rows.
 	 */
@@ -563,7 +563,7 @@ export namespace Listing {
 
 	/**
 	 * Builds a page from the rows of an offset query and the count of the rows its filters match.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param query The parsed query, with its page.
 	 * @param rows The rows of the page.
 	 * @param total The rows matching the filters.
@@ -577,7 +577,7 @@ export namespace Listing {
 	/**
 	 * Checks whether a value is a page built by {@link page} or {@link offsetPage}, such as the
 	 * result of a handler, so that an interceptor can render it.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param value The value.
 	 */
 	export const isPage = (value: unknown): value is Page<unknown> =>
@@ -585,7 +585,7 @@ export namespace Listing {
 
 	/**
 	 * The pagination of a page built by {@link page} or {@link offsetPage}.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param page The page.
 	 */
 	export const paginationOf = (page: Page<unknown>): QueryPagination =>
@@ -594,7 +594,7 @@ export namespace Listing {
 
 	/**
 	 * Maps the rows of a page, such as models to resources, and keeps it a page.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param page The page.
 	 * @param map Maps one row.
 	 */
@@ -608,7 +608,7 @@ export namespace Listing {
 	/**
 	 * Keeps the rows of a page that pass a predicate, such as the rows the caller may see. The
 	 * cursor, or the page and the total, stay those of the page as listed.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param page The page.
 	 * @param keep Whether a row stays.
 	 */
@@ -630,7 +630,7 @@ export namespace Listing {
 
 	/**
 	 * The response schema of a page of resources from cursor pagination.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param item The schema of one row.
 	 */
 	export const pageSchema = <S extends TSchema>(item: S) =>
@@ -641,7 +641,7 @@ export namespace Listing {
 
 	/**
 	 * The response schema of a page of resources from offset pagination.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param item The schema of one row.
 	 */
 	export const offsetPageSchema = <S extends TSchema>(item: S) =>
@@ -658,7 +658,7 @@ export namespace Listing {
 	/**
 	 * The pagination of a schema made by {@link pageSchema} or {@link offsetPageSchema}, or
 	 * `undefined` for any other schema, so that an interceptor can describe what it renders.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param schema The schema.
 	 */
 	export const pageSchemaPagination = (schema: TSchema): QueryPagination | undefined => {
@@ -669,7 +669,7 @@ export namespace Listing {
 	/**
 	 * Checks whether a schema is the schema of a page, made by {@link pageSchema} or
 	 * {@link offsetPageSchema}.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param schema The schema.
 	 */
 	export const isPageSchema = (schema: TSchema): boolean =>
@@ -677,7 +677,7 @@ export namespace Listing {
 
 	/**
 	 * The schema of one row of a page schema.
-	 * @author Axel Nana <axel.nana@workbud.com>
+	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param schema A schema made by {@link pageSchema} or {@link offsetPageSchema}.
 	 */
 	export const itemSchemaOf = (schema: TSchema): TSchema | undefined =>

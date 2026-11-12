@@ -1,4 +1,4 @@
-// Copyright (c) 2025-present Workbud Technologies Inc. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ const jobOwners = new WeakMap<Job, ModuleNode>();
 
 /**
  * Job batch for processing
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 interface JobBatch {
 	queue: string;
@@ -44,7 +44,7 @@ interface JobBatch {
 
 /**
  * Worker metrics
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 interface WorkerMetrics {
 	jobsProcessed: number;
@@ -57,7 +57,7 @@ interface WorkerMetrics {
 /**
  * Worker implementation that uses Redis for communication.
  * This worker can run in a separate process from the dispatcher.
- * @author Axel Nana <axel.nana@workbud.com>
+ * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class RedisWorker extends BaseWorker<RedisTransport> {
 	/**
