@@ -23,6 +23,7 @@ Add a runtime package too: `@elysiumjs/bun`, `@elysiumjs/node` or `@elysiumjs/wo
 | `@elysiumjs/olympus/themis`          | Authentication: sessions, guards, API keys, CSRF, TOTP, OAuth and passkeys.                                                                                                                                             |
 | `@elysiumjs/olympus/harpocrates`     | Secrets and cryptography: password hashing (`Password` and the `PasswordHasher` port), encryption (the `Cipher` port), JWTs, signed URLs and hashing helpers.                                                           |
 | `@elysiumjs/olympus/cerberus`        | Ability-based roles and permissions.                                                                                                                                                                                    |
+| `@elysiumjs/olympus/hermes`          | Notifications: channels with fallback chains, the inbox, mail and broadcast channels, queued notifications and test fakes.                                                                                              |
 
 Database drivers, stores and runtimes ship as separate packages, such as `@elysiumjs/drizzle` and `@elysiumjs/redis`.
 
@@ -532,6 +533,144 @@ List `ActionJob` in the `jobs` of one module, next to `HeraclesModule`, in the p
 The job runs without the caller's context, such as the current user: what the handler needs goes in the input, which travels as JSON, in clear. It is written with `Json`, so dates come back as dates; an input that `Json.survives()` refuses, such as a `Map` or a class instance, is refused with `QueuedInputError`. The job finds the action by its name, so two action classes cannot share one (`DuplicateActionNameError`).
 
 A refusal of the handler ends the job, logged. A thrown error fails it, and Heracles retries it within the `maxRetries` of the queue (never for an action registered with `retry: false`). A job may run more than once, so give an action that must not an idempotency key: a second run replays the stored response. The job trusts its queue: `authorize` ran when the call was queued, so anything that can write to the queue can run any registered action.
+
+## Notifications
+
+A notification is a class built with its data. `channels()` says where it goes for each notifiable, and each channel has a method, named after it, that answers the message of that channel. An entry of `channels()` is a channel, or a fallback chain tried in order until one channel delivers:
+
+```ts
+import type { Notifiable } from '@elysiumjs/olympus/hermes';
+
+import { InboxMessage, MailMessage, Notification } from '@elysiumjs/olympus/hermes';
+
+@Notification.register({ type: 'invoice.paid', queue: 'notifications' })
+export class InvoicePaid extends Notification<{ invoiceId: string; amount: number }> {
+	public channels() {
+		// Keep it in the inbox, and send a mail, or an SMS when no mail can go.
+		return ['inbox', ['mail', 'sms']] as const;
+	}
+
+	public canSend(notifiable: Notifiable, channel: string) {
+		return true; // such as the preferences of the user
+	}
+
+	public inbox() {
+		return new InboxMessage({ invoiceId: this.data.invoiceId, amount: this.data.amount });
+	}
+
+	public mail() {
+		return new MailMessage()
+			.subject('Your invoice is paid')
+			.greeting('Hello!')
+			.line(`We received ${this.data.amount}.`)
+			.action('See the invoice', `https://example.com/invoices/${this.data.invoiceId}`);
+	}
+}
+
+await Notification.send(user, new InvoicePaid({ invoiceId, amount: 1200 }));
+await Notification.route('mail', 'ada@example.com').notify(
+	new InvoicePaid({ invoiceId, amount: 1200 })
+);
+```
+
+A notifiable implements `Notifiable`: a `notifiableId` (the key of its inbox), `routeNotificationFor(channel)` (an address, a phone number, or `null`) and, optionally, `preferredLocale()`. `Notification.route()` reaches someone at an address only, with no inbox.
+
+A channel of the chain is passed over when `canSend()` refuses it, when the channel is not available (`isAvailable()`), or when it throws `ChannelRejected`; any other error fails the delivery. `@Notification.register()` type-checks each channel method against the message its channel accepts, and each message is checked again when it is sent.
+
+- `Notification.send()` queues the notification when it is registered with a `queue`, and delivers it right away otherwise. In a unit of work, it waits for the commit and is dropped on rollback, unless registered with `afterCommit: false`.
+- `Notification.sendNow()` delivers right away and answers, for each notifiable and entry, the channel that delivered it (`null` when none could).
+- The channels emit `elysium:hermes:sending`, `elysium:hermes:sent` and `elysium:hermes:failed`, with the notification, the notifiable, the message, and what the channel answered or the error.
+
+### Queued notifications
+
+A queued notification becomes one Heracles job per notifiable and per entry; a fallback chain runs in order inside its job. `delay` (in milliseconds, or one per channel) holds the job back. Import `HeraclesModule` with the queue, and `HermesModule`, which runs the job.
+
+The job rebuilds the notification from its type and data, so its constructor takes its data only, and the data must pass `Json.survives()`: plain data and dates. The notifiable is recorded as its id, its routes for the channels of the entry and its locale. A notifiable with a `notifiableType` is read again in the job through the resolver registered for that type, so that the job sees its current routes and preferences; a resolver that answers `null` drops the notification:
+
+```ts
+@Notification.resolver('user')
+@Service.register()
+export class UserResolver implements NotifiableResolver {
+	constructor(@Service.inject() private readonly users: UserRepository) {}
+
+	async resolve(id: string) {
+		const user = await this.users.find(id);
+		return user ? new UserRecipient(user) : null;
+	}
+}
+```
+
+### Channels
+
+| Channel     | Message            | What it does                                                                                                      |
+| ----------- | ------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| `inbox`     | `InboxMessage`     | Keeps the data in the notification store, for notifiables with an id. Read it with `Notification.store()`.        |
+| `mail`      | `MailMessage`      | Draws the message with the mail renderer and sends it through the mail transport, to the `mail` route.            |
+| `broadcast` | `BroadcastMessage` | Emits `elysium:hermes:broadcast` with the event name and data, for a WebSocket or a stream of the app to forward. |
+| `log`       | `LogMessage`       | Writes a line to the application log.                                                                             |
+
+An app or a package adds a channel with a class and its message, declared in `NotificationChannels`:
+
+```ts
+export class SmsMessage {
+	constructor(public readonly text: string) {}
+}
+
+declare module '@elysiumjs/olympus/hermes' {
+	interface NotificationChannels {
+		sms: SmsMessage;
+	}
+}
+
+@Notification.channel('sms', { message: SmsMessage })
+export class SmsChannel implements NotificationChannel<SmsMessage> {
+	isAvailable(notifiable: Notifiable) {
+		return notifiable.routeNotificationFor('sms') !== null;
+	}
+
+	async send(notifiable: Notifiable, message: SmsMessage) {
+		const response = await provider.send(notifiable.routeNotificationFor('sms'), message.text);
+		if (response.status === 400) throw new ChannelRejected('Unknown number');
+		return { id: response.id };
+	}
+}
+```
+
+A channel or resolver that needs services is listed in a module's `services`; it then runs in that module.
+
+### Inbox and mail
+
+`HermesModule.with()` provides the notification store (`memory` by default; `@elysiumjs/drizzle` provides a PostgreSQL one), the mail transport (`log` by default, which writes mails to the log), the mail renderer (`basic` by default) and the default sender:
+
+```ts
+HermesModule.with({
+	store: () => NotificationStore.for('drizzle', { table: notifications }),
+	mail: { transport: () => new SmtpTransport(), from: 'Example <hello@example.com>' }
+});
+
+const page = await Notification.store().list(userId, { unread: true, limit: 20 });
+await Notification.store().markAsRead(userId, [page.items[0].id]);
+```
+
+The store pages newest first, counts unread notifications, marks them as read and deletes them. The `basic` renderer lays out the greeting, lines, buttons and salutation as text and HTML; a message drawn with `view(name, data)` needs a renderer of the app, given as `mail.renderer`, that implements `MailRendererDriver`. `Mail.send()` sends a mail through the transport outside notifications too.
+
+### Notifications in tests
+
+```ts
+const notifications = Notification.fake();
+const mails = Mail.fake();
+
+await Moirai.execute(PayInvoice, { invoiceId });
+
+notifications.assertSentTo(user, InvoicePaid, (n) => n.data.invoiceId === invoiceId);
+notifications.assertNotSentTo(admin, InvoicePaid);
+mails.assertNothingSent();
+
+notifications.restore();
+mails.restore();
+```
+
+A faked notification records what `channels()` answered for each notifiable, and delivers nothing.
 
 ## Services
 

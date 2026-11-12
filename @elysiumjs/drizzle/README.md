@@ -201,6 +201,21 @@ MoiraiModule.with({
 
 Each store takes `connection`, the name of a database connection, which defaults to `default`. A store's `table` needs the columns of the matching table in `moiraiTables`, and may add others: it can live in a domain's own `pgSchema` and have another primary key, such as a composite one. `StoreTable<T>` is the type it accepts.
 
+## Notification store
+
+`notificationsTable()` builds the table of the notification store of `@elysiumjs/olympus/hermes`, and `DrizzleNotificationStore` (the `drizzle` driver of `NotificationStore`) keeps the notifications of the `inbox` channel in it:
+
+```ts
+import { notificationsTable } from '@elysiumjs/drizzle';
+import { HermesModule, NotificationStore } from '@elysiumjs/olympus/hermes';
+
+export const notifications = notificationsTable(); // or notificationsTable('notifications', 'social')
+
+HermesModule.with({ store: () => NotificationStore.for('drizzle', { table: notifications }) });
+```
+
+The table has an index on the notifiable and the id, which pages use, and a partial index on unread notifications. Any table with the same columns works, given as `table`, with an optional `connection`.
+
 ## License
 
 This project is licensed under the Apache License, Version 2.0. See the [LICENSE](../../LICENSE) file for more info.
