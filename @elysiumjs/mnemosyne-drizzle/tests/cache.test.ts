@@ -41,9 +41,7 @@ let storage: Omit<CacheInterface, 'tags'>;
 
 beforeAll(async () => {
 	app = await Application.testing({
-		modules: [
-			MnemosyneModule.with({ cache: { redis: false, memory: { ttl: 60_000, lruSize: 5000 } } })
-		],
+		modules: [MnemosyneModule.with({ cache: { memory: { ttl: 60_000, lruSize: 5000 } } })],
 		boot: 'eager'
 	});
 	storage = Cache.memory.tags('database');

@@ -57,7 +57,7 @@ const DEFAULT_MAX_OPERATIONS = 900;
  * @example
  * ```ts
  * MnemosyneModule.with({
- * 	cache: { redis: false, stores: { kv: () => new KeyvWorkersKV({ binding: 'CACHE' }) } }
+ * 	cache: { stores: { kv: () => new KeyvWorkersKV({ binding: 'CACHE' }) } }
  * });
  * ```
  * @author Axel Nana <ax.lnana@outlook.com>

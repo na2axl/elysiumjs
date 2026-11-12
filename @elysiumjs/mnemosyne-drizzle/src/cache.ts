@@ -90,7 +90,7 @@ const toArray = <T>(value: T | T[] | undefined): T[] =>
  * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class DrizzleDatabaseCache extends DrizzleCache {
-	#storageEngine: 'redis' | 'memory';
+	#storageEngine: 'memory' | (string & {});
 	#cache?: Omit<CacheInterface, 'tags'>;
 	#cacheStrategy: 'explicit' | 'all';
 	#globalTtl: number;
@@ -109,14 +109,14 @@ export class DrizzleDatabaseCache extends DrizzleCache {
 	/**
 	 * @param cacheStrategy Whether queries are cached only when they opt in (`explicit`), or always.
 	 * @param globalTtl The default time to live of cached results, in seconds.
-	 * @param storageEngine The cache storage to use.
+	 * @param storageEngine The cache that holds the results: `memory`, or the name of a mnemosyne cache store.
 	 * @param connectionName The name of the connection, which prefixes every key.
 	 * @param prefix A prefix for every key, before the connection name (empty for none).
 	 */
 	constructor(
 		cacheStrategy: 'explicit' | 'all' = 'explicit',
 		globalTtl: number = DEFAULT_CACHE_TTL,
-		storageEngine: 'redis' | 'memory' = 'redis',
+		storageEngine: 'memory' | (string & {}) = 'memory',
 		connectionName: string = 'default',
 		prefix: string = ''
 	) {

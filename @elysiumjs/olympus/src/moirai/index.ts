@@ -95,13 +95,11 @@ export {
 	registerEffect
 } from './outbox';
 export {
-	type ActionLock,
 	type EventReadFilter,
 	type EventStore,
 	type IdempotencyRecord,
 	type IdempotencyStore,
 	type InboxStore,
-	MemoryActionLock,
 	MemoryEventStore,
 	MemoryProjectionStorage,
 	MemoryIdempotencyStore,

@@ -1,0 +1,60 @@
+{
+  "name": "@elysiumjs/redis",
+  "version": "0.1.13",
+  "license": "Apache-2.0",
+  "description": "Redis for the Elysium.js framework: connections, rate limits, cache store, Heracles transport and worker.",
+  "private": false,
+  "author": {
+    "name": "Axel Nana",
+    "email": "ax.lnana@outlook.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/na2axl/elysiumjs.git",
+    "directory": "@elysiumjs/redis"
+  },
+  "homepage": "https://github.com/na2axl/elysiumjs/tree/main/@elysiumjs/redis#readme",
+  "bugs": {
+    "url": "https://github.com/na2axl/elysiumjs/issues"
+  },
+  "scripts": {
+    "format": "prettier --write \"./src/**/*.ts\"",
+    "clean": "rimraf dist",
+    "build:js": "bun build ./src/index.ts --outdir ./dist --target node --packages external --root ./src --minify-syntax --minify-whitespace",
+    "build:ts": "tsc",
+    "build": "bun run clean && bun run build:js && bun run build:ts",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "bun run build",
+    "test": "bun test",
+    "test:coverage": "bun test --coverage"
+  },
+  "keywords": [
+    "elysium",
+    "framework",
+    "typescript",
+    "redis"
+  ],
+  "type": "module",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "CHANGELOG.md"
+  ],
+  "sideEffects": [
+    "./dist/index.js",
+    "./src/index.ts",
+    "./src/lock.ts"
+  ],
+  "devDependencies": {
+    "@elysiumjs/olympus": "workspace:*"
+  },
+  "peerDependencies": {
+    "@elysiumjs/olympus": "workspace:^"
+  },
+  "dependencies": {
+    "cacheable": "^2.5.0",
+    "keyv": "^5.6.0",
+    "radash": "catalog:"
+  }
+}

@@ -26,8 +26,11 @@ import { Glob } from 'bun';
 /** A host-specific reference found in a source file. */
 export type PortabilityFinding = { file: string; line: number; match: string };
 
-/** Node.js modules available on Workers under nodejs_compat. */
-const ALLOWED_NODE_MODULES = ['async_hooks', 'buffer', 'events'];
+/**
+ * Node.js modules available on Workers under nodejs_compat. `fs` is there too, without a real
+ * file system: code that needs one (the `local` disk) refuses to start where it is missing.
+ */
+const ALLOWED_NODE_MODULES = ['async_hooks', 'buffer', 'crypto', 'events', 'fs', 'fs/promises'];
 
 const BARE_BUILTINS = builtinModules
 	.filter(
@@ -61,6 +64,7 @@ const LINE_ALLOW = /\/\/\s*portability-allow:\s*\S/;
 /** Packages scanned by the gate, relative to the repository root. */
 export const ROOTS = [
 	'@elysiumjs/olympus',
+	'@elysiumjs/redis',
 	'conformance',
 	'@elysiumjs/argus',
 	'@elysiumjs/plugin-sentry',

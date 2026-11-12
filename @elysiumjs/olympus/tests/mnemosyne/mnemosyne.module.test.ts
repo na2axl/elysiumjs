@@ -14,41 +14,14 @@
 
 import type { TestingApp } from '../../src/index';
 
-import { Application, Service, ServiceNotFoundError } from '../../src/index';
-import { RedisModule } from '../../src/redis/index';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, mock } from 'bun:test';
+import { afterEach, describe, expect, it, mock } from 'bun:test';
 import { KeyvCacheableMemory } from 'cacheable';
 
+import { Application, Service, ServiceNotFoundError } from '../../src/index';
 import * as pkg from '../../src/mnemosyne';
 import { Cache, cacheStoreService, MnemosyneModule } from '../../src/mnemosyne';
 import { AbstractDatabase } from '../../src/mnemosyne/database';
-import { KeyvRedis } from '../../src/mnemosyne/keyv-redis';
 import { getTenancyConfig, getTenancyStrategy } from '../../src/mnemosyne/tenancy';
-
-const store = new Map<string, string>();
-const originalRedisClient = Bun.RedisClient;
-const ClientMock = mock(function (_url: string, _options?: object) {
-	return {
-		close: mock(),
-		get: mock(async (k: string) => store.get(k) ?? null),
-		set: mock(async (k: string, v: string) => {
-			store.set(k, v);
-			return 'OK';
-		})
-	};
-});
-beforeAll(() => {
-	Bun.RedisClient = ClientMock as unknown as typeof Bun.RedisClient;
-});
-
-afterAll(() => {
-	Bun.RedisClient = originalRedisClient;
-});
-
-const redis = RedisModule.with({
-	default: 'cache',
-	connections: { cache: { url: 'redis://cache:6379' } }
-});
 
 class TestDatabase extends AbstractDatabase<any, any> {
 	protected driver = {
@@ -61,58 +34,18 @@ class TestDatabase extends AbstractDatabase<any, any> {
 describe('MnemosyneModule', () => {
 	let app: TestingApp | undefined;
 
-	beforeEach(() => {
-		store.clear();
-		ClientMock.mockClear();
-	});
-
 	afterEach(async () => {
 		await app?.shutdown();
 		app = undefined;
 	});
 
 	it('registers nothing on import', () => {
-		expect(Service.exists('mnemosyne.cache.redis')).toBe(false);
 		expect(Service.exists('mnemosyne.cache.memory')).toBe(false);
-		expect(() => Cache.redis).toThrow(ServiceNotFoundError);
 		expect(() => Cache.memory).toThrow(ServiceNotFoundError);
 	});
 
 	it('exports the module', () => {
 		expect(pkg.MnemosyneModule).toBe(MnemosyneModule);
-	});
-
-	it('serves Cache.redis without opening a client until first use', async () => {
-		app = await Application.testing({ modules: [redis, MnemosyneModule] });
-		await app.get('mnemosyne.cache.redis');
-		const cache = Cache.redis;
-		expect(cache).toBeDefined();
-		expect(ClientMock).not.toHaveBeenCalled();
-
-		await cache.set('a', 'b');
-		expect(ClientMock).toHaveBeenCalledTimes(1);
-		expect(await cache.get('a')).toBe('b');
-	});
-
-	it('resolves the redis client through the async path on a lazy boot', async () => {
-		app = await Application.testing({ modules: [redis, MnemosyneModule], boot: 'lazy' });
-		await app.get('mnemosyne.cache.redis');
-		expect(await Cache.redis.get('missing')).toBeUndefined();
-	});
-
-	it('uses the configured redis connection', async () => {
-		app = await Application.testing({
-			modules: [
-				RedisModule.with({
-					default: 'other',
-					connections: { other: { url: 'redis://other:6379' } }
-				}),
-				MnemosyneModule.with({ cache: { redis: { connection: 'other' } } })
-			]
-		});
-		await app.get('mnemosyne.cache.redis');
-		await Cache.redis.set('a', 'b');
-		expect(ClientMock).toHaveBeenCalledWith('redis://other:6379', {});
 	});
 
 	it('Cache.memory uses the configured TTL', async () => {
@@ -132,7 +65,6 @@ describe('MnemosyneModule', () => {
 			modules: [
 				MnemosyneModule.with({
 					cache: {
-						redis: false,
 						stores: { local: () => new KeyvCacheableMemory({ ttl: 1000, lruSize: 10 }) }
 					}
 				})
@@ -151,43 +83,22 @@ describe('MnemosyneModule', () => {
 		});
 		await app.get('mnemosyne.cache.memory');
 		expect(Service.exists('mnemosyne.cache.memory')).toBe(true);
-		expect(Service.exists('mnemosyne.cache.redis')).toBe(true);
 	});
 
-	it('registers no redis cache when it is set to false', async () => {
-		app = await Application.testing({
-			modules: [MnemosyneModule.with({ cache: { redis: false } })]
-		});
+	it('provides no Redis cache of its own', async () => {
+		app = await Application.testing({ modules: [MnemosyneModule] });
 		await app.get('mnemosyne.cache.memory');
-
 		expect(Service.exists('mnemosyne.cache.redis')).toBe(false);
-		expect(() => Cache.redis).toThrow(ServiceNotFoundError);
-		await Cache.memory.set('k', 'v');
-		expect(await Cache.memory.get('k')).toBe('v');
+		expect(() => Cache.store('redis')).toThrow(ServiceNotFoundError);
 	});
 
 	it('registers no memory cache when it is set to false', async () => {
 		app = await Application.testing({
-			modules: [redis, MnemosyneModule.with({ cache: { memory: false } })]
+			modules: [MnemosyneModule.with({ cache: { memory: false } })]
 		});
-		await app.get('mnemosyne.cache.redis');
 
 		expect(Service.exists('mnemosyne.cache.memory')).toBe(false);
 		expect(() => Cache.memory).toThrow(ServiceNotFoundError);
-	});
-
-	it('disconnect leaves the shared redis client open', async () => {
-		app = await Application.testing({ modules: [redis, MnemosyneModule] });
-		await app.get('redis.connection.cache');
-		const client = ClientMock.mock.results[0]!.value as { close: ReturnType<typeof mock> };
-		const adapter = new KeyvRedis({ connection: 'cache' });
-
-		await adapter.set('a', 'b');
-		await adapter.disconnect();
-
-		expect(client.close).not.toHaveBeenCalled();
-		expect(ClientMock).toHaveBeenCalledTimes(1);
-		expect(await adapter.get('a')).toBe('b');
 	});
 
 	describe('tenancy', () => {

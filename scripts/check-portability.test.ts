@@ -44,7 +44,7 @@ describe('checkPortability', () => {
 				'Bun.sleep(1);',
 				'// Bun.sleep',
 				'/** process.exit() */',
-				"import { x } from 'node:fs';",
+				"import { x } from 'node:path';",
 				"import { y } from 'node:events';"
 			].join('\n')
 		});
@@ -63,11 +63,11 @@ describe('checkPortability', () => {
 	test('catches dynamic, side-effect, require and bare Node imports', async () => {
 		const root = await fixture({
 			'b.ts': [
-				"const a = import('node:fs');",
-				"import 'node:fs';",
-				"const c = require('node:fs');",
-				"import { d } from 'fs';",
-				"import { e } from 'fs/promises';",
+				"const a = import('node:child_process');",
+				"import 'node:path';",
+				"const c = require('node:os');",
+				"import { d } from 'path';",
+				"import { e } from 'child_process';",
 				"import { f } from 'events';",
 				"const g = import('node:events');",
 				"import { h } from 'bun';",
@@ -77,6 +77,18 @@ describe('checkPortability', () => {
 		});
 		const lines = checkPortability([root], {}).map((f) => f.line);
 		expect(lines).toEqual([1, 2, 3, 4, 5, 8, 10]);
+	});
+
+	test('allows the Node.js modules Workers offer under nodejs_compat', async () => {
+		const root = await fixture({
+			'd.ts': [
+				"import { scrypt } from 'node:crypto';",
+				"import { readFile } from 'node:fs/promises';",
+				"import { existsSync } from 'node:fs';",
+				"import { Buffer } from 'node:buffer';"
+			].join('\n')
+		});
+		expect(checkPortability([root], {})).toEqual([]);
 	});
 
 	test('catches optional chaining, bun: builtins, aliases and code after block comments', async () => {

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Service } from '@elysiumjs/olympus';
 import { applyTableMarkers, getTableMarker } from '@elysiumjs/mnemosyne-drizzle';
+import { Lock, Service } from '@elysiumjs/olympus';
 import { ConcurrencyConflictError, IdempotencyConflictError } from '@elysiumjs/olympus/moirai';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import {
@@ -254,12 +254,28 @@ describe('moirai stores', () => {
 		);
 	});
 
-	it('takes an advisory lock in the transaction', async () => {
-		await new PgAdvisoryLock().lock('wallet:1');
+	it('waits for an advisory lock in the transaction', async () => {
+		const handle = await new PgAdvisoryLock().acquire('wallet:1', 60_000, { wait: Infinity });
+		expect(handle?.key).toBe('wallet:1');
 		expect(fake.log[0]).toMatchObject({
 			query: 'select pg_advisory_xact_lock(hashtextextended($1, 0))',
 			params: ['wallet:1']
 		});
+	});
+
+	it('tries an advisory lock once without a wait', async () => {
+		answer = () => [{ taken: false }];
+		expect(await new PgAdvisoryLock().acquire('wallet:1', 60_000)).toBeNull();
+		expect(fake.log[0]).toMatchObject({
+			query: 'select pg_try_advisory_xact_lock(hashtextextended($1, 0)) as taken',
+			params: ['wallet:1']
+		});
+		answer = () => [{ taken: true }];
+		expect(await new PgAdvisoryLock().acquire('wallet:1', 60_000)).not.toBeNull();
+	});
+
+	it('registers as the postgres lock driver', () => {
+		expect(Lock.for('postgres')).toBeInstanceOf(PgAdvisoryLock);
 	});
 
 	const event = {

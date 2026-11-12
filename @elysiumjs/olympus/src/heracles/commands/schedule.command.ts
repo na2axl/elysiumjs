@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Command, CommandArgumentType, Runtime } from '../../index';
-import { Redis } from '../../redis/index';
+import type { LockDriver } from '../../index';
 
+import { Command, Runtime, Service } from '../../index';
+import { HERACLES_LOCK } from '../registry';
 import { ScheduleRunner } from '../schedule';
 
 /**
@@ -27,22 +28,12 @@ export class HeraclesScheduleCommand extends Command {
 	public static readonly description: string = 'Dispatch the scheduled jobs at their times.';
 	public static readonly boot = true;
 
-	@Command.arg({
-		name: 'redis',
-		required: false,
-		description:
-			'The Redis connection holding the lock of each tick, so that several schedulers dispatch it once',
-		type: CommandArgumentType.STRING
-	})
-	private redis?: string;
-
 	public async run(): Promise<void> {
-		if (this.redis !== undefined && !Redis.connectionExists(this.redis)) {
-			this.error(`Redis connection "${this.redis}" does not exist`);
-			Runtime.get().exit(1);
-		}
-
-		const scheduler = new ScheduleRunner({ redis: this.redis ?? false });
+		// The lock of `HeraclesModule.with({ lock })`, so that several schedulers dispatch each tick once.
+		const lock = Service.exists(HERACLES_LOCK)
+			? await Service.resolve<LockDriver>(HERACLES_LOCK)
+			: undefined;
+		const scheduler = new ScheduleRunner({ lock });
 		const jobs = scheduler.start();
 		if (jobs.length === 0) this.warning('No job is scheduled.');
 		for (const { name, schedule } of jobs) {

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { LockDriver } from '../index';
 import type {
-	ActionLock,
 	EventStore,
 	IdempotencyStore,
 	InboxStore,
@@ -22,7 +22,6 @@ import type {
 } from './stores';
 
 import { ModuleContext, Service } from '../index';
-
 import { MissingStoreError } from './errors';
 
 /** The service names of the moirai stores and options. */
@@ -56,6 +55,11 @@ export type MoiraiOptions = {
 	 * Cloudflare Workers, pass `(work) => Workers.context().waitUntil(work)` to answer first.
 	 */
 	defer?: (work: Promise<unknown>) => void;
+	/**
+	 * How long the lock of `serializeBy` and `Moirai.lock()` lasts at most, in milliseconds, in
+	 * case its holder dies before it lets go. Defaults to 60 seconds.
+	 */
+	lockTtl: number;
 	/** The attempts of an outbox row before it is dead. Defaults to 8. */
 	maxRelayAttempts: number;
 	/** The rows a relay claims at once. Defaults to 50. */
@@ -96,6 +100,7 @@ export const DEFAULT_OPTIONS: MoiraiOptions = {
 	maxAttempts: 3,
 	isTransient: isTransientError,
 	relayOnCommit: true,
+	lockTtl: 60_000,
 	maxRelayAttempts: 8,
 	relayBatch: 50,
 	relayLease: 300
@@ -125,7 +130,7 @@ const store =
 export const idempotencyStore = store<IdempotencyStore>(MOIRAI_IDEMPOTENCY_STORE, 'idempotency');
 export const outboxStore = store<OutboxStore>(MOIRAI_OUTBOX_STORE, 'outbox');
 export const inboxStore = store<InboxStore>(MOIRAI_INBOX_STORE, 'inbox');
-export const actionLock = store<ActionLock>(MOIRAI_ACTION_LOCK, 'lock');
+export const actionLock = store<LockDriver>(MOIRAI_ACTION_LOCK, 'lock');
 export const eventStore = store<EventStore>(MOIRAI_EVENT_STORE, 'events');
 export const projectionStorage = store<ProjectionStorage>(MOIRAI_PROJECTION_STORAGE, 'projections');
 

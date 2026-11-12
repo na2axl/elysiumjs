@@ -66,13 +66,6 @@ export { DbSeedCommand } from './commands/db_seed.command';
 export * from './tenancy';
 export type { TenancyConfig, TenancyMode, ModelTenancyConfig } from './tenancy';
 
-export {
-	Cache,
-	type CacheInterface,
-	cacheStoreService,
-	MEMORY_CACHE_SERVICE,
-	REDIS_CACHE_SERVICE
-} from './cache';
+export { Cache, type CacheInterface, cacheStoreService, MEMORY_CACHE_SERVICE } from './cache';
 export * from './mnemosyne.module';
-export * from './keyv-redis';
 export { CacheInterceptor, type CacheInterceptorOptions } from './cache.interceptor';

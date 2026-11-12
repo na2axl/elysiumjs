@@ -15,11 +15,11 @@
 import type { Static } from 'typebox';
 import type { StoredEventMeta } from '../../src/moirai';
 
-import { DomainError, isDomainError, Result, Service } from '../../src/index';
-import { withUnitOfWork } from '../../src/mnemosyne/index';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { Type as t } from 'typebox';
 
+import { DomainError, isDomainError, MemoryLock, Result, Service } from '../../src/index';
+import { withUnitOfWork } from '../../src/mnemosyne/index';
 import {
 	Action,
 	Aggregate,
@@ -27,7 +27,6 @@ import {
 	DEFAULT_OPTIONS_FOR_TESTS,
 	DuplicateStreamNameError,
 	Event,
-	MemoryActionLock,
 	MemoryEventStore,
 	MemoryIdempotencyStore,
 	MemoryInboxStore,
@@ -220,7 +219,7 @@ beforeEach(() => {
 	Service.instance(MOIRAI_OUTBOX_STORE, outbox);
 	Service.instance(MOIRAI_INBOX_STORE, new MemoryInboxStore());
 	Service.instance(MOIRAI_IDEMPOTENCY_STORE, new MemoryIdempotencyStore());
-	Service.instance(MOIRAI_ACTION_LOCK, new MemoryActionLock());
+	Service.instance(MOIRAI_ACTION_LOCK, new MemoryLock());
 	Service.instance(MOIRAI_OPTIONS, {
 		...DEFAULT_OPTIONS_FOR_TESTS,
 		relayOnCommit: false,

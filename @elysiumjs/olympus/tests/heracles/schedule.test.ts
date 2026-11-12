@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { RedisConnection } from '../../src/redis/index';
-
-import { Redis } from '../../src/redis/index';
 import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test';
 
 import { wranglerTriggers } from '../../src/heracles/commands/crons.command';
@@ -29,6 +26,7 @@ import {
 	ScheduleRunner,
 	schedulesOf
 } from '../../src/heracles/schedule';
+import { MemoryLock } from '../../src/index';
 
 const next = (expression: string, from: string) =>
 	Cron.next(Cron.parse(expression), new Date(from)).toISOString();
@@ -107,19 +105,17 @@ describe('Scheduler', () => {
 			dispatched.push(job.schedule.args);
 			return 1;
 		});
-		const locks = new Set<string>();
-		const connection = {
-			async send(_command: string, [key]: string[]) {
-				if (locks.has(key!)) return null;
-				locks.add(key!);
-				return 'OK';
-			}
-		} as unknown as RedisConnection;
-		const getConnection = spyOn(Redis, 'getConnection').mockReturnValue(connection);
+		const lock = new MemoryLock();
+		const locks: string[] = [];
+		const acquire = lock.acquire.bind(lock);
+		lock.acquire = async (key, ttl, options) => {
+			locks.push(key);
+			return acquire(key, ttl, options);
+		};
 
 		setSystemTime(new Date('2026-11-06T03:04:59.990Z'));
-		const a = new ScheduleRunner({ redis: 'default' });
-		const b = new ScheduleRunner({ redis: 'default' });
+		const a = new ScheduleRunner({ lock });
+		const b = new ScheduleRunner({ lock });
 		a.start();
 		b.start();
 		await new Promise((resolve) => setTimeout(resolve, 50));
@@ -127,11 +123,10 @@ describe('Scheduler', () => {
 		b.stop();
 
 		expect(dispatched).toEqual([['daily']]);
-		expect([...locks]).toEqual([
+		expect([...new Set(locks)]).toEqual([
 			'heracles:schedule:scheduled-report:*/5 * * * *:2026-11-06T03:05:00.000Z'
 		]);
 		dispatch.mockRestore();
-		getConnection.mockRestore();
 	});
 
 	it('fans a scheduler out: one job per case, with an id per scheduler, case and tick', async () => {

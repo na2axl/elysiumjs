@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ServiceDefinition } from '../index';
+import type { LockDriver, ServiceDefinition } from '../index';
 import type { MoiraiOptions } from './config';
 import type {
-	ActionLock,
 	EventStore,
 	IdempotencyStore,
 	InboxStore,
@@ -24,7 +23,6 @@ import type {
 } from './stores';
 
 import { Module } from '../index';
-
 import { ProjectionRebuildCommand } from './commands/projection-rebuild.command';
 import {
 	DEFAULT_OPTIONS,
@@ -48,7 +46,7 @@ export type MoiraiStores = Partial<MoiraiOptions> & {
 	idempotency?: StoreOption<IdempotencyStore>;
 	outbox?: StoreOption<OutboxStore>;
 	inbox?: StoreOption<InboxStore>;
-	lock?: StoreOption<ActionLock>;
+	lock?: StoreOption<LockDriver>;
 	events?: StoreOption<EventStore>;
 	projections?: StoreOption<ProjectionStorage>;
 };
@@ -102,7 +100,7 @@ export const moduleStores = (config: MoiraiStores): ServiceDefinition[] =>
  * 	idempotency: () => new DrizzleIdempotencyStore({ table: tables.idempotencyKeys }),
  * 	outbox: () => new DrizzleOutboxStore({ table: tables.outbox }),
  * 	inbox: () => new DrizzleInboxStore({ table: tables.inbox }),
- * 	lock: () => new PgAdvisoryLock()
+ * 	lock: () => Lock.for('postgres')
  * });
  * ```
  */

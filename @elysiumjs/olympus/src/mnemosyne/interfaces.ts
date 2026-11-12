@@ -237,9 +237,10 @@ export interface DatabaseCacheConfig {
 	strategy?: 'explicit' | 'all';
 
 	/**
-	 * The storage engine to use for the cache.
+	 * The cache that holds the query results: `memory` (the default), or the name of a store given
+	 * in `MnemosyneModule.with({ cache: { stores } })`, such as `redis`.
 	 */
-	storage?: 'redis' | 'memory';
+	storage?: 'memory' | (string & {});
 
 	/**
 	 * A prefix for every cache key, before the connection name. Set it when several applications

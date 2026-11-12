@@ -49,7 +49,9 @@ export const versionFor = (name: string): string => {
 	return range;
 };
 
-export const getModuleCode = (module: string) => /* js */ `import { Module } from '@elysiumjs/olympus';
+export const getModuleCode = (
+	module: string
+) => /* js */ `import { Module } from '@elysiumjs/olympus';
 
 @Module.register({
 	controllers: []
@@ -117,7 +119,7 @@ export type AppParts = {
 	/** A PostgreSQL connection through `@elysiumjs/mnemosyne-drizzle`. */
 	database: boolean;
 
-	/** A Redis connection through `@elysiumjs/olympus/redis`. */
+	/** A Redis connection through `@elysiumjs/redis`. */
 	cache: boolean;
 };
 
@@ -139,6 +141,7 @@ export const appPackages = (
 		if (runtime !== 'bun') prod.push('postgres');
 	}
 	if (parts.cache) {
+		prod.push('@elysiumjs/redis');
 		if (runtime === 'node') prod.push('ioredis');
 	}
 	return { prod, dev };
@@ -164,13 +167,13 @@ const partCode = (runtime: keyof typeof RUNTIMES, parts: AppParts) => {
 	const modules: string[] = [];
 	if (parts.cache) {
 		if (runtime === 'bun') {
-			imports.push("import { RedisModule } from '@elysiumjs/olympus/redis';");
+			imports.push("import { RedisModule } from '@elysiumjs/redis';");
 			modules.push(`RedisModule.with(() => ({
 			default: 'cache',
 			connections: { cache: { url: Env.get('REDIS_URL').reveal() } }
 		}))`);
 		} else if (runtime === 'node') {
-			imports.push("import { ioredis, RedisModule } from '@elysiumjs/olympus/redis';");
+			imports.push("import { ioredis, RedisModule } from '@elysiumjs/redis';");
 			imports.push("import IORedis from 'ioredis';");
 			modules.push(`RedisModule.with(() => ({
 			default: 'cache',
@@ -178,7 +181,7 @@ const partCode = (runtime: keyof typeof RUNTIMES, parts: AppParts) => {
 			connections: { cache: { url: Env.get('REDIS_URL').reveal() } }
 		}))`);
 		} else {
-			imports.push("import { RedisModule, upstash } from '@elysiumjs/olympus/redis';");
+			imports.push("import { RedisModule, upstash } from '@elysiumjs/redis';");
 			modules.push(`RedisModule.with(() => ({
 			default: 'cache',
 			client: upstash({ token: Env.get('UPSTASH_REDIS_REST_TOKEN').reveal() }),

@@ -15,6 +15,8 @@
 import type { TestingApp } from '../../src/index';
 import type { SeederInput } from '../../src/mnemosyne';
 
+import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
+
 import {
 	Application,
 	DATABASE_TRANSACTION_SERVICE,
@@ -23,9 +25,6 @@ import {
 	ModuleContext,
 	Service
 } from '../../src/index';
-import { testRuntime as bunRuntime } from '../core/test-runtime';
-import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
-
 import {
 	DbSeedCommand,
 	DuplicateSeederError,
@@ -34,6 +33,7 @@ import {
 	SeederCycleError,
 	UnknownSeederError
 } from '../../src/mnemosyne';
+import { testRuntime as bunRuntime } from '../core/test-runtime';
 
 /** What the seeders did, in order. */
 let calls: string[] = [];
@@ -271,12 +271,7 @@ describe('db:seed', () => {
 	const run = async (...args: string[]) => {
 		@Application.register({
 			runtime: bunRuntime,
-			modules: [
-				FakeDatabaseModule,
-				MnemosyneModule.with({ cache: { redis: false } }),
-				CoreModule,
-				FinancesModule
-			]
+			modules: [FakeDatabaseModule, MnemosyneModule, CoreModule, FinancesModule]
 		})
 		class TestApp extends Application {}
 		started = new TestApp();
@@ -334,12 +329,7 @@ describe('db:seed', () => {
 
 		@Application.register({
 			runtime: bunRuntime,
-			modules: [
-				FakeDatabaseModule,
-				MnemosyneModule.with({ cache: { redis: false } }),
-				HostModule,
-				CoreModule
-			]
+			modules: [FakeDatabaseModule, MnemosyneModule, HostModule, CoreModule]
 		})
 		class HostApp extends Application {}
 		started = new HostApp();

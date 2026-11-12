@@ -34,18 +34,17 @@
       "peerDependencies": {
         "@elysiumjs/olympus": "workspace:^",
       },
-      "optionalPeers": [
-        "@elysiumjs/olympus",
-      ],
     },
     "@elysiumjs/ariadne-redis": {
       "name": "@elysiumjs/ariadne-redis",
       "version": "0.1.3",
       "devDependencies": {
         "@elysiumjs/olympus": "workspace:*",
+        "@elysiumjs/redis": "workspace:*",
       },
       "peerDependencies": {
         "@elysiumjs/olympus": "workspace:^",
+        "@elysiumjs/redis": "workspace:^",
       },
     },
     "@elysiumjs/ariadne-workers": {
@@ -171,6 +170,21 @@
         "@elysiumjs/olympus": "workspace:^",
       },
     },
+    "@elysiumjs/redis": {
+      "name": "@elysiumjs/redis",
+      "version": "0.1.13",
+      "dependencies": {
+        "cacheable": "^2.5.0",
+        "keyv": "^5.6.0",
+        "radash": "catalog:",
+      },
+      "devDependencies": {
+        "@elysiumjs/olympus": "workspace:*",
+      },
+      "peerDependencies": {
+        "@elysiumjs/olympus": "workspace:^",
+      },
+    },
     "@elysiumjs/runtime-bun": {
       "name": "@elysiumjs/runtime-bun",
       "version": "0.1.13",
@@ -231,9 +245,11 @@
       "version": "0.0.4",
       "devDependencies": {
         "@elysiumjs/olympus": "workspace:*",
+        "@elysiumjs/redis": "workspace:*",
       },
       "peerDependencies": {
         "@elysiumjs/olympus": "workspace:^",
+        "@elysiumjs/redis": "workspace:^",
       },
     },
     "@elysiumjs/themis-workers": {
@@ -279,6 +295,7 @@
       "dependencies": {
         "@elysiumjs/mnemosyne-drizzle": "workspace:^",
         "@elysiumjs/olympus": "workspace:^",
+        "@elysiumjs/redis": "workspace:^",
         "@elysiumjs/runtime-bun": "workspace:^",
         "@elysiumjs/styx": "workspace:^",
         "radash": "catalog:",
@@ -412,6 +429,8 @@
     "@elysiumjs/olympus": ["@elysiumjs/olympus@workspace:@elysiumjs/olympus"],
 
     "@elysiumjs/plugin-sentry": ["@elysiumjs/plugin-sentry@workspace:@elysiumjs/plugin-sentry"],
+
+    "@elysiumjs/redis": ["@elysiumjs/redis@workspace:@elysiumjs/redis"],
 
     "@elysiumjs/runtime-bun": ["@elysiumjs/runtime-bun@workspace:@elysiumjs/runtime-bun"],
 

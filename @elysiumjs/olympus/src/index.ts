@@ -52,6 +52,27 @@ export { Metadata } from './metadata';
 export { currentUserId, userIdOf } from './user';
 export { currentEnvironment } from './utils';
 export { Clock, ClockAdjustmentRefusedError, SystemClock } from './clock';
+export {
+	type LockAcquireOptions,
+	type LockHandle,
+	type LockRun,
+	Lock,
+	LockDriver,
+	MemoryLock
+} from './lock';
+export {
+	type PortClass,
+	type PortDriver,
+	type PortDriverClass,
+	type PortDriverName,
+	type PortDriverOptions,
+	type PortDrivers,
+	type PortDriverType,
+	type Ports,
+	DuplicatePortDriverError,
+	Port,
+	UnknownPortDriverError
+} from './port';
 export { AsyncResult, Failed, Passed, Result } from './result';
 export type { ClockSource } from './clock';
 export { Environments } from './environments';

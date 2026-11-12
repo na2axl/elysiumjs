@@ -14,67 +14,33 @@
 
 import type { Mock } from 'bun:test';
 
-import { Application } from '../../src/index';
-import { RedisModule } from '../../src/redis/index';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 import { createCache } from 'cache-manager';
+import { KeyvCacheableMemory } from 'cacheable';
 import * as KV from 'keyv';
 
-import { Cache, MnemosyneModule } from '../../src/mnemosyne';
+import { Application } from '../../src/index';
+import { Cache, cacheStoreService, MnemosyneModule } from '../../src/mnemosyne';
 
 // Mock dependencies
 mock.module('cache-manager', () => ({
 	createCache: mock(createCache)
 }));
 
-// A minimal in-memory stand-in for Bun.RedisClient
-const data = new Map<string, string>();
-const originalRedisClient = Bun.RedisClient;
-const RedisClientFake = mock(function () {
-	return {
-		close: mock(),
-		get: async (k: string) => data.get(k) ?? null,
-		set: async (k: string, v: string) => {
-			data.set(k, v);
-			return 'OK';
-		},
-		del: async (...keys: string[]) => keys.filter((k) => data.delete(k)).length,
-		unlink: async (...keys: string[]) => keys.filter((k) => data.delete(k)).length,
-		exists: async (k: string) => data.has(k),
-		mget: async (...keys: string[]) => keys.map((k) => data.get(k) ?? null),
-		send: async (cmd: string, args: string[]) => {
-			if (cmd === 'UNLINK') return args.filter((k) => data.delete(k)).length;
-			if (cmd === 'SET') {
-				data.set(args[0], args[1]);
-				return 'OK';
-			}
-			if (cmd === 'EXISTS') return Number(data.has(args[0]));
-			if (cmd === 'MGET') return args.map((k) => data.get(k) ?? null);
-			if (cmd === 'SCAN') {
-				const pattern = args[args.indexOf('MATCH') + 1] ?? '*';
-				const regex = new RegExp(`^${pattern.split('*').map(RegExp.escape).join('.*')}$`);
-				return ['0', [...data.keys()].filter((key) => regex.test(key))];
-			}
-			if (cmd === 'FLUSHDB') return data.clear();
-			return null;
-		}
-	};
-}) as unknown as typeof Bun.RedisClient;
-
 let app: Awaited<ReturnType<typeof Application.testing>>;
 
 beforeAll(async () => {
-	Bun.RedisClient = RedisClientFake;
 	app = await Application.testing({
 		modules: [
-			RedisModule.with({
-				default: 'cache',
-				connections: { cache: { url: 'redis://cache:6379' } }
-			}),
-			MnemosyneModule
+			MnemosyneModule.with({
+				cache: {
+					memory: { ttl: 60_000, lruSize: 5000 },
+					stores: { shared: () => new KeyvCacheableMemory({ ttl: 60_000, lruSize: 5000 }) }
+				}
+			})
 		]
 	});
-	await app.get('mnemosyne.cache.redis');
+	await app.get(cacheStoreService('shared'));
 	await app.get('mnemosyne.cache.memory');
 });
 
@@ -82,7 +48,6 @@ afterAll(async () => {
 	// Some tests spy on Keyv without restoring it
 	mock.restore();
 	await app.shutdown();
-	Bun.RedisClient = originalRedisClient;
 });
 
 // Test the weak cache
@@ -134,10 +99,10 @@ describe('Cache.weak', () => {
 	});
 });
 
-// Test the Redis cache
-describe('Cache.redis', () => {
+// Test a cache over a named store
+describe('Cache.store()', () => {
 	beforeAll(async () => {
-		await Cache.redis.clear();
+		await Cache.store('shared').clear();
 	});
 
 	// Reset mocks before each test
@@ -153,10 +118,10 @@ describe('Cache.redis', () => {
 	});
 
 	it('should call get method with the correct parameters', async () => {
-		const getSpy = spyOn(Cache.redis, 'get');
+		const getSpy = spyOn(Cache.store('shared'), 'get');
 
 		// Call the get method
-		const result = await Cache.redis.get('test-key');
+		const result = await Cache.store('shared').get('test-key');
 
 		// Check if the get method was called with the correct parameters
 		expect(getSpy).toHaveBeenCalledWith('test-key');
@@ -166,10 +131,10 @@ describe('Cache.redis', () => {
 	});
 
 	it('should call set method with the correct parameters', async () => {
-		const setSpy = spyOn(Cache.redis, 'set');
+		const setSpy = spyOn(Cache.store('shared'), 'set');
 
 		// Call the set method
-		const result = await Cache.redis.set('test-key', 'test-value', 3600);
+		const result = await Cache.store('shared').set('test-key', 'test-value', 3600);
 
 		// Check if the set method was called with the correct parameters
 		expect(setSpy).toHaveBeenCalledWith('test-key', 'test-value', 3600);
@@ -179,10 +144,10 @@ describe('Cache.redis', () => {
 	});
 
 	it('should call ttl method with the correct parameters', async () => {
-		const ttlSpy = spyOn(Cache.redis, 'ttl');
+		const ttlSpy = spyOn(Cache.store('shared'), 'ttl');
 
 		// Call the ttl method
-		const result = await Cache.redis.ttl('test-key');
+		const result = await Cache.store('shared').ttl('test-key');
 
 		// Check if the ttl method was called with the correct parameters
 		expect(ttlSpy).toHaveBeenCalledWith('test-key');
@@ -194,10 +159,10 @@ describe('Cache.redis', () => {
 	});
 
 	it('should call del method with the correct parameters', async () => {
-		const delSpy = spyOn(Cache.redis, 'del');
+		const delSpy = spyOn(Cache.store('shared'), 'del');
 
 		// Call the del method
-		const result = await Cache.redis.del('test-key');
+		const result = await Cache.store('shared').del('test-key');
 
 		// Check if the del method was called with the correct parameters
 		expect(delSpy).toHaveBeenCalledWith('test-key');
@@ -207,7 +172,7 @@ describe('Cache.redis', () => {
 	});
 
 	it('should call mset method with the correct parameters', async () => {
-		const msetSpy = spyOn(Cache.redis, 'mset');
+		const msetSpy = spyOn(Cache.store('shared'), 'mset');
 
 		// Set up the mock to return the test data
 		const testData = [
@@ -216,7 +181,7 @@ describe('Cache.redis', () => {
 		];
 
 		// Call the mset method
-		const result = await Cache.redis.mset(testData);
+		const result = await Cache.store('shared').mset(testData);
 
 		// Check if the mset method was called with the correct parameters
 		expect(msetSpy).toHaveBeenCalledWith(testData);
@@ -226,10 +191,10 @@ describe('Cache.redis', () => {
 	});
 
 	it('should call mget method with the correct parameters', async () => {
-		const mgetSpy = spyOn(Cache.redis, 'mget');
+		const mgetSpy = spyOn(Cache.store('shared'), 'mget');
 
 		// Call the mget method
-		const result = await Cache.redis.mget(['key1', 'key2']);
+		const result = await Cache.store('shared').mget(['key1', 'key2']);
 
 		// Check if the mget method was called with the correct parameters
 		expect(mgetSpy).toHaveBeenCalledWith(['key1', 'key2']);
@@ -239,10 +204,10 @@ describe('Cache.redis', () => {
 	});
 
 	it('should call mdel method with the correct parameters', async () => {
-		const mdelSpy = spyOn(Cache.redis, 'mdel');
+		const mdelSpy = spyOn(Cache.store('shared'), 'mdel');
 
 		// Call the mdel method
-		const result = await Cache.redis.mdel(['key1', 'key2']);
+		const result = await Cache.store('shared').mdel(['key1', 'key2']);
 
 		// Check if the mdel method was called with the correct parameters
 		expect(mdelSpy).toHaveBeenCalledWith(['key1', 'key2']);
@@ -252,10 +217,10 @@ describe('Cache.redis', () => {
 	});
 
 	it('should call clear method', async () => {
-		const clearSpy = spyOn(Cache.redis, 'clear');
+		const clearSpy = spyOn(Cache.store('shared'), 'clear');
 
 		// Call the clear method
-		const result = await Cache.redis.clear();
+		const result = await Cache.store('shared').clear();
 
 		// Check if the clear method was called
 		expect(clearSpy).toHaveBeenCalled();
@@ -268,7 +233,7 @@ describe('Cache.redis', () => {
 		const keyvSpy = spyOn(KV, 'Keyv').mockReturnThis();
 
 		// Call the tags method
-		Cache.redis.tags('tag1', 'tag2');
+		Cache.store('shared').tags('tag1', 'tag2');
 
 		// Check if Keyv was instantiated with the correct namespace
 		expect(keyvSpy).toHaveBeenCalledWith({
@@ -517,14 +482,15 @@ describe('Cache namespacing and tagging', () => {
 });
 
 describe('Cache namespace isolation', () => {
-	for (const name of ['memory', 'redis'] as const) {
-		describe(`Cache.${name}`, () => {
+	const caches = { memory: () => Cache.memory, shared: () => Cache.store('shared') };
+	for (const name of ['memory', 'shared'] as const) {
+		describe(`Cache ${name}`, () => {
 			beforeEach(() => {
 				mock.restore();
 			});
 
 			it('keeps base and tagged entries apart', async () => {
-				const base = Cache[name];
+				const base = caches[name]();
 				const tagged = base.tags(`isolation-${name}`);
 
 				await base.set('shared-key', 'base');
@@ -535,7 +501,7 @@ describe('Cache namespace isolation', () => {
 			});
 
 			it('still reads base entries written before a tagged cache was created', async () => {
-				const base = Cache[name];
+				const base = caches[name]();
 				await base.set('before-tags', 'base');
 
 				base.tags(`late-${name}`);
@@ -544,7 +510,7 @@ describe('Cache namespace isolation', () => {
 			});
 
 			it('clears only its own namespace', async () => {
-				const base = Cache[name];
+				const base = caches[name]();
 				const first = base.tags(`clear-a-${name}`);
 				const second = base.tags(`clear-b-${name}`);
 
@@ -565,7 +531,7 @@ describe('Cache namespace isolation', () => {
 			});
 
 			it('deletes only its own keys', async () => {
-				const base = Cache[name];
+				const base = caches[name]();
 				const tagged = base.tags(`del-${name}`);
 
 				await base.set('deleted', 'base');

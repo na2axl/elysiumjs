@@ -13,7 +13,6 @@
 // limitations under the License.
 
 import { UnitOfWork } from '../mnemosyne/index';
-
 import { ConcurrencyConflictError, IdempotencyConflictError } from './errors';
 
 /**
@@ -39,15 +38,6 @@ export interface IdempotencyRecord {
 export interface IdempotencyStore {
 	get(key: string): Promise<IdempotencyRecord | undefined>;
 	put(record: IdempotencyRecord): Promise<void>;
-}
-
-/**
- * Serializes the actions that share a key (`serializeBy`): `lock` waits for the other holders,
- * and the lock lasts until the unit of work ends, or until the returned release runs.
- * @author Axel Nana <ax.lnana@outlook.com>
- */
-export interface ActionLock {
-	lock(key: string): Promise<(() => void) | void>;
 }
 
 /**
@@ -152,27 +142,6 @@ export class MemoryIdempotencyStore implements IdempotencyStore {
 	public async put(record: IdempotencyRecord): Promise<void> {
 		if (this.#records.has(record.key)) throw new IdempotencyConflictError(record.key);
 		this.#records.set(record.key, structuredClone(record));
-	}
-}
-
-/**
- * Serializes actions in the process, one holder per key at a time.
- * @author Axel Nana <ax.lnana@outlook.com>
- */
-export class MemoryActionLock implements ActionLock {
-	readonly #tails = new Map<string, Promise<void>>();
-
-	public async lock(key: string): Promise<() => void> {
-		const previous = this.#tails.get(key) ?? Promise.resolve();
-		let release!: () => void;
-		const current = new Promise<void>((resolve) => (release = resolve));
-		const tail = previous.then(() => current);
-		this.#tails.set(key, tail);
-		await previous;
-		return () => {
-			release();
-			if (this.#tails.get(key) === tail) this.#tails.delete(key);
-		};
 	}
 }
 

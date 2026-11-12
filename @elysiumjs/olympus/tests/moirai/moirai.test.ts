@@ -15,6 +15,9 @@
 import type { BackgroundScope, BackgroundWork, Static, TestingApp } from '../../src/index';
 import type { MoiraiOptions } from '../../src/moirai';
 
+import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'bun:test';
+
+import { Job, JobRegistry, WithId } from '../../src/heracles/index';
 import {
 	Application,
 	Background,
@@ -22,16 +25,14 @@ import {
 	ConflictError,
 	DomainError,
 	isDomainError,
+	MemoryLock,
 	Module,
 	NotFoundError,
 	Result,
 	Service,
 	t
 } from '../../src/index';
-import { Job, JobRegistry, WithId } from '../../src/heracles/index';
 import { UnitOfWork, withUnitOfWork } from '../../src/mnemosyne/index';
-import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'bun:test';
-
 import { HERACLES_JOB_EFFECT, InvalidOnceJobError, job, Once } from '../../src/moirai/heracles';
 import {
 	Action,
@@ -47,7 +48,6 @@ import {
 	InvalidInputError,
 	isTransientError,
 	LockOutsideUnitOfWorkError,
-	MemoryActionLock,
 	MemoryIdempotencyStore,
 	MemoryInboxStore,
 	MemoryOutboxStore,
@@ -107,7 +107,7 @@ beforeEach(() => {
 	Service.instance(MOIRAI_OUTBOX_STORE, outbox);
 	Service.instance(MOIRAI_IDEMPOTENCY_STORE, idempotency);
 	Service.instance(MOIRAI_INBOX_STORE, new MemoryInboxStore());
-	Service.instance(MOIRAI_ACTION_LOCK, new MemoryActionLock());
+	Service.instance(MOIRAI_ACTION_LOCK, new MemoryLock());
 	setOptions();
 });
 
