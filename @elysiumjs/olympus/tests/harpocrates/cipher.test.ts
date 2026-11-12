@@ -41,18 +41,18 @@ describe('AesGcmCipher', () => {
 	it('refuses another context, an altered value, and foreign values', async () => {
 		const cipher = new AesGcmCipher({ keys: { k1: OLD } });
 		const sealed = await cipher.encrypt('value', 'a');
-		expect(cipher.decrypt(sealed, 'b')).rejects.toBeInstanceOf(DecryptionFailedError);
-		expect(cipher.decrypt(sealed)).rejects.toBeInstanceOf(DecryptionFailedError);
+		await expect(cipher.decrypt(sealed, 'b')).rejects.toBeInstanceOf(DecryptionFailedError);
+		await expect(cipher.decrypt(sealed)).rejects.toBeInstanceOf(DecryptionFailedError);
 		const altered = `${sealed.slice(0, -2)}${sealed.endsWith('AA') ? 'BB' : 'AA'}`;
-		expect(cipher.decrypt(altered, 'a')).rejects.toBeInstanceOf(DecryptionFailedError);
-		expect(cipher.decrypt('plain', 'a')).rejects.toBeInstanceOf(DecryptionFailedError);
-		expect(cipher.decrypt('aes-256-gcm:k2:AAAA', 'a')).rejects.toBeInstanceOf(
+		await expect(cipher.decrypt(altered, 'a')).rejects.toBeInstanceOf(DecryptionFailedError);
+		await expect(cipher.decrypt('plain', 'a')).rejects.toBeInstanceOf(DecryptionFailedError);
+		await expect(cipher.decrypt('aes-256-gcm:k2:AAAA', 'a')).rejects.toBeInstanceOf(
 			DecryptionFailedError
 		);
-		expect(cipher.decrypt('aes-256-gcm:toString:AAAA', 'a')).rejects.toBeInstanceOf(
+		await expect(cipher.decrypt('aes-256-gcm:toString:AAAA', 'a')).rejects.toBeInstanceOf(
 			DecryptionFailedError
 		);
-		expect(cipher.decrypt('aes-256-gcm:k1:AAAA:x', 'a')).rejects.toBeInstanceOf(
+		await expect(cipher.decrypt('aes-256-gcm:k1:AAAA:x', 'a')).rejects.toBeInstanceOf(
 			DecryptionFailedError
 		);
 	});
@@ -63,9 +63,18 @@ describe('AesGcmCipher', () => {
 		const after = new AesGcmCipher({ keys: { old: OLD, new: () => NEW }, current: 'new' });
 		expect(await after.decrypt(sealed)).toBe('value');
 		expect(await after.encrypt('value')).toStartWith('aes-256-gcm:new:');
-		expect(new AesGcmCipher({ keys: { old: NEW } }).decrypt(sealed)).rejects.toBeInstanceOf(
+		await expect(new AesGcmCipher({ keys: { old: NEW } }).decrypt(sealed)).rejects.toBeInstanceOf(
 			DecryptionFailedError
 		);
+	});
+
+	it('derives the key again when the secret a function reads changes', async () => {
+		let secret = OLD;
+		const cipher = new AesGcmCipher({ keys: { k: () => secret } });
+		const before = await cipher.encrypt('value');
+		secret = NEW;
+		await expect(cipher.decrypt(before)).rejects.toBeInstanceOf(DecryptionFailedError);
+		expect(await cipher.decrypt(await cipher.encrypt('value'))).toBe('value');
 	});
 
 	it('validates its keyring', async () => {
@@ -75,7 +84,7 @@ describe('AesGcmCipher', () => {
 		expect(() => new AesGcmCipher({ keys: { a: OLD }, current: 'toString' })).toThrow(
 			'not in the keyring'
 		);
-		expect(new AesGcmCipher({ keys: { a: 'short' } }).encrypt('x')).rejects.toBeInstanceOf(
+		await expect(new AesGcmCipher({ keys: { a: 'short' } }).encrypt('x')).rejects.toBeInstanceOf(
 			WeakSecretError
 		);
 	});

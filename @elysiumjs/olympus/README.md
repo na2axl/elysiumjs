@@ -325,7 +325,7 @@ if (await Password.verify(input, hash)) {
 }
 ```
 
-The drivers are `scrypt` (the default) and `pbkdf2` (PBKDF2-HMAC-SHA256 through Web Crypto); `@elysiumjs/bun` adds `bun`, Argon2id through `Bun.password`. Pick one with options through the port: `Password.use(PasswordHasher.for('scrypt', { N: 32768 }))`.
+The drivers are `scrypt` (the default, N=16384, r=8, p=1) and `pbkdf2` (PBKDF2-HMAC-SHA256 through Web Crypto); `@elysiumjs/bun` adds `bun`, Argon2id through `Bun.password`. Pick one with options through the port: `Password.use(PasswordHasher.for('scrypt', { N: 32768 }))`. On Bun, call `Password.use('bun')` at startup to keep making Argon2id hashes; otherwise `needsRehash` asks to replace them with scrypt ones. Cloudflare Workers cap PBKDF2 at 100,000 iterations, so a PBKDF2 hash made elsewhere with more does not verify there.
 
 `Cipher` encrypts strings. The `aes-gcm` driver uses AES-256-GCM over a keyring of secrets of at least 32 bytes; each ciphertext names its key, so you can add a key, make it current, and still decrypt the values of the older ones. The context binds a ciphertext to where it belongs: decrypting it under another context fails with `DecryptionFailedError`.
 
@@ -396,7 +396,11 @@ await MemoryTransport.settled();
 
 ## Encrypted jobs
 
-A job registered with `encrypted: true` has its arguments encrypted before they reach the transport, with the context `heracles:<job name>`, and decrypted in the worker, so that a queue backend never stores them in clear. Give the module a cipher; dispatching an encrypted job without one throws `MissingJobCipherError`. The arguments travel as JSON, on the in-memory transport too.
+A job registered with `encrypted: true` has its arguments encrypted before they reach the transport, with the context `heracles:<job name>`, and decrypted in the worker, so that a queue backend never stores them in clear. The `job()` outbox effect of moirai encrypts them too, before they reach the outbox. Give the module a cipher; dispatching an encrypted job without one throws `MissingJobCipherError`. The arguments travel as JSON, on the in-memory transport too.
+
+Only the arguments are encrypted: the job name, the job id and the dispatch options stay in clear. A job that derives its id from its arguments, through `generateJobId()`, should hash them first with `hmac` from harpocrates.
+
+When the arguments do not decrypt, the job does not run: it fails on the in-memory and Redis transports, and on Cloudflare Workers it is retried within its `maxRetries`, then goes to the dead letters. To rotate keys without losing jobs, add the new key to the keyring of every worker first, then make it current where jobs are dispatched.
 
 ```ts
 import { Cipher } from '@elysiumjs/olympus/harpocrates';

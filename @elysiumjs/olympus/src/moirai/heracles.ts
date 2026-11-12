@@ -15,15 +15,9 @@
 import type { Job, JobClass, JobDispatchOptions } from '../heracles/index';
 import type { OutboxEffect } from './stores';
 
-import {
-	DATABASE_TRANSACTION_SERVICE,
-	ElysiumError,
-	ModuleContext,
-	Service
-} from '../index';
-import { Heracles, JobRegistry } from '../heracles/index';
+import { Heracles, JobRegistry, sealJobArgs } from '../heracles/index';
+import { DATABASE_TRANSACTION_SERVICE, ElysiumError, ModuleContext, Service } from '../index';
 import { UnitOfWork } from '../mnemosyne/index';
-
 import { Inbox, registerEffect } from './outbox';
 
 /** The kind of the effects that dispatch a Heracles job. */
@@ -40,24 +34,30 @@ registerEffect(HERACLES_JOB_EFFECT, async (payload) => {
 
 /**
  * An outbox effect that dispatches a Heracles job once the action commits, with the retries of
- * the outbox until the job is queued.
+ * the outbox until the job is queued. The arguments of an encrypted job are encrypted here, so
+ * that the outbox does not store them in clear either.
  * @author Axel Nana <ax.lnana@outlook.com>
  * @param jobClass The job class, registered in a module's `jobs`.
  * @param args The arguments of the job, JSON-safe.
  * @param options The dispatch options.
+ * @throws {MissingJobCipherError} When the job is encrypted and no cipher is configured.
  * @example
  * ```ts
  * await Outbox.enqueue(job(SendReceiptJob, [order.id]));
  * ```
  */
-export const job = <TClass extends JobClass<any>>(
+export const job = async <TClass extends JobClass<any>>(
 	jobClass: TClass,
 	args: ConstructorParameters<TClass>,
 	options?: JobDispatchOptions
-): OutboxEffect => {
+): Promise<OutboxEffect> => {
 	const name = JobRegistry.all().find((entry) => entry.jobClass === jobClass)?.name;
 	if (!name) throw new Error(`${jobClass.name} is not registered in a module's jobs.`);
-	return { kind: HERACLES_JOB_EFFECT, payload: { job: name, args, options } satisfies JobPayload };
+	const carried = await sealJobArgs(jobClass, name, args);
+	return {
+		kind: HERACLES_JOB_EFFECT,
+		payload: { job: name, args: carried, options } satisfies JobPayload
+	};
 };
 
 /**

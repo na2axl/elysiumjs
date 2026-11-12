@@ -46,6 +46,17 @@ class GreetJob extends Job {
 	}
 }
 
+@Job.register({ name: 'secret', queue: 'jobs', maxRetries: 1, encrypted: true })
+class SecretJob extends Job {
+	constructor(private readonly who: string) {
+		super();
+	}
+
+	protected async execute(): Promise<void> {
+		ran.push(`secret:${this.who}`);
+	}
+}
+
 @Http.controller('/greet')
 class GreetController {
 	@Http.post('/:who')
@@ -55,7 +66,7 @@ class GreetController {
 	}
 }
 
-@Module.register({ controllers: [GreetController], jobs: [GreetJob] })
+@Module.register({ controllers: [GreetController], jobs: [GreetJob, SecretJob] })
 class GreetModule extends Module {}
 
 const ctx = (): WorkersExecutionContext => ({ waitUntil() {}, passThroughOnException() {} });
@@ -180,6 +191,32 @@ describe('Heracles on Cloudflare Workers', () => {
 		]);
 		expect(buried).toHaveLength(1);
 		expect(buried[0]).toMatchObject({ job: sent[0]!.body.job, queue: 'jobs', attempts: 3 });
+		await app.kernel.shutdown();
+	});
+
+	it('retries, then buries, a job whose arguments do not decrypt, without running it', async () => {
+		const buried: DeadJob[] = [];
+		const { app, worker, env } = await setup({ onDead: (job) => void buried.push(job) });
+		const body = {
+			type: 'job:process',
+			job: 'elysium.heracles.job.secret',
+			jobId: 'j-1',
+			dispatchId: 'd-1',
+			args: ['in clear'],
+			queue: 'jobs',
+			options: { maxRetries: 1 }
+		};
+
+		const first = batchOf([body], 1);
+		await worker.queue(first.batch, env, ctx());
+		expect(first.retried).toEqual([{ index: 0, delaySeconds: undefined }]);
+
+		const last = batchOf([body], 2);
+		await worker.queue(last.batch, env, ctx());
+		expect(last.acked).toEqual([0]);
+		expect(buried).toHaveLength(1);
+		expect((buried[0]!.error as Error).message).toContain('sent in clear');
+		expect(ran).not.toContain('secret:in clear');
 		await app.kernel.shutdown();
 	});
 

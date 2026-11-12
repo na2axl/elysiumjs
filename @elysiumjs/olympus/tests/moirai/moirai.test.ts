@@ -688,12 +688,12 @@ describe('heracles jobs', () => {
 
 	afterEach(() => JobRegistry.clear());
 
-	it('describes a job dispatch as an outbox effect', () => {
-		expect(() => job(ReceiptJob, ['o-1'])).toThrow('is not registered');
+	it('describes a job dispatch as an outbox effect', async () => {
+		await expect(job(ReceiptJob, ['o-1'])).rejects.toThrow('is not registered');
 		JobRegistry.set([
 			['elysium.heracles.job.receipt', { jobClass: ReceiptJob as never, module: null as never }]
 		]);
-		expect(job(ReceiptJob, ['o-1'], { delay: 1000 } as never)).toEqual({
+		expect(await job(ReceiptJob, ['o-1'], { delay: 1000 } as never)).toEqual({
 			kind: HERACLES_JOB_EFFECT,
 			payload: { job: 'elysium.heracles.job.receipt', args: ['o-1'], options: { delay: 1000 } }
 		});

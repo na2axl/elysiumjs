@@ -149,7 +149,8 @@ export type JobProps = {
 	 * Encrypts the job's arguments with the cipher of `HeraclesModule.with({ cipher })` before
 	 * they reach the transport, and decrypts them in the worker, for arguments such as personal
 	 * data that a queue backend should not store in clear. The arguments then travel as JSON on
-	 * every transport, the in-memory one included.
+	 * every transport, the in-memory one included. The job name, the job id and the dispatch
+	 * options stay in clear: hash the arguments a custom `generateJobId()` uses.
 	 * @default false
 	 */
 	encrypted?: boolean;

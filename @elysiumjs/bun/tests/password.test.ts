@@ -40,6 +40,12 @@ describe('BunPasswordHasher', () => {
 		expect(new BunPasswordHasher().needsRehash('$scrypt$x')).toBe(true);
 	});
 
+	it('lets Password verify Argon2id hashes without ever using the bun driver', async () => {
+		const hash = await new BunPasswordHasher({ memoryCost: 4096, timeCost: 2 }).hash('pw');
+		expect(await Password.verify('pw', hash)).toBe(true);
+		expect(await Password.verify('nope', hash)).toBe(false);
+	});
+
 	it('lets Password verify Argon2id hashes once another driver makes new ones', async () => {
 		Password.use('bun');
 		const hash = await Password.hash('correct horse');

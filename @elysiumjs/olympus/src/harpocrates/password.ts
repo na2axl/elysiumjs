@@ -59,7 +59,7 @@ export class PasswordHasher extends Port('password-hasher') {}
 
 let configured: PasswordHasherDriver | undefined;
 const known: PasswordHasherDriver[] = [];
-const byName = new Map<string, PasswordHasherDriver>();
+const byName = new Map<string, PasswordHasherDriver | null>();
 
 /** The default driver: scrypt, which runs on Node.js, Bun and Workers with `nodejs_compat`. */
 const current = (): PasswordHasherDriver => (configured ??= PasswordHasher.for('scrypt'));
@@ -70,10 +70,11 @@ const driverNamed = (name: string): PasswordHasherDriver | undefined => {
 		try {
 			byName.set(name, PasswordHasher.for(name as PortDriverName<'password-hasher'>));
 		} catch {
-			return undefined;
+			// A driver that needs options: not built again on every verification.
+			byName.set(name, null);
 		}
 	}
-	return byName.get(name);
+	return byName.get(name) ?? undefined;
 };
 
 /**

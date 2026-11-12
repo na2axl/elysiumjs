@@ -36,6 +36,8 @@ Password.use('bun');
 Password.use(PasswordHasher.for('bun', { memoryCost: 131072, timeCost: 3 }));
 ```
 
+`Password.verify` routes the hashes that start with `$argon2id$` to this driver.
+
 ## License
 
 Apache-2.0

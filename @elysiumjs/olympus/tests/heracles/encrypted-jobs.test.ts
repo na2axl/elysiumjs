@@ -24,6 +24,7 @@ import { Job, JobStatus } from '../../src/heracles/job';
 import { Queue } from '../../src/heracles/queue';
 import { MemoryTransport } from '../../src/heracles/transports/memory.transport';
 import { Application, Module } from '../../src/index';
+import { job } from '../../src/moirai/heracles';
 
 const ENCRYPTED = 'elysium.heracles.job.EncryptedStatementJob';
 const received: unknown[] = [];
@@ -113,7 +114,7 @@ describe('encrypted jobs', () => {
 
 	it('refuses to dispatch an encrypted job without a cipher', async () => {
 		await boot(false);
-		expect(Heracles.dispatch(StatementJob, ['FR76', { value: 1 }])).rejects.toBeInstanceOf(
+		await expect(Heracles.dispatch(StatementJob, ['FR76', { value: 1 }])).rejects.toBeInstanceOf(
 			MissingJobCipherError
 		);
 	});
@@ -129,12 +130,28 @@ describe('encrypted jobs', () => {
 		expect(status?.error).toContain('sent in clear');
 	});
 
+	it('leaves sealed arguments as they are, so that a dead letter can be dispatched again', async () => {
+		await boot();
+		const sealed = await sealJobArgs(StatementJob, ENCRYPTED, ['again', { value: 3 }]);
+		expect(await sealJobArgs(StatementJob, ENCRYPTED, sealed)).toEqual(sealed);
+		await Heracles.dispatch(StatementJob, sealed as never);
+		await MemoryTransport.settled();
+		expect(received).toEqual([['again', { value: 3 }]]);
+	});
+
+	it('encrypts the arguments of the outbox job() effect', async () => {
+		await boot();
+		const effect = await job(StatementJob, ['FR76 secret', { value: 4 }]);
+		expect(JSON.stringify(effect.payload)).not.toContain('FR76');
+		expect(JSON.stringify(effect.payload)).toContain('aes-256-gcm:main:');
+	});
+
 	it('binds the ciphertext to its job', async () => {
 		await boot();
 		const sealed = await sealJobArgs(StatementJob, ENCRYPTED, ['x', { value: 1 }]);
 		expect(await openJobArgs(StatementJob, ENCRYPTED, sealed)).toEqual(['x', { value: 1 }]);
-		expect(openJobArgs(StatementJob, 'elysium.heracles.job.OtherJob', sealed)).rejects.toThrow(
-			'could not be decrypted'
-		);
+		await expect(
+			openJobArgs(StatementJob, 'elysium.heracles.job.OtherJob', sealed)
+		).rejects.toThrow('could not be decrypted');
 	});
 });

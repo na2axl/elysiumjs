@@ -17,7 +17,7 @@ import type { Secret } from './secret';
 import { ElysiumError } from '../index';
 import { Port } from '../port';
 import { fromBase64Url, fromUtf8, randomBytes, toBase64Url, utf8 } from './crypto';
-import { assertStrongSecret, resolveSecret } from './secret';
+import { resolveSecret } from './secret';
 
 /**
  * Encrypts and decrypts strings: a driver of the {@link Cipher} port. A ciphertext names its
@@ -122,7 +122,7 @@ export class AesGcmCipher implements CipherDriver {
 		if (!Object.hasOwn(options.keys, current)) {
 			throw new ElysiumError(`The current key "${current}" is not in the keyring.`);
 		}
-		this.#keys = options.keys;
+		this.#keys = { ...options.keys };
 		this.#current = current;
 	}
 
@@ -163,7 +163,6 @@ export class AesGcmCipher implements CipherDriver {
 	/** The AES key of a keyring entry, derived again when its secret changes. */
 	async #key(id: string): Promise<CryptoKey> {
 		const secret = await resolveSecret(this.#keys[id]!, `cipher key "${id}"`);
-		assertStrongSecret(secret, `cipher key "${id}"`);
 		const cached = this.#derived.get(id);
 		if (cached?.secret === secret) return cached.key;
 		const key = crypto.subtle
@@ -178,6 +177,8 @@ export class AesGcmCipher implements CipherDriver {
 				)
 			);
 		this.#derived.set(id, { secret, key });
+		// A failed derivation is not kept: the next call tries again.
+		key.catch(() => this.#derived.delete(id));
 		return key;
 	}
 }

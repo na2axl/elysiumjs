@@ -50,7 +50,8 @@ const contextOf = (job: string): string => `heracles:${job}`;
 
 /**
  * The arguments a transport carries for a job: as they are, or encrypted as one JSON value when
- * the job is registered with `encrypted: true`.
+ * the job is registered with `encrypted: true`. Arguments that are already encrypted are left as
+ * they are. The ciphertext is bound to the job name: it does not open for another job.
  * @author Axel Nana <ax.lnana@outlook.com>
  * @param jobClass The job class.
  * @param job The job's service name.
@@ -62,6 +63,8 @@ export const sealJobArgs = async (
 	args: readonly unknown[]
 ): Promise<unknown[]> => {
 	if (!getJobMetadata(jobClass)?.encrypted) return [...args];
+	// Already sealed, such as the arguments of an outbox effect or of a dead letter dispatched again.
+	if (isSealed(args)) return [...args];
 	const cipher = await cipherFor(job);
 	return [{ $encrypted: await cipher.encrypt(JSON.stringify(args), contextOf(job)) }];
 };

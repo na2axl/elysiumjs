@@ -112,6 +112,23 @@ describe('passwords', () => {
 		expect(new ScryptPasswordHasher().needsRehash(hash)).toBe(true);
 	});
 
+	it('refuses scrypt hashes with a short key or salt, or costly parameters', async () => {
+		const hasher = new ScryptPasswordHasher({ N: 1024 });
+		const salt = 'A'.repeat(22);
+		const key = 'A'.repeat(43);
+		const hash = (params: string, s = salt, k = key) => `$scrypt$${params}$${s}$${k}`;
+		expect(await hasher.verify('x', hash('N=16384,r=8,p=1', salt, 'A'))).toBe(false);
+		expect(await Password.verify('x', hash('N=16384,r=8,p=1', salt, 'A'))).toBe(false);
+		expect(await hasher.verify('x', hash('N=16384,r=8,p=1', 'AA'))).toBe(false);
+		expect(await hasher.verify('x', hash('N=1000,r=8,p=1'))).toBe(false);
+		expect(await hasher.verify('x', hash(`N=${2 ** 21},r=8,p=1`))).toBe(false);
+		expect(await hasher.verify('x', hash('N=1024,r=64,p=1'))).toBe(false);
+		expect(await hasher.verify('x', hash('N=1024,r=8,p=0'))).toBe(false);
+		expect(hasher.needsRehash(hash('N=1024,r=8,p=1', salt, 'A'))).toBe(true);
+		const strong = new ScryptPasswordHasher({ N: 1024, p: 2 });
+		expect(strong.needsRehash(await hasher.hash('x'))).toBe(true);
+	});
+
 	it('verifies the hashes of other hashers and asks to rehash them', async () => {
 		const old = await new Pbkdf2PasswordHasher({ iterations: 1000 }).hash('pw');
 		Password.use(new ScryptPasswordHasher({ N: 2048 }));
@@ -147,8 +164,8 @@ describe('JWT', () => {
 		expect(bad.status).toBe(401);
 
 		const expired = await Jwt.sign({}, { secret, expiresIn: -60 });
-		expect(Jwt.verify(expired, { secret })).rejects.toThrow('has expired');
-		expect(Jwt.verify(token, { secret, audience: 'other' })).rejects.toBeInstanceOf(
+		await expect(Jwt.verify(expired, { secret })).rejects.toThrow('has expired');
+		await expect(Jwt.verify(token, { secret, audience: 'other' })).rejects.toBeInstanceOf(
 			InvalidTokenError
 		);
 	});
@@ -165,7 +182,7 @@ describe('JWT', () => {
 			const link = await SignedUrl.sign('https://x.test/a', { secret, expiresIn: 60 });
 			expect(await SignedUrl.verify(link, { secret })).toBe(true);
 			Clock.travel(10 * 60 * 1000);
-			expect(Jwt.verify(token, { secret })).rejects.toThrow('has expired');
+			await expect(Jwt.verify(token, { secret })).rejects.toThrow('has expired');
 			expect(await SignedUrl.verify(link, { secret })).toBe(false);
 		} finally {
 			Clock.reset();
@@ -202,8 +219,8 @@ describe('JWT keys, claims and clock', () => {
 		const keys = [{ secret: current }, { secret: previous }];
 		expect(await Jwt.verify(old, { keys })).toMatchObject({ v: 'old' });
 		const forged = await Jwt.sign({}, { secret: 'f'.repeat(32), expiresIn: 60 });
-		expect(Jwt.verify(forged, { keys })).rejects.toThrow('does not verify');
-		expect(Jwt.verify(old, { keys: [] })).rejects.toBeInstanceOf(InvalidTokenError);
+		await expect(Jwt.verify(forged, { keys })).rejects.toThrow('does not verify');
+		await expect(Jwt.verify(old, { keys: [] })).rejects.toBeInstanceOf(InvalidTokenError);
 	});
 
 	it('does not try the next key for an expired token', async () => {
@@ -218,7 +235,7 @@ describe('JWT keys, claims and clock', () => {
 				}
 			}
 		];
-		expect(Jwt.verify(expired, { keys })).rejects.toThrow('has expired');
+		await expect(Jwt.verify(expired, { keys })).rejects.toThrow('has expired');
 		await Jwt.verify(expired, { keys }).catch(() => undefined);
 		expect(previousRead).toBe(false);
 	});
@@ -235,10 +252,10 @@ describe('JWT keys, claims and clock', () => {
 
 	it('requires an expiry unless told otherwise, and other claims when asked', async () => {
 		const forever = await Jwt.sign({}, { secret: current });
-		expect(Jwt.verify(forever, { secret: current })).rejects.toThrow('"exp"');
+		await expect(Jwt.verify(forever, { secret: current })).rejects.toThrow('"exp"');
 		expect(await Jwt.verify(forever, { secret: current, requiredClaims: [] })).toMatchObject({});
 		const anonymous = await Jwt.sign({}, { secret: current, expiresIn: 60 });
-		expect(
+		await expect(
 			Jwt.verify(anonymous, { secret: current, requiredClaims: ['exp', 'sub'] })
 		).rejects.toThrow('"sub"');
 	});
@@ -252,7 +269,7 @@ describe('JWT keys, claims and clock', () => {
 			iat: issuedAt.getTime() / 1000,
 			exp: issuedAt.getTime() / 1000 + 600
 		});
-		expect(at('2026-01-01T00:10:00Z')).rejects.toThrow('has expired');
+		await expect(at('2026-01-01T00:10:00Z')).rejects.toThrow('has expired');
 
 		const numeric = await Jwt.sign({}, { secret: current, issuedAt, expiresIn: 90 });
 		expect(

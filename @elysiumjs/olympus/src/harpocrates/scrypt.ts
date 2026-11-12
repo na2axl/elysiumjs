@@ -25,6 +25,14 @@ import { PasswordHasher } from './password';
  */
 export type ScryptOptions = { N?: number; r?: number; p?: number; keyLength?: number };
 
+/** Bounds of the parameters read from a hash. */
+const MAX_N = 2 ** 20;
+const MAX_R = 32;
+const MAX_P = 16;
+const MIN_SALT_BYTES = 8;
+const MIN_KEY_BYTES = 16;
+const MAX_KEY_BYTES = 64;
+
 const derive = (
 	password: string,
 	salt: Buffer,
@@ -73,16 +81,32 @@ export class ScryptPasswordHasher implements PasswordHasherDriver {
 
 	public needsRehash(hash: string): boolean {
 		const parsed = this.#parse(hash);
-		return !parsed || parsed.options.N < this.#options.N || parsed.options.r < this.#options.r;
+		return (
+			!parsed ||
+			parsed.options.N < this.#options.N ||
+			parsed.options.r < this.#options.r ||
+			parsed.options.p < this.#options.p ||
+			parsed.key.length < this.#options.keyLength
+		);
 	}
 
+	/**
+	 * Reads a hash, or answers `null` when it is malformed or out of bounds: a short salt or key,
+	 * which would verify too easily, or parameters that would cost too much to derive.
+	 */
 	#parse(hash: string) {
 		const match = /^\$scrypt\$N=(\d+),r=(\d+),p=(\d+)\$([\w-]+)\$([\w-]+)$/.exec(hash);
 		if (!match) return null;
-		return {
-			options: { N: Number(match[1]), r: Number(match[2]), p: Number(match[3]), keyLength: 32 },
-			salt: Buffer.from(match[4]!, 'base64url'),
-			key: Buffer.from(match[5]!, 'base64url')
-		};
+		const N = Number(match[1]);
+		const r = Number(match[2]);
+		const p = Number(match[3]);
+		const salt = Buffer.from(match[4]!, 'base64url');
+		const key = Buffer.from(match[5]!, 'base64url');
+		const powerOfTwo = N >= 2 && (N & (N - 1)) === 0;
+		if (!powerOfTwo || N > MAX_N || r < 1 || r > MAX_R || p < 1 || p > MAX_P) return null;
+		if (salt.length < MIN_SALT_BYTES || key.length < MIN_KEY_BYTES || key.length > MAX_KEY_BYTES) {
+			return null;
+		}
+		return { options: { N, r, p, keyLength: key.length }, salt, key };
 	}
 }
