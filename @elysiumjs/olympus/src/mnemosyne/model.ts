@@ -15,9 +15,9 @@
 import type { TSchema } from '../index';
 import type { ColumnMetadata, ModelAdapter } from './interfaces';
 
-import { Application } from '../index';
 import { t } from 'elysia';
 
+import { Application } from '../index';
 import { getCurrentTenant, getTenancyStrategy } from './tenancy';
 
 /**
@@ -183,6 +183,12 @@ export const AbstractModel = <TTable, TColumns extends Record<string, unknown>>(
 		 * wrapped by the tenancy strategy when the current tenant is not `public`.
 		 */
 		public static readonly supportTenancy: boolean = false;
+
+		/**
+		 * The model adapter of the model's backend, whose repository adapter serves
+		 * `Repository(Model)`.
+		 */
+		public static readonly adapter: ModelAdapter<TTable> = adapter;
 	}
 
 	return M;

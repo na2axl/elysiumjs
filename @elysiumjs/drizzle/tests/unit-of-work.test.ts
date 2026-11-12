@@ -13,13 +13,17 @@
 // limitations under the License.
 
 import { ConflictError, Service } from '@elysiumjs/olympus';
-import { Transactional, UnitOfWork, withUnitOfWork } from '@elysiumjs/olympus/mnemosyne';
+import {
+	Repository,
+	Transactional,
+	UnitOfWork,
+	withUnitOfWork
+} from '@elysiumjs/olympus/mnemosyne';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import * as d from 'drizzle-orm/pg-core';
 
 import { Database } from '../src/database';
 import { DrizzleModel } from '../src/model';
-import { DrizzleRepository } from '../src/repository';
 import { pgTable } from '../src/table';
 import { fakeConnection } from './fake-sql';
 
@@ -29,7 +33,7 @@ const accounts = pgTable('uow_accounts', {
 });
 
 class Account extends DrizzleModel(accounts) {}
-class AccountRepository extends DrizzleRepository(Account) {}
+class AccountRepository extends Repository(Account) {}
 
 describe('units of work', () => {
 	let fake: ReturnType<typeof fakeConnection>;

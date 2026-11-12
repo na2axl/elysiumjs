@@ -29,6 +29,8 @@ export type {
 export * from './database';
 export * from './model';
 export * from './repository';
+export * from './memory';
+export * from './pruner';
 export { ModelResource, type ModelResourceOptions } from './resource';
 export { type TransactionRunner, Transactional, UnitOfWork, withUnitOfWork } from './unit-of-work';
 export {

@@ -19,6 +19,7 @@ import type { PgColumn, PgTable, PgTableWithColumns } from 'drizzle-orm/pg-core'
 import { AbstractModel, createSchemaFromModel } from '@elysiumjs/olympus/mnemosyne';
 import { getTableConfig } from 'drizzle-orm/pg-core';
 
+import { drizzleRepositoryAdapter } from './repository';
 import { getTableBuilders } from './table';
 import { wrapTenantSchema } from './tenancy';
 
@@ -101,7 +102,9 @@ export const drizzleAdapter: ModelAdapter<PgTableWithColumns<any>> = {
 		}
 		const config = getTableConfig(table);
 		return wrapTenantSchema(tenant, config.name, builders) as PgTableWithColumns<any>;
-	}
+	},
+
+	repository: drizzleRepositoryAdapter as ModelAdapter<PgTableWithColumns<any>>['repository']
 };
 
 // ============================================================================
@@ -163,7 +166,13 @@ export const DrizzleModel = <TTable extends PgTable>(
 	type TSelect = InferSelectModel<TTable>;
 	type TInsert = InferInsertModel<TTable>;
 
-	const Base = AbstractModel(config.name, builders ?? {}, drizzleAdapter, table);
+	// Typed with the table itself, so that the model's table type is the precise one.
+	const Base = AbstractModel(
+		config.name,
+		builders ?? {},
+		drizzleAdapter as unknown as ModelAdapter<TTable>,
+		table
+	);
 
 	// Override supportTenancy if specified
 	if (options?.supportTenancy !== undefined) {

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import type { TSchema } from '../index';
+import type { RepositoryAdapter } from './repository';
 
 // ============================================================================
 // Driver
@@ -136,6 +137,12 @@ export interface ModelAdapter<TTable = unknown> {
 	 * @returns A new table scoped to the given tenant.
 	 */
 	createTenantTable(table: TTable, tenant: string): TTable;
+
+	/**
+	 * The repository adapter of the backend, which `Repository(Model)` sends its storage calls
+	 * to.
+	 */
+	readonly repository?: RepositoryAdapter<TTable, any, any>;
 }
 
 // ============================================================================
@@ -280,20 +287,12 @@ export type RowKey = IdType | Readonly<Record<string, unknown>>;
  * @template TUpdate The type needed by update queries.
  * @template TId The primary key type: a value, or an object of the key columns.
  */
-export interface RepositoryInterface<TSelect, TInsert, TUpdate, TId extends RowKey = string> {
+export interface RepositoryInterface<TSelect, TInsert, TUpdate, TId = RowKey> {
 	/**
 	 * Retrieves all the records in the database.
 	 * @returns All the records in the database.
 	 */
 	all(): Promise<TSelect[]>;
-
-	/**
-	 * Retrieves a paginated subset of the records in the database.
-	 * @param count The number of records per page.
-	 * @param page The page number to retrieve.
-	 * @returns A paginated response containing the records and the total count.
-	 */
-	paginate(count: number, page: number): Promise<{ page: number; data: TSelect[]; total: number }>;
 
 	/**
 	 * Retrieves a record by its id.
@@ -424,6 +423,11 @@ export type ModelClass<
 	 * Whether the model supports tenancy.
 	 */
 	readonly supportTenancy: boolean;
+
+	/**
+	 * The model adapter of the model's backend.
+	 */
+	readonly adapter?: ModelAdapter<TTable>;
 
 	/**
 	 * Creates a new instance of the model.

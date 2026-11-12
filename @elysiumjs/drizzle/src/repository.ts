@@ -14,53 +14,38 @@
 
 import type {
 	CursorPage,
-	ModelClass,
-	OffsetPage,
-	Page,
 	ParsedQuery,
-	RowKey
+	RepositoryAdapter,
+	RepositoryTarget,
+	Row
 } from '@elysiumjs/olympus/mnemosyne';
 import type { SQL } from 'drizzle-orm';
 import type { PgColumn, PgTable, PgTableWithColumns } from 'drizzle-orm/pg-core';
 import type { DrizzleConnection } from './database';
 
-import { ElysiumError } from '@elysiumjs/olympus';
 import {
-	AbstractRepository,
 	getCurrentTenant,
 	getTenancyConfig,
 	getTenancyStrategy,
 	Listing
 } from '@elysiumjs/olympus/mnemosyne';
-import { and, eq, getTableColumns } from 'drizzle-orm';
+import { and, eq, getTableColumns, or, sql } from 'drizzle-orm';
 import { getTableConfig } from 'drizzle-orm/pg-core';
 
 import { Database } from './database';
 import { compileQuery } from './query';
 import { DrizzleRLSTenancy } from './tenancy';
 
-// ============================================================================
-// DrizzleRepository Mixin
-// ============================================================================
+declare module '@elysiumjs/olympus/mnemosyne' {
+	interface RepositoryDrivers {
+		drizzle: { table: PgTable; connection: DrizzleConnection; scope: SQL };
+	}
+}
 
-/**
- * Raised when a repository cannot tell the primary key of its table, or gets a key that does not
- * match it.
- * @author Axel Nana <ax.lnana@outlook.com>
- */
-export class RepositoryKeyError extends ElysiumError {}
+type Target = RepositoryTarget<PgTable>;
 
-/**
- * Options of {@link DrizzleRepository}.
- * @author Axel Nana <ax.lnana@outlook.com>
- */
-export type DrizzleRepositoryOptions<TSelect> = {
-	/**
-	 * The columns of the primary key, by their property names. Defaults to the primary key of the
-	 * table: its `primaryKey({ columns })`, else its `.primaryKey()` columns.
-	 */
-	key?: readonly (keyof TSelect & string)[];
-};
+/** The table of a target, typed loosely for the query builders. */
+const tableOf = (target: Target) => target.table as unknown as PgTableWithColumns<any>;
 
 /** The property names of the primary key columns of a table, matched by their database names. */
 const primaryKeyOf = (table: PgTable): string[] => {
@@ -76,230 +61,170 @@ const primaryKeyOf = (table: PgTable): string[] => {
 	return columns.map((column) => names.get(column.name)).filter((name) => name !== undefined);
 };
 
+/** The condition that selects the row of a key, given as the values of its columns. */
+const whereKey = (target: Target, key: Row): SQL => {
+	const table = tableOf(target);
+	return and(...Object.entries(key).map(([column, value]) => eq(table[column], value)))!;
+};
+
+/** Two conditions together, either of which may be left out. */
+const both = (a: SQL | undefined, b: SQL | undefined): SQL | undefined =>
+	a && b ? and(a, b) : (a ?? b);
+
+/** At most `limit` rows of a scope, by their physical row id, for the bounded statements. */
+const limited = (target: Target, scope: SQL, limit?: number): SQL =>
+	limit === undefined
+		? scope
+		: sql`ctid in (select ctid from ${target.table} where ${scope} limit ${limit})`;
+
 /**
- * Drizzle-specific repository mixin with concrete CRUD operations.
- *
- * Extends the abstract repository with Drizzle query builder calls for all standard CRUD methods.
- * `find`, `update`, `delete` and `exists` take the primary key of the table: its value, or an
- * object of the values of its columns when it spans several, such as
- * `{ userId, creatorId }`.
- *
- * @author Axel Nana <ax.lnana@outlook.com>
- * @template TModel The model class type.
- * @param model The model class to create the repository for.
- * @param options The columns of the primary key, when they differ from the table's.
- * @returns A concrete repository class with CRUD methods.
- * @example
- * ```ts
- * export const follows = pgTable(
- * 	'follows',
- * 	{ userId: uuid().notNull(), creatorId: uuid().notNull() },
- * 	(t) => [primaryKey({ columns: [t.userId, t.creatorId] })]
- * );
- *
- * class FollowRepository extends DrizzleRepository(FollowModel) {}
- *
- * await repository.find({ userId, creatorId });
- * ```
+ * Runs an operation on a connection. In RLS tenancy mode, an operation outside a transaction is
+ * wrapped in one scoped to the current tenant, so that the policies apply to it; inside an open
+ * transaction, it joins it when that transaction is bound to the current tenant, and throws
+ * `TenantMismatchError` otherwise.
  */
-export const DrizzleRepository = <TModel extends ModelClass<any, any, any, PgTable>>(
-	model: TModel,
-	options: DrizzleRepositoryOptions<TModel['$inferSelect']> = {}
-) => {
-	type TSelect = TModel['$inferSelect'];
-	type TKey = RowKey | Partial<TSelect>;
-	type TInsert = TModel['$inferInsert'];
-	type TUpdate = TModel['$inferUpdate'];
+const run = async <T>(
+	name: string,
+	operation: (db: DrizzleConnection) => Promise<T>
+): Promise<T> => {
+	if (getTenancyConfig().mode !== 'rls') return operation(Database.getConnection(name));
+	const strategy = getTenancyStrategy() ?? new DrizzleRLSTenancy();
+	return strategy.withIsolation(
+		Database.getBaseConnection(name),
+		getCurrentTenant() ?? 'public',
+		() => operation(Database.getConnection(name))
+	);
+};
 
-	/**
-	 * Gets the model table, resolved for the current tenant on each call. Typed loosely for the
-	 * query builders.
-	 */
-	const table = () => model.table as unknown as PgTableWithColumns<any>;
+/**
+ * The repository adapter of Drizzle: `Repository(Model)` runs on it for the models of
+ * `DrizzleModel()`. Statements join the transaction open on the connection, and honour the
+ * tenant isolation of row-level security.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export const drizzleRepositoryAdapter: RepositoryAdapter<PgTable, DrizzleConnection, SQL> = {
+	primaryKey: primaryKeyOf,
+	connection: (name) => Database.getConnection(name),
+	run,
 
-	let keyColumns: readonly string[] | undefined;
-	/** The property names of the primary key columns, read from the table once. */
-	const key = (): readonly string[] => {
-		keyColumns ??= options.key ?? primaryKeyOf(table());
-		if (keyColumns.length === 0)
-			throw new RepositoryKeyError(
-				`The table of ${model.name} has no primary key: declare one, or pass \`key\` to DrizzleRepository().`
-			);
-		return keyColumns;
-	};
+	all(target) {
+		return run(target.connection, (db) => db.select().from(tableOf(target)));
+	},
 
-	/** The condition that selects the row of a key. */
-	const whereKey = (id: TKey): SQL => {
-		const columns = key();
-		const t = table();
-		if (typeof id !== 'object' || id === null) {
-			if (columns.length > 1)
-				throw new RepositoryKeyError(
-					`The primary key of ${model.name} spans ${columns.join(', ')}: pass an object of their values.`
-				);
-			return eq(t[columns[0]!], id);
-		}
-		const values = id as Record<string, unknown>;
-		const missing = columns.filter((column) => values[column] === undefined);
-		if (missing.length > 0)
-			throw new RepositoryKeyError(`The key of ${model.name} misses ${missing.join(', ')}.`);
-		return and(...columns.map((column) => eq(t[column], values[column])))!;
-	};
+	async find(target, key) {
+		const [row] = await run(target.connection, (db) =>
+			db.select().from(tableOf(target)).where(whereKey(target, key))
+		);
+		return row ?? null;
+	},
 
-	/** Two conditions together, either of which may be left out. */
-	const both = (a: SQL | undefined, b: SQL | undefined): SQL | undefined =>
-		a && b ? and(a, b) : (a ?? b);
+	async findBy(target, column, value) {
+		const [row] = await run(target.connection, (db) =>
+			db
+				.select()
+				.from(tableOf(target))
+				.where(eq(tableOf(target)[column], value))
+		);
+		return row ?? null;
+	},
 
-	class R extends AbstractRepository<TModel, DrizzleConnection>(model, Database) {
-		/**
-		 * Runs a database operation on the repository connection.
-		 *
-		 * In RLS tenancy mode, an operation that runs outside a transaction is wrapped in one
-		 * scoped to the current tenant (through the tenancy strategy's `withIsolation`), so RLS
-		 * policies apply to it. Inside an open transaction, the operation joins it when the
-		 * transaction is bound to the current tenant, and throws `TenantMismatchError` otherwise
-		 * (see `DrizzleRLSTenancy.withIsolation`).
-		 * @param operation The operation to run with the connection to use.
-		 * @returns The return value of the operation.
-		 */
-		public async withConnection<T>(operation: (db: DrizzleConnection) => Promise<T>): Promise<T> {
-			const name = (this.constructor as typeof R).connection;
-			if (getTenancyConfig().mode !== 'rls') return operation(this.db);
+	findWhere(target, scope, limit) {
+		return run(target.connection, (db) => {
+			const query = db.select().from(tableOf(target)).where(scope);
+			return limit === undefined ? query : query.limit(limit);
+		});
+	},
 
-			const strategy = getTenancyStrategy() ?? new DrizzleRLSTenancy();
-			return strategy.withIsolation(
-				Database.getBaseConnection(name),
-				getCurrentTenant() ?? 'public',
-				() => operation(this.db)
-			);
-		}
+	async insert(target, data) {
+		const [row] = await run(target.connection, (db) =>
+			db.insert(tableOf(target)).values(data).returning()
+		);
+		return row!;
+	},
 
-		public async all(): Promise<TSelect[]> {
-			return this.withConnection((db) => db.select().from(table()));
-		}
+	async update(target, key, data) {
+		const [row] = await run(target.connection, (db) =>
+			db.update(tableOf(target)).set(data).where(whereKey(target, key)).returning()
+		);
+		return row ?? null;
+	},
 
-		/**
-		 * @deprecated Use `list()` with a spec whose `pagination` is `offset`: it applies the
-		 * filters and the sort of the query string.
-		 */
-		public async paginate(
-			count: number,
-			page: number = 1
-		): Promise<{ page: number; data: TSelect[]; total: number }> {
-			const offset = Math.max(page - 1, 0) * count;
-			return this.withConnection(async (db) => ({
-				page,
-				total: await db.$count(table()),
-				data: await db.select().from(table()).offset(offset).limit(count)
-			}));
-		}
+	updateAll(target, data) {
+		return run(target.connection, (db) => db.update(tableOf(target)).set(data).returning());
+	},
 
-		public async find(id: TKey): Promise<TSelect | null> {
-			const [row] = await this.withConnection((db) =>
-				db.select().from(table()).where(whereKey(id))
-			);
-			return (row ?? null) as TSelect | null;
-		}
+	async delete(target, key) {
+		const [row] = await run(target.connection, (db) =>
+			db.delete(tableOf(target)).where(whereKey(target, key)).returning()
+		);
+		return row ?? null;
+	},
 
-		public async findBy<TKey extends keyof TSelect>(
-			column: TKey,
-			value: TSelect[TKey]
-		): Promise<TSelect | null> {
-			const [row] = await this.withConnection((db) =>
-				db.select().from(table()).where(eq(table()[column], value))
-			);
-			return (row ?? null) as TSelect | null;
-		}
+	async deleteMany(target, keys) {
+		if (keys.length === 0) return 0;
+		const rows = await run(target.connection, (db) =>
+			db
+				.delete(tableOf(target))
+				.where(or(...keys.map((key) => whereKey(target, key))))
+				.returning({ deleted: sql<number>`1` })
+		);
+		return rows.length;
+	},
 
-		public async insert(data: TInsert): Promise<TSelect> {
-			const [row] = await this.withConnection((db) => db.insert(table()).values(data).returning());
-			return row as TSelect;
-		}
+	deleteAll(target) {
+		return run(target.connection, (db) => db.delete(tableOf(target)).returning());
+	},
 
-		public async update(id: TKey, data: TUpdate): Promise<TSelect | null> {
-			const [row] = await this.withConnection((db) =>
-				db.update(table()).set(data).where(whereKey(id)).returning()
-			);
-			return (row ?? null) as TSelect | null;
-		}
+	async deleteWhere(target, scope, limit) {
+		const rows = await run(target.connection, (db) =>
+			db
+				.delete(tableOf(target))
+				.where(limited(target, scope, limit))
+				.returning({ deleted: sql<number>`1` })
+		);
+		return rows.length;
+	},
 
-		public async updateAll(data: TUpdate): Promise<TSelect[]> {
-			return this.withConnection((db) => db.update(table()).set(data).returning());
-		}
+	async exists(target, key) {
+		const count = await run(target.connection, (db) =>
+			db.$count(tableOf(target), whereKey(target, key))
+		);
+		return count > 0;
+	},
 
-		public async delete(id: TKey): Promise<TSelect | null> {
-			const [row] = await this.withConnection((db) =>
-				db.delete(table()).where(whereKey(id)).returning()
-			);
-			return (row ?? null) as TSelect | null;
-		}
-
-		public async deleteAll(): Promise<TSelect[]> {
-			return this.withConnection((db) => db.delete(table()).returning());
-		}
-
-		/**
-		 * Lists a page of rows matching a parsed query (see `Listing.parse`): its filters, its sort and
-		 * its page. With cursor pagination, one row more than the limit is fetched to tell whether a
-		 * next page exists. With offset pagination, the rows matching the filters are counted.
-		 * @param query The parsed query.
-		 * @param scope A condition the rows must also meet, such as their owner, ANDed with the
-		 * filters of the query.
-		 * @returns The rows of the page and the cursor of the next one, or the page and the total.
-		 * @example
-		 * ```ts
-		 * return this.list(query, eq(posts.authorId, userId));
-		 * ```
-		 */
-		public async list(query: ParsedQuery<'offset'>, scope?: SQL): Promise<OffsetPage<TSelect>>;
-		public async list(query: ParsedQuery<'cursor'>, scope?: SQL): Promise<CursorPage<TSelect>>;
-		public async list(query: ParsedQuery, scope?: SQL): Promise<Page<TSelect>>;
-		public async list(query: ParsedQuery, scope?: SQL): Promise<Page<TSelect>> {
-			const compiled = compileQuery(table(), query);
-			const where = both(compiled.where, scope);
-			const { orderBy } = compiled;
-			if (query.page !== undefined) {
-				const offsetQuery = query as ParsedQuery<'offset'>;
-				return this.withConnection(async (db) => {
-					const rows = await db
-						.select()
-						.from(table())
-						.where(where)
-						.orderBy(...orderBy)
-						.offset((offsetQuery.page - 1) * offsetQuery.limit)
-						.limit(offsetQuery.limit);
-					const total = await db.$count(table(), where);
-					return Listing.offsetPage(offsetQuery, rows as TSelect[], total);
-				});
-			}
-			const rows = await this.withConnection((db) =>
-				db
+	async list(target, query, scope) {
+		const table = tableOf(target);
+		const compiled = compileQuery(table, query);
+		const where = both(compiled.where, scope);
+		const { orderBy } = compiled;
+		if (query.page !== undefined) {
+			const offsetQuery = query as ParsedQuery<'offset'>;
+			return run(target.connection, async (db) => {
+				const rows = await db
 					.select()
-					.from(table())
+					.from(table)
 					.where(where)
 					.orderBy(...orderBy)
-					.limit(query.limit + 1)
-			);
-			return Listing.page(query, rows as Record<string, unknown>[]) as CursorPage<TSelect>;
+					.offset((offsetQuery.page - 1) * offsetQuery.limit)
+					.limit(offsetQuery.limit);
+				const total = await db.$count(table, where);
+				return Listing.offsetPage(offsetQuery, rows as Row[], total);
+			});
 		}
+		const rows = await run(target.connection, (db) =>
+			db
+				.select()
+				.from(table)
+				.where(where)
+				.orderBy(...orderBy)
+				.limit(query.limit + 1)
+		);
+		return Listing.page(query, rows as Row[]) as CursorPage<Row>;
+	},
 
-		/**
-		 * Counts the rows matching the filters of a parsed query, ignoring its cursor.
-		 * @param query The parsed query.
-		 * @param scope A condition the rows must also meet, as for `list()`.
-		 */
-		public async count(query?: ParsedQuery, scope?: SQL): Promise<number> {
-			const filters = query
-				? compileQuery(table(), { ...query, after: undefined }).where
-				: undefined;
-			return this.withConnection((db) => db.$count(table(), both(filters, scope)));
-		}
-
-		public async exists(id: TKey): Promise<boolean> {
-			const count = await this.withConnection((db) => db.$count(table(), whereKey(id)));
-			return count > 0;
-		}
+	count(target, query, scope) {
+		const table = tableOf(target);
+		const filters = query ? compileQuery(table, { ...query, after: undefined }).where : undefined;
+		return run(target.connection, (db) => db.$count(table, both(filters, scope)));
 	}
-
-	return R;
 };

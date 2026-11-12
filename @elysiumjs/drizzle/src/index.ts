@@ -62,7 +62,7 @@ export {
 	type TableMarker
 } from './table-markers';
 export { compileAfter, compileFilter, compileQuery } from './query';
-export { DrizzleRepository, type DrizzleRepositoryOptions, RepositoryKeyError } from './repository';
+export { drizzleRepositoryAdapter } from './repository';
 export {
 	DrizzleSchemaTenancy,
 	DrizzleRLSTenancy,

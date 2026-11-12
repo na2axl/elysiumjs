@@ -34,7 +34,8 @@ export class App extends Application {}
 Define models with the enhanced `pgTable`:
 
 ```ts
-import { DrizzleModel, DrizzleRepository, pgTable } from '@elysiumjs/drizzle';
+import { DrizzleModel, pgTable } from '@elysiumjs/drizzle';
+import { Repository } from '@elysiumjs/olympus/mnemosyne';
 import { uuid, varchar } from 'drizzle-orm/pg-core';
 
 const users = pgTable('users', {
@@ -43,16 +44,18 @@ const users = pgTable('users', {
 });
 
 export class UserModel extends DrizzleModel(users, { supportTenancy: true }) {}
-export class UserRepository extends DrizzleRepository(UserModel) {}
+export class UserRepository extends Repository(UserModel) {}
 ```
+
+`Repository(Model)` comes from `@elysiumjs/olympus/mnemosyne` and runs on the Drizzle repository adapter for the models of `DrizzleModel()`: `this.db` is the Drizzle connection (or the transaction open on it), and the scope of `list()`, `count()`, `deleteWhere()` and `Pruner` is an SQL condition. Statements honour the tenant isolation of row-level security; a custom query that must too goes through `this.withConnection((db) => ...)`.
 
 The repository finds rows by the table's primary key. A table without an `id` column, or with a composite primary key, takes the key as an object; `key` names other columns to use instead:
 
 ```ts
-export class MembershipRepository extends DrizzleRepository(MembershipModel) {}
+export class MembershipRepository extends Repository(MembershipModel) {}
 await memberships.find({ teamId, userId });
 
-export class SessionRepository extends DrizzleRepository(SessionModel, { key: ['token'] }) {}
+export class SessionRepository extends Repository(SessionModel, { key: ['token'] }) {}
 await sessions.find('abc123');
 ```
 
@@ -63,6 +66,8 @@ public listFor(userId: string, query: ParsedQuery<'cursor'>) {
 	return this.list(query, eq(posts.authorId, userId));
 }
 ```
+
+`deleteWhere(scope, limit)` deletes at most `limit` rows of a scope in one statement, which is how `Pruner(Model)` jobs delete stale rows chunk by chunk.
 
 ### Migration hooks
 
