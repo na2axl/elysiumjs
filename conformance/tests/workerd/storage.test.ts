@@ -14,6 +14,7 @@
 
 import type { R2BucketLike, R2ObjectLike } from '@elysiumjs/workers';
 
+import { InvalidObjectKeyError, ObjectNotFoundError } from '@elysiumjs/olympus/pithos';
 import { R2Disk } from '@elysiumjs/workers';
 import { env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
@@ -65,5 +66,6 @@ diskContract(
 	{ describe, it, expect },
 	'r2 (workerd)',
 	'r2',
-	() => new R2Disk({ binding: scoped(`${crypto.randomUUID()}/`), ...contractUrls('r2') })
+	() => new R2Disk({ binding: scoped(`${crypto.randomUUID()}/`), ...contractUrls('r2') }),
+	{ InvalidObjectKeyError, ObjectNotFoundError }
 );

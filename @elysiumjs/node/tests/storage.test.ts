@@ -16,7 +16,7 @@ import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { Storage } from '@elysiumjs/olympus/pithos';
+import { InvalidObjectKeyError, ObjectNotFoundError, Storage } from '@elysiumjs/olympus/pithos';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { contractUrls, diskContract } from '../../olympus/tests/pithos/disk-contract';
@@ -36,7 +36,8 @@ diskContract(
 	{ describe, it, expect },
 	'local',
 	'local',
-	() => new LocalDisk({ root: join(root, crypto.randomUUID()), ...contractUrls('local') })
+	() => new LocalDisk({ root: join(root, crypto.randomUUID()), ...contractUrls('local') }),
+	{ InvalidObjectKeyError, ObjectNotFoundError }
 );
 
 describe('LocalDisk', () => {
@@ -50,7 +51,7 @@ describe('LocalDisk', () => {
 		await disk.put('a', 'x', { contentType: 'text/plain' });
 		expect((await disk.list()).items.map((item) => item.key)).toEqual(['a']);
 		expect(await readdir(folder)).toContain('.pithos');
-		await expect(disk.get('.pithos/a.json')).rejects.toHaveProperty('name', 'ObjectNotFoundError');
+		await expect(disk.get('.pithos/a.json')).rejects.toBeInstanceOf(ObjectNotFoundError);
 	});
 
 	it('lists nothing before the first write', async () => {

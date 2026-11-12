@@ -14,7 +14,7 @@
 
 import type { R2BucketLike, R2ObjectBodyLike, R2ObjectLike } from '../src';
 
-import { Storage } from '@elysiumjs/olympus/pithos';
+import { InvalidObjectKeyError, ObjectNotFoundError, Storage } from '@elysiumjs/olympus/pithos';
 import { describe, expect, it } from 'bun:test';
 
 import { contractUrls, diskContract } from '../../olympus/tests/pithos/disk-contract';
@@ -88,7 +88,8 @@ diskContract(
 	{ describe, it, expect },
 	'r2',
 	'r2',
-	() => new R2Disk({ binding: new FakeBucket(), ...contractUrls('r2') })
+	() => new R2Disk({ binding: new FakeBucket(), ...contractUrls('r2') }),
+	{ InvalidObjectKeyError, ObjectNotFoundError }
 );
 
 describe('R2Disk', () => {

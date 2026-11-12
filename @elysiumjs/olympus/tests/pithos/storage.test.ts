@@ -20,7 +20,9 @@ import { Application } from '../../src/index';
 import {
 	DiskCannotSignError,
 	DiskNotPublicError,
+	InvalidObjectKeyError,
 	MemoryDisk,
+	ObjectNotFoundError,
 	PithosModule,
 	Storage,
 	UnknownDiskError
@@ -32,7 +34,10 @@ const signing = (disk: string) => ({
 	secret: 'x'.repeat(32)
 });
 
-diskContract({ describe, it, expect }, 'memory', 'm', () => new MemoryDisk(contractUrls('m')));
+diskContract({ describe, it, expect }, 'memory', 'm', () => new MemoryDisk(contractUrls('m')), {
+	InvalidObjectKeyError,
+	ObjectNotFoundError
+});
 
 describe('disks without a URL or signing', () => {
 	it('refuse url() and signedUrl()', async () => {

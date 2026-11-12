@@ -17,6 +17,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { LocalDisk } from '@elysiumjs/node';
+import { InvalidObjectKeyError, ObjectNotFoundError } from '@elysiumjs/olympus/pithos';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { contractUrls, diskContract } from '../../../@elysiumjs/olympus/tests/pithos/disk-contract';
@@ -36,5 +37,6 @@ diskContract(
 	{ describe, it, expect },
 	'local',
 	'local',
-	() => new LocalDisk({ root: join(root, crypto.randomUUID()), ...contractUrls('local') })
+	() => new LocalDisk({ root: join(root, crypto.randomUUID()), ...contractUrls('local') }),
+	{ InvalidObjectKeyError, ObjectNotFoundError }
 );

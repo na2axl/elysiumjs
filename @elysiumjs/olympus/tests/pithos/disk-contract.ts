@@ -28,19 +28,26 @@ export const contractUrls = (path: string) => ({
 	signing: { url: `http://localhost/storage/${path}`, secret: 'x'.repeat(32) }
 });
 
+/** The error classes the contract expects, from the copy of olympus the disk was built with. */
+export type ContractErrors = {
+	ObjectNotFoundError: abstract new (...args: never[]) => Error;
+	InvalidObjectKeyError: abstract new (...args: never[]) => Error;
+};
+
 /**
  * What every disk does, run on the disks of olympus and of the runtime packages. `make` builds an
- * empty disk with `contractUrls(path)`. Errors are matched by name, so that the contract also runs
- * against a built copy of olympus.
+ * empty disk with `contractUrls(path)`. The runtime packages use a built copy of olympus, so they
+ * give the error classes of that copy.
  */
 export const diskContract = (
 	{ describe, it, expect }: TestApi,
 	name: string,
 	path: string,
-	make: () => StorageDriver
+	make: () => StorageDriver,
+	errors: ContractErrors
 ): void => {
-	const rejectsWith = async (promise: Promise<unknown>, error: string) => {
-		await expect(promise).rejects.toHaveProperty('name', error);
+	const rejectsWith = async (promise: Promise<unknown>, error: keyof ContractErrors) => {
+		await expect(promise).rejects.toBeInstanceOf(errors[error]);
 	};
 
 	describe(`${name} disk`, () => {
