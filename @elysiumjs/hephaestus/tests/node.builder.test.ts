@@ -45,8 +45,19 @@ const serveUnderNode = async (bundle: string, path: string) => {
 			if (Date.now() > deadline || child.exitCode !== null) throw new Error(output || 'no output');
 			await Bun.sleep(50);
 		}
-		const response = await fetch(`http://127.0.0.1:${port}${path}`);
-		return { status: response.status, body: await response.json() };
+		// The server binds asynchronously after `listen()` returns, so the first connection may be
+		// refused: retry until the deadline.
+		for (;;) {
+			try {
+				const response = await fetch(`http://127.0.0.1:${port}${path}`);
+				return { status: response.status, body: await response.json() };
+			} catch (error) {
+				if ((error as { code?: string }).code !== 'ECONNREFUSED' || Date.now() > deadline) {
+					throw error;
+				}
+				await Bun.sleep(50);
+			}
+		}
 	} finally {
 		child.kill();
 	}
