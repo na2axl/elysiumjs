@@ -77,7 +77,7 @@ const registry: RegisteredSerializer[] = [];
  * `Json` again, so it may hold other serializable values; `deserialize()` receives it read back.
  *
  * Register a class with `@Serializer.register({ name })`; it is built once, without arguments.
- * Dates are supported out of the box.
+ * Dates, maps, sets and bigints are supported out of the box.
  * @author Axel Nana <ax.lnana@outlook.com>
  * @template TIn The values the serializer supports.
  * @template TOut What it turns them into.
@@ -178,5 +178,64 @@ export class DateSerializer extends Serializer<Date, string> {
 
 	public deserialize(value: string): Date {
 		return new Date(value);
+	}
+}
+
+/**
+ * Writes a `Map` as the list of its entries, keys and values written with `Json` again. A
+ * subclass of `Map` is not supported, since it would read back as a plain `Map`.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+@Serializer.register({ name: 'map' })
+export class MapSerializer extends Serializer<Map<unknown, unknown>, [unknown, unknown][]> {
+	public supports(value: unknown): boolean {
+		return value instanceof Map && Object.getPrototypeOf(value) === Map.prototype;
+	}
+
+	public serialize(value: Map<unknown, unknown>): [unknown, unknown][] {
+		return [...value.entries()];
+	}
+
+	public deserialize(value: [unknown, unknown][]): Map<unknown, unknown> {
+		return new Map(value);
+	}
+}
+
+/**
+ * Writes a `Set` as the list of its values, written with `Json` again. A subclass of `Set` is not
+ * supported, since it would read back as a plain `Set`.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+@Serializer.register({ name: 'set' })
+export class SetSerializer extends Serializer<Set<unknown>, unknown[]> {
+	public supports(value: unknown): boolean {
+		return value instanceof Set && Object.getPrototypeOf(value) === Set.prototype;
+	}
+
+	public serialize(value: Set<unknown>): unknown[] {
+		return [...value];
+	}
+
+	public deserialize(value: unknown[]): Set<unknown> {
+		return new Set(value);
+	}
+}
+
+/**
+ * Writes a `bigint` as its decimal string.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+@Serializer.register({ name: 'bigint' })
+export class BigIntSerializer extends Serializer<bigint, string> {
+	public supports(value: unknown): boolean {
+		return typeof value === 'bigint';
+	}
+
+	public serialize(value: bigint): string {
+		return value.toString();
+	}
+
+	public deserialize(value: string): bigint {
+		return BigInt(value);
 	}
 }

@@ -67,21 +67,6 @@ class SlotSerializer extends Serializer<Slot, { from: Date; to: Date }> {
 	}
 }
 
-@Serializer.register({ name: 'test.bigint' })
-class BigIntSerializer extends Serializer<bigint, string> {
-	public supports(value: unknown) {
-		return typeof value === 'bigint';
-	}
-
-	public serialize(value: bigint) {
-		return value.toString();
-	}
-
-	public deserialize(value: string) {
-		return BigInt(value);
-	}
-}
-
 describe('Json', () => {
 	it('keeps dates at any depth', () => {
 		const value = { at: new Date('2026-01-01T00:00:00Z'), list: [{ due: new Date(0) }], n: 1 };
@@ -122,6 +107,38 @@ describe('Json', () => {
 				to: { $type: 'date', $value: '2026-01-01T10:00:00.000Z' }
 			}
 		});
+	});
+
+	it('keeps maps, sets and bigints, with what they hold', () => {
+		const value = {
+			byDay: new Map<unknown, unknown>([
+				[new Date('2026-01-01T00:00:00Z'), new Set(['a', 'b'])],
+				['total', 2n ** 70n]
+			]),
+			tags: new Set([1, { nested: new Map([['k', new Date(0)]]) }])
+		};
+		const text = Json.stringify(value);
+		expect(JSON.parse(text).tags).toEqual({
+			$type: 'set',
+			$value: [
+				1,
+				{
+					nested: {
+						$type: 'map',
+						$value: [['k', { $type: 'date', $value: '1970-01-01T00:00:00.000Z' }]]
+					}
+				}
+			]
+		});
+		const back = Json.parse<typeof value>(text);
+		expect(back).toEqual(value);
+		expect(back.byDay).toBeInstanceOf(Map);
+		expect([...back.byDay.keys()][0]).toBeInstanceOf(Date);
+		expect(back.byDay.get('total')).toBe(2n ** 70n);
+		expect(Json.survives(value)).toBe(true);
+		class Registry extends Map {}
+		expect(Json.survives(new Registry())).toBe(false);
+		expect(Json.survives(new Map([['f', () => 1]]))).toBe(false);
 	});
 
 	it('refuses a value that names an unknown serializer', () => {
@@ -170,7 +187,7 @@ describe('Json', () => {
 	it('tells whether a value comes back as it was', () => {
 		expect(Json.survives({ at: new Date(), tags: ['a'], n: null })).toBe(true);
 		expect(Json.survives({ price: new Money(1n, 'EUR'), big: 1n })).toBe(true);
-		expect(Json.survives({ map: new Map() })).toBe(false);
+		expect(Json.survives({ weak: new WeakMap() })).toBe(false);
 		expect(Json.survives({ fn: () => 1 })).toBe(false);
 		expect(Json.survives([undefined])).toBe(false);
 		expect(Json.survives(undefined)).toBe(false);
@@ -184,4 +201,4 @@ describe('Json', () => {
 	});
 });
 
-export const serializers = [MoneySerializer, SlotSerializer, BigIntSerializer];
+export const serializers = [MoneySerializer, SlotSerializer];
