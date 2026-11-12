@@ -1,9 +1,10 @@
-import { Service, ServiceScope } from '@elysiumjs/olympus';
-import { HermesLogger } from '@elysiumjs/olympus/hermes';
+import { getLogger, Service, ServiceScope } from '@elysiumjs/olympus';
 
 @Service.register({ name: '{alias}', scope: ServiceScope.{scope} })
 export class {name} {
-    private static readonly logger = HermesLogger.make({name}.name);
+    private get logger() {
+        return getLogger({ name: {name}.name });
+    }
 
     public constructor() {}
 }

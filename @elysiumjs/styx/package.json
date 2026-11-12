@@ -1,64 +1,64 @@
 {
-  "name": "@elysiumjs/styx",
-  "version": "0.15.0",
-  "license": "Apache-2.0",
-  "description": "The command line tool of the Elysium.js framework: creates projects, generates code and runs app commands.",
-  "private": false,
-  "author": "Axel Nana <ax.lnana@outlook.com>",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/na2axl/elysiumjs.git",
-    "directory": "@elysiumjs/styx"
-  },
-  "homepage": "https://github.com/na2axl/elysiumjs/tree/main/@elysiumjs/styx#readme",
-  "bugs": {
-    "url": "https://github.com/na2axl/elysiumjs/issues"
-  },
-  "scripts": {
-    "format": "prettier --write \"./src/**/*.ts\"",
-    "clean": "rimraf dist",
-    "build:js": "bun build ./src/cli.ts ./src/index.ts --outdir ./dist --target bun -e @elysiumjs/* --root ./src --minify-syntax --minify-whitespace",
-    "build:ts": "tsc",
-    "build": "bun run clean && bun run build:js && bun run build:ts",
-    "typecheck": "tsc --noEmit",
-    "prepublishOnly": "bun run build",
-    "test": "bun test",
-    "test:coverage": "bun test --coverage",
-    "build:bin": "bun scripts/build-bin.ts"
-  },
-  "keywords": [
-    "elysium",
-    "framework",
-    "web",
-    "api",
-    "typescript",
-    "cli"
-  ],
-  "type": "module",
-  "sideEffects": false,
-  "bin": {
-    "styx": "dist/cli.js"
-  },
-  "module": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "files": [
-    "dist",
-    "stubs",
-    "templates",
-    "CHANGELOG.md"
-  ],
-  "devDependencies": {
-    "@elysiumjs/hephaestus": "workspace:*",
-    "@elysiumjs/olympus": "workspace:*",
-    "@elysiumjs/runtime-bun": "workspace:*",
-    "@types/prompts": "^2.4.9",
-    "@types/string-template": "^1.0.7",
-    "prompts": "^2.4.2",
-    "radash": "catalog:",
-    "string-template": "^1.0.0"
-  },
-  "dependencies": {
-    "@elysiumjs/olympus": "workspace:^",
-    "@elysiumjs/runtime-bun": "workspace:^"
-  }
+	"name": "@elysiumjs/styx",
+	"version": "0.15.0",
+	"license": "Apache-2.0",
+	"description": "The command line tool of the Elysium.js framework: creates projects, generates code and runs app commands.",
+	"private": false,
+	"author": "Axel Nana <ax.lnana@outlook.com>",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/na2axl/elysiumjs.git",
+		"directory": "@elysiumjs/styx"
+	},
+	"homepage": "https://github.com/na2axl/elysiumjs/tree/main/@elysiumjs/styx#readme",
+	"bugs": {
+		"url": "https://github.com/na2axl/elysiumjs/issues"
+	},
+	"scripts": {
+		"format": "prettier --write \"./src/**/*.ts\"",
+		"clean": "rimraf dist",
+		"build:js": "bun build ./src/cli.ts ./src/index.ts --outdir ./dist --target bun -e @elysiumjs/* --root ./src --minify-syntax --minify-whitespace",
+		"build:ts": "tsc",
+		"build": "bun run clean && bun run build:js && bun run build:ts",
+		"typecheck": "tsc --noEmit",
+		"prepublishOnly": "bun run build",
+		"test": "bun test",
+		"test:coverage": "bun test --coverage",
+		"build:bin": "bun scripts/build-bin.ts"
+	},
+	"keywords": [
+		"elysium",
+		"framework",
+		"web",
+		"api",
+		"typescript",
+		"cli"
+	],
+	"type": "module",
+	"sideEffects": false,
+	"bin": {
+		"styx": "dist/cli.js"
+	},
+	"module": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"files": [
+		"dist",
+		"stubs",
+		"templates",
+		"CHANGELOG.md"
+	],
+	"devDependencies": {
+		"@elysiumjs/hephaestus": "workspace:*",
+		"@elysiumjs/olympus": "workspace:*",
+		"@elysiumjs/bun": "workspace:*",
+		"@types/prompts": "^2.4.9",
+		"@types/string-template": "^1.0.7",
+		"prompts": "^2.4.2",
+		"radash": "catalog:",
+		"string-template": "^1.0.0"
+	},
+	"dependencies": {
+		"@elysiumjs/olympus": "workspace:^",
+		"@elysiumjs/bun": "workspace:^"
+	}
 }

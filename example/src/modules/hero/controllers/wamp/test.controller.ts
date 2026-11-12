@@ -1,11 +1,10 @@
-import type { WampRegistrationHandlerArgs } from '@elysiumjs/olympus';
+import type { LoggerInterface, WampRegistrationHandlerArgs } from '@elysiumjs/olympus';
 
-import { Service, Wamp } from '@elysiumjs/olympus';
-import { HermesLogger } from '@elysiumjs/olympus/hermes';
+import { LOGGER_SERVICE, Service, Wamp } from '@elysiumjs/olympus';
 
 @Wamp.controller({ connection: 'default' })
 export class TestController {
-	public constructor(@Service.inject() public logger: HermesLogger) {}
+	public constructor(@Service.inject(LOGGER_SERVICE) public logger: LoggerInterface) {}
 
 	@Wamp.register('test.topic.ext')
 	private onTestTopic(data: WampRegistrationHandlerArgs) {

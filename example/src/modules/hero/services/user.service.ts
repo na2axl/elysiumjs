@@ -1,14 +1,13 @@
-import type { LifecycleEvent } from '@elysiumjs/olympus';
+import type { LifecycleEvent, LoggerInterface } from '@elysiumjs/olympus';
 
-import { Lifecycle, Service, ServiceScope } from '@elysiumjs/olympus';
-import { HermesLogger } from '@elysiumjs/olympus/hermes';
+import { getLogger, Lifecycle, LOGGER_SERVICE, Service, ServiceScope } from '@elysiumjs/olympus';
 
 import { UserRepository } from '#hero/repositories/user.repository';
 
 @Service.register({ name: 'user.service', scope: ServiceScope.SINGLETON })
 export class UserService {
 	public constructor(
-		@Service.inject() public logger: HermesLogger,
+		@Service.inject(LOGGER_SERVICE) public logger: LoggerInterface,
 		@Service.inject() public userRepository: UserRepository
 	) {}
 
@@ -24,7 +23,7 @@ export class UserService {
 
 	@Lifecycle.on('user:say')
 	private static sayFromEvent(e: LifecycleEvent<string>) {
-		const logger = Service.get(HermesLogger)!;
+		const logger = getLogger();
 		logger.info(`from source: ${e.source} with event: ${e.data}`);
 		throw new Error('Custom error');
 	}

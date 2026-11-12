@@ -14,8 +14,8 @@
 
 import type { ModuleClass } from '@elysiumjs/olympus';
 
+import { runtime as bunRuntime } from '@elysiumjs/bun';
 import { Application, Module } from '@elysiumjs/olympus';
-import { runtime as bunRuntime } from '@elysiumjs/runtime-bun';
 
 import {
 	MakeCommandCommand,

@@ -8,7 +8,7 @@ The Elysium.js framework: an application built from modules of controllers and s
 bun add @elysiumjs/olympus
 ```
 
-Add a runtime package too: `@elysiumjs/runtime-bun`, `@elysiumjs/runtime-node` or `@elysiumjs/runtime-workers` (see [Runtimes](#runtimes)).
+Add a runtime package too: `@elysiumjs/bun`, `@elysiumjs/node` or `@elysiumjs/workers` (see [Runtimes](#runtimes)), and `@elysiumjs/pino` for pino logs (see [Logging](#logging)).
 
 ## Exports
 
@@ -23,9 +23,9 @@ Add a runtime package too: `@elysiumjs/runtime-bun`, `@elysiumjs/runtime-node` o
 | `@elysiumjs/olympus/themis`          | Authentication: passwords, tokens, sessions, guards, CSRF, TOTP, OAuth and passkeys.                                                                                                                           |
 | `@elysiumjs/olympus/themis/scrypt`   | `ScryptPasswordHasher`.                                                                                                                                                                                        |
 | `@elysiumjs/olympus/cerberus`        | Ability-based roles and permissions.                                                                                                                                                                           |
-| `@elysiumjs/olympus/hermes`          | Structured logging with JSON and pretty output and request logs.                                                                                                                                               |
+| `@elysiumjs/olympus/hermes`          | `HermesModule` (the app logger), the `console` logger driver, request logs and `@Logged()`.                                                                                                                    |
 
-Database drivers, stores and runtimes ship as separate packages, such as `@elysiumjs/mnemosyne-drizzle` and `@elysiumjs/redis`.
+Database drivers, stores and runtimes ship as separate packages, such as `@elysiumjs/drizzle` and `@elysiumjs/redis`.
 
 ## Usage
 
@@ -64,6 +64,9 @@ Create an application class. Modules that need configuration are bound to it wit
 ```typescript
 import { Application } from '@elysiumjs/olympus';
 import { HermesModule } from '@elysiumjs/olympus/hermes';
+
+import '@elysiumjs/pino';
+
 import { RedisModule } from '@elysiumjs/redis';
 
 import { MainModule } from './main.module';
@@ -286,7 +289,7 @@ const search = Search.for('meilisearch', { url: 'http://localhost:7700' });
 
 ## Locks
 
-`Lock` is a port: one holder per key at a time, until it lets go or its time to live ends. The `memory` driver ships here; backend packages add others, such as `redis` from `@elysiumjs/redis` and `postgres` from `@elysiumjs/moirai-drizzle`. Each domain takes its own lock: `HeraclesModule.with({ lock })` for scheduler ticks, `MoiraiModule.with({ lock })` for `serializeBy` and `Moirai.lock()`.
+`Lock` is a port: one holder per key at a time, until it lets go or its time to live ends. The `memory` driver ships here; backend packages add others, such as `redis` from `@elysiumjs/redis`, `durable-object` from `@elysiumjs/workers` and `postgres` from `@elysiumjs/drizzle`. Each domain takes its own lock: `HeraclesModule.with({ lock })` for the ticks of `heracles:schedule` processes, `MoiraiModule.with({ lock })` for `serializeBy` and `Moirai.lock()`.
 
 ```ts
 import { Lock } from '@elysiumjs/olympus';
@@ -305,6 +308,39 @@ if (run.acquired) console.log(run.value);
 ```
 
 The locks of `serializeBy` and `Moirai.lock()` are let go when their unit of work commits or rolls back. In case their holder dies first, they also end after `lockTtl` milliseconds (`MoiraiModule.with({ lockTtl: 30_000 })`, 60 seconds by default): keep it longer than your slowest unit of work.
+
+## Logging
+
+`getLogger()` answers the app's `logger` service, or a plain console logger when there is none. `HermesModule` from `@elysiumjs/olympus/hermes` provides that service from the `Logger` port, through the driver its `transport` names:
+
+- `console` (in `@elysiumjs/olympus/hermes`): one JSON object per line through `console`, with no dependency. The default on Cloudflare Workers, and wherever no other driver is loaded.
+- `pino` (in `@elysiumjs/pino`): JSON lines, or readable ones with `format: 'pretty'`. Importing the package registers it and makes it the default.
+
+```ts
+import { getLogger } from '@elysiumjs/olympus';
+import { HermesModule } from '@elysiumjs/olympus/hermes';
+
+import '@elysiumjs/pino';
+
+HermesModule.with({ name: 'shop', level: 'debug', format: 'pretty' });
+
+getLogger({ module: 'orders' }).info('Order placed', { orderId: 'o-1' });
+```
+
+A logging package registers its driver with `@Logger.driver(name)` on a class that implements `LoggerInterface` and takes `LoggerOptions` (`name`, `level`, `format`), and declares the name so that `transport` and `Logger.for()` accept it:
+
+```ts
+declare module '@elysiumjs/olympus' {
+	interface PortDrivers {
+		'logger:datadog': typeof DatadogLogger;
+	}
+}
+
+@Logger.driver('datadog')
+export class DatadogLogger implements LoggerInterface {
+	// ...
+}
+```
 
 ## Jobs in tests
 
@@ -438,17 +474,17 @@ A CLI command boots lazily: running `app:cmd` initialises the command's own modu
 
 Olympus never calls a host API directly. Environment variables, timers, the HTTP server, process exit and shutdown signals come from a runtime, which ships as its own package:
 
-| Package                      | Exports                             | Notes                                                                                                     |
-| ---------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `@elysiumjs/runtime-bun`     | `runtime`                           | `Bun.env`, `Bun.sleep`, `listen`, process exit and signals                                                |
-| `@elysiumjs/runtime-node`    | `runtime`                           | Same on Node.js; set `server: { adapter: node() }` from `@elysiajs/node`                                  |
-| `@elysiumjs/runtime-workers` | `runtime`, `createRuntime({ env })` | Env from `process.env` (`nodejs_compat`) or `env`; no `serve` (export the app's `fetch`), exit or signals |
+| Package              | Exports                             | Notes                                                                                                     |
+| -------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `@elysiumjs/bun`     | `runtime`                           | `Bun.env`, `Bun.sleep`, `listen`, process exit and signals                                                |
+| `@elysiumjs/node`    | `runtime`                           | Same on Node.js, served on a `node:http` server; no adapter to configure                                  |
+| `@elysiumjs/workers` | `runtime`, `createRuntime({ env })` | Env from `process.env` (`nodejs_compat`) or `env`; no `serve` (export the app's `fetch`), exit or signals |
 
 Each package exports `runtime` (rename it at import if you like). Pass it to the application, or call `Runtime.use()` before anything needs it:
 
 ```ts
+import { runtime } from '@elysiumjs/bun';
 import { Application } from '@elysiumjs/olympus';
-import { runtime } from '@elysiumjs/runtime-bun';
 
 @Application.register({ runtime, modules: [] })
 class App extends Application {}

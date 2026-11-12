@@ -1,4 +1,4 @@
-import { DrizzleModel, pgTable } from '@elysiumjs/mnemosyne-drizzle';
+import { DrizzleModel, pgTable } from '@elysiumjs/drizzle';
 import { boolean, integer, uuid, varchar } from 'drizzle-orm/pg-core';
 
 export const usersTable = pgTable('users', {

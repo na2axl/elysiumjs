@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { WorkersExecutionContext } from '@elysiumjs/runtime-workers';
+import type { WorkersExecutionContext } from '@elysiumjs/workers';
 import type { AssertAdapter, ScenarioDriver } from '../../src/scenarios';
 
-import { createWorker, runtime as runtimeWorkers } from '@elysiumjs/runtime-workers';
+import { createWorker, runtime as runtimeWorkers } from '@elysiumjs/workers';
 import { createExecutionContext, env, waitOnExecutionContext } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 

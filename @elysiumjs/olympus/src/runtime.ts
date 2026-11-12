@@ -35,8 +35,8 @@ export type ServeHandle = {
  * The host-specific operations the framework needs. Core never calls a host API directly
  * (`Bun.*`, `process.exit`, a server's `listen`): it asks the current runtime.
  *
- * Implementations ship as packages: `@elysiumjs/runtime-bun`, `@elysiumjs/runtime-node` and
- * `@elysiumjs/runtime-workers`. Set one with the `runtime` option of `@Application.register()`
+ * Implementations ship as packages: `@elysiumjs/bun`, `@elysiumjs/node` and
+ * `@elysiumjs/workers`. Set one with the `runtime` option of `@Application.register()`
  * or with {@link Runtime.use}.
  *
  * The runtime is process-wide: the last application constructed wins.
@@ -159,7 +159,7 @@ export class RuntimeNotSupportedError extends ElysiumError {
 export class RuntimeNotConfiguredError extends ElysiumError {
 	public constructor() {
 		super(
-			'No runtime is set. Install @elysiumjs/runtime-bun, @elysiumjs/runtime-node or @elysiumjs/runtime-workers, then pass it as the `runtime` option of @Application.register() or call Runtime.use().'
+			'No runtime is set. Install @elysiumjs/bun, @elysiumjs/node or @elysiumjs/workers, then pass it as the `runtime` option of @Application.register() or call Runtime.use().'
 		);
 	}
 }

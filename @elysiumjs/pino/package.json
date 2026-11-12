@@ -1,0 +1,67 @@
+{
+	"name": "@elysiumjs/pino",
+	"version": "0.0.0",
+	"license": "Apache-2.0",
+	"description": "Pino logger for the Elysium.js framework: the pino driver of the Logger port, with pretty output in development.",
+	"private": false,
+	"author": {
+		"name": "Axel Nana",
+		"email": "ax.lnana@outlook.com"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/na2axl/elysiumjs.git",
+		"directory": "@elysiumjs/pino"
+	},
+	"homepage": "https://github.com/na2axl/elysiumjs/tree/main/@elysiumjs/pino#readme",
+	"bugs": {
+		"url": "https://github.com/na2axl/elysiumjs/issues"
+	},
+	"scripts": {
+		"format": "prettier --write \"./src/**/*.ts\"",
+		"clean": "rimraf dist",
+		"build:js": "bun build ./src/index.ts --outdir ./dist --target node --packages external --root ./src --minify-syntax --minify-whitespace",
+		"build:ts": "tsc",
+		"build": "bun run clean && bun run build:js && bun run build:ts",
+		"typecheck": "tsc --noEmit",
+		"prepublishOnly": "bun run build",
+		"test": "bun test",
+		"test:coverage": "bun test --coverage"
+	},
+	"keywords": [
+		"elysium",
+		"framework",
+		"typescript",
+		"logging",
+		"pino"
+	],
+	"type": "module",
+	"module": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
+	},
+	"files": [
+		"dist",
+		"CHANGELOG.md"
+	],
+	"sideEffects": [
+		"./dist/index.js",
+		"./src/index.ts",
+		"./src/pino.logger.ts"
+	],
+	"dependencies": {
+		"pino": "^10.4.0",
+		"pino-pretty": "^13.2.0"
+	},
+	"peerDependencies": {
+		"@elysiumjs/olympus": "workspace:^"
+	},
+	"devDependencies": {
+		"@elysiumjs/olympus": "workspace:*",
+		"@elysiumjs/bun": "workspace:*"
+	}
+}

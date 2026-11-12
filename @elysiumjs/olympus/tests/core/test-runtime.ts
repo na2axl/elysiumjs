@@ -16,7 +16,7 @@ import type { Runtime } from '../../src/runtime';
 
 const SIGNALS = ['SIGINT', 'SIGTERM'] as const;
 
-/** The runtime core's tests run on, shaped like `@elysiumjs/runtime-bun`. */
+/** The runtime core's tests run on, shaped like `@elysiumjs/bun`. */
 export const testRuntime: Runtime = {
 	name: 'test',
 	env: () => process.env,

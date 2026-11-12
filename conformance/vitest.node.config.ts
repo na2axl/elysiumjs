@@ -15,7 +15,7 @@
 import swc from 'unplugin-swc';
 import { defineConfig } from 'vitest/config';
 
-// The Node lane. `@elysiumjs/olympus` and `@elysiumjs/runtime-node` resolve to their built
+// The Node lane. `@elysiumjs/olympus` and `@elysiumjs/node` resolve to their built
 // `dist` (their `module` field, see `resolve.mainFields`): run `bun run build` first. The scenarios are TypeScript with
 // legacy decorators, and Vitest's default transform does not emit `design:paramtypes`, which
 // the container reads for constructor injection: SWC compiles them instead.

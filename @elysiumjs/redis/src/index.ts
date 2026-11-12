@@ -26,3 +26,5 @@ export { HeraclesCleanCommand } from './heracles/commands/clean.command';
 export { HeraclesWorkCommand } from './heracles/commands/work.command';
 export { type RedisTransportOptions, RedisTransport } from './heracles/redis.transport';
 export { RedisWorker } from './heracles/redis.worker';
+export { RedisFlowStore } from './ariadne/flow-store';
+export { RedisSessionStore } from './themis/session-store';

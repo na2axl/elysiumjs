@@ -2,7 +2,7 @@
 	"name": "@elysiumjs/redis",
 	"version": "0.1.13",
 	"license": "Apache-2.0",
-	"description": "Redis for the Elysium.js framework: connections, rate limits, cache store, Heracles transport and worker.",
+	"description": "Redis backend for the Elysium.js framework: connections, caches, rate limits, locks, Heracles queues and workers, flow and session stores.",
 	"private": false,
 	"author": {
 		"name": "Axel Nana",

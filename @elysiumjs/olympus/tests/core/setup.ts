@@ -14,7 +14,7 @@
 
 import { mock } from 'bun:test';
 
-// Core ships no runtime: the tests use one shaped like @elysiumjs/runtime-bun.
+// Core ships no runtime: the tests use one shaped like @elysiumjs/bun.
 import { Runtime } from '../../src/runtime';
 import { testRuntime } from './test-runtime';
 

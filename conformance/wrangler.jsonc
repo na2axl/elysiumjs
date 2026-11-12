@@ -12,7 +12,12 @@
 		"consumers": [{ "queue": "jobs", "max_batch_size": 10, "max_batch_timeout": 1 }]
 	},
 	"services": [{ "binding": "SELF", "service": "elysium-conformance" }],
-	// The flow store of @elysiumjs/ariadne-workers, exported by the Worker.
-	"durable_objects": { "bindings": [{ "name": "FLOWS", "class_name": "FlowStoreObject" }] },
-	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["FlowStoreObject"] }]
+	// The flow store and the lock of @elysiumjs/workers, exported by the Worker.
+	"durable_objects": {
+		"bindings": [
+			{ "name": "FLOWS", "class_name": "FlowStoreObject" },
+			{ "name": "LOCKS", "class_name": "LockObject" }
+		]
+	},
+	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["FlowStoreObject", "LockObject"] }]
 }

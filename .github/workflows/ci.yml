@@ -36,7 +36,7 @@ jobs:
       - name: Core runs outside Bun
         run: |
           bun run --cwd @elysiumjs/olympus check:runtime
-          bun run --cwd @elysiumjs/runtime-workers check:runtime
+          bun run --cwd @elysiumjs/workers check:runtime
 
       - name: Lint
         run: bun run lint
@@ -145,10 +145,10 @@ jobs:
         run: bun run --cwd @elysiumjs/olympus check:minified
 
       - name: Compiles ahead of time for Workers
-        run: bun run --cwd @elysiumjs/runtime-workers check:aot
+        run: bun run --cwd @elysiumjs/workers check:aot
 
       - name: Runs in wrangler dev
-        run: bun run --cwd @elysiumjs/runtime-workers check:wrangler
+        run: bun run --cwd @elysiumjs/workers check:wrangler
 
       - name: Test
         run: bun run test:coverage

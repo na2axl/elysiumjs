@@ -14,5 +14,5 @@
 
 // The `cloudflare:test` module of the workerd lane. Its declarations name the Workers types
 // (`ExecutionContext`, `Fetcher`, ...) without importing them; `skipLibCheck` lets them through,
-// and the tests use the structural types of `@elysiumjs/runtime-workers` instead.
+// and the tests use the structural types of `@elysiumjs/workers` instead.
 /// <reference types="@cloudflare/vitest-plugin/types" />

@@ -14,8 +14,8 @@
 
 import type { AssertAdapter, Scenario } from '../../src/scenarios';
 
+import { runtime as runtimeBun } from '@elysiumjs/bun';
 import { Application, Http, Module, Service } from '@elysiumjs/olympus';
-import { runtime as runtimeBun } from '@elysiumjs/runtime-bun';
 import { describe, expect, it } from 'bun:test';
 
 import { runScenario } from '../../src/scenarios';

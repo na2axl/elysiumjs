@@ -15,7 +15,6 @@
 import type { ThemisConfig } from './config';
 
 import { Module } from '../index';
-
 import { THEMIS_CONFIG } from './config';
 import { assertStrongSecret } from './errors';
 
@@ -26,7 +25,7 @@ import { assertStrongSecret } from './errors';
  * ```ts
  * ThemisModule.with({
  * 	secret: env.APP_SECRET,
- * 	session: { store: new RedisSessionStore({ connection: () => Redis.connection() }) },
+ * 	session: { store: new RedisSessionStore({ connection: () => Redis.getConnection() }) },
  * 	guards: {
  * 		session: sessionGuard({ user: (id) => users.find(id) }),
  * 		jwt: jwtGuard({ secret: env.JWT_SECRET })

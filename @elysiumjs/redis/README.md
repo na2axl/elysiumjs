@@ -1,6 +1,6 @@
 # @elysiumjs/redis
 
-Redis for [Elysium.js](https://github.com/na2axl/elysiumjs): connections, a lock driver, a cache store, rate limits, and a Heracles transport with its worker.
+Redis for [Elysium.js](https://github.com/na2axl/elysiumjs): connections, a lock driver, a cache store, rate limits, a Heracles transport with its worker, and flow and session stores.
 
 ## Installation
 
@@ -13,9 +13,9 @@ bun add @elysiumjs/olympus @elysiumjs/redis
 `RedisModule` registers each connection as a global service named `redis.connection.{name}`. Clients are created on first use.
 
 ```ts
+import { runtime as bunRuntime } from '@elysiumjs/bun';
 import { Application } from '@elysiumjs/olympus';
 import { Redis, RedisModule } from '@elysiumjs/redis';
-import { runtime as bunRuntime } from '@elysiumjs/runtime-bun';
 
 @Application.register({
 	runtime: bunRuntime,
@@ -85,6 +85,39 @@ class App extends Application {}
 ```bash
 styx heracles:work --id worker-1 --queues emails --redis default
 ```
+
+## Flows
+
+`RedisFlowStore` keeps the flows of `@elysiumjs/olympus/ariadne`:
+
+```ts
+import { AriadneModule } from '@elysiumjs/olympus/ariadne';
+import { Redis, RedisFlowStore } from '@elysiumjs/redis';
+
+AriadneModule.with({
+	store: new RedisFlowStore({ connection: () => Redis.getConnection(), prefix: 'flow:' })
+});
+```
+
+Each flow is a hash under `{prefix}{flow:flowKey}`, with a lease key that expires on its own and, once the flow is finished, a marker that keeps its owner and end time for its TTL. The keys of a flow share a hash tag, so they live on the same cluster slot.
+
+## Sessions
+
+`RedisSessionStore` keeps the sessions of `@elysiumjs/olympus/themis`, on any connection, Upstash included:
+
+```ts
+import { ThemisModule } from '@elysiumjs/olympus/themis';
+import { Redis, RedisSessionStore } from '@elysiumjs/redis';
+
+ThemisModule.with({
+	secret: env.APP_SECRET,
+	session: {
+		store: new RedisSessionStore({ connection: () => Redis.getConnection(), prefix: 'session:' })
+	}
+});
+```
+
+Each session is a JSON value under `{prefix}{id}` (`session:` by default), which expires with the session.
 
 ## License
 

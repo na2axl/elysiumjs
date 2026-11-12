@@ -91,7 +91,7 @@ export const moduleStores = (config: MoiraiStores): ServiceDefinition[] =>
 /**
  * Provides the moirai stores and options of the application as global services. Set the stores
  * the app uses: the memory ones (`MemoryIdempotencyStore`, ...) for tests, the Postgres ones of
- * `@elysiumjs/moirai-drizzle` in production. A module that needs stores of its own, such as the
+ * `@elysiumjs/drizzle` in production. A module that needs stores of its own, such as the
  * outbox and inbox tables of a domain, lists them with `Moirai.stores()` in its services.
  * @author Axel Nana <ax.lnana@outlook.com>
  * @example

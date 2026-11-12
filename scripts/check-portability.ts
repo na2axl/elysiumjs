@@ -65,22 +65,17 @@ const LINE_ALLOW = /\/\/\s*portability-allow:\s*\S/;
 export const ROOTS = [
 	'@elysiumjs/olympus',
 	'@elysiumjs/redis',
-	'conformance',
+	'@elysiumjs/drizzle',
+	'@elysiumjs/workers',
 	'@elysiumjs/argus',
 	'@elysiumjs/plugin-sentry',
-	'@elysiumjs/mnemosyne-drizzle',
-	'@elysiumjs/heracles-workers',
-	'@elysiumjs/moirai-drizzle',
-	'@elysiumjs/themis-redis',
-	'@elysiumjs/themis-workers',
-	'@elysiumjs/ariadne-redis',
-	'@elysiumjs/ariadne-workers'
+	'conformance'
 ];
 
 /** Files exempt from the gate, per root. Globs are relative to the root. */
 export const ALLOW: Record<string, string[]> = {
 	// The Bun SQL driver, and the CLI commands, which run on Bun (migration:generate calls drizzle-kit).
-	'@elysiumjs/mnemosyne-drizzle': ['src/drivers/bun-sql.ts', 'src/commands/**']
+	'@elysiumjs/drizzle': ['src/drivers/bun-sql.ts', 'src/commands/**']
 };
 
 /**

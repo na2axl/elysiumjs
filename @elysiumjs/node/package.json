@@ -1,0 +1,53 @@
+{
+	"name": "@elysiumjs/node",
+	"version": "0.0.0",
+	"license": "Apache-2.0",
+	"description": "Node.js runtime and HTTP server for the Elysium.js framework.",
+	"private": false,
+	"author": {
+		"name": "Axel Nana",
+		"email": "ax.lnana@outlook.com"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/na2axl/elysiumjs.git",
+		"directory": "@elysiumjs/node"
+	},
+	"homepage": "https://github.com/na2axl/elysiumjs/tree/main/@elysiumjs/node#readme",
+	"bugs": {
+		"url": "https://github.com/na2axl/elysiumjs/issues"
+	},
+	"scripts": {
+		"format": "prettier --write \"./src/**/*.ts\"",
+		"clean": "rimraf dist",
+		"build:js": "bun build ./src/index.ts --outdir ./dist --target node --packages external --root ./src --minify-syntax --minify-whitespace",
+		"build:ts": "tsc",
+		"build": "bun run clean && bun run build:js && bun run build:ts",
+		"typecheck": "tsc --noEmit",
+		"prepublishOnly": "bun run build",
+		"test": "bun test",
+		"test:coverage": "bun test --coverage"
+	},
+	"keywords": [
+		"elysium",
+		"framework",
+		"typescript",
+		"runtime",
+		"node"
+	],
+	"type": "module",
+	"module": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"files": [
+		"dist",
+		"CHANGELOG.md"
+	],
+	"sideEffects": false,
+	"devDependencies": {
+		"@elysiumjs/olympus": "workspace:*",
+		"elysia": "^2.0.0-rc.1"
+	},
+	"peerDependencies": {
+		"@elysiumjs/olympus": "workspace:^"
+	}
+}
