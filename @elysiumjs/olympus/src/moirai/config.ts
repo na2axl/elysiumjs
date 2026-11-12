@@ -33,6 +33,9 @@ export const MOIRAI_EVENT_STORE = 'moirai.events';
 export const MOIRAI_PROJECTION_STORAGE = 'moirai.projections';
 export const MOIRAI_OPTIONS = 'moirai.options';
 
+/** The name of the Heracles job that runs a queued action. */
+export const MOIRAI_ACTION_JOB = 'moirai.action';
+
 /** The service name of the options a module overrides with `Moirai.stores()`. */
 export const MOIRAI_MODULE_OPTIONS = 'moirai.module-options';
 
