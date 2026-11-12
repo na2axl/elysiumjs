@@ -24,7 +24,11 @@ export interface TransportConfig {
 	options?: Record<string, unknown>;
 }
 
-export interface HermesConfig {
+/**
+ * The options of {@link LoggerModule}.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export interface LoggerConfig {
 	name?: string;
 	level: LogLevel;
 	format: LogFormat;
@@ -38,7 +42,7 @@ export interface HermesConfig {
 	transport?: PortDriverName<'logger'>;
 }
 
-export const DEFAULT_CONFIG: HermesConfig = {
+export const DEFAULT_CONFIG: LoggerConfig = {
 	level: 'info',
 	format: 'json'
 };

@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { ConsoleLogger, LOGGER_SERVICE, Service } from '../../src/index';
 import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
-import { Logged } from '../../src/hermes/decorators/logged';
+import { ConsoleLogger, LOGGER_SERVICE, Service } from '../../src/index';
+import { Logged } from '../../src/logging/decorators/logged';
 
 describe('@Logged decorator', () => {
 	it('should call the original method and return its result', async () => {

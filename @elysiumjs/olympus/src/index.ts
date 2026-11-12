@@ -251,3 +251,9 @@ export {
 	InvalidCorsOptionsError,
 	PayloadTooLargeError
 } from './security';
+export { LoggerModule } from './logging/logger.module';
+export { RequestLogInterceptor } from './logging/interceptors/request-log.interceptor';
+export { JsonConsoleLogger } from './logging/services/json-console.logger';
+export { type HttpTransportOptions, HttpTransport } from './logging/transports/http.transport';
+export { type LoggedOptions, Logged } from './logging/decorators/logged';
+export { type LogFormat, type LoggerConfig, type TransportConfig } from './logging/types';

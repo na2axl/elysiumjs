@@ -14,10 +14,16 @@
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { HermesModule, JsonConsoleLogger } from '../../src/hermes';
-import { Application, Logger, Service, UnknownPortDriverError } from '../../src/index';
+import {
+	Application,
+	JsonConsoleLogger,
+	Logger,
+	LoggerModule,
+	Service,
+	UnknownPortDriverError
+} from '../../src/index';
 
-describe('HermesModule', () => {
+describe('LoggerModule', () => {
 	let app: Awaited<ReturnType<typeof Application.testing>> | undefined;
 
 	afterEach(async () => {
@@ -34,14 +40,14 @@ describe('HermesModule', () => {
 	});
 
 	it('uses the console driver when no logging package is loaded, built from config', async () => {
-		app = await Application.testing({ modules: [HermesModule.with({ level: 'debug' })] });
+		app = await Application.testing({ modules: [LoggerModule.with({ level: 'debug' })] });
 		const logger = await app.get<JsonConsoleLogger>('logger');
 		expect(logger).toBeInstanceOf(JsonConsoleLogger);
 		expect(logger.level).toBe('debug');
 	});
 
 	it('falls back to the default level', async () => {
-		app = await Application.testing({ modules: [HermesModule] });
+		app = await Application.testing({ modules: [LoggerModule] });
 		expect((await app.get<JsonConsoleLogger>('logger')).level).toBe('info');
 	});
 
@@ -49,13 +55,13 @@ describe('HermesModule', () => {
 		@Logger.driver('hermes-test')
 		class MemoryLogger extends JsonConsoleLogger {}
 		app = await Application.testing({
-			modules: [HermesModule.with({ transport: 'hermes-test' })]
+			modules: [LoggerModule.with({ transport: 'hermes-test' })]
 		});
 		expect(await app.get('logger')).toBeInstanceOf(MemoryLogger);
 	});
 
 	it('throws UnknownPortDriverError for a driver nobody registered', async () => {
-		app = await Application.testing({ modules: [HermesModule.with({ transport: 'pino' })] });
+		app = await Application.testing({ modules: [LoggerModule.with({ transport: 'pino' })] });
 		await expect(app.get('logger')).rejects.toBeInstanceOf(UnknownPortDriverError);
 	});
 });

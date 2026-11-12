@@ -13,8 +13,14 @@
 // limitations under the License.
 
 import { runtime as bunRuntime } from '@elysiumjs/bun';
-import { Application, Logger, Runtime, Service } from '@elysiumjs/olympus';
-import { HermesModule, JsonConsoleLogger } from '@elysiumjs/olympus/hermes';
+import {
+	Application,
+	JsonConsoleLogger,
+	Logger,
+	LoggerModule,
+	Runtime,
+	Service
+} from '@elysiumjs/olympus';
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import pino from 'pino';
 
@@ -150,7 +156,7 @@ describe('PinoLogger', () => {
 		});
 	});
 
-	describe('HermesModule', () => {
+	describe('LoggerModule', () => {
 		let app: Awaited<ReturnType<typeof Application.testing>> | undefined;
 
 		afterEach(async () => {
@@ -159,7 +165,7 @@ describe('PinoLogger', () => {
 		});
 
 		it('is the default logger once loaded, built from the config', async () => {
-			app = await Application.testing({ modules: [HermesModule.with({ level: 'debug' })] });
+			app = await Application.testing({ modules: [LoggerModule.with({ level: 'debug' })] });
 			const logger = await app.get<PinoLogger>('logger');
 			expect(logger).toBeInstanceOf(PinoLogger);
 			expect((logger as any).pino.level).toBe('debug');
@@ -172,7 +178,7 @@ describe('PinoLogger', () => {
 				configurable: true
 			});
 			try {
-				app = await Application.testing({ modules: [HermesModule] });
+				app = await Application.testing({ modules: [LoggerModule] });
 				expect(await app.get('logger')).toBeInstanceOf(JsonConsoleLogger);
 			} finally {
 				if (navigator) Object.defineProperty(globalThis, 'navigator', navigator);
@@ -182,7 +188,7 @@ describe('PinoLogger', () => {
 
 		it('constructs nothing on shutdown when the logger was never resolved', async () => {
 			const flush = spyOn(PinoLogger.prototype, 'flush');
-			app = await Application.testing({ modules: [HermesModule] });
+			app = await Application.testing({ modules: [LoggerModule] });
 			await app.shutdown();
 			app = undefined;
 			expect(flush).not.toHaveBeenCalled();
@@ -190,13 +196,13 @@ describe('PinoLogger', () => {
 		});
 
 		it('gives way to the console driver when asked', async () => {
-			app = await Application.testing({ modules: [HermesModule.with({ transport: 'console' })] });
+			app = await Application.testing({ modules: [LoggerModule.with({ transport: 'console' })] });
 			expect(await app.get('logger')).toBeInstanceOf(JsonConsoleLogger);
 		});
 
 		it('flushes a built logger on shutdown', async () => {
 			const flush = spyOn(PinoLogger.prototype, 'flush');
-			app = await Application.testing({ modules: [HermesModule] });
+			app = await Application.testing({ modules: [LoggerModule] });
 			await app.get('logger');
 			await app.shutdown();
 			app = undefined;

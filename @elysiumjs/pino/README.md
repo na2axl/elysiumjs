@@ -10,16 +10,15 @@ bun add @elysiumjs/olympus @elysiumjs/pino
 
 ## Usage
 
-Import the package once, such as in the app's entry: it registers the `pino` driver, and `HermesModule` then uses it for the app's `logger` service.
+Import the package once, such as in the app's entry: it registers the `pino` driver, and `LoggerModule` then uses it for the app's `logger` service.
 
 ```ts
-import { Application, getLogger } from '@elysiumjs/olympus';
-import { HermesModule } from '@elysiumjs/olympus/hermes';
+import { Application, getLogger, LoggerModule } from '@elysiumjs/olympus';
 
 import '@elysiumjs/pino';
 
 @Application.register({
-	modules: [HermesModule.with({ name: 'shop', level: 'debug', format: 'pretty' })]
+	modules: [LoggerModule.with({ name: 'shop', level: 'debug', format: 'pretty' })]
 })
 export class App extends Application {}
 
@@ -29,7 +28,7 @@ getLogger({ module: 'orders' }).info('Order placed', { orderId: 'o-1' });
 - `format: 'json'` (the default) writes one JSON object per line; `format: 'pretty'` writes readable lines through pino-pretty, for development.
 - Errors logged under `error` are serialized with their type, message and stack.
 - The logger flushes its buffered lines when the app shuts down.
-- On Cloudflare Workers, where pino's Node.js streams are not available, `HermesModule` keeps the `console` driver unless you set `transport: 'pino'`.
+- On Cloudflare Workers, where pino's Node.js streams are not available, `LoggerModule` keeps the `console` driver unless you set `transport: 'pino'`.
 
 Build one outside the module with the port:
 

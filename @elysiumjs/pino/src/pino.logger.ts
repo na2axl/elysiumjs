@@ -26,14 +26,14 @@ declare module '@elysiumjs/olympus' {
 
 /**
  * The `pino` driver of the `Logger` port: JSON lines through pino, or readable lines through
- * pino-pretty with `format: 'pretty'`. Importing the package registers it, and `HermesModule`
+ * pino-pretty with `format: 'pretty'`. Importing the package registers it, and `LoggerModule`
  * then uses it by default, except on Cloudflare Workers.
  * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
  * import '@elysiumjs/pino';
  *
- * HermesModule.with({ name: 'shop', level: 'debug', format: 'pretty' });
+ * LoggerModule.with({ name: 'shop', level: 'debug', format: 'pretty' });
  * ```
  */
 @Logger.driver('pino')

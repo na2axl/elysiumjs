@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { LoggerInterface } from '../../index';
-import type { HermesConfig, LogLevel } from '../types';
+import type { LoggerInterface } from '../../logger';
+import type { LoggerConfig, LogLevel } from '../types';
 
-import { InteractsWithConsole, Logger } from '../../index';
+import { InteractsWithConsole } from '../../console';
+import { Logger } from '../../logger';
 import { DEFAULT_CONFIG } from '../types';
 
 const LEVELS: Record<LogLevel, number> = {
@@ -53,7 +54,7 @@ export class JsonConsoleLogger implements LoggerInterface {
 	readonly #threshold: number;
 	readonly #bindings: Record<string, unknown>;
 
-	constructor(config: Partial<HermesConfig> = {}, bindings: Record<string, unknown> = {}) {
+	constructor(config: Partial<LoggerConfig> = {}, bindings: Record<string, unknown> = {}) {
 		const level = config.level ?? DEFAULT_CONFIG.level;
 		this.#threshold = LEVELS[level];
 		this.#bindings = { ...(config.name ? { name: config.name } : {}), ...bindings };

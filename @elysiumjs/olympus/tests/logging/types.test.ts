@@ -14,7 +14,7 @@
 
 import { describe, expect, it } from 'bun:test';
 
-import { DEFAULT_CONFIG } from '../../src/hermes/types';
+import { DEFAULT_CONFIG } from '../../src/logging/types';
 
 describe('DEFAULT_CONFIG', () => {
 	it('should have info as default level', () => {

@@ -11,10 +11,11 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-import type { PortDriverName } from '../index';
-import type { HermesConfig } from './types';
+import type { PortDriverName } from '../port';
+import type { LoggerConfig } from './types';
 
-import { Logger, LOGGER_SERVICE, Module } from '../index';
+import { Logger, LOGGER_SERVICE } from '../logger';
+import { Module } from '../module';
 
 import './services/json-console.logger';
 
@@ -37,10 +38,10 @@ const defaultTransport = (): PortDriverName<'logger'> =>
  * ```ts
  * import '@elysiumjs/pino';
  *
- * HermesModule.with({ level: 'debug', transport: 'pino' });
+ * LoggerModule.with({ level: 'debug', transport: 'pino' });
  * ```
  */
-@Module.register<HermesConfig>({
+@Module.register<LoggerConfig>({
 	services: (config) => [
 		{
 			name: LOGGER_SERVICE,
@@ -49,6 +50,6 @@ const defaultTransport = (): PortDriverName<'logger'> =>
 		}
 	]
 })
-export class HermesModule extends Module.configurable<HermesConfig>({
+export class LoggerModule extends Module.configurable<LoggerConfig>({
 	defaults: { ...DEFAULT_CONFIG }
 }) {}

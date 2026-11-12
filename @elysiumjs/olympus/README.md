@@ -12,18 +12,17 @@ Add a runtime package too: `@elysiumjs/bun`, `@elysiumjs/node` or `@elysiumjs/wo
 
 ## Exports
 
-| Import                               | Contents                                                                                                                                                                                                       |
-| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@elysiumjs/olympus`                 | Application, modules, dependency injection, HTTP, WebSocket and WAMP controllers, middleware, interceptors, filters, problem details, configuration, environment, lifecycle events, console commands, OpenAPI. |
-| `@elysiumjs/olympus/mnemosyne`       | Models, repositories with events, pruning jobs, the query DSL, units of work, caches, seeders and an in-memory backend.                                                                                        |
-| `@elysiumjs/olympus/moirai`          | Actions and queries, idempotency, outbox, inbox and domain events.                                                                                                                                             |
-| `@elysiumjs/olympus/moirai/heracles` | Outbox effect that dispatches heracles jobs. Import it once in the process that relays the outbox.                                                                                                             |
-| `@elysiumjs/olympus/heracles`        | Background jobs: queues, schedules, fan-out, retries and dead letters. `MemoryTransport` runs jobs in the process.                                                                                             |
-| `@elysiumjs/olympus/ariadne`         | Multi-step flows with server-side state and replayable steps.                                                                                                                                                  |
-| `@elysiumjs/olympus/themis`          | Authentication: sessions, guards, API keys, CSRF, TOTP, OAuth and passkeys.                                                                                                                                    |
-| `@elysiumjs/olympus/harpocrates`     | Secrets and cryptography: password hashing (`Password` and the `PasswordHasher` port), encryption (the `Cipher` port), JWTs, signed URLs and hashing helpers.                                                  |
-| `@elysiumjs/olympus/cerberus`        | Ability-based roles and permissions.                                                                                                                                                                           |
-| `@elysiumjs/olympus/hermes`          | `HermesModule` (the app logger), the `console` logger driver, request logs and `@Logged()`.                                                                                                                    |
+| Import                               | Contents                                                                                                                                                                                                                |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@elysiumjs/olympus`                 | Application, modules, dependency injection, HTTP, WebSocket and WAMP controllers, middleware, interceptors, filters, problem details, configuration, environment, lifecycle events, logging, console commands, OpenAPI. |
+| `@elysiumjs/olympus/mnemosyne`       | Models, repositories with events, pruning jobs, the query DSL, units of work, caches, seeders and an in-memory backend.                                                                                                 |
+| `@elysiumjs/olympus/moirai`          | Actions and queries, idempotency, outbox, inbox and domain events.                                                                                                                                                      |
+| `@elysiumjs/olympus/moirai/heracles` | Outbox effect that dispatches heracles jobs. Import it once in the process that relays the outbox.                                                                                                                      |
+| `@elysiumjs/olympus/heracles`        | Background jobs: queues, schedules, fan-out, retries and dead letters. `MemoryTransport` runs jobs in the process.                                                                                                      |
+| `@elysiumjs/olympus/ariadne`         | Multi-step flows with server-side state and replayable steps.                                                                                                                                                           |
+| `@elysiumjs/olympus/themis`          | Authentication: sessions, guards, API keys, CSRF, TOTP, OAuth and passkeys.                                                                                                                                             |
+| `@elysiumjs/olympus/harpocrates`     | Secrets and cryptography: password hashing (`Password` and the `PasswordHasher` port), encryption (the `Cipher` port), JWTs, signed URLs and hashing helpers.                                                           |
+| `@elysiumjs/olympus/cerberus`        | Ability-based roles and permissions.                                                                                                                                                                                    |
 
 Database drivers, stores and runtimes ship as separate packages, such as `@elysiumjs/drizzle` and `@elysiumjs/redis`.
 
@@ -62,8 +61,7 @@ export class MainModule extends Module {}
 Create an application class. Modules that need configuration are bound to it with `with()`:
 
 ```typescript
-import { Application } from '@elysiumjs/olympus';
-import { HermesModule } from '@elysiumjs/olympus/hermes';
+import { Application, LoggerModule } from '@elysiumjs/olympus';
 
 import '@elysiumjs/pino';
 
@@ -73,7 +71,7 @@ import { MainModule } from './main.module';
 
 @Application.register({
 	modules: [
-		HermesModule.with({ level: 'debug', format: 'pretty' }),
+		LoggerModule.with({ level: 'debug', format: 'pretty' }),
 		RedisModule.with({
 			default: 'cache',
 			connections: { cache: { url: process.env.REDIS_URL! } }
@@ -418,18 +416,17 @@ const phone = await cipher.decrypt(sealed, 'contacts.phone');
 
 ## Logging
 
-`getLogger()` answers the app's `logger` service, or a plain console logger when there is none. `HermesModule` from `@elysiumjs/olympus/hermes` provides that service from the `Logger` port, through the driver its `transport` names:
+`getLogger()` answers the app's `logger` service, or a plain console logger when there is none. `LoggerModule` provides that service from the `Logger` port, through the driver its `transport` names:
 
-- `console` (in `@elysiumjs/olympus/hermes`): one JSON object per line through `console`, with no dependency. The default on Cloudflare Workers, and wherever no other driver is loaded.
+- `console` (in olympus): one JSON object per line through `console`, with no dependency. The default on Cloudflare Workers, and wherever no other driver is loaded.
 - `pino` (in `@elysiumjs/pino`): JSON lines, or readable ones with `format: 'pretty'`. Importing the package registers it and makes it the default.
 
 ```ts
-import { getLogger } from '@elysiumjs/olympus';
-import { HermesModule } from '@elysiumjs/olympus/hermes';
+import { getLogger, LoggerModule } from '@elysiumjs/olympus';
 
 import '@elysiumjs/pino';
 
-HermesModule.with({ name: 'shop', level: 'debug', format: 'pretty' });
+LoggerModule.with({ name: 'shop', level: 'debug', format: 'pretty' });
 
 getLogger({ module: 'orders' }).info('Order placed', { orderId: 'o-1' });
 ```

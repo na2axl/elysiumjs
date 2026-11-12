@@ -14,7 +14,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 
-import { HttpTransport } from '../../src/hermes/transports/http.transport';
+import { HttpTransport } from '../../src/logging/transports/http.transport';
 
 describe('HttpTransport', () => {
 	let fetchSpy: ReturnType<typeof spyOn>;

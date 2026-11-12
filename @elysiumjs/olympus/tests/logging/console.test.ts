@@ -14,18 +14,20 @@
 
 import type { OutputLevel } from '../../src/index';
 
+import { afterEach, describe, expect, it } from 'bun:test';
+
 import {
 	Application,
 	createTestingHttpApp,
 	Http,
+	JsonConsoleLogger,
+	LoggerModule,
 	Module,
 	NotFoundError,
+	RequestLogInterceptor,
 	Runtime
 } from '../../src/index';
 import { testRuntime as bunRuntime } from '../core/test-runtime';
-import { afterEach, describe, expect, it } from 'bun:test';
-
-import { HermesModule, JsonConsoleLogger, RequestLogInterceptor } from '../../src/hermes';
 
 type Method = 'debug' | 'info' | 'warn' | 'error';
 
@@ -112,9 +114,9 @@ describe('JsonConsoleLogger', () => {
 		}
 	});
 
-	it('is the logger of HermesModule with transport: console', async () => {
+	it('is the logger of LoggerModule with transport: console', async () => {
 		const app = await Application.testing({
-			modules: [HermesModule.with({ transport: 'console' })]
+			modules: [LoggerModule.with({ transport: 'console' })]
 		});
 		try {
 			expect(await app.get('logger')).toBeInstanceOf(JsonConsoleLogger);
@@ -146,7 +148,7 @@ class LogController {
 class LogModule extends Module {}
 
 @Application.register({
-	modules: [HermesModule.with({ transport: 'console', level: 'info' }), LogModule],
+	modules: [LoggerModule.with({ transport: 'console', level: 'info' }), LogModule],
 	interceptors: [RequestLogInterceptor],
 	openapi: false
 })
