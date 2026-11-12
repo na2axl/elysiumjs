@@ -40,7 +40,10 @@ const hex = (bytes: ArrayBuffer): string =>
 const sha256 = async (text: string): Promise<string> =>
 	hex(await crypto.subtle.digest('SHA-256', encoder.encode(text)));
 
-const hmac = async (key: ArrayBuffer | Uint8Array, text: string): Promise<ArrayBuffer> => {
+const hmac = async (
+	key: ArrayBuffer | Uint8Array<ArrayBuffer>,
+	text: string
+): Promise<ArrayBuffer> => {
 	const imported = await crypto.subtle.importKey(
 		'raw',
 		key,
