@@ -15,9 +15,9 @@
 import type { CryptoKey, JWTPayload, KeyObject } from 'jose';
 import type { Secret } from './secret';
 
-import { Clock, DomainError } from '../index';
 import { jwtVerify, SignJWT } from 'jose';
 
+import { Clock, DomainError } from '../index';
 import { utf8 } from './crypto';
 import { resolveSecret } from './secret';
 

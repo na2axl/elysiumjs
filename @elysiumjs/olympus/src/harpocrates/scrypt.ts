@@ -12,11 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { PasswordHasher } from './password';
+import type { PasswordHasherDriver } from './password';
 
 import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
 
-type ScryptOptions = { N?: number; r?: number; p?: number; keyLength?: number };
+import { PasswordHasher } from './password';
+
+/**
+ * The scrypt parameters: the cost `N` (16384 by default), the block size `r` (8), the
+ * parallelism `p` (1) and the key length in bytes (32).
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export type ScryptOptions = { N?: number; r?: number; p?: number; keyLength?: number };
 
 const derive = (
 	password: string,
@@ -35,10 +42,11 @@ const derive = (
 
 /**
  * Hashes passwords with scrypt from `node:crypto`: Node.js, Bun, and Workers with the
- * `nodejs_compat` flag.
+ * `nodejs_compat` flag. Registered as the `scrypt` driver of {@link PasswordHasher}, the default.
  * @author Axel Nana <ax.lnana@outlook.com>
  */
-export class ScryptPasswordHasher implements PasswordHasher {
+@PasswordHasher.driver('scrypt')
+export class ScryptPasswordHasher implements PasswordHasherDriver {
 	public readonly prefix = '$scrypt$';
 	readonly #options: Required<ScryptOptions>;
 

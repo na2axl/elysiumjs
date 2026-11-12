@@ -20,7 +20,6 @@ import type {
 	RegistrationResponseJSON
 } from '@simplewebauthn/server';
 
-import { DomainError } from '../index';
 import {
 	generateAuthenticationOptions,
 	generateRegistrationOptions,
@@ -28,7 +27,8 @@ import {
 	verifyRegistrationResponse
 } from '@simplewebauthn/server';
 
-import { fromBase64Url, toBase64Url, utf8 } from './crypto';
+import { fromBase64Url, toBase64Url, utf8 } from '../harpocrates/crypto';
+import { DomainError } from '../index';
 import { Session } from './session';
 
 /**

@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { Secret } from '../../src/harpocrates';
 import type { TestingHttpApp, TestResponse } from '../../src/index';
-import type { AuthUser, Guard, Secret, SessionStore } from '../../src/themis';
+import type { AuthUser, Guard, SessionStore } from '../../src/themis';
 
-import { Application, ConflictError, Http, Middleware, Module, Service, t } from '../../src/index';
 import { afterEach, describe, expect, it } from 'bun:test';
 
+import { Jwt, WeakSecretError } from '../../src/harpocrates';
+import { Application, ConflictError, Http, Middleware, Module, Service, t } from '../../src/index';
 import {
 	apiKeyGuard,
 	ApiKeys,
@@ -25,14 +27,12 @@ import {
 	AuthMiddleware,
 	Csrf,
 	CsrfMiddleware,
-	Jwt,
 	jwtGuard,
 	MemorySessionStore,
 	Session,
 	sessionGuard,
 	SessionMiddleware,
-	ThemisModule,
-	WeakSecretError
+	ThemisModule
 } from '../../src/themis';
 
 const SECRET = 's'.repeat(32);

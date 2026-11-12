@@ -27,6 +27,7 @@ export { Cron, type CronSchedule, InvalidCronError } from './cron';
 export { HeraclesModule, type HeraclesModuleConfig } from './heracles.module';
 export {
 	DuplicateJobError,
+	HERACLES_CIPHER,
 	HERACLES_LOCK,
 	JobRegistry,
 	type JobRegistryEntry,
@@ -48,6 +49,7 @@ export {
 export { Heracles } from './heracles';
 export { Job, JobStatus, JobOverlapBehavior, WithId } from './job';
 export { getJobMetadata } from './utils';
+export { MissingJobCipherError, openJobArgs, sealJobArgs } from './encryption';
 export { Queue } from './queue';
 export { TransportMode } from './transport';
 export { MemoryTransport } from './transports/memory.transport';

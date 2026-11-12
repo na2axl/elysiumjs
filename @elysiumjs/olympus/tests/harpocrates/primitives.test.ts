@@ -12,22 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Clock } from '../../src/index';
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import {
-	ApiKeys,
-	BunPasswordHasher,
 	InvalidSignatureError,
 	InvalidTokenError,
 	Jwt,
 	Password,
+	PasswordHasher,
 	Pbkdf2PasswordHasher,
+	ScryptPasswordHasher,
 	SignedUrl,
 	WeakSecretError
-} from '../../src/themis';
-import { decrypt, encrypt, fromBase64Url, safeEqual, toBase64Url } from '../../src/themis/crypto';
-import { ScryptPasswordHasher } from '../../src/themis/scrypt';
+} from '../../src/harpocrates';
+import {
+	decrypt,
+	encrypt,
+	fromBase64Url,
+	safeEqual,
+	toBase64Url
+} from '../../src/harpocrates/crypto';
+import { Clock } from '../../src/index';
 
 describe('crypto helpers', () => {
 	it('round-trips base64url and compares strings', () => {
@@ -51,12 +56,38 @@ describe('crypto helpers', () => {
 describe('passwords', () => {
 	afterEach(() => Password.reset());
 
-	it('hashes with Argon2id on Bun, and verifies', async () => {
+	it('hashes with scrypt by default, and verifies', async () => {
 		const hash = await Password.hash('correct horse');
-		expect(hash).toStartWith('$argon2id$');
+		expect(hash).toStartWith('$scrypt$N=16384,r=8,p=1$');
 		expect(await Password.verify('correct horse', hash)).toBe(true);
 		expect(await Password.verify('wrong', hash)).toBe(false);
 		expect(Password.needsRehash(hash)).toBe(false);
+		expect(Password.hasher()).toBeInstanceOf(ScryptPasswordHasher);
+	});
+
+	it('registers scrypt and pbkdf2 as drivers of the PasswordHasher port', () => {
+		expect(PasswordHasher.drivers()).toEqual(expect.arrayContaining(['scrypt', 'pbkdf2']));
+		expect(PasswordHasher.for('pbkdf2')).toBeInstanceOf(Pbkdf2PasswordHasher);
+		Password.use('pbkdf2');
+		expect(Password.hasher()).toBeInstanceOf(Pbkdf2PasswordHasher);
+	});
+
+	it('recognises the hashes of every registered driver, without registering them', async () => {
+		const hash = await new Pbkdf2PasswordHasher().hash('pw');
+		expect(await Password.verify('pw', hash)).toBe(true);
+		expect(Password.needsRehash(hash)).toBe(true);
+	});
+
+	it('answers false when a driver throws', async () => {
+		Password.register({
+			prefix: '$broken$',
+			hash: async () => '$broken$',
+			verify: async () => {
+				throw new Error('boom');
+			},
+			needsRehash: () => false
+		});
+		expect(await Password.verify('pw', '$broken$x')).toBe(false);
 	});
 
 	it('hashes with PBKDF2, which every runtime has', async () => {
@@ -83,7 +114,7 @@ describe('passwords', () => {
 
 	it('verifies the hashes of other hashers and asks to rehash them', async () => {
 		const old = await new Pbkdf2PasswordHasher({ iterations: 1000 }).hash('pw');
-		Password.use(new BunPasswordHasher({ memoryCost: 4096, timeCost: 2 }));
+		Password.use(new ScryptPasswordHasher({ N: 2048 }));
 		expect(await Password.verify('pw', old)).toBe(true);
 		expect(Password.needsRehash(old)).toBe(true);
 
@@ -239,16 +270,6 @@ describe('signed URL secrets', () => {
 		const link = await SignedUrl.sign('https://x.test/a?b=1', { secret, expiresIn: 60 });
 		expect(await SignedUrl.verify(link, { secret })).toBe(true);
 		expect(await SignedUrl.verify(link, { secret: () => 't'.repeat(32) })).toBe(false);
-	});
-});
-
-describe('API keys', () => {
-	it('generates prefixed keys, and verifies them against their hash', async () => {
-		const { key, hash } = await ApiKeys.generate({ prefix: 'sk' });
-		expect(key).toMatch(/^sk_[\w-]{43}$/);
-		expect(hash).toMatch(/^[0-9a-f]{64}$/);
-		expect(await ApiKeys.verify(key, hash)).toBe(true);
-		expect(await ApiKeys.verify(`${key}x`, hash)).toBe(false);
 	});
 });
 

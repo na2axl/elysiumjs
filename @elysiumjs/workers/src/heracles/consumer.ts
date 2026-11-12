@@ -16,7 +16,14 @@ import type { TransportProcessMessage } from '@elysiumjs/olympus/heracles';
 import type { WorkersQueueMessage } from '../index';
 
 import { getLogger, ModuleContext, Service } from '@elysiumjs/olympus';
-import { JobRegistry, JobStatus, Queue, QUEUES_SERVICE, WithId } from '@elysiumjs/olympus/heracles';
+import {
+	JobRegistry,
+	JobStatus,
+	openJobArgs,
+	Queue,
+	QUEUES_SERVICE,
+	WithId
+} from '@elysiumjs/olympus/heracles';
 
 import { Workers } from '../index';
 
@@ -124,9 +131,32 @@ export const runJobMessage = async (
 		return;
 	}
 
+	let args: unknown[];
+	try {
+		args = await openJobArgs(entry.jobClass, body.job, body.args);
+	} catch (error) {
+		// Retrying does not help: the arguments go to the dead letters, where they can be replayed
+		// once the cipher is fixed.
+		const reason = error instanceof Error ? error.message : String(error);
+		await bury(
+			{
+				job: body.job,
+				jobId: body.jobId,
+				dispatchId: body.dispatchId,
+				queue: body.queue,
+				attempts: message.attempts,
+				error: reason,
+				message: body
+			},
+			options
+		);
+		message.ack();
+		return;
+	}
+
 	const job = ModuleContext.run(
 		entry.module,
-		() => new (WithId(entry.jobClass, body.jobId, body.dispatchId))(...(body.args ?? []))
+		() => new (WithId(entry.jobClass, body.jobId, body.dispatchId))(...args)
 	);
 	job.queueName = body.queue;
 	await ModuleContext.run(entry.module, () => job.run());

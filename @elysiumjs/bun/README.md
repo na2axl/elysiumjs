@@ -22,6 +22,20 @@ The package exports `runtime`; rename it at import if you like: `import { runtim
 
 Uses `Bun.env`, `Bun.sleep`, Elysia's `listen`, `process.exit` and `SIGINT`/`SIGTERM` handlers.
 
+## Argon2id passwords
+
+Importing the package registers `bun`, a driver of the `PasswordHasher` port that hashes with Argon2id through `Bun.password`. Make it the hasher of new passwords; hashes of the other drivers still verify, and `Password.needsRehash()` tells when to replace them:
+
+```ts
+import '@elysiumjs/bun';
+
+import { Password, PasswordHasher } from '@elysiumjs/olympus/harpocrates';
+
+Password.use('bun');
+// or with stronger parameters
+Password.use(PasswordHasher.for('bun', { memoryCost: 131072, timeCost: 3 }));
+```
+
 ## License
 
 Apache-2.0

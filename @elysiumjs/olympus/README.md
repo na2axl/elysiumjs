@@ -20,8 +20,8 @@ Add a runtime package too: `@elysiumjs/bun`, `@elysiumjs/node` or `@elysiumjs/wo
 | `@elysiumjs/olympus/moirai/heracles` | Outbox effect that dispatches heracles jobs. Import it once in the process that relays the outbox.                                                                                                             |
 | `@elysiumjs/olympus/heracles`        | Background jobs: queues, schedules, fan-out, retries and dead letters. `MemoryTransport` runs jobs in the process.                                                                                             |
 | `@elysiumjs/olympus/ariadne`         | Multi-step flows with server-side state and replayable steps.                                                                                                                                                  |
-| `@elysiumjs/olympus/themis`          | Authentication: passwords, tokens, sessions, guards, CSRF, TOTP, OAuth and passkeys.                                                                                                                           |
-| `@elysiumjs/olympus/themis/scrypt`   | `ScryptPasswordHasher`.                                                                                                                                                                                        |
+| `@elysiumjs/olympus/themis`          | Authentication: sessions, guards, API keys, CSRF, TOTP, OAuth and passkeys.                                                                                                                                    |
+| `@elysiumjs/olympus/harpocrates`     | Secrets and cryptography: password hashing (`Password` and the `PasswordHasher` port), encryption (the `Cipher` port), JWTs, signed URLs and hashing helpers.                                                  |
 | `@elysiumjs/olympus/cerberus`        | Ability-based roles and permissions.                                                                                                                                                                           |
 | `@elysiumjs/olympus/hermes`          | `HermesModule` (the app logger), the `console` logger driver, request logs and `@Logged()`.                                                                                                                    |
 
@@ -309,6 +309,40 @@ if (run.acquired) console.log(run.value);
 
 The locks of `serializeBy` and `Moirai.lock()` are let go when their unit of work commits or rolls back. In case their holder dies first, they also end after `lockTtl` milliseconds (`MoiraiModule.with({ lockTtl: 30_000 })`, 60 seconds by default): keep it longer than your slowest unit of work.
 
+## Passwords and encryption
+
+`@elysiumjs/olympus/harpocrates` holds the cryptography the other domains use, on Web Crypto and `node:crypto` (Cloudflare Workers need the `nodejs_compat` flag).
+
+`Password` hashes with the drivers of the `PasswordHasher` port. New hashes come from scrypt unless `Password.use()` picks another driver; `verify` recognises the hashes of every registered driver by their prefix, and `needsRehash` tells when to replace a hash after a successful login:
+
+```ts
+import { Password } from '@elysiumjs/olympus/harpocrates';
+
+const hash = await Password.hash('correct horse battery staple');
+
+if (await Password.verify(input, hash)) {
+	if (Password.needsRehash(hash)) await users.updateHash(userId, await Password.hash(input));
+}
+```
+
+The drivers are `scrypt` (the default) and `pbkdf2` (PBKDF2-HMAC-SHA256 through Web Crypto); `@elysiumjs/bun` adds `bun`, Argon2id through `Bun.password`. Pick one with options through the port: `Password.use(PasswordHasher.for('scrypt', { N: 32768 }))`.
+
+`Cipher` encrypts strings. The `aes-gcm` driver uses AES-256-GCM over a keyring of secrets of at least 32 bytes; each ciphertext names its key, so you can add a key, make it current, and still decrypt the values of the older ones. The context binds a ciphertext to where it belongs: decrypting it under another context fails with `DecryptionFailedError`.
+
+```ts
+import { Cipher } from '@elysiumjs/olympus/harpocrates';
+
+const cipher = Cipher.for('aes-gcm', {
+	keys: { '2026-01': oldKey, '2026-06': currentKey },
+	current: '2026-06'
+});
+
+const sealed = await cipher.encrypt('+33 6 12 34 56 78', 'contacts.phone');
+const phone = await cipher.decrypt(sealed, 'contacts.phone');
+```
+
+`Jwt` signs and verifies tokens, `SignedUrl` signs links that expire, and `randomToken`, `sha256`, `hmac` and `verifyHmac` cover the smaller needs.
+
 ## Logging
 
 `getLogger()` answers the app's `logger` service, or a plain console logger when there is none. `HermesModule` from `@elysiumjs/olympus/hermes` provides that service from the `Logger` port, through the driver its `transport` names:
@@ -358,6 +392,30 @@ const app = await Application.testing({
 
 await Heracles.dispatch(SendWelcomeMail, ['ada@example.com']);
 await MemoryTransport.settled();
+```
+
+## Encrypted jobs
+
+A job registered with `encrypted: true` has its arguments encrypted before they reach the transport, with the context `heracles:<job name>`, and decrypted in the worker, so that a queue backend never stores them in clear. Give the module a cipher; dispatching an encrypted job without one throws `MissingJobCipherError`. The arguments travel as JSON, on the in-memory transport too.
+
+```ts
+import { Cipher } from '@elysiumjs/olympus/harpocrates';
+import { HeraclesModule, Job } from '@elysiumjs/olympus/heracles';
+
+HeraclesModule.with({
+	cipher: Cipher.for('aes-gcm', { keys: { main: () => readSecret('JOBS_KEY') } })
+});
+
+@Job.register({ encrypted: true })
+class SendStatement extends Job {
+	constructor(private readonly iban: string) {
+		super();
+	}
+
+	protected async execute(): Promise<void> {
+		// ...
+	}
+}
 ```
 
 ## Services

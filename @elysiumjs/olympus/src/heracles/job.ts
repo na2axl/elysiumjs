@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Environment } from '../index';
 import type { Class } from 'type-fest';
+import type { Environment } from '../index';
 
-import { Background, Environments, InteractsWithConsole, Metadata, Service } from '../index';
 import { assign, uid } from 'radash';
 
+import { Background, Environments, InteractsWithConsole, Metadata, Service } from '../index';
 import { getJobMetadata, Symbols } from './utils';
 
 /** The prefix of the service names of jobs. */
@@ -84,6 +84,11 @@ export interface JobMetadata {
 	 * @default undefined - Uses queue setting
 	 */
 	retryDelay?: number;
+
+	/**
+	 * Whether the job's arguments are encrypted with the cipher of `HeraclesModule.with({ cipher })`.
+	 */
+	encrypted?: boolean;
 }
 
 /**
@@ -139,6 +144,15 @@ export type JobProps = {
 	 * registered: it is neither dispatched nor scheduled.
 	 */
 	env?: readonly Environment[];
+
+	/**
+	 * Encrypts the job's arguments with the cipher of `HeraclesModule.with({ cipher })` before
+	 * they reach the transport, and decrypts them in the worker, for arguments such as personal
+	 * data that a queue backend should not store in clear. The arguments then travel as JSON on
+	 * every transport, the in-memory one included.
+	 * @default false
+	 */
+	encrypted?: boolean;
 };
 
 /**
@@ -214,7 +228,8 @@ export abstract class Job extends InteractsWithConsole {
 				overlapDelay: options.overlapDelay!,
 				priority: options.priority!,
 				maxRetries: options.maxRetries,
-				retryDelay: options.retryDelay
+				retryDelay: options.retryDelay,
+				encrypted: options.encrypted ?? false
 			};
 
 			Metadata.define(Symbols.job, metadata, target);
