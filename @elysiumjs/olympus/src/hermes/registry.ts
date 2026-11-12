@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { NotificationChannel } from './channel';
-import type { NotifiableResolver } from './notifiable';
+import type { ChannelName, NotificationChannel } from './channel';
+import type { Notifiable, NotifiableResolver } from './notifiable';
+import type { Notification } from './notification';
 
 import { Metadata } from '../metadata';
 import { ModuleContext } from '../module-context';
@@ -46,6 +47,12 @@ export type NotificationOptions = {
 	 * one per channel, read from the first channel of each entry.
 	 */
 	readonly delay?: number | Readonly<Record<string, number>>;
+
+	/** The priority of its jobs on the queue. */
+	readonly priority?: number;
+
+	/** How many times its jobs are retried, instead of the `maxRetries` of the queue. */
+	readonly maxRetries?: number;
 };
 
 /** A class that is built without arguments or by the container. */
@@ -94,3 +101,37 @@ export const withInstance = async <T extends object, R>(
 	}
 	return work(instance);
 };
+
+/**
+ * How notifications are queued, installed by `@elysiumjs/olympus/hermes/heracles`.
+ * @internal
+ */
+export type NotificationQueue = {
+	/**
+	 * Checks that the delivery can be queued and records what its job carries, before any unit of
+	 * work is waited for.
+	 */
+	prepare(
+		notifiable: Notifiable,
+		notification: Notification<any>,
+		options: NotificationOptions & { readonly queue: string },
+		chain: readonly ChannelName[],
+		id: string
+	): Promise<unknown>;
+
+	/** Dispatches the prepared jobs: once the unit of work commits, unless `afterCommit` is off. */
+	dispatch(prepared: readonly unknown[], options: NotificationOptions): Promise<void>;
+};
+
+let notificationQueue: NotificationQueue | undefined;
+
+/**
+ * Installs how notifications are queued.
+ * @internal
+ */
+export const setNotificationQueue = (queue: NotificationQueue): void => {
+	notificationQueue = queue;
+};
+
+/** How notifications are queued, when `@elysiumjs/olympus/hermes/heracles` is loaded. */
+export const getNotificationQueue = (): NotificationQueue | undefined => notificationQueue;

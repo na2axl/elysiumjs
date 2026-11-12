@@ -18,7 +18,7 @@ import type { MailAddress } from '../messages';
 import type { Notifiable } from '../notifiable';
 
 import { Service } from '../../service';
-import { HERMES_MAIL_RENDERER, HERMES_OPTIONS } from '../config';
+import { HERMES_MAIL_RENDERER } from '../config';
 import { HermesServiceMissingError } from '../errors';
 import { Mail } from '../mail';
 import { MailMessage } from '../messages';
@@ -43,8 +43,10 @@ const addressesOf = (route: unknown): MailAddress[] => {
  */
 @Notification.channel('mail', { message: MailMessage })
 export class MailChannel implements NotificationChannel<MailMessage> {
-	public isAvailable(notifiable: Notifiable, context: ChannelContext): boolean {
-		return addressesOf(notifiable.routeNotificationFor('mail', context.notification)).length > 0;
+	public async isAvailable(notifiable: Notifiable, context: ChannelContext): Promise<boolean> {
+		return (
+			addressesOf(await notifiable.routeNotificationFor('mail', context.notification)).length > 0
+		);
 	}
 
 	public async send(
@@ -54,7 +56,6 @@ export class MailChannel implements NotificationChannel<MailMessage> {
 	): Promise<MailReceipt> {
 		const renderer = Service.get<MailRendererDriver>(HERMES_MAIL_RENDERER);
 		if (!renderer) throw new HermesServiceMissingError('mail renderer');
-		const options = Service.get<{ from?: MailAddress }>(HERMES_OPTIONS) ?? {};
 		const content = message.toJSON();
 		const rendered = await renderer.render(message, {
 			locale: notifiable.preferredLocale?.(),
@@ -62,8 +63,9 @@ export class MailChannel implements NotificationChannel<MailMessage> {
 			type: context.type
 		});
 		return Mail.send({
-			to: addressesOf(notifiable.routeNotificationFor('mail', context.notification)),
-			from: content.from ?? options.from,
+			id: context.id,
+			to: addressesOf(await notifiable.routeNotificationFor('mail', context.notification)),
+			from: content.from,
 			replyTo: content.replyTo,
 			cc: content.cc,
 			bcc: content.bcc,

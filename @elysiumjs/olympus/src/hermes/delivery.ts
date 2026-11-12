@@ -17,6 +17,7 @@ import type { Notifiable } from './notifiable';
 import type { Notification } from './notification';
 
 import { Lifecycle } from '../lifecycle';
+import { getLogger } from '../logger';
 import {
 	ChannelRejected,
 	InvalidChannelMessageError,
@@ -66,6 +67,18 @@ export type NotificationDelivery = {
 
 const SKIPPED = Symbol('skipped');
 
+/** Emits an event; a listener that throws is logged, and does not fail the delivery. */
+const emit = (event: string, data: NotificationEvent): void => {
+	try {
+		Lifecycle.emit<NotificationEvent>(event, data);
+	} catch (error) {
+		getLogger().error('A notification event listener failed', {
+			event,
+			error: error instanceof Error ? error.message : String(error)
+		});
+	}
+};
+
 /**
  * Delivers a notification to a notifiable on the first channel of a chain that can: a channel the
  * notification refuses with `canSend`, that is not available, or that rejects the message is
@@ -104,13 +117,13 @@ export const deliverChain = async (
 					);
 				}
 				const event = { ...context, notifiable, message };
-				Lifecycle.emit<NotificationEvent>(HERMES_SENDING, event);
+				emit(HERMES_SENDING, event);
 				try {
 					const result = await instance.send(notifiable, message, context);
-					Lifecycle.emit<NotificationEvent>(HERMES_SENT, { ...event, result });
+					emit(HERMES_SENT, { ...event, result });
 					return { result };
 				} catch (error) {
-					Lifecycle.emit<NotificationEvent>(HERMES_FAILED, { ...event, error });
+					emit(HERMES_FAILED, { ...event, error });
 					if (error instanceof ChannelRejected) return SKIPPED;
 					throw error;
 				}

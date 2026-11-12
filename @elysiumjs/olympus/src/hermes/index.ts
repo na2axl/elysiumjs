@@ -26,7 +26,7 @@ export type {
 } from './channel';
 export type { NotificationDelivery, NotificationEvent } from './delivery';
 export type { SentNotification } from './fake';
-export type { NotificationRun, QueuedRecipient } from './job';
+export type { NotificationRun, QueuedRecipient } from './queued';
 export type {
 	MailEnvelope,
 	MailReceipt,
@@ -38,7 +38,13 @@ export type {
 export type { MailAddress, MailMessageContent, MailPart } from './messages';
 export type { Notifiable, NotifiableResolver } from './notifiable';
 export type { NotificationOptions } from './registry';
-export type { InboxPage, InboxQuery, NotificationStoreDriver, StoredNotification } from './store';
+export type {
+	InboxOwner,
+	InboxPage,
+	InboxQuery,
+	NotificationStoreDriver,
+	StoredNotification
+} from './store';
 export type { HermesModuleConfig } from './hermes.module';
 export type { BroadcastEvent } from './channels/broadcast.channel';
 
@@ -64,6 +70,7 @@ export {
 	MailViewUnsupportedError,
 	MissingChannelMessageError,
 	MissingHermesServiceError,
+	NotificationDeliveryError,
 	QueuedNotificationDataError,
 	QueuedNotificationsUnavailableError,
 	UnknownChannelError,
@@ -72,7 +79,6 @@ export {
 } from './errors';
 export { NotificationFake } from './fake';
 export { HermesModule } from './hermes.module';
-export { NotificationJob } from './job';
 export {
 	BasicMailRenderer,
 	LogMailTransport,

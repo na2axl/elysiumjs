@@ -16,6 +16,7 @@ import type { ChannelContext, NotificationChannel } from '../channel';
 import type { Notifiable } from '../notifiable';
 
 import { Clock } from '../../clock';
+import { uuidv7 } from '../../moirai/ids';
 import { InboxMessage } from '../messages';
 import { Notification } from '../notification';
 
@@ -35,14 +36,18 @@ export class InboxChannel implements NotificationChannel<InboxMessage> {
 		message: InboxMessage,
 		context: ChannelContext
 	): Promise<{ id: string }> {
+		// The id is made at delivery, so that pages, which sort by id, keep the order of delivery.
+		const id = uuidv7();
 		await Notification.store().save({
-			id: context.id,
+			id,
+			deliveryId: context.id,
+			notifiableType: notifiable.notifiableType ?? null,
 			notifiableId: notifiable.notifiableId!,
 			type: context.type,
 			data: message.data,
 			readAt: null,
 			createdAt: Clock.now()
 		});
-		return { id: context.id };
+		return { id };
 	}
 }

@@ -56,7 +56,8 @@ export interface Notifiable {
 	readonly notifiableType?: string;
 
 	/**
-	 * Where a channel reaches them, or `null` when it cannot.
+	 * Where a channel reaches them, or `null` when it cannot; a promise of it is awaited by the
+	 * built-in channels and when the notification is queued.
 	 * @param channel The channel.
 	 * @param notification The notification being sent.
 	 */

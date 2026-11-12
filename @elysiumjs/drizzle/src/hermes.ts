@@ -13,17 +13,19 @@
 // limitations under the License.
 
 import type {
+	InboxOwner,
 	InboxPage,
 	InboxQuery,
 	NotificationStoreDriver,
 	StoredNotification
 } from '@elysiumjs/olympus/hermes';
+import type { SQL } from 'drizzle-orm';
 import type { DrizzleStoreOptions, StoreTable } from './moirai';
 
 import { Clock } from '@elysiumjs/olympus';
 import { DEFAULT_INBOX_LIMIT, NotificationStore } from '@elysiumjs/olympus/hermes';
 import { and, count, desc, eq, inArray, isNull, lt } from 'drizzle-orm';
-import { index, jsonb, pgSchema, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
+import { index, jsonb, pgSchema, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 
 import { Database } from './database';
 
@@ -54,6 +56,8 @@ export const notificationsTable = (name = 'notifications', schema?: string) => {
 		name,
 		{
 			id: text('id').primaryKey(),
+			deliveryId: text('delivery_id').notNull(),
+			notifiableType: text('notifiable_type'),
 			notifiableId: text('notifiable_id').notNull(),
 			type: text('type').notNull(),
 			data: jsonb('data').$type<Record<string, unknown>>().notNull(),
@@ -61,8 +65,9 @@ export const notificationsTable = (name = 'notifications', schema?: string) => {
 			createdAt: at('created_at').notNull()
 		},
 		(t) => [
-			index(`${name}_notifiable_idx`).on(t.notifiableId, t.id),
-			index(`${name}_unread_idx`).on(t.notifiableId).where(isNull(t.readAt))
+			uniqueIndex(`${name}_delivery_uq`).on(t.deliveryId),
+			index(`${name}_notifiable_idx`).on(t.notifiableId, t.notifiableType, t.id),
+			index(`${name}_unread_idx`).on(t.notifiableId, t.notifiableType).where(isNull(t.readAt))
 		]
 	);
 };
@@ -84,6 +89,17 @@ export class DrizzleNotificationStore implements NotificationStoreDriver {
 		return this.options.table as unknown as NotificationsTable;
 	}
 
+	/** The rows of an owner: its id, and its type or none. */
+	private owned(owner: InboxOwner): SQL {
+		const t = this.table;
+		return and(
+			eq(t.notifiableId, owner.notifiableId),
+			owner.notifiableType === undefined
+				? isNull(t.notifiableType)
+				: eq(t.notifiableType, owner.notifiableType)
+		)!;
+	}
+
 	private get db() {
 		return Database.getConnection(this.options.connection);
 	}
@@ -92,7 +108,7 @@ export class DrizzleNotificationStore implements NotificationStoreDriver {
 		await this.db.insert(this.table).values(notification).onConflictDoNothing();
 	}
 
-	public async list(notifiableId: string, query: InboxQuery = {}): Promise<InboxPage> {
+	public async list(owner: InboxOwner, query: InboxQuery = {}): Promise<InboxPage> {
 		const t = this.table;
 		const limit = query.limit ?? DEFAULT_INBOX_LIMIT;
 		const rows = await this.db
@@ -100,7 +116,7 @@ export class DrizzleNotificationStore implements NotificationStoreDriver {
 			.from(t)
 			.where(
 				and(
-					eq(t.notifiableId, notifiableId),
+					this.owned(owner),
 					query.unread ? isNull(t.readAt) : undefined,
 					query.cursor === undefined ? undefined : lt(t.id, query.cursor)
 				)
@@ -111,40 +127,40 @@ export class DrizzleNotificationStore implements NotificationStoreDriver {
 		return { items, nextCursor: rows.length > limit ? items[items.length - 1]!.id : null };
 	}
 
-	public async unreadCount(notifiableId: string): Promise<number> {
+	public async unreadCount(owner: InboxOwner): Promise<number> {
 		const t = this.table;
 		const [row] = await this.db
 			.select({ total: count() })
 			.from(t)
-			.where(and(eq(t.notifiableId, notifiableId), isNull(t.readAt)));
+			.where(and(this.owned(owner), isNull(t.readAt)));
 		return Number(row?.total ?? 0);
 	}
 
-	public async markAsRead(notifiableId: string, ids: readonly string[]): Promise<number> {
+	public async markAsRead(owner: InboxOwner, ids: readonly string[]): Promise<number> {
 		if (ids.length === 0) return 0;
-		return this.read(inArray(this.table.id, [...ids]), notifiableId);
+		return this.read(inArray(this.table.id, [...ids]), owner);
 	}
 
-	public async markAllAsRead(notifiableId: string): Promise<number> {
-		return this.read(undefined, notifiableId);
+	public async markAllAsRead(owner: InboxOwner): Promise<number> {
+		return this.read(undefined, owner);
 	}
 
-	public async delete(notifiableId: string, ids: readonly string[]): Promise<number> {
+	public async delete(owner: InboxOwner, ids: readonly string[]): Promise<number> {
 		if (ids.length === 0) return 0;
 		const t = this.table;
 		const removed = await this.db
 			.delete(t)
-			.where(and(eq(t.notifiableId, notifiableId), inArray(t.id, [...ids])))
+			.where(and(this.owned(owner), inArray(t.id, [...ids])))
 			.returning({ id: t.id });
 		return removed.length;
 	}
 
-	private async read(filter: ReturnType<typeof inArray> | undefined, notifiableId: string) {
+	private async read(filter: SQL | undefined, owner: InboxOwner) {
 		const t = this.table;
 		const changed = await this.db
 			.update(t)
 			.set({ readAt: Clock.now() })
-			.where(and(eq(t.notifiableId, notifiableId), isNull(t.readAt), filter))
+			.where(and(this.owned(owner), isNull(t.readAt), filter))
 			.returning({ id: t.id });
 		return changed.length;
 	}

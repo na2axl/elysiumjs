@@ -15,7 +15,15 @@
 // Compile-time checks of notifications: run by `bun run typecheck`.
 import type { Notifiable } from '../../../src/hermes/index';
 
-import { InboxMessage, MailMessage, Notification } from '../../../src/hermes/index';
+import { InboxMessage, LogMessage, MailMessage, Notification } from '../../../src/hermes/index';
+
+class User implements Notifiable {
+	constructor(public readonly notifiableId: string) {}
+
+	public routeNotificationFor() {
+		return null;
+	}
+}
 
 @Notification.register({ type: 'types.welcome' })
 export class Welcome extends Notification<{ name: string }> {
@@ -27,8 +35,13 @@ export class Welcome extends Notification<{ name: string }> {
 		return new InboxMessage({ name: this.data.name });
 	}
 
-	public mail(_notifiable: Notifiable) {
-		return new MailMessage().subject(`Welcome ${this.data.name}`);
+	// A method may take the notifiable class it expects.
+	public mail(user: User) {
+		return new MailMessage().subject(`Welcome ${this.data.name} ${user.notifiableId}`);
+	}
+
+	public async log() {
+		return new LogMessage('welcome');
 	}
 }
 
@@ -36,6 +49,45 @@ export class Welcome extends Notification<{ name: string }> {
 export class Ping extends Notification {
 	public channels() {
 		return ['log'] as const;
+	}
+
+	public log() {
+		return new LogMessage('ping');
+	}
+}
+
+// @ts-expect-error the mail channel needs a mail() method
+@Notification.register({ type: 'types.missing' })
+export class MissingMethod extends Notification {
+	public channels() {
+		return ['inbox', ['log', 'mail']] as const;
+	}
+
+	public inbox() {
+		return new InboxMessage({});
+	}
+
+	public log() {
+		return new LogMessage('x');
+	}
+}
+
+// @ts-expect-error a queued notification is rebuilt from its data only
+@Notification.register({ type: 'types.arguments' })
+export class ExtraArgument extends Notification<{ id: string }> {
+	constructor(
+		data: { id: string },
+		public readonly extra: number
+	) {
+		super(data);
+	}
+
+	public channels() {
+		return ['log'] as const;
+	}
+
+	public log() {
+		return new LogMessage('x');
 	}
 }
 

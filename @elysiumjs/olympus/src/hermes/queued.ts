@@ -15,20 +15,13 @@
 import type { ChannelName } from './channel';
 import type { Notifiable } from './notifiable';
 import type { Notification } from './notification';
-import type { NotificationOptions } from './registry';
 
-import { Clock } from '../clock';
-import { ElysiumError } from '../errors';
-import { Heracles, Job, JobRegistry, Queue, QUEUES_SERVICE } from '../heracles/index';
 import { Json } from '../json';
 import { getLogger } from '../logger';
-import { Service } from '../service';
-import { HERMES_NOTIFICATION_JOB } from './config';
 import { deliverChain } from './delivery';
 import {
 	DuplicateNotificationTypeError,
 	QueuedNotificationDataError,
-	QueuedNotificationsUnavailableError,
 	UnknownNotificationError
 } from './errors';
 import { notificationTypes, resolverRegistry, withInstance } from './registry';
@@ -51,6 +44,7 @@ export type QueuedRecipient = {
  */
 export type NotificationRun = {
 	readonly type: string;
+	/** The id of the delivery. */
 	readonly id: string;
 	/** The data of the notification, written with `Json`. */
 	readonly data: unknown;
@@ -84,6 +78,45 @@ class RecordedNotifiable implements Notifiable {
 }
 
 /**
+ * Checks that a delivery can be queued and records what its job carries: the type and data of
+ * the notification, and the id, type, locale and routes of the notifiable.
+ * @throws {DuplicateNotificationTypeError} When another class took the type of the notification.
+ * @throws {QueuedNotificationDataError} When the data or the routes do not survive JSON.
+ */
+export const prepareRun = async (
+	notifiable: Notifiable,
+	notification: Notification<any>,
+	type: string,
+	chain: readonly ChannelName[],
+	id: string
+): Promise<NotificationRun> => {
+	if (notificationTypes.get(type) !== notification.constructor) {
+		throw new DuplicateNotificationTypeError(type);
+	}
+	const data: unknown = notification.data;
+	if (data !== undefined && !Json.survives(data)) {
+		throw new QueuedNotificationDataError(type, 'data');
+	}
+	const routes: Record<string, unknown> = {};
+	for (const channel of chain) {
+		routes[channel] = (await notifiable.routeNotificationFor(channel, notification)) ?? null;
+	}
+	if (!Json.survives(routes)) throw new QueuedNotificationDataError(type, 'routes');
+	return {
+		type,
+		id,
+		data: Json.encode(data),
+		chain,
+		recipient: {
+			id: notifiable.notifiableId,
+			type: notifiable.notifiableType,
+			locale: notifiable.preferredLocale?.(),
+			routes: Json.encode(routes)
+		}
+	};
+};
+
+/**
  * Delivers a queued notification: rebuilds it from its type and data, reads the notifiable again
  * through its resolver when one is registered, and runs the fallback chain.
  * @throws {UnknownNotificationError} When no class registers the type.
@@ -108,75 +141,4 @@ export const runQueuedNotification = async (run: NotificationRun): Promise<void>
 		}
 	}
 	await deliverChain(notifiable, notification, run.type, run.chain, run.id);
-};
-
-/**
- * The job that delivers queued notifications, one per notifiable and channel entry. A fallback
- * chain runs in order inside the job. `HermesModule` lists it in its jobs.
- * @author Axel Nana <ax.lnana@outlook.com>
- */
-@Job.register({ name: HERMES_NOTIFICATION_JOB })
-export class NotificationJob extends Job {
-	public static override readonly description: string = 'Delivers a queued notification.';
-
-	constructor(private readonly delivery: NotificationRun) {
-		super();
-	}
-
-	protected async execute(): Promise<void> {
-		await runQueuedNotification(this.delivery);
-	}
-}
-
-/**
- * Queues the delivery of a notification to a notifiable on a channel entry.
- * @throws {QueuedNotificationsUnavailableError} When no module runs the job.
- * @throws {QueuedNotificationDataError} When the data or the routes do not survive JSON.
- */
-export const queueNotification = async (
-	notifiable: Notifiable,
-	notification: Notification<any>,
-	options: NotificationOptions & { readonly queue: string },
-	chain: readonly ChannelName[],
-	id: string
-): Promise<void> => {
-	const { type, queue } = options;
-	// Resolving the queues also initialises HeraclesModule, which fills the job registry.
-	if (Service.exists(QUEUES_SERVICE)) await Service.resolve(QUEUES_SERVICE);
-	if (!JobRegistry.all().some((entry) => entry.jobClass === NotificationJob)) {
-		throw new QueuedNotificationsUnavailableError(type);
-	}
-	if (!Queue.exists(queue)) {
-		throw new ElysiumError(`Queue ${queue} does not exist: configure it in HeraclesModule.`);
-	}
-	if (notificationTypes.get(type) !== notification.constructor) {
-		throw new DuplicateNotificationTypeError(type);
-	}
-	const data: unknown = notification.data;
-	if (data !== undefined && !Json.survives(data)) {
-		throw new QueuedNotificationDataError(type, 'data');
-	}
-	const routes: Record<string, unknown> = {};
-	for (const channel of chain) {
-		routes[channel] = notifiable.routeNotificationFor(channel, notification) ?? null;
-	}
-	if (!Json.survives(routes)) throw new QueuedNotificationDataError(type, 'routes');
-	const run: NotificationRun = {
-		type,
-		id,
-		data: Json.encode(data),
-		chain,
-		recipient: {
-			id: notifiable.notifiableId,
-			type: notifiable.notifiableType,
-			locale: notifiable.preferredLocale?.(),
-			routes: Json.encode(routes)
-		}
-	};
-	const delay =
-		typeof options.delay === 'number' ? options.delay : options.delay?.[chain[0] as string];
-	await Heracles.dispatch(NotificationJob, [run], {
-		queue,
-		...(delay ? { scheduledFor: new Date(Clock.now().getTime() + delay) } : {})
-	});
 };

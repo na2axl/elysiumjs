@@ -169,3 +169,28 @@ export class MailViewUnsupportedError extends ElysiumError {
  * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class HermesAssertionError extends ElysiumError {}
+
+/**
+ * Thrown by `Notification.sendNow()`, and by `Notification.send()` outside a unit of work, when
+ * some deliveries failed. The other notifiables and entries were still delivered.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export class NotificationDeliveryError extends ElysiumError {
+	constructor(
+		/** The deliveries that went through. */
+		public readonly deliveries: readonly unknown[],
+		/** The failures, with the id of each delivery and the notifiable. */
+		public readonly failures: readonly {
+			readonly id: string;
+			readonly notifiableId?: string;
+			readonly error: unknown;
+		}[]
+	) {
+		super(
+			`${failures.length} notification deliver${failures.length === 1 ? 'y' : 'ies'} failed: ` +
+				failures
+					.map((failure) => String((failure.error as Error)?.message ?? failure.error))
+					.join('; ')
+		);
+	}
+}

@@ -24,10 +24,13 @@ import type { TestingApp } from '../../src/index';
 import { afterEach, describe, expect, it, spyOn } from 'bun:test';
 
 import { Heracles, HeraclesModule, MemoryTransport } from '../../src/heracles/index';
+import { NotificationJob } from '../../src/hermes/heracles';
 import {
 	BasicMailRenderer,
 	BroadcastMessage,
 	ChannelRejected,
+	DuplicateChannelError,
+	DuplicateNotificationTypeError,
 	HERMES_BROADCAST,
 	HERMES_FAILED,
 	HERMES_SENDING,
@@ -42,15 +45,19 @@ import {
 	MailViewUnsupportedError,
 	MemoryNotificationStore,
 	MissingChannelMessageError,
+	MissingHermesServiceError,
 	Notification,
+	NotificationDeliveryError,
 	QueuedNotificationDataError,
 	QueuedNotificationsUnavailableError,
 	UnknownChannelError,
 	UnregisteredNotificationError
 } from '../../src/hermes/index';
-import { Application, DATABASE_TRANSACTION_SERVICE } from '../../src/index';
+import { prepareRun, runQueuedNotification } from '../../src/hermes/queued';
+import { Application, DATABASE_TRANSACTION_SERVICE, Module, Service } from '../../src/index';
 import { LifecycleBus } from '../../src/lifecycle';
 import { UnitOfWork, withUnitOfWork } from '../../src/mnemosyne/index';
+import { MemoryOutboxStore, MoiraiModule } from '../../src/moirai';
 
 class SmsMessage {
 	constructor(public readonly text: string) {}
@@ -60,6 +67,8 @@ declare module '../../src/hermes/channel' {
 	interface NotificationChannels {
 		sms: SmsMessage;
 		push: SmsMessage;
+		audit: LogMessage;
+		orphan: LogMessage;
 	}
 }
 
@@ -70,6 +79,7 @@ let smsRejects = false;
 class SmsChannel implements NotificationChannel<SmsMessage> {
 	public send(notifiable: Notifiable, message: SmsMessage) {
 		if (smsRejects) throw new ChannelRejected('unknown number');
+		if (notifiable.routeNotificationFor('sms') === '+fail') throw new Error('provider down');
 		sms.push({ to: notifiable.routeNotificationFor('sms'), text: message.text });
 		return { ref: 'sms-1' };
 	}
@@ -212,16 +222,71 @@ class Pushed extends Notification {
 		return [['push', 'sms']] as const;
 	}
 
+	public push() {
+		return new SmsMessage('push');
+	}
+
 	public sms() {
 		return new SmsMessage('fallback');
 	}
 }
 
+const audited: object[] = [];
+
+@Notification.channel('audit', { message: LogMessage })
+@Service.register()
+class AuditChannel implements NotificationChannel<LogMessage> {
+	public send(_notifiable: Notifiable, message: LogMessage) {
+		audited.push(this);
+		return message.text;
+	}
+}
+
+@Notification.channel('orphan', { message: LogMessage })
+@Service.register()
+class OrphanChannel implements NotificationChannel<LogMessage> {
+	public send() {}
+}
+
+@Notification.register({ type: 'audited' })
+class Audited extends Notification {
+	public channels() {
+		return ['audit'] as const;
+	}
+
+	public audit() {
+		return new LogMessage('audited');
+	}
+}
+
+@Notification.register({ type: 'orphaned' })
+class Orphaned extends Notification {
+	public channels() {
+		return ['orphan'] as const;
+	}
+
+	public orphan() {
+		return new LogMessage('orphaned');
+	}
+}
+
+@Notification.register({ type: 'invoice.instant', afterCommit: false })
+class InvoiceInstant extends InvoicePaid {}
+
+class AsyncUser extends User {
+	public override routeNotificationFor(channel: string): any {
+		return Promise.resolve(super.routeNotificationFor(channel));
+	}
+}
+
+@Module.register({ jobs: [NotificationJob], services: [AuditChannel] })
+class JobsModule extends Module {}
+
 describe('Notification', () => {
 	let app: TestingApp | undefined;
 	let store: MemoryNotificationStore;
 
-	const boot = async (options: { heracles?: boolean } = {}) => {
+	const boot = async (options: { heracles?: boolean; outbox?: MemoryOutboxStore } = {}) => {
 		store = new MemoryNotificationStore();
 		app = await Application.testing({
 			modules: [
@@ -230,13 +295,16 @@ describe('Notification', () => {
 					: [
 							HeraclesModule.with({
 								queues: { notifications: { transport: MemoryTransport } }
-							})
+							}),
+							JobsModule
 						]),
-				HermesModule.with({ store, mail: { from: 'hello@example.com' } })
+				HermesModule.with({ store, mail: { from: 'hello@example.com' } }),
+				...(options.outbox ? [MoiraiModule.with({ outbox: options.outbox })] : [])
 			] as never[],
 			overrides: {
 				[DATABASE_TRANSACTION_SERVICE]: withUnitOfWork((callback) => callback())
-			}
+			},
+			boot: 'eager'
 		});
 	};
 
@@ -263,6 +331,7 @@ describe('Notification', () => {
 		sms.length = 0;
 		smsRejects = false;
 		users.clear();
+		audited.length = 0;
 	});
 
 	it('keeps it in the inbox and mails it, the first channel of the chain that delivers', async () => {
@@ -281,11 +350,21 @@ describe('Notification', () => {
 			expect(mail.html).toContain('href="https://example.com/i?a=1&amp;b=2"');
 			expect(sms).toEqual([]);
 
-			const page = await Notification.store().list('u1');
+			const page = await Notification.store().list({ notifiableId: 'u1', notifiableType: 'user' });
 			expect(page.items).toMatchObject([
-				{ notifiableId: 'u1', type: 'invoice.paid', data: { invoiceId: 'i1' }, readAt: null }
+				{
+					notifiableId: 'u1',
+					notifiableType: 'user',
+					type: 'invoice.paid',
+					data: { invoiceId: 'i1' },
+					readAt: null
+				}
 			]);
-			expect(page.items[0]!.id).toBe(deliveries[0]!.id);
+			expect(page.items[0]!.deliveryId).toBe(deliveries[0]!.id);
+			expect(deliveries[0]!.result).toEqual({ id: page.items[0]!.id });
+			expect(mail.id).toBe(deliveries[1]!.id);
+			// Another notifiable type does not share the inbox.
+			expect(await store.unreadCount({ notifiableId: 'u1', notifiableType: 'team' })).toBe(0);
 		} finally {
 			mails.restore();
 		}
@@ -356,7 +435,10 @@ describe('Notification', () => {
 				.notifyNow(new InvoicePaid({ invoiceId: 'r' }));
 			expect(deliveries.map((d) => d.channel)).toEqual([null, 'mail']);
 			mails.assertSent('ada@example.com');
-			expect(await store.list('ada@example.com')).toEqual({ items: [], nextCursor: null });
+			expect(await store.list({ notifiableId: 'ada@example.com' })).toEqual({
+				items: [],
+				nextCursor: null
+			});
 		} finally {
 			mails.restore();
 		}
@@ -384,13 +466,13 @@ describe('Notification', () => {
 		await expect(Notification.sendNow(user, new MissingMethod())).rejects.toBeInstanceOf(
 			MissingChannelMessageError
 		);
-		await expect(Notification.sendNow(user, new WrongMessage())).rejects.toBeInstanceOf(
-			InvalidChannelMessageError
-		);
+		const wrong = await Notification.sendNow(user, new WrongMessage()).catch((e) => e);
+		expect(wrong).toBeInstanceOf(NotificationDeliveryError);
+		expect(wrong.failures[0].error).toBeInstanceOf(InvalidChannelMessageError);
 		await expect(Notification.sendNow(user, new UnknownChannel())).rejects.toBeInstanceOf(
 			UnknownChannelError
 		);
-		expect(() => Notification.sendNow(user, new Unregistered())).toThrow(
+		await expect(Notification.sendNow(user, new Unregistered())).rejects.toBeInstanceOf(
 			UnregisteredNotificationError
 		);
 	});
@@ -421,7 +503,7 @@ describe('Notification', () => {
 			await Notification.send(user, new InvoicePaid({ invoiceId: 'f' }));
 			await Notification.send([new User('u2')], new Ping());
 			expect(sms).toEqual([]);
-			expect(await store.unreadCount('u1')).toBe(0);
+			expect(await store.unreadCount({ notifiableId: 'u1', notifiableType: 'user' })).toBe(0);
 			fake.assertSentTo(
 				user,
 				InvoicePaid,
@@ -436,6 +518,126 @@ describe('Notification', () => {
 			fake.restore();
 		}
 		await Notification.send(new User('u1', null), new InvoicePaid({ invoiceId: 'real' }));
+		expect(sms).toHaveLength(1);
+	});
+
+	it('delivers to the other notifiables and entries when one fails', async () => {
+		await boot();
+		const seen = events();
+		try {
+			const error = await Notification.sendNow(
+				[new User('u1', null, '+fail'), new User('u2', null)],
+				new InvoicePaid({ invoiceId: 'p' })
+			).catch((e) => e);
+			expect(error).toBeInstanceOf(NotificationDeliveryError);
+			expect(error.failures).toMatchObject([{ notifiableId: 'u1' }]);
+			expect(error.failures[0].error.message).toBe('provider down');
+			expect(error.deliveries.map((d: { channel: string }) => d.channel)).toEqual([
+				'inbox',
+				'inbox',
+				'sms'
+			]);
+			expect(sms.map((s) => s.text)).toEqual(['paid p fr']);
+			const failed = seen.seen.filter(([name]) => name === HERMES_FAILED);
+			expect(failed.map(([, data]) => (data.error as Error).message)).toEqual(['provider down']);
+		} finally {
+			seen.off();
+		}
+	});
+
+	it('is not failed by a listener that throws', async () => {
+		await boot();
+		const boom = () => {
+			throw new Error('listener');
+		};
+		LifecycleBus.instance.on(HERMES_SENT, boom);
+		try {
+			const deliveries = await Notification.sendNow(
+				new User('u1', null),
+				new InvoicePaid({ invoiceId: 'l' })
+			);
+			expect(deliveries.map((d) => d.channel)).toEqual(['inbox', 'sms']);
+		} finally {
+			LifecycleBus.instance.off(HERMES_SENT, boom);
+		}
+	});
+
+	it('runs a channel listed as a service in its module, and refuses one no module lists', async () => {
+		await boot();
+		await Notification.sendNow(new User('u1'), new Audited());
+		await Notification.sendNow(new User('u1'), new Audited());
+		expect(audited).toHaveLength(2);
+		expect(audited[0]).toBe(audited[1]!);
+		const error = await Notification.sendNow(new User('u1'), new Orphaned()).catch((e) => e);
+		expect(error.failures[0].error).toBeInstanceOf(MissingHermesServiceError);
+	});
+
+	it('refuses a second class for a type or a channel name', () => {
+		expect(() => {
+			@Notification.register({ type: 'invoice.paid' })
+			class Again extends InvoicePaid {}
+			return Again;
+		}).toThrow(DuplicateNotificationTypeError);
+		expect(() => {
+			@Notification.channel('sms', { message: SmsMessage })
+			class OtherSms implements NotificationChannel<SmsMessage> {
+				public send() {}
+			}
+			return OtherSms;
+		}).toThrow(DuplicateChannelError);
+	});
+
+	it('awaits a route that is a promise', async () => {
+		await boot();
+		const mails = Mail.fake();
+		try {
+			const deliveries = await Notification.sendNow(
+				new AsyncUser('u1'),
+				new InvoicePaid({ invoiceId: 'a' })
+			);
+			expect(deliveries.map((d) => d.channel)).toEqual(['inbox', 'mail']);
+			mails.assertSent('u1@example.com');
+		} finally {
+			mails.restore();
+		}
+	});
+
+	it('delivers right away in a unit of work when registered with afterCommit: false', async () => {
+		await boot();
+		await expect(
+			UnitOfWork.run(async () => {
+				await Notification.send(new User('u1', null), new InvoiceInstant({ invoiceId: 'i' }));
+				expect(sms).toHaveLength(1);
+				throw new Error('rollback');
+			})
+		).rejects.toThrow('rollback');
+		expect(sms).toHaveLength(1);
+	});
+
+	it('sends mails with the default sender', async () => {
+		await boot();
+		const mails = Mail.fake();
+		try {
+			await Mail.send({
+				to: [{ address: 'ada@example.com', name: 'Ada' }],
+				subject: 'Hi',
+				text: 'Hi'
+			});
+			expect(mails.sent[0]?.from).toBe('hello@example.com');
+			mails.assertSent((mail) => mail.subject === 'Hi');
+			expect(() => mails.assertSent('bob@example.com')).toThrow(HermesAssertionError);
+		} finally {
+			mails.restore();
+		}
+	});
+
+	it('turns the fakes off when the application stops', async () => {
+		await boot();
+		Notification.fake();
+		Mail.fake();
+		await app!.shutdown();
+		await boot();
+		await Notification.sendNow(new User('u1', null), new InvoicePaid({ invoiceId: 'off' }));
 		expect(sms).toHaveLength(1);
 	});
 
@@ -457,7 +659,7 @@ describe('Notification', () => {
 					'queued q 2026-01-01T00:00:00.000Z +15550100',
 					'queued q 2026-01-01T00:00:00.000Z +15550100'
 				]);
-				expect(await store.unreadCount('u1')).toBe(1);
+				expect(await store.unreadCount({ notifiableId: 'u1', notifiableType: 'user' })).toBe(1);
 			} finally {
 				dispatch.mockRestore();
 			}
@@ -497,6 +699,103 @@ describe('Notification', () => {
 			}
 		});
 
+		it('checks the data before waiting for the unit of work', async () => {
+			await boot();
+			await expect(
+				UnitOfWork.run(async () => {
+					await Notification.send(
+						new User('u1'),
+						new InvoiceQueued({ invoiceId: new Map() as never })
+					);
+				})
+			).rejects.toBeInstanceOf(QueuedNotificationDataError);
+			const fake = Notification.fake();
+			try {
+				await expect(
+					Notification.send(new User('u1'), new InvoiceQueued({ invoiceId: new Map() as never }))
+				).rejects.toBeInstanceOf(QueuedNotificationDataError);
+				fake.assertNothingSent();
+			} finally {
+				fake.restore();
+			}
+		});
+
+		it('dispatches the jobs once the unit of work commits, and none on rollback', async () => {
+			await boot();
+			const dispatch = spyOn(Heracles, 'dispatch');
+			try {
+				await UnitOfWork.run(async () => {
+					await Notification.send(new User('u1', null), new InvoiceQueued({ invoiceId: 'c' }));
+					expect(dispatch).not.toHaveBeenCalled();
+				});
+				expect(dispatch).toHaveBeenCalledTimes(2);
+				expect(dispatch.mock.calls[0]?.[2]?.dispatchId).toStartWith('notification_');
+				await expect(
+					UnitOfWork.run(async () => {
+						await Notification.send(new User('u1', null), new InvoiceQueued({ invoiceId: 'r' }));
+						throw new Error('rollback');
+					})
+				).rejects.toThrow('rollback');
+				expect(dispatch).toHaveBeenCalledTimes(2);
+			} finally {
+				dispatch.mockRestore();
+			}
+		});
+
+		it('stores the jobs in the outbox of the unit of work when there is one', async () => {
+			const outbox = new MemoryOutboxStore();
+			await boot({ outbox });
+			const dispatch = spyOn(Heracles, 'dispatch');
+			try {
+				const user = new User('u1', null);
+				users.set('u1', user);
+				await UnitOfWork.run(async () => {
+					await Notification.send(user, new InvoiceQueued({ invoiceId: 'o' }));
+					expect(outbox.rows.map((row) => row.kind)).toEqual(['heracles.job', 'heracles.job']);
+				});
+				// The outbox relays its rows once the unit commits.
+				expect(dispatch).toHaveBeenCalledTimes(2);
+				await MemoryTransport.settled();
+				expect(sms.map((s) => s.text)).toEqual(['queued o none +15550100']);
+			} finally {
+				dispatch.mockRestore();
+			}
+		});
+
+		it('keeps one inbox row and gives mails the same id when a delivery runs again', async () => {
+			await boot();
+			const mails = Mail.fake();
+			try {
+				const user = new User('u1');
+				users.set('u1', user);
+				const run = await prepareRun(
+					user,
+					new InvoiceQueued({ invoiceId: 'twice' }),
+					'invoice.queued',
+					['inbox', 'mail'],
+					'delivery-1'
+				);
+				await runQueuedNotification(run);
+				await runQueuedNotification({ ...run, chain: ['inbox'] });
+				const mailRun = { ...run, chain: ['mail' as const] };
+				await runQueuedNotification(mailRun);
+				await runQueuedNotification(mailRun);
+				expect(await store.unreadCount({ notifiableId: 'u1', notifiableType: 'user' })).toBe(1);
+				expect(mails.sent.map((mail) => mail.id)).toEqual(['delivery-1', 'delivery-1']);
+			} finally {
+				mails.restore();
+			}
+		});
+
+		it('snapshots a route that is a promise', async () => {
+			await boot();
+			const user = new AsyncUser('u9', null, '+9000');
+			Object.defineProperty(user, 'notifiableType', { value: 'guest' });
+			await Notification.send(user, new InvoiceQueued({ invoiceId: 'p' }));
+			await MemoryTransport.settled();
+			expect(sms.map((s) => s.to)).toEqual(['+9000']);
+		});
+
 		it('refuses data that does not survive JSON', async () => {
 			await boot();
 			await expect(
@@ -522,6 +821,8 @@ describe('Notification', () => {
 describe('MemoryNotificationStore', () => {
 	const row = (id: string, notifiableId = 'u1') => ({
 		id,
+		deliveryId: `d-${id}`,
+		notifiableType: null,
 		notifiableId,
 		type: 't',
 		data: {},
@@ -534,19 +835,22 @@ describe('MemoryNotificationStore', () => {
 		for (const id of ['a', 'b', 'c']) await store.save(row(id));
 		await store.save(row('z', 'u2'));
 		await store.save({ ...row('a'), type: 'again' });
+		await store.save({ ...row('x'), deliveryId: 'd-a' });
+		const u1 = { notifiableId: 'u1' };
+		const u2 = { notifiableId: 'u2' };
 
-		const first = await store.list('u1', { limit: 2 });
+		const first = await store.list(u1, { limit: 2 });
 		expect(first.items.map((r) => r.id)).toEqual(['c', 'b']);
-		const second = await store.list('u1', { limit: 2, cursor: first.nextCursor! });
+		const second = await store.list(u1, { limit: 2, cursor: first.nextCursor! });
 		expect(second).toMatchObject({ items: [{ id: 'a', type: 't' }], nextCursor: null });
 
-		expect(await store.markAsRead('u1', ['b', 'z'])).toBe(1);
-		expect(await store.unreadCount('u1')).toBe(2);
-		expect((await store.list('u1', { unread: true })).items.map((r) => r.id)).toEqual(['c', 'a']);
-		expect(await store.markAllAsRead('u1')).toBe(2);
-		expect(await store.unreadCount('u1')).toBe(0);
-		expect(await store.delete('u1', ['a', 'z'])).toBe(1);
-		expect(await store.unreadCount('u2')).toBe(1);
+		expect(await store.markAsRead(u1, ['b', 'z'])).toBe(1);
+		expect(await store.unreadCount(u1)).toBe(2);
+		expect((await store.list(u1, { unread: true })).items.map((r) => r.id)).toEqual(['c', 'a']);
+		expect(await store.markAllAsRead(u1)).toBe(2);
+		expect(await store.unreadCount(u1)).toBe(0);
+		expect(await store.delete(u1, ['a', 'z'])).toBe(1);
+		expect(await store.unreadCount(u2)).toBe(1);
 	});
 });
 

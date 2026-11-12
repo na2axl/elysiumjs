@@ -20,8 +20,12 @@ import { Port } from '../port';
  * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type StoredNotification = {
-	/** The id of the delivery: sortable by time. */
+	/** Its id: sortable by the time it was kept. */
 	readonly id: string;
+	/** The id of the delivery that kept it: keeping the same delivery again changes nothing. */
+	readonly deliveryId: string;
+	/** The `notifiableType` of who it belongs to, or `null`. */
+	readonly notifiableType: string | null;
 	/** Who it belongs to. */
 	readonly notifiableId: string;
 	/** The type of the notification. */
@@ -33,6 +37,16 @@ export type StoredNotification = {
 	/** When it was kept. */
 	readonly createdAt: Date;
 };
+
+/**
+ * Whose inbox: a `notifiableId`, and the `notifiableType` when notifiables have one, since two
+ * types may share ids. A notifiable with an id fits.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export type InboxOwner = { readonly notifiableId: string; readonly notifiableType?: string };
+
+/** The `notifiableType` of an owner, as it is stored. */
+export const ownerType = (owner: InboxOwner): string | null => owner.notifiableType ?? null;
 
 /**
  * A page of an inbox, newest first.
@@ -63,23 +77,23 @@ export type InboxQuery = {
  * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface NotificationStoreDriver {
-	/** Keeps a notification; keeping the same id again changes nothing. */
+	/** Keeps a notification; keeping the same delivery id again changes nothing. */
 	save(notification: StoredNotification): Promise<void>;
 
-	/** A page of the notifications of a notifiable, newest first. */
-	list(notifiableId: string, query?: InboxQuery): Promise<InboxPage>;
+	/** A page of the notifications of an owner, newest first. */
+	list(owner: InboxOwner, query?: InboxQuery): Promise<InboxPage>;
 
-	/** How many notifications of a notifiable are unread. */
-	unreadCount(notifiableId: string): Promise<number>;
+	/** How many notifications of an owner are unread. */
+	unreadCount(owner: InboxOwner): Promise<number>;
 
-	/** Marks notifications of a notifiable as read, and answers how many changed. */
-	markAsRead(notifiableId: string, ids: readonly string[]): Promise<number>;
+	/** Marks notifications of an owner as read, and answers how many changed. */
+	markAsRead(owner: InboxOwner, ids: readonly string[]): Promise<number>;
 
-	/** Marks every notification of a notifiable as read, and answers how many changed. */
-	markAllAsRead(notifiableId: string): Promise<number>;
+	/** Marks every notification of an owner as read, and answers how many changed. */
+	markAllAsRead(owner: InboxOwner): Promise<number>;
 
-	/** Deletes notifications of a notifiable, and answers how many were deleted. */
-	delete(notifiableId: string, ids: readonly string[]): Promise<number>;
+	/** Deletes notifications of an owner, and answers how many were deleted. */
+	delete(owner: InboxOwner, ids: readonly string[]): Promise<number>;
 }
 
 declare module '../port' {
@@ -114,12 +128,15 @@ export class MemoryNotificationStore implements NotificationStoreDriver {
 	readonly #rows = new Map<string, StoredNotification>();
 
 	public async save(notification: StoredNotification): Promise<void> {
-		if (!this.#rows.has(notification.id)) this.#rows.set(notification.id, { ...notification });
+		const kept = [...this.#rows.values()].some((row) => row.deliveryId === notification.deliveryId);
+		if (!kept && !this.#rows.has(notification.id)) {
+			this.#rows.set(notification.id, { ...notification });
+		}
 	}
 
-	public async list(notifiableId: string, query: InboxQuery = {}): Promise<InboxPage> {
+	public async list(owner: InboxOwner, query: InboxQuery = {}): Promise<InboxPage> {
 		const limit = query.limit ?? DEFAULT_INBOX_LIMIT;
-		const rows = this.#of(notifiableId)
+		const rows = this.#of(owner)
 			.filter((row) => !query.unread || row.readAt === null)
 			.filter((row) => query.cursor === undefined || row.id < query.cursor)
 			.sort((a, b) => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
@@ -127,28 +144,31 @@ export class MemoryNotificationStore implements NotificationStoreDriver {
 		return { items, nextCursor: rows.length > limit ? items[items.length - 1]!.id : null };
 	}
 
-	public async unreadCount(notifiableId: string): Promise<number> {
-		return this.#of(notifiableId).filter((row) => row.readAt === null).length;
+	public async unreadCount(owner: InboxOwner): Promise<number> {
+		return this.#of(owner).filter((row) => row.readAt === null).length;
 	}
 
-	public async markAsRead(notifiableId: string, ids: readonly string[]): Promise<number> {
+	public async markAsRead(owner: InboxOwner, ids: readonly string[]): Promise<number> {
 		const wanted = new Set(ids);
-		return this.#read(this.#of(notifiableId).filter((row) => wanted.has(row.id)));
+		return this.#read(this.#of(owner).filter((row) => wanted.has(row.id)));
 	}
 
-	public async markAllAsRead(notifiableId: string): Promise<number> {
-		return this.#read(this.#of(notifiableId));
+	public async markAllAsRead(owner: InboxOwner): Promise<number> {
+		return this.#read(this.#of(owner));
 	}
 
-	public async delete(notifiableId: string, ids: readonly string[]): Promise<number> {
+	public async delete(owner: InboxOwner, ids: readonly string[]): Promise<number> {
 		const wanted = new Set(ids);
-		const rows = this.#of(notifiableId).filter((row) => wanted.has(row.id));
+		const rows = this.#of(owner).filter((row) => wanted.has(row.id));
 		for (const row of rows) this.#rows.delete(row.id);
 		return rows.length;
 	}
 
-	#of(notifiableId: string): StoredNotification[] {
-		return [...this.#rows.values()].filter((row) => row.notifiableId === notifiableId);
+	#of(owner: InboxOwner): StoredNotification[] {
+		const type = ownerType(owner);
+		return [...this.#rows.values()].filter(
+			(row) => row.notifiableId === owner.notifiableId && row.notifiableType === type
+		);
 	}
 
 	#read(rows: StoredNotification[]): number {

@@ -18,7 +18,7 @@ import type { Notifiable } from './notifiable';
 import { getLogger } from '../logger';
 import { Port } from '../port';
 import { Service } from '../service';
-import { HERMES_MAIL_TRANSPORT } from './config';
+import { HERMES_MAIL_TRANSPORT, HERMES_OPTIONS } from './config';
 import {
 	HermesAssertionError,
 	HermesServiceMissingError,
@@ -30,6 +30,11 @@ import {
  * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type MailEnvelope = {
+	/**
+	 * The id of the notification delivery that sends the mail: the same when a queued delivery
+	 * runs again, so that a transport can drop the second mail, such as with an idempotency key.
+	 */
+	readonly id?: string;
 	readonly to: readonly MailAddress[];
 	readonly from?: MailAddress;
 	readonly replyTo?: MailAddress;
@@ -225,6 +230,11 @@ export class MailFake {
 	public restore(): void {
 		if (mailFake === this) mailFake = null;
 	}
+
+	/** Restores, for `using mails = Mail.fake()`. */
+	public [Symbol.dispose](): void {
+		this.restore();
+	}
 }
 
 let mailFake: MailFake | null = null;
@@ -244,10 +254,13 @@ let mailFake: MailFake | null = null;
  */
 export namespace Mail {
 	/**
-	 * Sends a mail, or records it while `Mail.fake()` is on.
+	 * Sends a mail, or records it while `Mail.fake()` is on. A mail without a sender gets the
+	 * `from` of `HermesModule`.
 	 * @throws {HermesServiceMissingError} When no module provides the mail transport.
 	 */
-	export const send = async (mail: MailEnvelope): Promise<MailReceipt> => {
+	export const send = async (envelope: MailEnvelope): Promise<MailReceipt> => {
+		const from = envelope.from ?? Service.get<{ from?: MailAddress }>(HERMES_OPTIONS)?.from;
+		const mail = from === undefined ? envelope : { ...envelope, from };
 		if (mailFake) {
 			mailFake.sent.push(mail);
 			return {};
@@ -263,3 +276,8 @@ export namespace Mail {
 		return mailFake;
 	};
 }
+
+/** Turns `Mail.fake()` off, such as when the application stops. */
+export const restoreMailFake = (): void => {
+	mailFake = null;
+};

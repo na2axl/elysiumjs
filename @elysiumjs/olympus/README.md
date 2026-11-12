@@ -24,6 +24,7 @@ Add a runtime package too: `@elysiumjs/bun`, `@elysiumjs/node` or `@elysiumjs/wo
 | `@elysiumjs/olympus/harpocrates`     | Secrets and cryptography: password hashing (`Password` and the `PasswordHasher` port), encryption (the `Cipher` port), JWTs, signed URLs and hashing helpers.                                                           |
 | `@elysiumjs/olympus/cerberus`        | Ability-based roles and permissions.                                                                                                                                                                                    |
 | `@elysiumjs/olympus/hermes`          | Notifications: channels with fallback chains, the inbox, mail and broadcast channels, queued notifications and test fakes.                                                                                              |
+| `@elysiumjs/olympus/hermes/heracles` | `NotificationJob`, which delivers queued notifications. List it in a module's `jobs`.                                                                                                                                   |
 
 Database drivers, stores and runtimes ship as separate packages, such as `@elysiumjs/drizzle` and `@elysiumjs/redis`.
 
@@ -566,13 +567,13 @@ A notification is a class built with its data. `channels()` says where it goes f
 ```ts
 import type { Notifiable } from '@elysiumjs/olympus/hermes';
 
-import { InboxMessage, MailMessage, Notification } from '@elysiumjs/olympus/hermes';
+import { InboxMessage, LogMessage, MailMessage, Notification } from '@elysiumjs/olympus/hermes';
 
 @Notification.register({ type: 'invoice.paid', queue: 'notifications' })
 export class InvoicePaid extends Notification<{ invoiceId: string; amount: number }> {
 	public channels() {
-		// Keep it in the inbox, and send a mail, or an SMS when no mail can go.
-		return ['inbox', ['mail', 'sms']] as const;
+		// Keep it in the inbox, and send a mail, or write to the log when no mail can go.
+		return ['inbox', ['mail', 'log']] as const;
 	}
 
 	public canSend(notifiable: Notifiable, channel: string) {
@@ -590,6 +591,10 @@ export class InvoicePaid extends Notification<{ invoiceId: string; amount: numbe
 			.line(`We received ${this.data.amount}.`)
 			.action('See the invoice', `https://example.com/invoices/${this.data.invoiceId}`);
 	}
+
+	public log() {
+		return new LogMessage('An invoice was paid, with no mail address to send it to');
+	}
 }
 
 await Notification.send(user, new InvoicePaid({ invoiceId, amount: 1200 }));
@@ -598,19 +603,29 @@ await Notification.route('mail', 'ada@example.com').notify(
 );
 ```
 
-A notifiable implements `Notifiable`: a `notifiableId` (the key of its inbox), `routeNotificationFor(channel)` (an address, a phone number, or `null`) and, optionally, `preferredLocale()`. `Notification.route()` reaches someone at an address only, with no inbox.
+A notifiable implements `Notifiable`: a `notifiableId` (the key of its inbox), an optional `notifiableType`, `routeNotificationFor(channel)` (an address, a phone number, or `null`, or a promise of it) and, optionally, `preferredLocale()`. `Notification.route()` reaches someone at an address only, with no inbox.
 
-A channel of the chain is passed over when `canSend()` refuses it, when the channel is not available (`isAvailable()`), or when it throws `ChannelRejected`; any other error fails the delivery. `@Notification.register()` type-checks each channel method against the message its channel accepts, and each message is checked again when it is sent.
+`@Notification.register()` type-checks that the class has a method for each channel its `channels()` names, answering the message that channel accepts, and that its constructor takes its data only. A channel of a chain is passed over when `canSend()` refuses it, when the channel is not available (`isAvailable()`), or when it throws `ChannelRejected`; any other error fails that delivery.
 
-- `Notification.send()` queues the notification when it is registered with a `queue`, and delivers it right away otherwise. In a unit of work, it waits for the commit and is dropped on rollback, unless registered with `afterCommit: false`.
+- `Notification.send()` checks the channels first, and for a queued notification its data and routes, so that a mistake throws at the call. It then queues the notification when it is registered with a `queue`, and delivers it right away otherwise. In a unit of work, it waits for the commit and is dropped on rollback, unless registered with `afterCommit: false`; a delivery that fails after the commit is logged.
 - `Notification.sendNow()` delivers right away and answers, for each notifiable and entry, the channel that delivered it (`null` when none could).
-- The channels emit `elysium:hermes:sending`, `elysium:hermes:sent` and `elysium:hermes:failed`, with the notification, the notifiable, the message, and what the channel answered or the error.
+- A delivery that fails does not stop the others: once they are done, `NotificationDeliveryError` lists the failures, with the deliveries that went through.
+- The channels emit `elysium:hermes:sending`, `elysium:hermes:sent` and `elysium:hermes:failed`, with the notification, the notifiable, the message, and what the channel answered or the error. A listener that throws is logged, and does not fail the delivery.
 
 ### Queued notifications
 
-A queued notification becomes one Heracles job per notifiable and per entry; a fallback chain runs in order inside its job. `delay` (in milliseconds, or one per channel) holds the job back. Import `HeraclesModule` with the queue, and `HermesModule`, which runs the job.
+A queued notification becomes one Heracles job per notifiable and per entry; a fallback chain runs in order inside its job. List `NotificationJob` from `@elysiumjs/olympus/hermes/heracles` in a module's `jobs`, next to `HeraclesModule` and its queue:
 
-The job rebuilds the notification from its type and data, so its constructor takes its data only, and the data must pass `Json.survives()`: plain data and dates. The notifiable is recorded as its id, its routes for the channels of the entry and its locale. A notifiable with a `notifiableType` is read again in the job through the resolver registered for that type, so that the job sees its current routes and preferences; a resolver that answers `null` drops the notification:
+```ts
+import { NotificationJob } from '@elysiumjs/olympus/hermes/heracles';
+
+@Module.register({ jobs: [NotificationJob] })
+class AppModule extends Module {}
+```
+
+`delay` (in milliseconds, or one per channel, read from the first channel of the entry), `priority` and `maxRetries` in `@Notification.register()` apply to its jobs. In a unit of work, the jobs go to the outbox of moirai when the module has one, so that they are dispatched once the unit commits even if the process stops in between; without an outbox, they are dispatched after the commit.
+
+The job rebuilds the notification from its type and data, so the data must pass `Json.survives()`. The notifiable is recorded as its id, its type, its locale and its routes for the channels of the entry, which travel in clear on the queue. In the job, `canSend()`, the channels and the channel methods receive that record, unless a resolver is registered for the `notifiableType`: the notifiable is then read again, so that the job sees its current routes and preferences, and a resolver that answers `null` drops the notification:
 
 ```ts
 @Notification.resolver('user')
@@ -624,6 +639,8 @@ export class UserResolver implements NotifiableResolver {
 	}
 }
 ```
+
+A job may run more than once. Each delivery has an id, kept with the job: the inbox keeps one notification per delivery id, and mail transports receive it as `id`, to drop a second mail. With the inbox store of moirai and a database, a delivery that completed is recorded and does not run again.
 
 ### Channels
 
@@ -649,12 +666,13 @@ declare module '@elysiumjs/olympus/hermes' {
 
 @Notification.channel('sms', { message: SmsMessage })
 export class SmsChannel implements NotificationChannel<SmsMessage> {
-	isAvailable(notifiable: Notifiable) {
-		return notifiable.routeNotificationFor('sms') !== null;
+	async isAvailable(notifiable: Notifiable) {
+		return (await notifiable.routeNotificationFor('sms')) !== null;
 	}
 
-	async send(notifiable: Notifiable, message: SmsMessage) {
-		const response = await provider.send(notifiable.routeNotificationFor('sms'), message.text);
+	async send(notifiable: Notifiable, message: SmsMessage, context: ChannelContext) {
+		const to = await notifiable.routeNotificationFor('sms');
+		const response = await provider.send(to, message.text, { idempotencyKey: context.id });
 		if (response.status === 400) throw new ChannelRejected('Unknown number');
 		return { id: response.id };
 	}
@@ -673,29 +691,27 @@ HermesModule.with({
 	mail: { transport: () => new SmtpTransport(), from: 'Example <hello@example.com>' }
 });
 
-const page = await Notification.store().list(userId, { unread: true, limit: 20 });
-await Notification.store().markAsRead(userId, [page.items[0].id]);
+const owner = { notifiableId: user.id, notifiableType: 'user' };
+const page = await Notification.store().list(owner, { unread: true, limit: 20 });
+await Notification.store().markAsRead(owner, [page.items[0].id]);
 ```
 
-The store pages newest first, counts unread notifications, marks them as read and deletes them. The `basic` renderer lays out the greeting, lines, buttons and salutation as text and HTML; a message drawn with `view(name, data)` needs a renderer of the app, given as `mail.renderer`, that implements `MailRendererDriver`. `Mail.send()` sends a mail through the transport outside notifications too.
+An inbox belongs to a `notifiableId` and its `notifiableType`, since two types may share ids. The store pages newest first, by the time each notification was kept, counts unread notifications, marks them as read and deletes them. The `basic` renderer lays out the greeting, lines, buttons and salutation as text and HTML; a message drawn with `view(name, data)` needs a renderer of the app, given as `mail.renderer`, that implements `MailRendererDriver`. `Mail.send()` sends a mail through the transport outside notifications too, with the default sender when the mail names none.
 
 ### Notifications in tests
 
 ```ts
-const notifications = Notification.fake();
-const mails = Mail.fake();
+using notifications = Notification.fake();
+using mails = Mail.fake();
 
 await Moirai.execute(PayInvoice, { invoiceId });
 
 notifications.assertSentTo(user, InvoicePaid, (n) => n.data.invoiceId === invoiceId);
 notifications.assertNotSentTo(admin, InvoicePaid);
 mails.assertNothingSent();
-
-notifications.restore();
-mails.restore();
 ```
 
-A faked notification records what `channels()` answered for each notifiable, and delivers nothing.
+A faked notification records what `channels()` answered for each notifiable, and delivers nothing; a queued one still has its data and routes checked. `restore()`, or the end of a `using` block, turns a fake off, and `HermesModule` turns both off when the application stops.
 
 ## Services
 

@@ -23,8 +23,8 @@ import {
 	HERMES_NOTIFICATION_STORE,
 	HERMES_OPTIONS
 } from './config';
-import { NotificationJob } from './job';
-import { MailRenderer, MailTransport } from './mail';
+import { restoreNotificationFake } from './fake';
+import { MailRenderer, MailTransport, restoreMailFake } from './mail';
 import { NotificationStore } from './store';
 
 type Option<T> = T | (() => T);
@@ -53,7 +53,8 @@ export type HermesModuleConfig = {
 
 /**
  * Provides the notification store, the mail transport and the mail renderer to the whole
- * application, and runs queued notifications when `HeraclesModule` is loaded too.
+ * application. Queued notifications also need `HeraclesModule` and `NotificationJob` from
+ * `@elysiumjs/olympus/hermes/heracles` in a module's jobs.
  * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
@@ -81,7 +82,12 @@ export type HermesModuleConfig = {
 			factory: () => build(config.mail?.renderer ?? (() => MailRenderer.for('basic')))
 		},
 		{ name: HERMES_OPTIONS, global: true, factory: () => ({ from: config.mail?.from }) }
-	],
-	jobs: [NotificationJob]
+	]
 })
-export class HermesModule extends Module.configurable<HermesModuleConfig>() {}
+export class HermesModule extends Module.configurable<HermesModuleConfig>() {
+	/** Turns the fakes off, so that a test that forgets to restore them does not leak them. */
+	public override onDestroy(): void {
+		restoreNotificationFake();
+		restoreMailFake();
+	}
+}

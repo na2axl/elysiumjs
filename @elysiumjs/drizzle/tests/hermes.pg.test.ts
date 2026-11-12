@@ -32,6 +32,8 @@ describe('notificationsTable', () => {
 		const config = getTableConfig(table);
 		expect(config.columns.map((c) => c.name)).toEqual([
 			'id',
+			'delivery_id',
+			'notifiable_type',
 			'notifiable_id',
 			'type',
 			'data',
@@ -39,6 +41,7 @@ describe('notificationsTable', () => {
 			'created_at'
 		]);
 		expect(config.indexes.map((i) => i.config.name)).toEqual([
+			'pg_hermes_notifications_delivery_uq',
 			'pg_hermes_notifications_notifiable_idx',
 			'pg_hermes_notifications_unread_idx'
 		]);
@@ -56,6 +59,8 @@ describe.skipIf(!url)('DrizzleNotificationStore on PostgreSQL', () => {
 	const store = NotificationStore.for('drizzle', { table });
 	const row = (id: string, notifiableId = 'u1') => ({
 		id,
+		deliveryId: `d-${id}`,
+		notifiableType: null,
 		notifiableId,
 		type: 'invoice.paid',
 		data: { id },
@@ -67,7 +72,7 @@ describe.skipIf(!url)('DrizzleNotificationStore on PostgreSQL', () => {
 		Service.instance('db.connection.default', db);
 		await db.execute(sql`drop table if exists pg_hermes_notifications`);
 		await db.execute(
-			sql`create table pg_hermes_notifications (id text primary key, notifiable_id text not null, type text not null, data jsonb not null, read_at timestamptz, created_at timestamptz not null)`
+			sql`create table pg_hermes_notifications (id text primary key, delivery_id text not null unique, notifiable_type text, notifiable_id text not null, type text not null, data jsonb not null, read_at timestamptz, created_at timestamptz not null)`
 		);
 	});
 
@@ -86,21 +91,26 @@ describe.skipIf(!url)('DrizzleNotificationStore on PostgreSQL', () => {
 		for (const id of ['a', 'b', 'c']) await store.save(row(id));
 		await store.save(row('z', 'u2'));
 		await store.save({ ...row('a'), type: 'again' });
+		await store.save({ ...row('x'), deliveryId: 'd-a' });
+		await store.save({ ...row('t'), notifiableType: 'team' });
+		const u1 = { notifiableId: 'u1' };
+		const u2 = { notifiableId: 'u2' };
 
-		const first = await store.list('u1', { limit: 2 });
+		const first = await store.list(u1, { limit: 2 });
 		expect(first.items.map((r) => r.id)).toEqual(['c', 'b']);
 		expect(first.items[0]).toEqual(row('c'));
-		const second = await store.list('u1', { limit: 2, cursor: first.nextCursor! });
+		const second = await store.list(u1, { limit: 2, cursor: first.nextCursor! });
 		expect(second).toMatchObject({ items: [{ id: 'a', type: 'invoice.paid' }], nextCursor: null });
 
-		expect(await store.markAsRead('u1', ['b', 'z'])).toBe(1);
-		expect(await store.markAsRead('u1', [])).toBe(0);
-		expect(await store.unreadCount('u1')).toBe(2);
-		expect((await store.list('u1', { unread: true })).items.map((r) => r.id)).toEqual(['c', 'a']);
-		expect((await store.list('u1')).items.find((r) => r.id === 'b')?.readAt).toBeInstanceOf(Date);
-		expect(await store.markAllAsRead('u1')).toBe(2);
-		expect(await store.unreadCount('u1')).toBe(0);
-		expect(await store.delete('u1', ['a', 'z'])).toBe(1);
-		expect(await store.unreadCount('u2')).toBe(1);
+		expect(await store.markAsRead(u1, ['b', 'z'])).toBe(1);
+		expect(await store.markAsRead(u1, [])).toBe(0);
+		expect(await store.unreadCount(u1)).toBe(2);
+		expect((await store.list(u1, { unread: true })).items.map((r) => r.id)).toEqual(['c', 'a']);
+		expect((await store.list(u1)).items.find((r) => r.id === 'b')?.readAt).toBeInstanceOf(Date);
+		expect(await store.markAllAsRead(u1)).toBe(2);
+		expect(await store.unreadCount(u1)).toBe(0);
+		expect(await store.delete(u1, ['a', 'z'])).toBe(1);
+		expect(await store.unreadCount(u2)).toBe(1);
+		expect(await store.unreadCount({ notifiableId: 'u1', notifiableType: 'team' })).toBe(1);
 	});
 });

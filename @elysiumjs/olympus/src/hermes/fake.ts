@@ -128,6 +128,11 @@ export class NotificationFake {
 	public restore(): void {
 		if (current === this) current = null;
 	}
+
+	/** Restores, for `using notifications = Notification.fake()`. */
+	public [Symbol.dispose](): void {
+		this.restore();
+	}
 }
 
 let current: NotificationFake | null = null;
@@ -139,4 +144,9 @@ export const currentNotificationFake = (): NotificationFake | null => current;
 export const startNotificationFake = (): NotificationFake => {
 	current = new NotificationFake();
 	return current;
+};
+
+/** Turns `Notification.fake()` off, such as when the application stops. */
+export const restoreNotificationFake = (): void => {
+	current = null;
 };
