@@ -14,7 +14,13 @@
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { DATABASE_TRANSACTION_SERVICE, Service } from '../../src/index';
+import {
+	Application,
+	DATABASE_TRANSACTION_SERVICE,
+	Module,
+	ModuleContext,
+	Service
+} from '../../src/index';
 import {
 	AbstractModel,
 	Listing,
@@ -130,6 +136,56 @@ describe('Repository on the memory backend', () => {
 		expect(await repository.deleteWhere((book) => book.pages > 415)).toBe(1);
 		expect((await repository.all()).map((book) => book.id)).toEqual(['b1']);
 	});
+
+	it('needs a scope to delete by one', async () => {
+		const repository = await seed();
+		await expect(repository.deleteWhere(undefined as never)).rejects.toThrow('use deleteAll()');
+		expect(await repository.count()).toBe(3);
+	});
+
+	it('refuses a second row with the same key', async () => {
+		const repository = await seed();
+		await expect(
+			repository.insert({ id: 'b1', title: 'Again', pages: 1, author: 'x' })
+		).rejects.toThrow('already has a row with the key');
+		await expect(repository.update('b2', { id: 'b1' })).rejects.toThrow(
+			'already has a row with the key'
+		);
+		expect(await repository.find('b2')).toMatchObject({ title: 'Emma' });
+	});
+
+	it('compares values strictly, and dates by time', async () => {
+		type Event = { id: string; at: Date; tags: string[]; code: unknown };
+		class EventModel extends MemoryModel<Event>('events') {}
+		class EventRepository extends Repository(EventModel) {}
+		const repository = new EventRepository();
+		await repository.insert({ id: 'e1', at: new Date('2026-01-01'), tags: ['a'], code: 10 });
+		await repository.insert({ id: 'e2', at: new Date('2026-02-01'), tags: ['b'], code: '10' });
+
+		expect(await repository.findBy('at', new Date('2026-01-01'))).toMatchObject({ id: 'e1' });
+		expect(await repository.findBy('tags', ['b'])).toMatchObject({ id: 'e2' });
+		expect(await repository.findBy('code', '10')).toMatchObject({ id: 'e2' });
+		expect(await repository.findBy('code', 10)).toMatchObject({ id: 'e1' });
+	});
+
+	it('sorts missing values last in ascending order and first in descending order', async () => {
+		type Score = { id: string; points: number | null };
+		class ScoreModel extends MemoryModel<Score>('scores') {}
+		class ScoreRepository extends Repository(ScoreModel) {}
+		const repository = new ScoreRepository();
+		for (const [id, points] of [
+			['a', 9],
+			['b', null],
+			['c', 100]
+		] as const) {
+			await repository.insert({ id, points });
+		}
+		const spec = { pagination: 'cursor', sort: ['points'], limit: { default: 5 } } as const;
+		const ids = async (sort: string) =>
+			(await repository.list(Listing.parse(spec, { sort }))).data.map((row) => row.id);
+		expect(await ids('points')).toEqual(['a', 'c', 'b']);
+		expect(await ids('-points')).toEqual(['b', 'c', 'a']);
+	});
 });
 
 describe('Repository keys', () => {
@@ -139,6 +195,15 @@ describe('Repository keys', () => {
 		expect(await repository.find({ userId: 'u1', creatorId: 'c1' })).toMatchObject({ since: 1 });
 		await expect(repository.find('u1')).rejects.toBeInstanceOf(RepositoryKeyError);
 		await expect(repository.find({ userId: 'u1' })).rejects.toThrow('misses creatorId');
+	});
+
+	it('takes a value that is not a plain object as the value of a single-column key', async () => {
+		type Day = { day: Date; visits: number };
+		class DayModel extends MemoryModel<Day>('days', { key: ['day'] }) {}
+		class DayRepository extends Repository(DayModel) {}
+		const repository = new DayRepository();
+		await repository.insert({ day: new Date('2026-03-01'), visits: 3 });
+		expect(await repository.find(new Date('2026-03-01') as never)).toMatchObject({ visits: 3 });
 	});
 
 	it('refuses keys for a table without one, unless the repository names them', async () => {
@@ -282,12 +347,18 @@ describe('Repository events', () => {
 		expect(await repository.delete('b2')).toMatchObject({ id: 'b2' });
 	});
 
-	it('calls the methods of an observer, resolved from the container when registered', async () => {
+	it('calls the methods of an observer built once when it is not a service', async () => {
 		class ObservedRepository extends Repository(BookModel) {}
 		const calls: string[] = [];
 
 		@Repository.observer(ObservedRepository)
 		class BookObserver {
+			public static instances = 0;
+
+			constructor() {
+				BookObserver.instances++;
+			}
+
 			public creating({ data }: { data: Partial<Book> }) {
 				calls.push(`creating:${data.id}`);
 				if (data.title === 'No') return new Error('no');
@@ -302,31 +373,128 @@ describe('Repository events', () => {
 			}
 		}
 
-		@Service.register()
-		class InjectedObserver {
-			public static instances = 0;
-
-			constructor() {
-				InjectedObserver.instances++;
-			}
-
-			public updated() {
-				calls.push('updated');
-			}
-		}
-		Repository.observer(ObservedRepository)(InjectedObserver);
-
 		const repository = new ObservedRepository();
 		await repository.insert({ id: 'o', title: 'Yes', pages: 1, author: 'x' });
 		await expect(
 			repository.insert({ id: 'p', title: 'No', pages: 1, author: 'x' })
 		).rejects.toThrow('no');
-		await repository.update('o', { pages: 2 });
 		await repository.delete('o');
-		expect(calls).toEqual(['creating:o', 'created:o', 'creating:p', 'updated', 'deleted:o']);
-		expect(BookObserver).toBeFunction();
-		expect(InjectedObserver.instances).toBe(1);
-		Service.remove(InjectedObserver);
+		expect(calls).toEqual(['creating:o', 'created:o', 'creating:p', 'deleted:o']);
+		expect(BookObserver.instances).toBe(1);
+	});
+
+	it('resolves an observer service from the container, in the module that declares it', async () => {
+		class ObservedRepository extends Repository(BookModel) {
+			public static override readonly afterCommit = false;
+		}
+		const calls: string[] = [];
+
+		@Service.register({ name: 'test.audit' })
+		class Audit {
+			public record(entry: string) {
+				calls.push(entry);
+			}
+		}
+
+		@Service.register()
+		@Repository.observer(ObservedRepository)
+		class AuditObserver {
+			constructor(@Service.inject('test.audit') private readonly audit: Audit) {}
+
+			public updated({ row }: { row: Book }) {
+				this.audit.record(`updated:${row.id}:${ModuleContext.current()?.id}`);
+			}
+		}
+
+		@Module.register({ services: [Audit, AuditObserver] })
+		class AuditModule extends Module {}
+
+		const repository = await seed(new ObservedRepository());
+		await expect(repository.update('b1', { pages: 1 })).rejects.toThrow(
+			'is registered as a service but is not in the container'
+		);
+
+		const app = await Application.testing({ modules: [AuditModule] });
+		try {
+			await repository.update('b1', { pages: 2 });
+			expect(calls).toEqual([`updated:b1:${Service.ownersOf(AuditObserver)[0]!.id}`]);
+		} finally {
+			await app.shutdown();
+		}
+	});
+
+	it('runs the listeners of a parent repository class for its subclasses', async () => {
+		class ParentRepository extends Repository(BookModel) {}
+		class ChildRepository extends ParentRepository {}
+		const calls: string[] = [];
+		ParentRepository.on('created', ({ row }) => void calls.push(`parent:${row.id}`));
+		ChildRepository.on('created', ({ row }) => void calls.push(`child:${row.id}`));
+
+		await new ChildRepository().insert({ id: 'c', title: 'C', pages: 1, author: 'x' });
+		await new ParentRepository().insert({ id: 'p', title: 'P', pages: 1, author: 'x' });
+		expect(calls).toEqual(['parent:c', 'child:c', 'parent:p']);
+	});
+
+	it('runs the -ing listeners in order, and stops at the first refusal', async () => {
+		class OrderedRepository extends Repository(BookModel) {}
+		const calls: string[] = [];
+		OrderedRepository.on('creating', async ({ data }) => {
+			await new Promise((resolve) => setTimeout(resolve, 5));
+			calls.push('first');
+			data.author = 'First';
+		});
+		OrderedRepository.on('creating', ({ data }) => {
+			calls.push(`second:${data.author}`);
+			if (data.title === 'No') return new Error('refused by second');
+		});
+		OrderedRepository.on('creating', () => void calls.push('third'));
+		const repository = new OrderedRepository();
+
+		expect(await repository.insert({ id: 'a', title: 'Yes', pages: 1 })).toMatchObject({
+			author: 'First'
+		});
+		await expect(repository.insert({ id: 'b', title: 'No', pages: 1 })).rejects.toThrow(
+			'refused by second'
+		);
+		expect(calls).toEqual(['first', 'second:First', 'third', 'first', 'second:First']);
+	});
+
+	it('throws the error a listener throws, as it is', async () => {
+		class ThrowingRepository extends Repository(BookModel) {
+			public static override readonly afterCommit = false;
+		}
+		ThrowingRepository.on('creating', ({ data }) => {
+			if (data.title === 'Boom') throw new TypeError('boom');
+		});
+		ThrowingRepository.on('created', ({ row }) => {
+			if (row.title === 'Late') throw new RangeError('late');
+		});
+		const repository = new ThrowingRepository();
+
+		await expect(repository.insert({ id: 'a', title: 'Boom', pages: 1 })).rejects.toBeInstanceOf(
+			TypeError
+		);
+		await expect(repository.insert({ id: 'b', title: 'Late', pages: 1 })).rejects.toBeInstanceOf(
+			RangeError
+		);
+	});
+
+	it('skips the -ed listeners when the unit of work rolls back', async () => {
+		Service.instance(
+			DATABASE_TRANSACTION_SERVICE,
+			withUnitOfWork((callback) => callback())
+		);
+		class RolledBackRepository extends Repository(BookModel) {}
+		const events: string[] = [];
+		RolledBackRepository.on('created', ({ row }) => void events.push(row.id));
+
+		await expect(
+			UnitOfWork.run(async () => {
+				await new RolledBackRepository().insert({ id: 'r', title: 'R', pages: 1, author: 'x' });
+				throw new Error('rollback');
+			})
+		).rejects.toThrow('rollback');
+		expect(events).toEqual([]);
 	});
 });
 
@@ -346,6 +514,19 @@ describe('Pruner', () => {
 		await job.run();
 		expect(job.pruned).toBe(3);
 		expect(await repository.all()).toEqual([]);
+	});
+
+	it('prunes nothing when its scope is undefined', async () => {
+		const repository = await seed();
+		class PruneNothing extends Pruner(BookModel) {
+			protected get prunable() {
+				return undefined;
+			}
+		}
+		const job = new PruneNothing();
+		await job.run();
+		expect(job.pruned).toBe(0);
+		expect(await repository.count()).toBe(3);
 	});
 
 	it('gives each chunk to its pruning() hook before it deletes it', async () => {

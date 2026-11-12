@@ -330,19 +330,19 @@ await books.update(book.id, { title: 'Dune Messiah' });
 const page = await books.list(query); // a ParsedQuery from Listing.parse()
 ```
 
-`find`, `update`, `delete` and `exists` take the key of a row: its value, or an object of the values of its key columns when the key spans several. Custom queries use `this.db`, the backend's own connection, typed for it (the Drizzle connection for Drizzle models). The scope that `list()`, `count()` and `deleteWhere()` take is a condition in the backend's terms: an SQL condition with Drizzle, a predicate in memory. The memory backend does not join transactions: a rolled-back unit of work keeps its rows.
+`find`, `update`, `delete` and `exists` take the key of a row: its value, or an object of the values of its key columns when the key spans several. Custom queries use `this.db`, the backend's own connection, typed for it (the Drizzle connection for Drizzle models). The scope that `list()`, `count()` and `deleteWhere()` take is a condition in the backend's terms: an SQL condition with Drizzle, a predicate in memory. `deleteWhere()` needs a scope: `deleteAll()` deletes every row. The memory backend refuses a second row with the same key, compares values strictly (dates by time, arrays and objects by content) and sorts missing values last in ascending order, as PostgreSQL does. It does not join transactions: a rolled-back unit of work keeps its rows.
 
 ### Events
 
-A repository class carries events: `creating`, `updating` and `deleting` run before the write, may change `data`, and refuse the write by returning an error, which the method throws; `created`, `updated` and `deleted` run once the unit of work commits (set `static afterCommit = false` to run them right after the write). Bulk methods (`updateAll`, `deleteAll`, `deleteWhere`) and custom queries do not fire events.
+A repository class carries events: `creating`, `updating` and `deleting` run before the write, may change `data` in place, and refuse the write by returning an error, which the method throws; `created`, `updated` and `deleted` run once the unit of work commits, and not at all when it rolls back (set `static afterCommit = false` to run them right after the write). Listeners run one after the other, in the order they subscribed, and the listeners after a refusal do not run. The listeners of a repository class also run for its subclasses. An error a listener throws reaches the caller as it is. Bulk methods (`updateAll`, `deleteAll`, `deleteWhere`) and custom queries do not fire events.
 
 ```ts
 BookRepository.on('creating', ({ data }) => {
-	if (!data.title.trim()) return new InvalidTitleError();
+	if (!data.title?.trim()) return new InvalidTitleError();
 });
 ```
 
-An observer groups the listeners in a class, one method per event. Registered as a service, it is resolved from the container, so it can inject others:
+An observer groups the listeners in a class, one method per event, typed against the events of its repository. Registered as a service and listed by a module, it is resolved from the container and runs in that module, so it can inject others; the module must be loaded when the repository fires an event. An observer that is not a service is built once, without arguments.
 
 ```ts
 @Service.register()
@@ -358,7 +358,7 @@ export class OrderObserver {
 
 ### Pruning
 
-`Pruner(Model)` is a job that deletes stale rows chunk by chunk. `prunable` names them, `chunkSize` sets the rows per statement (1,000 by default), and both are getters, read on each run. Without a `pruning(rows)` hook, rows are deleted without being loaded; with one, each chunk is loaded and given to it first.
+`Pruner(Model)` is a job that deletes stale rows chunk by chunk. `prunable` names them, `chunkSize` sets the rows per statement (1,000 by default), and both are getters, read on each run. Without a `pruning(rows)` hook, rows are deleted without being loaded; with one, each chunk is loaded, given to it first, then deleted by the table's primary key. A `prunable` of `undefined` prunes nothing on that run. A pruner works on the table of the tenant in context when it runs: with per-tenant tables, run it once per tenant.
 
 ```ts
 @Job.register({ queue: 'maintenance' })

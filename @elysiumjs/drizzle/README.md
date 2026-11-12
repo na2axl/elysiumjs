@@ -67,7 +67,7 @@ public listFor(userId: string, query: ParsedQuery<'cursor'>) {
 }
 ```
 
-`deleteWhere(scope, limit)` deletes at most `limit` rows of a scope in one statement, which is how `Pruner(Model)` jobs delete stale rows chunk by chunk.
+`deleteWhere(scope, limit)` deletes at most `limit` rows of a scope in one statement, partitioned tables included, which is how `Pruner(Model)` jobs delete stale rows chunk by chunk.
 
 ### Migration hooks
 

@@ -79,7 +79,7 @@ describe('Repository on Drizzle', () => {
 		expect(await repository.findBy('title', 'Emma')).toEqual(emma);
 		expect(await repository.findBy('title', 'Nope')).toBeNull();
 		expect(fake.log[0]!.query).toBe(
-			'select "id", "title" from "repo_books" where "repo_books"."title" = $1'
+			'select "id", "title" from "repo_books" where "repo_books"."title" = $1 limit $2'
 		);
 	});
 
@@ -166,8 +166,8 @@ describe('Repository on Drizzle', () => {
 		expect(await repository.deleteWhere(eq(books.title, 'Dune'), 2)).toBe(2);
 		expect(statements()).toEqual([
 			[
-				'delete from "repo_books" where ctid in (select ctid from "repo_books" where "repo_books"."title" = $1 limit $2) returning 1',
-				['Dune', 2]
+				'delete from "repo_books" where (("repo_books"."title" = $1) and ((tableoid, ctid) in (select tableoid, ctid from "repo_books" where "repo_books"."title" = $2 limit $3))) returning 1',
+				['Dune', 'Dune', 2]
 			]
 		]);
 	});
@@ -224,7 +224,7 @@ describe('Repository on Drizzle', () => {
 		expect(seen).toEqual([dune, emma]);
 		expect(job.pruned).toBe(2);
 		expect(statements()[1]).toEqual([
-			'delete from "repo_books" where (("repo_books"."id" = $1) or ("repo_books"."id" = $2)) returning 1',
+			'delete from "repo_books" where "repo_books"."id" in ($1, $2) returning 1',
 			[1, 2]
 		]);
 	});

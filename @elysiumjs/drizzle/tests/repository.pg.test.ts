@@ -39,10 +39,18 @@ const tags = pgTable(
 	(t) => [d.primaryKey({ columns: [t.articleId, t.tag] })]
 );
 
+const events = pgTable(
+	'pg_repo_events',
+	{ id: d.integer().notNull(), day: d.integer().notNull() },
+	(t) => [d.primaryKey({ columns: [t.id, t.day] })]
+);
+
 class Article extends DrizzleModel(articles) {}
 class ArticleRepository extends Repository(Article) {}
 class Tag extends DrizzleModel(tags) {}
 class TagRepository extends Repository(Tag) {}
+class Event extends DrizzleModel(events) {}
+class EventRepository extends Repository(Event) {}
 
 describe.skipIf(!url)('Repository on PostgreSQL', () => {
 	const driver = bunSql({ url });
@@ -50,7 +58,16 @@ describe.skipIf(!url)('Repository on PostgreSQL', () => {
 
 	beforeAll(async () => {
 		Service.instance('db.connection.default', db);
-		await db.execute(sql`drop table if exists pg_repo_articles, pg_repo_tags`);
+		await db.execute(sql`drop table if exists pg_repo_articles, pg_repo_tags, pg_repo_events`);
+		await db.execute(
+			sql`create table pg_repo_events (id integer not null, day integer not null, primary key (id, day)) partition by range (day)`
+		);
+		await db.execute(
+			sql`create table pg_repo_events_1 partition of pg_repo_events for values from (1) to (2)`
+		);
+		await db.execute(
+			sql`create table pg_repo_events_2 partition of pg_repo_events for values from (2) to (3)`
+		);
 		await db.execute(
 			sql`create table pg_repo_articles (id integer primary key, title text not null, views integer not null)`
 		);
@@ -60,7 +77,7 @@ describe.skipIf(!url)('Repository on PostgreSQL', () => {
 	});
 
 	beforeEach(async () => {
-		await db.execute(sql`truncate pg_repo_articles, pg_repo_tags`);
+		await db.execute(sql`truncate pg_repo_articles, pg_repo_tags, pg_repo_events`);
 		const repository = new ArticleRepository();
 		for (let id = 1; id <= 5; id++) {
 			await repository.insert({ id, title: `Article ${id}`, views: id * 10 });
@@ -68,7 +85,7 @@ describe.skipIf(!url)('Repository on PostgreSQL', () => {
 	});
 
 	afterAll(async () => {
-		await db.execute(sql`drop table if exists pg_repo_articles, pg_repo_tags`);
+		await db.execute(sql`drop table if exists pg_repo_articles, pg_repo_tags, pg_repo_events`);
 		Service.remove('db.connection.default');
 		await driver.close(db);
 	});
@@ -88,6 +105,15 @@ describe.skipIf(!url)('Repository on PostgreSQL', () => {
 		const page = await repository.list(Listing.parse(spec, {}));
 		expect(page.data.map((row) => row.id)).toEqual([1, 5]);
 		expect(await repository.count(undefined, gt(articles.views, 30))).toBe(3);
+	});
+
+	it('sorts numbers as numbers', async () => {
+		const repository = new ArticleRepository();
+		await repository.insert({ id: 6, title: 'Article 6', views: 100 });
+		await repository.insert({ id: 7, title: 'Article 7', views: 9 });
+		const spec = { pagination: 'cursor', sort: ['views'], limit: { default: 3 } } as const;
+		const page = await repository.list(Listing.parse(spec, { sort: '-views' }));
+		expect(page.data.map((row) => row.views)).toEqual([100, 50, 40]);
 	});
 
 	it('deletes at most a limit of the rows of a scope', async () => {
@@ -128,6 +154,39 @@ describe.skipIf(!url)('Repository on PostgreSQL', () => {
 		expect(await new ArticleRepository().count()).toBe(0);
 	});
 
+	it('runs the pruning() hook over several chunks', async () => {
+		const seen: number[][] = [];
+		class PruneInChunks extends Pruner(Article) {
+			protected get prunable() {
+				return gt(articles.views, 0);
+			}
+
+			protected override get chunkSize() {
+				return 2;
+			}
+
+			protected override pruning(rows: (typeof Article)['$inferSelect'][]) {
+				seen.push(rows.map((row) => row.id).sort());
+			}
+		}
+		const job = new PruneInChunks();
+		await job.run();
+		expect(job.pruned).toBe(5);
+		expect(seen.map((chunk) => chunk.length)).toEqual([2, 2, 1]);
+		expect(seen.flat().sort()).toEqual([1, 2, 3, 4, 5]);
+	});
+
+	it('deletes a limit of the rows of a partitioned table', async () => {
+		const repository = new EventRepository();
+		for (const day of [1, 2]) {
+			for (let id = 1; id <= 3; id++) await repository.insert({ id, day });
+		}
+		expect(await repository.deleteWhere(eq(events.id, 1), 1)).toBe(1);
+		expect(await repository.count()).toBe(5);
+		expect(await repository.deleteWhere(gt(events.id, 0), 3)).toBe(3);
+		expect(await repository.count()).toBe(2);
+	});
+
 	it('finds and deletes rows by a composite key', async () => {
 		const repository = new TagRepository();
 		await repository.insert({ articleId: 1, tag: 'news' });
@@ -138,5 +197,25 @@ describe.skipIf(!url)('Repository on PostgreSQL', () => {
 		});
 		expect(await repository.deleteWhere(eq(tags.articleId, 1), 1)).toBe(1);
 		expect(await repository.count()).toBe(1);
+	});
+
+	it('prunes rows by a composite key after the hook', async () => {
+		const repository = new TagRepository();
+		for (const tag of ['a', 'b', 'c']) await repository.insert({ articleId: 2, tag });
+		const seen: string[] = [];
+		class PruneTags extends Pruner(Tag) {
+			protected get prunable() {
+				return eq(tags.articleId, 2);
+			}
+
+			protected override pruning(rows: (typeof Tag)['$inferSelect'][]) {
+				seen.push(...rows.map((row) => row.tag));
+			}
+		}
+		const job = new PruneTags();
+		await job.run();
+		expect(job.pruned).toBe(3);
+		expect(seen.sort()).toEqual(['a', 'b', 'c']);
+		expect(await repository.count()).toBe(0);
 	});
 });

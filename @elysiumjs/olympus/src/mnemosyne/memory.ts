@@ -18,18 +18,25 @@ import type { RepositoryAdapter, RepositoryTarget, Row } from './repository';
 
 import { AbstractModel } from './model';
 import { Listing } from './query';
-
-const MEMORY_TABLE = Symbol('elysium:memory-table');
+import { RepositoryKeyError } from './repository';
 
 /**
  * A table of the in-memory backend: a name and the key columns.
  * @author Axel Nana <ax.lnana@outlook.com>
  */
-export type MemoryTable = {
-	readonly [MEMORY_TABLE]: true;
-	readonly name: string;
-	readonly key: readonly string[];
-};
+export class MemoryTable {
+	/** Keeps the type nominal, so that the tables of other backends never pass for it. */
+	declare private readonly memoryTable: true;
+
+	/**
+	 * @param name The table name.
+	 * @param key The key columns.
+	 */
+	constructor(
+		public readonly name: string,
+		public readonly key: readonly string[]
+	) {}
+}
 
 /**
  * A scope condition of the in-memory backend: a predicate over rows.
@@ -86,21 +93,46 @@ export class MemoryDatabase {
 
 const copy = <T>(value: T): T => structuredClone(value);
 
-/** A comparable form of a value: dates and date strings as times. */
+/** A comparable form of a value: dates, and date strings compared with dates, as times. */
 const comparable = (value: unknown, other: unknown): unknown => {
 	if (value instanceof Date) return value.getTime();
 	if (typeof value === 'string' && other instanceof Date) return Date.parse(value);
 	return value;
 };
 
-/** Compares two values: dates with dates or their ISO strings, numbers, strings. */
+/** Whether two values are equal: dates by time, arrays and plain objects by their content. */
+const equal = (a: unknown, b: unknown): boolean => {
+	if (a === null || a === undefined || b === null || b === undefined) return a === b;
+	const x = comparable(a, b);
+	const y = comparable(b, a);
+	if (typeof x !== 'object' || typeof y !== 'object') return x === y;
+	if (Array.isArray(x) !== Array.isArray(y)) return false;
+	const left = Object.entries(x as object);
+	if (left.length !== Object.keys(y as object).length) return false;
+	return left.every(([name, value]) => equal(value, (y as Row)[name]));
+};
+
+/**
+ * Orders two values as PostgreSQL does: a missing value comes after any other, so last in
+ * ascending order and first in descending order. Values of different types are ordered by
+ * their type name, never coerced into each other.
+ */
 const compare = (a: unknown, b: unknown): number => {
 	const x = comparable(a, b) as any;
 	const y = comparable(b, a) as any;
-	if (x === y) return 0;
-	if (x === null || x === undefined) return -1;
-	if (y === null || y === undefined) return 1;
+	const xMissing = x === null || x === undefined;
+	const yMissing = y === null || y === undefined;
+	if (xMissing || yMissing) return xMissing === yMissing ? 0 : xMissing ? 1 : -1;
+	if (typeof x !== typeof y) return typeof x < typeof y ? -1 : 1;
 	return x < y ? -1 : x > y ? 1 : 0;
+};
+
+/** Whether two present values of the same type can be ordered, for the range filters. */
+const ordered = (a: unknown, b: unknown): boolean => {
+	if (a === null || a === undefined || b === null || b === undefined) return false;
+	const x = comparable(a, b);
+	const y = comparable(b, a);
+	return typeof x === typeof y && typeof x !== 'object' && !Number.isNaN(x);
 };
 
 const matches = (row: Row, filter: ParsedFilter): boolean => {
@@ -108,19 +140,19 @@ const matches = (row: Row, filter: ParsedFilter): boolean => {
 	const expected = filter.value;
 	switch (filter.operator) {
 		case 'eq':
-			return compare(value, expected) === 0;
+			return equal(value, expected);
 		case 'ne':
-			return compare(value, expected) !== 0;
+			return value !== null && value !== undefined && !equal(value, expected);
 		case 'gt':
-			return value != null && compare(value, expected) > 0;
+			return ordered(value, expected) && compare(value, expected) > 0;
 		case 'gte':
-			return value != null && compare(value, expected) >= 0;
+			return ordered(value, expected) && compare(value, expected) >= 0;
 		case 'lt':
-			return value != null && compare(value, expected) < 0;
+			return ordered(value, expected) && compare(value, expected) < 0;
 		case 'lte':
-			return value != null && compare(value, expected) <= 0;
+			return ordered(value, expected) && compare(value, expected) <= 0;
 		case 'in':
-			return (expected as unknown[]).some((item) => compare(value, item) === 0);
+			return (expected as unknown[]).some((item) => equal(value, item));
 		case 'contains':
 			return String(value ?? '')
 				.toLowerCase()
@@ -154,7 +186,27 @@ const sorted = (rows: Row[], query: ParsedQuery): Row[] =>
 	});
 
 const sameKey = (row: Row, key: Row): boolean =>
-	Object.entries(key).every(([column, value]) => compare(row[column], value) === 0);
+	Object.entries(key).every(([column, value]) => equal(row[column], value));
+
+/** The values of the key columns of a row. */
+const keyOf = (row: Row, columns: readonly string[]): Row =>
+	Object.fromEntries(columns.map((column) => [column, row[column]]));
+
+/** Throws when another row of a table has the key of a row. */
+const assertUnique = (
+	target: RepositoryTarget<MemoryTable>,
+	rows: Row[],
+	row: Row,
+	self?: Row
+): void => {
+	if (target.key.length === 0) return;
+	const key = keyOf(row, target.key);
+	if (rows.some((item) => item !== self && sameKey(item, key))) {
+		throw new RepositoryKeyError(
+			`${target.model} already has a row with the key ${JSON.stringify(key)}.`
+		);
+	}
+};
 
 const tableOf = (target: RepositoryTarget<MemoryTable>): Row[] =>
 	MemoryDatabase.connection(target.connection).rows(target.table.name);
@@ -187,7 +239,7 @@ export const memoryRepositoryAdapter: RepositoryAdapter<MemoryTable, MemoryDatab
 		},
 
 		async findBy(target, column, value) {
-			const row = tableOf(target).find((item) => compare(item[column], value) === 0);
+			const row = tableOf(target).find((item) => equal(item[column], value));
 			return row ? copy(row) : null;
 		},
 
@@ -199,14 +251,19 @@ export const memoryRepositoryAdapter: RepositoryAdapter<MemoryTable, MemoryDatab
 			const row = copy(data);
 			const [only] = target.key;
 			if (target.key.length === 1 && row[only!] === undefined) row[only!] = crypto.randomUUID();
-			tableOf(target).push(row);
+			const rows = tableOf(target);
+			assertUnique(target, rows, row);
+			rows.push(row);
 			return copy(row);
 		},
 
 		async update(target, key, data) {
-			const row = tableOf(target).find((item) => sameKey(item, key));
+			const rows = tableOf(target);
+			const row = rows.find((item) => sameKey(item, key));
 			if (!row) return null;
-			Object.assign(row, copy(data));
+			const changed = { ...row, ...copy(data) };
+			assertUnique(target, rows, changed, row);
+			Object.assign(row, changed);
 			return copy(row);
 		},
 
@@ -279,7 +336,7 @@ export const memoryRepositoryAdapter: RepositoryAdapter<MemoryTable, MemoryDatab
 export const memoryModelAdapter: ModelAdapter<MemoryTable> = {
 	getTableName: (table) => table.name,
 	getColumns: () => [],
-	createTenantTable: (table, tenant) => ({ ...table, name: `${tenant}.${table.name}` }),
+	createTenantTable: (table, tenant) => new MemoryTable(`${tenant}.${table.name}`, table.key),
 	repository: memoryRepositoryAdapter
 };
 
@@ -314,7 +371,7 @@ export const MemoryModel = <TRow extends Row, TInsert = Partial<TRow>, TUpdate =
 	name: string,
 	options: MemoryModelOptions<TRow> = {}
 ) => {
-	const table: MemoryTable = { [MEMORY_TABLE]: true, name, key: options.key ?? ['id'] };
+	const table = new MemoryTable(name, options.key ?? ['id']);
 	const Base = AbstractModel(name, {}, memoryModelAdapter, table);
 	if (options.supportTenancy !== undefined) {
 		Object.defineProperty(Base, 'supportTenancy', { value: options.supportTenancy });

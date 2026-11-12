@@ -13,6 +13,7 @@
 // limitations under the License.
 
 // Compile-time checks: run by `bun run typecheck`, not by `bun test`.
+import type { ConnectionOf, ScopeOf } from '@elysiumjs/olympus/mnemosyne';
 import type { SQL } from 'drizzle-orm';
 import type { DrizzleConnection } from '../../src/database';
 
@@ -62,3 +63,23 @@ export class PruneUsers extends Pruner(User) {
 
 // @ts-expect-error a pruner names its rows with `prunable`
 export class PruneNothing extends Pruner(User) {}
+
+// A table typed `any` resolves to no backend, rather than to the first one declared.
+export const anyScope: ScopeOf<any> = 'anything';
+export const anyConnection: ConnectionOf<any> = 42;
+
+// Observer methods are checked against the events of their repository.
+@Repository.observer(UserRepository)
+export class UserObserver {
+	public creating({ data }: { data: typeof User.$inferInsert }) {
+		if (!data.name) return new Error('a name is needed');
+	}
+}
+
+// @ts-expect-error `created` receives `{ row }`, not `{ data }`
+@Repository.observer(UserRepository)
+export class WrongObserver {
+	public created({ data }: { data: number }) {
+		return data;
+	}
+}

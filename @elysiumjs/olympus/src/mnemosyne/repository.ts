@@ -17,7 +17,9 @@ import type { CursorPage, OffsetPage, Page, ParsedQuery } from './query';
 
 import Emittery from 'emittery';
 
-import { ElysiumError, Service } from '../index';
+import { ElysiumError, ModuleContext, Service } from '../index';
+import { Metadata } from '../metadata';
+import { Symbols } from '../utils';
 import { UnitOfWork } from './unit-of-work';
 
 /**
@@ -58,21 +60,25 @@ type DriverOf<TTable> = {
  * The connection type of the backend of a table type, from {@link RepositoryDrivers}.
  * @author Axel Nana <ax.lnana@outlook.com>
  */
-export type ConnectionOf<TTable> = [DriverOf<TTable>] extends [never]
+export type ConnectionOf<TTable> = 0 extends 1 & TTable
 	? unknown
-	: DriverOf<TTable> extends { connection: infer C }
-		? C
-		: unknown;
+	: [DriverOf<TTable>] extends [never]
+		? unknown
+		: DriverOf<TTable> extends { connection: infer C }
+			? C
+			: unknown;
 
 /**
  * The scope condition type of the backend of a table type, from {@link RepositoryDrivers}.
  * @author Axel Nana <ax.lnana@outlook.com>
  */
-export type ScopeOf<TTable> = [DriverOf<TTable>] extends [never]
+export type ScopeOf<TTable> = 0 extends 1 & TTable
 	? unknown
-	: DriverOf<TTable> extends { scope: infer S }
-		? S
-		: unknown;
+	: [DriverOf<TTable>] extends [never]
+		? unknown
+		: DriverOf<TTable> extends { scope: infer S }
+			? S
+			: unknown;
 
 /**
  * What a repository asks its adapter to work on: the table (resolved for the current tenant),
@@ -180,6 +186,12 @@ export type RepositoryObserver<TEvents> = {
 };
 
 /**
+ * The events of a repository class, as its listeners and observers receive them.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export type EventsOf<TRepository> = TRepository extends { readonly $events: infer E } ? E : never;
+
+/**
  * Options of {@link Repository}.
  * @author Axel Nana <ax.lnana@outlook.com>
  */
@@ -207,12 +219,47 @@ const emitterOf = (repository: Function): Emittery<Record<string, Payload>> => {
 	return emitter;
 };
 
-/** Subscribes a listener to an event of a repository class. */
+/**
+ * Subscribes a listener to an event of a repository class. Once a `-ing` listener refused the
+ * write, the listeners after it do not run.
+ */
 const subscribe = (repository: Function, event: string, listener: Function): (() => void) =>
 	emitterOf(repository).on(event, async ({ data }) => {
+		if (data[REFUSALS]?.length) return;
 		const result = await listener(data);
 		if (result instanceof Error) (data[REFUSALS] ??= []).push(result);
 	});
+
+/**
+ * The emitters of a repository class and of the repository classes it extends, the farthest
+ * first, so that the listeners of a parent class also run for its subclasses.
+ */
+const emittersOf = (repository: Function): Emittery<Record<string, Payload>>[] => {
+	const found: Emittery<Record<string, Payload>>[] = [];
+	for (
+		let current: unknown = repository;
+		typeof current === 'function' && current !== Function.prototype;
+		current = Object.getPrototypeOf(current)
+	) {
+		const emitter = emitters.get(current);
+		if (emitter) found.unshift(emitter);
+	}
+	return found;
+};
+
+/** Runs the listeners of an event one after the other, the parent classes' first. */
+const emitAll = async (repository: Function, event: string, payload: Payload): Promise<boolean> => {
+	const chain = emittersOf(repository).filter((emitter) => emitter.listenerCount(event) > 0);
+	for (const emitter of chain) await emitter.emitSerial(event, payload);
+	return chain.length > 0;
+};
+
+/** Whether a key is given as an object of the key column values. */
+const isPlainObject = (value: unknown): value is Row => {
+	if (typeof value !== 'object' || value === null) return false;
+	const prototype = Object.getPrototypeOf(value);
+	return prototype === Object.prototype || prototype === null;
+};
 
 /**
  * Creates a repository class over a model: CRUD, listing and counting over the model's
@@ -270,7 +317,7 @@ const createRepository = <TModel extends ModelClass>(
 				`The table of ${model.name} has no primary key: declare one, or pass \`key\` to Repository().`
 			);
 		}
-		if (typeof id !== 'object' || id === null) {
+		if (!isPlainObject(id)) {
 			if (columns.length > 1) {
 				throw new RepositoryKeyError(
 					`The primary key of ${model.name} spans ${columns.join(', ')}: pass an object of their values.`
@@ -298,13 +345,19 @@ const createRepository = <TModel extends ModelClass>(
 		key: key()
 	});
 
-	/** Runs the listeners of a `-ing` event, and throws the first error one returned. */
-	const before = async (repository: object, event: BeforeEvent, payload: Row): Promise<void> => {
-		const emitter = emitters.get(repository.constructor);
-		if (!emitter || emitter.listenerCount(event) === 0) return;
-		const data: Payload = { ...payload };
-		await emitter.emit(event, data);
-		if (data[REFUSALS]?.length) throw data[REFUSALS][0];
+	/**
+	 * Runs the listeners of a `-ing` event one after the other, on the payload itself so that
+	 * they may change its data, and throws the error the first refusing one returned.
+	 */
+	const before = async (
+		repository: object,
+		event: BeforeEvent,
+		payload: Payload
+	): Promise<void> => {
+		await emitAll(repository.constructor, event, payload);
+		const refusal = payload[REFUSALS]?.[0];
+		delete payload[REFUSALS];
+		if (refusal) throw refusal;
 	};
 
 	/** Runs the listeners of a `-ed` event, after the unit of work commits by default. */
@@ -313,9 +366,13 @@ const createRepository = <TModel extends ModelClass>(
 		event: 'created' | 'updated' | 'deleted',
 		row: unknown
 	): Promise<void> => {
-		const emitter = emitters.get(repository.constructor);
-		if (!emitter || emitter.listenerCount(event) === 0) return;
-		const emit = () => emitter.emit(event, { row });
+		const listening = emittersOf(repository.constructor).some(
+			(emitter) => emitter.listenerCount(event) > 0
+		);
+		if (!listening) return;
+		const emit = async () => {
+			await emitAll(repository.constructor, event, { row });
+		};
 		if ((repository.constructor as unknown as { afterCommit: boolean }).afterCommit) {
 			await UnitOfWork.afterCommit(emit);
 		} else await emit();
@@ -337,6 +394,9 @@ const createRepository = <TModel extends ModelClass>(
 		 * commit. Override it with `false` to run them right after the write.
 		 */
 		public static readonly afterCommit: boolean = true;
+
+		/** The events of this repository class, for typing only. */
+		declare public static readonly $events: TEvents;
 
 		/**
 		 * Subscribes a listener to an event of this repository class.
@@ -472,7 +532,12 @@ const createRepository = <TModel extends ModelClass>(
 		 * @param limit The most rows to delete.
 		 * @returns How many rows were deleted.
 		 */
-		public deleteWhere(scope: TScope, limit?: number): Promise<number> {
+		public async deleteWhere(scope: TScope, limit?: number): Promise<number> {
+			if (scope === undefined || scope === null) {
+				throw new RepositoryKeyError(
+					`deleteWhere() on ${model.name} needs a scope: use deleteAll() to delete every row.`
+				);
+			}
 			return adapter().deleteWhere(targetOf(this), scope, limit);
 		}
 
@@ -513,27 +578,65 @@ const createRepository = <TModel extends ModelClass>(
 	return R;
 };
 
-const observerInstances = new WeakMap<Function, unknown>();
+/**
+ * Raised when an observer registered as a service is not in the container when its repository
+ * fires an event, such as when its module is not imported.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export class MissingObserverError extends ElysiumError {
+	constructor(observer: string) {
+		super(
+			`The observer ${observer} is registered as a service but is not in the container: import its module.`
+		);
+	}
+}
 
-/** The observer instance: resolved from the container when registered there, else built once. */
-const observerOf = async (observer: new () => object): Promise<Record<string, Function>> => {
-	if (Service.exists(observer))
-		return Service.resolve(observer) as Promise<Record<string, Function>>;
+type ObserverInstance = Record<string, Function>;
+
+const observerInstances = new WeakMap<Function, ObserverInstance>();
+
+/**
+ * Calls a method of an observer. An observer registered as a service is resolved from the
+ * container, and called in the module that declares it when there is one, so that it uses that
+ * module's services and stores; any other is built once, without arguments.
+ */
+const callObserver = async (
+	observer: new (...args: any[]) => object,
+	method: string,
+	payload: unknown
+): Promise<unknown> => {
+	const [owner] = Service.ownersOf(observer);
+	if (owner) {
+		return ModuleContext.run(owner, async () => {
+			const instance = (await Service.resolve(observer)) as ObserverInstance;
+			return instance[method]!.call(instance, payload);
+		});
+	}
+	const instance = await observerOf(observer);
+	return instance[method]!.call(instance, payload);
+};
+
+/** The instance of an observer that no module declares. */
+const observerOf = async (observer: new (...args: any[]) => object): Promise<ObserverInstance> => {
+	if (Service.exists(observer)) return (await Service.resolve(observer)) as ObserverInstance;
+	if (Metadata.get(Symbols.serviceOptions, observer)) throw new MissingObserverError(observer.name);
 	let instance = observerInstances.get(observer);
 	if (!instance) {
-		instance = new observer();
+		instance = new observer() as ObserverInstance;
 		observerInstances.set(observer, instance);
 	}
-	return instance as Record<string, Function>;
+	return instance;
 };
 
 const EVENTS = ['creating', 'created', 'updating', 'updated', 'deleting', 'deleted'] as const;
 
 /**
  * Marks a class as an observer of a repository: each of its methods named after an event
- * (`creating`, `created`, `updating`, `updated`, `deleting`, `deleted`) listens to it. The
- * observer is resolved from the container when it is registered there, so it can inject
- * services.
+ * (`creating`, `created`, `updating`, `updated`, `deleting`, `deleted`) listens to it, and is
+ * typed against the repository's events. An observer registered as a service is resolved from
+ * the container and runs in the module that lists it, so it can inject services; that module
+ * must be loaded when the repository fires an event. Any other observer is built once, without
+ * arguments.
  * @author Axel Nana <ax.lnana@outlook.com>
  * @param repository The repository class.
  * @example
@@ -551,16 +654,17 @@ const EVENTS = ['creating', 'created', 'updating', 'updated', 'deleting', 'delet
  * ```
  */
 const observer =
-	<TRepository extends { on(event: never, listener: never): () => void }>(
+	<TRepository extends { on(event: never, listener: never): () => void; readonly $events: object }>(
 		repository: TRepository
 	) =>
-	<TObserver extends new () => object>(target: TObserver): void => {
+	<TObserver extends new (...args: any[]) => RepositoryObserver<EventsOf<TRepository>>>(
+		target: TObserver
+	): void => {
 		for (const event of EVENTS) {
 			if (typeof (target.prototype as Record<string, unknown>)[event] !== 'function') continue;
-			subscribe(repository as unknown as Function, event, async (payload: unknown) => {
-				const instance = await observerOf(target);
-				return instance[event]!.call(instance, payload);
-			});
+			subscribe(repository as unknown as Function, event, (payload: unknown) =>
+				callObserver(target, event, payload)
+			);
 		}
 	};
 

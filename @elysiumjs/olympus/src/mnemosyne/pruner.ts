@@ -35,8 +35,11 @@ export abstract class PrunerJob<TSelect = Row, TScope = unknown> extends Job {
 	/** How many rows were deleted by the last run. */
 	public pruned = 0;
 
-	/** The condition of the rows to delete, read on each run. */
-	protected abstract get prunable(): TScope;
+	/**
+	 * The condition of the rows to delete, read on each run. `undefined` means that there is
+	 * nothing to prune this time.
+	 */
+	protected abstract get prunable(): TScope | undefined;
 
 	/** How many rows each statement deletes, read on each run. Defaults to 1,000. */
 	protected get chunkSize(): number {
@@ -54,7 +57,9 @@ export abstract class PrunerJob<TSelect = Row, TScope = unknown> extends Job {
 		const adapter = model.adapter?.repository as RepositoryAdapter<unknown, unknown, TScope>;
 		if (!adapter) throw new MissingRepositoryAdapterError(model.name);
 
+		this.pruned = 0;
 		const scope = this.prunable;
+		if (scope === undefined || scope === null) return;
 		const size = Math.max(1, Math.floor(this.chunkSize));
 		const target: RepositoryTarget = {
 			table: model.table,
@@ -69,7 +74,6 @@ export abstract class PrunerJob<TSelect = Row, TScope = unknown> extends Job {
 			);
 		}
 
-		this.pruned = 0;
 		for (;;) {
 			let deleted: number;
 			if (this.pruning) {
@@ -108,7 +112,10 @@ export type PrunerClass<TSelect, TScope> = (abstract new () => PrunerJob<TSelect
  * window such as "older than 90 days" stays current.
  *
  * Without a `pruning()` hook, rows are deleted without being loaded. With one, each chunk is
- * loaded, given to the hook, then deleted.
+ * loaded, given to the hook, then deleted by the table's primary key.
+ *
+ * A pruner works on the table of the tenant in context when it runs: with per-tenant tables, run
+ * it once per tenant.
  * @author Axel Nana <ax.lnana@outlook.com>
  * @param model The model class.
  * @example

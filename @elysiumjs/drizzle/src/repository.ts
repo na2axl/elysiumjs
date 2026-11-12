@@ -29,7 +29,7 @@ import {
 	getTenancyStrategy,
 	Listing
 } from '@elysiumjs/olympus/mnemosyne';
-import { and, eq, getTableColumns, or, sql } from 'drizzle-orm';
+import { and, eq, getTableColumns, inArray, or, sql } from 'drizzle-orm';
 import { getTableConfig } from 'drizzle-orm/pg-core';
 
 import { Database } from './database';
@@ -71,11 +71,18 @@ const whereKey = (target: Target, key: Row): SQL => {
 const both = (a: SQL | undefined, b: SQL | undefined): SQL | undefined =>
 	a && b ? and(a, b) : (a ?? b);
 
-/** At most `limit` rows of a scope, by their physical row id, for the bounded statements. */
+/**
+ * At most `limit` rows of a scope, by their physical row id, for the bounded statements. The
+ * table oid joins the row id so that it stays unique across the partitions of a partitioned
+ * table, and the scope is checked again on the rows the statement reaches.
+ */
 const limited = (target: Target, scope: SQL, limit?: number): SQL =>
 	limit === undefined
 		? scope
-		: sql`ctid in (select ctid from ${target.table} where ${scope} limit ${limit})`;
+		: and(
+				scope,
+				sql`(tableoid, ctid) in (select tableoid, ctid from ${target.table} where ${scope} limit ${limit})`
+			)!;
 
 /**
  * Runs an operation on a connection. In RLS tenancy mode, an operation outside a transaction is
@@ -124,6 +131,7 @@ export const drizzleRepositoryAdapter: RepositoryAdapter<PgTable, DrizzleConnect
 				.select()
 				.from(tableOf(target))
 				.where(eq(tableOf(target)[column], value))
+				.limit(1)
 		);
 		return row ?? null;
 	},
@@ -162,10 +170,18 @@ export const drizzleRepositoryAdapter: RepositoryAdapter<PgTable, DrizzleConnect
 
 	async deleteMany(target, keys) {
 		if (keys.length === 0) return 0;
+		const [only] = target.key;
+		const where =
+			target.key.length === 1
+				? inArray(
+						tableOf(target)[only!],
+						keys.map((key) => key[only!])
+					)
+				: or(...keys.map((key) => whereKey(target, key)));
 		const rows = await run(target.connection, (db) =>
 			db
 				.delete(tableOf(target))
-				.where(or(...keys.map((key) => whereKey(target, key))))
+				.where(where)
 				.returning({ deleted: sql<number>`1` })
 		);
 		return rows.length;
