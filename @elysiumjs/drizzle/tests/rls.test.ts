@@ -14,6 +14,7 @@
 
 import { Application, Service } from '@elysiumjs/olympus';
 import {
+	Repository,
 	TENANCY_CONFIG_SERVICE,
 	TENANCY_STRATEGY_SERVICE,
 	withTenant
@@ -24,7 +25,6 @@ import * as d from 'drizzle-orm/pg-core';
 import * as pkg from '../src';
 import { Database, TenantMismatchError } from '../src/database';
 import { DrizzleModel } from '../src/model';
-import { DrizzleRepository } from '../src/repository';
 import { pgTable } from '../src/table';
 import { DrizzleRLSTenancy, getSessionTenant, withRLS } from '../src/tenancy';
 import { fakeConnection } from './fake-sql';
@@ -37,7 +37,7 @@ const users = pgTable('rls_users', {
 });
 
 class User extends DrizzleModel(users) {}
-class UserRepository extends DrizzleRepository(User) {}
+class UserRepository extends Repository(User) {}
 
 /** Replaces the registered tenancy configuration. */
 const useTenancy = (config: object) => {
@@ -424,7 +424,7 @@ describe('RLS isolation', () => {
 		});
 	});
 
-	describe('DrizzleRepository', () => {
+	describe('Repository on Drizzle', () => {
 		it('runs each operation in a transaction scoped to the current tenant', async () => {
 			const found = await withTenant('acme', () => new UserRepository().find(row.id));
 

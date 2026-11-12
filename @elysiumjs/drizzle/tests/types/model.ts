@@ -13,14 +13,19 @@
 // limitations under the License.
 
 // Compile-time checks: run by `bun run typecheck`, not by `bun test`.
+import type { ConnectionOf, ScopeOf } from '@elysiumjs/olympus/mnemosyne';
+import type { SQL } from 'drizzle-orm';
+import type { DrizzleConnection } from '../../src/database';
+
+import { Pruner, Repository } from '@elysiumjs/olympus/mnemosyne';
+import { eq } from 'drizzle-orm';
 import { integer, pgTable, text } from 'drizzle-orm/pg-core';
 
 import { DrizzleModel } from '../../src/model';
-import { DrizzleRepository } from '../../src/repository';
 
 const users = pgTable('users', { id: integer().primaryKey(), name: text().notNull() });
 export class User extends DrizzleModel(users) {}
-export class UserRepository extends DrizzleRepository(User) {}
+export class UserRepository extends Repository(User) {}
 type Row = typeof User.$inferSelect;
 export const ok: Row = { id: 1, name: 'a' };
 // @ts-expect-error id must be a number
@@ -32,3 +37,49 @@ export const found = async (r: UserRepository) => {
 	// @ts-expect-error unknown column
 	return u?.nope;
 };
+
+// `this.db` is the Drizzle connection, and the scope of list(), count() and Pruner is SQL.
+export class NamedUserRepository extends Repository(User) {
+	public named(name: string) {
+		const db: DrizzleConnection = this.db;
+		return db.select().from(users).where(eq(users.name, name));
+	}
+
+	public countNamed(name: string) {
+		return this.count(undefined, eq(users.name, name));
+	}
+
+	public wrongScope() {
+		// @ts-expect-error the scope is an SQL condition
+		return this.count(undefined, (row: unknown) => row !== null);
+	}
+}
+
+export class PruneUsers extends Pruner(User) {
+	protected get prunable(): SQL {
+		return eq(users.name, 'gone');
+	}
+}
+
+// @ts-expect-error a pruner names its rows with `prunable`
+export class PruneNothing extends Pruner(User) {}
+
+// A table typed `any` resolves to no backend, rather than to the first one declared.
+export const anyScope: ScopeOf<any> = 'anything';
+export const anyConnection: ConnectionOf<any> = 42;
+
+// Observer methods are checked against the events of their repository.
+@Repository.observer(UserRepository)
+export class UserObserver {
+	public creating({ data }: { data: typeof User.$inferInsert }) {
+		if (!data.name) return new Error('a name is needed');
+	}
+}
+
+// @ts-expect-error `created` receives `{ row }`, not `{ data }`
+@Repository.observer(UserRepository)
+export class WrongObserver {
+	public created({ data }: { data: number }) {
+		return data;
+	}
+}

@@ -13,13 +13,12 @@
 // limitations under the License.
 
 import { Service } from '@elysiumjs/olympus';
-import { Listing } from '@elysiumjs/olympus/mnemosyne';
+import { Listing, Repository } from '@elysiumjs/olympus/mnemosyne';
 import { afterEach, describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import * as d from 'drizzle-orm/pg-core';
 
 import { DrizzleModel } from '../src/model';
-import { DrizzleRepository } from '../src/repository';
 import { pgTable } from '../src/table';
 import { fakeConnection } from './fake-sql';
 
@@ -31,7 +30,7 @@ const posts = pgTable('query_posts', {
 });
 
 class Post extends DrizzleModel(posts) {}
-class PostRepository extends DrizzleRepository(Post) {}
+class PostRepository extends Repository(Post) {}
 
 const spec = Listing.define(Post, {
 	filters: { status: ['eq', 'in'], title: ['contains'], createdAt: ['gte'] },
@@ -46,7 +45,7 @@ const rows = [
 	{ id: 1, title: 'a', status: 'draft', createdAt: '2026-01-01 00:00:00+00' }
 ];
 
-describe('DrizzleRepository.list()', () => {
+describe('Repository on Drizzle.list()', () => {
 	let fake: ReturnType<typeof fakeConnection>;
 
 	afterEach(() => Service.remove('db.connection.default'));

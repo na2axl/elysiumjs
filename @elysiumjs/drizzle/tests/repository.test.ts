@@ -15,11 +15,12 @@
 import type { Responder } from './fake-sql';
 
 import { Service } from '@elysiumjs/olympus';
+import { Pruner, Repository, RepositoryKeyError } from '@elysiumjs/olympus/mnemosyne';
 import { afterEach, describe, expect, it } from 'bun:test';
+import { eq } from 'drizzle-orm';
 import * as d from 'drizzle-orm/pg-core';
 
 import { DrizzleModel } from '../src/model';
-import { DrizzleRepository, RepositoryKeyError } from '../src/repository';
 import { pgTable } from '../src/table';
 import { fakeConnection } from './fake-sql';
 
@@ -29,16 +30,16 @@ const books = pgTable('repo_books', {
 });
 
 class Book extends DrizzleModel(books) {}
-class BookRepository extends DrizzleRepository(Book) {}
+class BookRepository extends Repository(Book) {}
 
-class ArchiveRepository extends DrizzleRepository(Book) {
+class ArchiveRepository extends Repository(Book) {
 	public static readonly connection = 'archive';
 }
 
 const dune = { id: 1, title: 'Dune' };
 const emma = { id: 2, title: 'Emma' };
 
-describe('DrizzleRepository', () => {
+describe('Repository on Drizzle', () => {
 	let fake: ReturnType<typeof fakeConnection>;
 
 	const use = (respond: Responder, name = 'default') => {
@@ -60,23 +61,6 @@ describe('DrizzleRepository', () => {
 		expect(statements()).toEqual([['select "id", "title" from "repo_books"', []]]);
 	});
 
-	it('paginate() counts the rows and selects the requested page', async () => {
-		use((query) => (query.includes('count(*)') ? [{ count: 3 }] : [emma]));
-
-		expect(await new BookRepository().paginate(1, 2)).toEqual({ page: 2, total: 3, data: [emma] });
-		expect(statements()).toEqual([
-			['select count(*) from "repo_books"', []],
-			['select "id", "title" from "repo_books" limit $1 offset $2', [1, 1]]
-		]);
-	});
-
-	it('paginate() starts at the first page', async () => {
-		use((query) => (query.includes('count(*)') ? [{ count: 0 }] : []));
-
-		expect(await new BookRepository().paginate(10)).toEqual({ page: 1, total: 0, data: [] });
-		expect(statements()[1]).toEqual(['select "id", "title" from "repo_books" limit $1', [10]]);
-	});
-
 	it('find() returns the row with the id, or null', async () => {
 		use((_, params) => (params[0] === 1 ? [dune] : []));
 		const repository = new BookRepository();
@@ -95,7 +79,7 @@ describe('DrizzleRepository', () => {
 		expect(await repository.findBy('title', 'Emma')).toEqual(emma);
 		expect(await repository.findBy('title', 'Nope')).toBeNull();
 		expect(fake.log[0]!.query).toBe(
-			'select "id", "title" from "repo_books" where "repo_books"."title" = $1'
+			'select "id", "title" from "repo_books" where "repo_books"."title" = $1 limit $2'
 		);
 	});
 
@@ -175,6 +159,76 @@ describe('DrizzleRepository', () => {
 		);
 	});
 
+	it('deleteWhere() deletes the rows of a scope, at most a limit of them', async () => {
+		use(() => [{ deleted: 1 }, { deleted: 1 }]);
+		const repository = new BookRepository();
+
+		expect(await repository.deleteWhere(eq(books.title, 'Dune'), 2)).toBe(2);
+		expect(statements()).toEqual([
+			[
+				'delete from "repo_books" where (("repo_books"."title" = $1) and ((tableoid, ctid) in (select tableoid, ctid from "repo_books" where "repo_books"."title" = $2 limit $3))) returning 1',
+				['Dune', 'Dune', 2]
+			]
+		]);
+	});
+
+	it('deleteWhere() without a limit deletes every row of the scope', async () => {
+		use(() => [{ deleted: 1 }]);
+
+		expect(await new BookRepository().deleteWhere(eq(books.title, 'Dune'))).toBe(1);
+		expect(statements()).toEqual([
+			['delete from "repo_books" where "repo_books"."title" = $1 returning 1', ['Dune']]
+		]);
+	});
+
+	it('runs a Pruner over the scope, chunk by chunk', async () => {
+		let left = 3;
+		use(() => {
+			const deleted = Math.min(left, 2);
+			left -= deleted;
+			return Array.from({ length: deleted }, () => ({ deleted: 1 }));
+		});
+
+		class PruneDune extends Pruner(Book) {
+			protected get prunable() {
+				return eq(books.title, 'Dune');
+			}
+
+			protected override get chunkSize() {
+				return 2;
+			}
+		}
+
+		const job = new PruneDune();
+		await job.run();
+		expect(job.pruned).toBe(3);
+		expect(fake.log).toHaveLength(2);
+	});
+
+	it('runs the pruning() hook of a Pruner on each chunk, then deletes it by key', async () => {
+		use((query) => (query.startsWith('select') ? [dune, emma] : [{ deleted: 1 }, { deleted: 1 }]));
+		const seen: unknown[] = [];
+
+		class PruneAll extends Pruner(Book) {
+			protected get prunable() {
+				return eq(books.id, books.id);
+			}
+
+			protected override pruning(rows: (typeof Book)['$inferSelect'][]) {
+				seen.push(...rows);
+			}
+		}
+
+		const job = new PruneAll();
+		await job.run();
+		expect(seen).toEqual([dune, emma]);
+		expect(job.pruned).toBe(2);
+		expect(statements()[1]).toEqual([
+			'delete from "repo_books" where "repo_books"."id" in ($1, $2) returning 1',
+			[1, 2]
+		]);
+	});
+
 	it('uses the connection named by the repository', async () => {
 		use(() => [dune], 'archive');
 
@@ -189,18 +243,18 @@ const follows = pgTable(
 	(t) => [d.primaryKey({ columns: [t.userId, t.creatorId] })]
 );
 class Follow extends DrizzleModel(follows) {}
-class FollowRepository extends DrizzleRepository(Follow) {}
+class FollowRepository extends Repository(Follow) {}
 
 const handles = pgTable('repo_handles', { handle: d.text().primaryKey(), owner: d.text() });
 class Handle extends DrizzleModel(handles) {}
-class HandleRepository extends DrizzleRepository(Handle) {}
+class HandleRepository extends Repository(Handle) {}
 
 const slugs = pgTable('repo_slugs', { slug: d.text().notNull(), title: d.text() });
 class Slug extends DrizzleModel(slugs) {}
-class SlugRepository extends DrizzleRepository(Slug, { key: ['slug'] }) {}
-class KeylessRepository extends DrizzleRepository(Slug) {}
+class SlugRepository extends Repository(Slug, { key: ['slug'] }) {}
+class KeylessRepository extends Repository(Slug) {}
 
-describe('DrizzleRepository keys', () => {
+describe('Repository on Drizzle keys', () => {
 	let fake: ReturnType<typeof fakeConnection>;
 
 	const use = (respond: Responder) => {

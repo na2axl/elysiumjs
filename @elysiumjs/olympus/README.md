@@ -15,7 +15,7 @@ Add a runtime package too: `@elysiumjs/bun`, `@elysiumjs/node` or `@elysiumjs/wo
 | Import                               | Contents                                                                                                                                                                                                       |
 | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `@elysiumjs/olympus`                 | Application, modules, dependency injection, HTTP, WebSocket and WAMP controllers, middleware, interceptors, filters, problem details, configuration, environment, lifecycle events, console commands, OpenAPI. |
-| `@elysiumjs/olympus/mnemosyne`       | Models, repositories, the query DSL, units of work, caches and seeders.                                                                                                                                        |
+| `@elysiumjs/olympus/mnemosyne`       | Models, repositories with events, pruning jobs, the query DSL, units of work, caches, seeders and an in-memory backend.                                                                                        |
 | `@elysiumjs/olympus/moirai`          | Actions and queries, idempotency, outbox, inbox and domain events.                                                                                                                                             |
 | `@elysiumjs/olympus/moirai/heracles` | Outbox effect that dispatches heracles jobs. Import it once in the process that relays the outbox.                                                                                                             |
 | `@elysiumjs/olympus/heracles`        | Background jobs: queues, schedules, fan-out, retries and dead letters. `MemoryTransport` runs jobs in the process.                                                                                             |
@@ -308,6 +308,79 @@ if (run.acquired) console.log(run.value);
 ```
 
 The locks of `serializeBy` and `Moirai.lock()` are let go when their unit of work commits or rolls back. In case their holder dies first, they also end after `lockTtl` milliseconds (`MoiraiModule.with({ lockTtl: 30_000 })`, 60 seconds by default): keep it longer than your slowest unit of work.
+
+## Repositories
+
+`Repository(Model)` from `@elysiumjs/olympus/mnemosyne` gives a model its CRUD, listing and counting. The backend comes from the model: `DrizzleModel()` from `@elysiumjs/drizzle` runs on PostgreSQL, and `MemoryModel()` keeps rows in the process, for tests and prototypes. Writes join the transaction open on the connection, and the table is resolved for the current tenant on each call.
+
+```ts
+import { Service } from '@elysiumjs/olympus';
+import { MemoryModel, Repository } from '@elysiumjs/olympus/mnemosyne';
+
+type Book = { id: string; title: string; authorId: string };
+
+class BookModel extends MemoryModel<Book>('books') {}
+
+@Service.register()
+export class BookRepository extends Repository(BookModel) {}
+
+const books = new BookRepository();
+const book = await books.insert({ title: 'Dune', authorId: 'a-1' });
+await books.update(book.id, { title: 'Dune Messiah' });
+const page = await books.list(query); // a ParsedQuery from Listing.parse()
+```
+
+`find`, `update`, `delete` and `exists` take the key of a row: its value, or an object of the values of its key columns when the key spans several. Custom queries use `this.db`, the backend's own connection, typed for it (the Drizzle connection for Drizzle models). The scope that `list()`, `count()` and `deleteWhere()` take is a condition in the backend's terms: an SQL condition with Drizzle, a predicate in memory. `deleteWhere()` needs a scope: `deleteAll()` deletes every row. The memory backend refuses a second row with the same key, compares values strictly (dates by time, arrays and objects by content) and sorts missing values last in ascending order, as PostgreSQL does. It does not join transactions: a rolled-back unit of work keeps its rows.
+
+### Events
+
+A repository class carries events: `creating`, `updating` and `deleting` run before the write, may change `data` in place, and refuse the write by returning an error, which the method throws; `created`, `updated` and `deleted` run once the unit of work commits, and not at all when it rolls back (set `static afterCommit = false` to run them right after the write). Listeners run one after the other, in the order they subscribed, and the listeners after a refusal do not run. The listeners of a repository class also run for its subclasses. An error a listener throws reaches the caller as it is. Bulk methods (`updateAll`, `deleteAll`, `deleteWhere`) and custom queries do not fire events.
+
+```ts
+BookRepository.on('creating', ({ data }) => {
+	if (!data.title?.trim()) return new InvalidTitleError();
+});
+```
+
+An observer groups the listeners in a class, one method per event, typed against the events of its repository. Registered as a service and listed by a module, it is resolved from the container and runs in that module, so it can inject others; the module must be loaded when the repository fires an event. An observer that is not a service is built once, without arguments.
+
+```ts
+@Service.register()
+@Repository.observer(OrderRepository)
+export class OrderObserver {
+	constructor(@Service.inject() private readonly mailer: Mailer) {}
+
+	public async created({ row }: { row: Order }) {
+		await this.mailer.sendConfirmation(row.id);
+	}
+}
+```
+
+### Pruning
+
+`Pruner(Model)` is a job that deletes stale rows chunk by chunk. `prunable` names them, `chunkSize` sets the rows per statement (1,000 by default), and both are getters, read on each run. Without a `pruning(rows)` hook, rows are deleted without being loaded; with one, each chunk is loaded, given to it first, then deleted by the table's primary key. A `prunable` of `undefined` prunes nothing on that run. A pruner works on the table of the tenant in context when it runs: with per-tenant tables, run it once per tenant.
+
+```ts
+@Job.register({ queue: 'maintenance' })
+@Scheduler.job('0 3 * * *')
+export class PruneSessions extends Pruner(SessionModel) {
+	protected get prunable() {
+		return lt(sessions.expiresAt, new Date());
+	}
+}
+```
+
+### Other backends
+
+A backend package provides a `RepositoryAdapter` through its model adapter (`ModelAdapter.repository`), and declares the types of its tables, connection and scope so that `this.db` and the scopes are typed:
+
+```ts
+declare module '@elysiumjs/olympus/mnemosyne' {
+	interface RepositoryDrivers {
+		sqlite: { table: SQLiteTable; connection: SQLiteConnection; scope: SQL };
+	}
+}
+```
 
 ## Passwords and encryption
 

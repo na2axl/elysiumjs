@@ -1,7 +1,7 @@
 import { Service, ServiceScope } from '@elysiumjs/olympus';
-import { DrizzleRepository } from '@elysiumjs/drizzle';
+import { Repository } from '@elysiumjs/olympus/mnemosyne';
 
 import { {model} } from '#{module}/models/{model_name}.model';
 
 @Service.register({ name: '{alias}', scope: ServiceScope.{scope} })
-export class {name} extends DrizzleRepository({model}) {}
+export class {name} extends Repository({model}) {}

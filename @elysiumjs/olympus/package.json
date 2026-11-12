@@ -108,6 +108,7 @@
 		"cacheable": "^2.5.0",
 		"commander": "^15.0.0",
 		"elysia": "^2.0.0-rc.1",
+		"emittery": "^2.2.0",
 		"exact-mirror": "^1.2.6",
 		"http-status": "^2.1.0",
 		"jose": "^6.2.15",
