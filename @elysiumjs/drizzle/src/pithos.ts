@@ -19,6 +19,7 @@ import type {
 	FileStatus,
 	FileStoreDriver
 } from '@elysiumjs/olympus/pithos';
+import type { BuiltPgTable } from './built-table';
 import type { DrizzleStoreOptions, StoreTable } from './moirai';
 
 import { FileStore } from '@elysiumjs/olympus/pithos';
@@ -35,6 +36,27 @@ declare module '@elysiumjs/olympus' {
 
 const at = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' });
 
+/** The columns of the files table. */
+const fileColumns = () => ({
+	id: text('id').primaryKey(),
+	purpose: text('purpose').notNull(),
+	disk: text('disk').notNull(),
+	key: text('key').notNull(),
+	contentType: text('content_type').notNull(),
+	size: bigint('size', { mode: 'number' }).notNull(),
+	ownerType: text('owner_type').notNull(),
+	ownerId: text('owner_id').notNull(),
+	createdBy: text('created_by'),
+	status: text('status').$type<FileStatus>().notNull(),
+	createdAt: at('created_at').notNull(),
+	readyAt: at('ready_at'),
+	claimedAt: at('claimed_at'),
+	releasedAt: at('released_at'),
+	expiresAt: at('expires_at'),
+	deletedAt: at('deleted_at'),
+	rejection: text('rejection')
+});
+
 /**
  * Builds the table of the file store, in a schema when one is given. Export it from the Drizzle
  * schema so that `migration:generate` creates it.
@@ -48,45 +70,23 @@ const at = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' 
  * PithosModule.with({ disks, files: { store: () => FileStore.for('drizzle', { table: files }) } });
  * ```
  */
-export const filesTable = (name = 'files', schema?: string) => {
+export const filesTable = (name = 'files', schema?: string): FilesTable => {
 	const table = (schema ? pgSchema(schema).table : pgTable) as typeof pgTable;
-	return table(
-		name,
-		{
-			id: text('id').primaryKey(),
-			purpose: text('purpose').notNull(),
-			disk: text('disk').notNull(),
-			key: text('key').notNull(),
-			contentType: text('content_type').notNull(),
-			size: bigint('size', { mode: 'number' }).notNull(),
-			ownerType: text('owner_type').notNull(),
-			ownerId: text('owner_id').notNull(),
-			createdBy: text('created_by'),
-			status: text('status').$type<FileStatus>().notNull(),
-			createdAt: at('created_at').notNull(),
-			readyAt: at('ready_at'),
-			claimedAt: at('claimed_at'),
-			releasedAt: at('released_at'),
-			expiresAt: at('expires_at'),
-			deletedAt: at('deleted_at'),
-			rejection: text('rejection')
-		},
-		(t) => [
-			index(`${name}_owner_idx`).on(t.ownerType, t.ownerId),
-			// The cap on uploads in progress reads the pending files of one person.
-			index(`${name}_pending_idx`)
-				.on(t.createdBy, t.expiresAt)
-				.where(sql`${t.status} = 'pending'`),
-			// Pruning reads the files whose time is over.
-			index(`${name}_due_idx`)
-				.on(t.expiresAt)
-				.where(sql`${t.status} in ('pending', 'finishing', 'ready') and ${t.expiresAt} is not null`)
-		]
-	);
+	return table(name, fileColumns(), (t) => [
+		index(`${name}_owner_idx`).on(t.ownerType, t.ownerId),
+		// The cap on uploads in progress reads the pending files of one person.
+		index(`${name}_pending_idx`)
+			.on(t.createdBy, t.expiresAt)
+			.where(sql`${t.status} = 'pending'`),
+		// Pruning reads the files whose time is over.
+		index(`${name}_due_idx`)
+			.on(t.expiresAt)
+			.where(sql`${t.status} in ('pending', 'finishing', 'ready') and ${t.expiresAt} is not null`)
+	]);
 };
 
 /** The table `filesTable()` builds. */
-export type FilesTable = ReturnType<typeof filesTable>;
+export type FilesTable = BuiltPgTable<string, undefined, ReturnType<typeof fileColumns>>;
 
 type FileRow = FilesTable['$inferSelect'];
 

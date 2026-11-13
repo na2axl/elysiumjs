@@ -20,6 +20,7 @@ import type {
 	StoredNotification
 } from '@elysiumjs/olympus/hermes';
 import type { SQL } from 'drizzle-orm';
+import type { BuiltPgTable } from './built-table';
 import type { DrizzleStoreOptions, StoreTable } from './moirai';
 
 import { Clock } from '@elysiumjs/olympus';
@@ -37,6 +38,18 @@ declare module '@elysiumjs/olympus' {
 
 const at = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' });
 
+/** The columns of the notifications table. */
+const notificationColumns = () => ({
+	id: text('id').primaryKey(),
+	deliveryId: text('delivery_id').notNull(),
+	notifiableType: text('notifiable_type'),
+	notifiableId: text('notifiable_id').notNull(),
+	type: text('type').notNull(),
+	data: jsonb('data').$type<Record<string, unknown>>().notNull(),
+	readAt: at('read_at'),
+	createdAt: at('created_at').notNull()
+});
+
 /**
  * Builds the table of the notification store, in a schema when one is given. Export it from the
  * Drizzle schema so that `migration:generate` creates it.
@@ -50,30 +63,21 @@ const at = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' 
  * HermesModule.with({ store: () => new DrizzleNotificationStore({ table: notifications }) });
  * ```
  */
-export const notificationsTable = (name = 'notifications', schema?: string) => {
+export const notificationsTable = (name = 'notifications', schema?: string): NotificationsTable => {
 	const table = (schema ? pgSchema(schema).table : pgTable) as typeof pgTable;
-	return table(
-		name,
-		{
-			id: text('id').primaryKey(),
-			deliveryId: text('delivery_id').notNull(),
-			notifiableType: text('notifiable_type'),
-			notifiableId: text('notifiable_id').notNull(),
-			type: text('type').notNull(),
-			data: jsonb('data').$type<Record<string, unknown>>().notNull(),
-			readAt: at('read_at'),
-			createdAt: at('created_at').notNull()
-		},
-		(t) => [
-			uniqueIndex(`${name}_delivery_uq`).on(t.deliveryId),
-			index(`${name}_notifiable_idx`).on(t.notifiableId, t.notifiableType, t.id),
-			index(`${name}_unread_idx`).on(t.notifiableId, t.notifiableType).where(isNull(t.readAt))
-		]
-	);
+	return table(name, notificationColumns(), (t) => [
+		uniqueIndex(`${name}_delivery_uq`).on(t.deliveryId),
+		index(`${name}_notifiable_idx`).on(t.notifiableId, t.notifiableType, t.id),
+		index(`${name}_unread_idx`).on(t.notifiableId, t.notifiableType).where(isNull(t.readAt))
+	]);
 };
 
 /** The table `notificationsTable()` builds. */
-export type NotificationsTable = ReturnType<typeof notificationsTable>;
+export type NotificationsTable = BuiltPgTable<
+	string,
+	undefined,
+	ReturnType<typeof notificationColumns>
+>;
 
 /**
  * Keeps the notifications of the `inbox` channel in a Postgres table, built with

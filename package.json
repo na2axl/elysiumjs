@@ -43,5 +43,8 @@
 		"turbo": "^2.11.11",
 		"type-fest": "^5.10.0",
 		"typescript": "^7.0.2"
+	},
+	"overrides": {
+		"drizzle-orm": "1.0.0-rc.5"
 	}
 }

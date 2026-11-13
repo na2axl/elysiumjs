@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { DrizzleConfig } from 'drizzle-orm';
+import type { AnyRelations, DrizzleConfig } from 'drizzle-orm';
 import type { DrizzleDatabaseCache } from './cache';
 import type { DrizzleConnection } from './database';
 import type { MigrationConnection } from './migration';
@@ -23,7 +23,7 @@ import { ElysiumError } from '@elysiumjs/olympus';
  * What a driver connects with: the Drizzle options of the connection and its query cache.
  * @author Axel Nana <ax.lnana@outlook.com>
  */
-export type DrizzleDriverConfig = Omit<DrizzleConfig<Record<string, unknown>>, 'cache'> & {
+export type DrizzleDriverConfig = Omit<DrizzleConfig<AnyRelations>, 'cache'> & {
 	cache?: DrizzleDatabaseCache;
 };
 
