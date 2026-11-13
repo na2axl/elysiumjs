@@ -1236,17 +1236,22 @@ export namespace Http {
 							if (result instanceof DomainError) throw result;
 							if (route.view && result != null) {
 								const { view, kind, pagination } = route.view;
+								const json = Views.rendersJson(view);
 								if (isSerializable(result)) {
+									if (!json) c.set.headers['content-type'] ??= view.contentType;
 									return Views.render(view, kind, result, pagination) as TResult;
 								}
 								// A status the handler set, such as `c.status(201, post)`: its body is rendered
-								// and serialized through the view, and keeps its status and headers.
+								// by the view, and keeps its status and headers.
 								if (result instanceof ElysiaStatus && result.response != null) {
-									const body = Resource.serialize(
-										Views.schemaOf(view, kind, pagination),
-										Views.render(view, kind, result.response, pagination)
-									);
-									return new ElysiaStatus(result.status, body, result.headers) as TResult;
+									const rendered = Views.render(view, kind, result.response, pagination);
+									const body = json
+										? Resource.serialize(Views.schemaOf(view, kind, pagination), rendered)
+										: rendered;
+									const headers = json
+										? result.headers
+										: { 'content-type': view.contentType, ...result.headers };
+									return new ElysiaStatus(result.status, body, headers) as TResult;
 								}
 							}
 							return result as TResult;
@@ -1317,6 +1322,8 @@ export namespace Http {
 						 */
 						const toBody = (c: Context, result: unknown): unknown => {
 							if (!isSerializable(result)) return result;
+							// A view that renders another media type, such as HTML, sends what it rendered.
+							if (route.view && !Views.rendersJson(route.view.view)) return result;
 							if (!successSchema) return toJsonForm(result);
 							const fields = readFields(c.query as Record<string, unknown>);
 							const body = Resource.serialize(successSchema, result, { fields });
@@ -1472,7 +1479,11 @@ export namespace Http {
 							detail: {
 								tags: props.tags,
 								description: route.description,
-								operationId: route.operationId
+								operationId: route.operationId,
+								// The media type of a view that does not render JSON, for the OpenAPI document.
+								...(route.view && !Views.rendersJson(route.view.view)
+									? { [Views.MEDIA_TYPE_KEYWORD]: route.view.view.contentType }
+									: {})
 							},
 							...(route.parse && { parse: route.parse }),
 							body: isValidator ? route.body?.validator?.schema : route.body?.schema,

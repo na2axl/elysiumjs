@@ -227,6 +227,18 @@ export class PostController {
 - The handler's value is rendered before the route's interceptors see it. A `Response`, a stream or a problem is answered as it is. `null` and `undefined` are not rendered and fail the response schema, so a handler answers a missing item with a problem such as `NotFoundError`.
 - A view must define `render`, and a route that answers with a view always serializes its result and cannot send events: the route is refused when it is declared. Generator handlers are answered as they are. A status the handler sets with `c.status(201, post)` keeps its code, and its body is rendered by the view.
 - The return type of the handler is not checked against the input of `render`: annotate it, as in `show(): Promise<PostModel | NotFoundError>`.
+- A view renders JSON unless it names another media type in `contentType`. A view of HTML, CSV or a feed renders a string or bytes, and its response is sent as rendered with that `content-type`, which the OpenAPI document gives as the media type of its success responses. A sparse fieldset (`?fields=id,title`) applies only to JSON views.
+
+```ts
+export class PostPage extends View(t.String()) {
+	public static override readonly contentType = 'text/html; charset=utf-8';
+
+	public static override render(post: PostModel): string {
+		return `<article><h1>${escapeHtml(post.title)}</h1>${post.html}</article>`;
+	}
+}
+```
+
 - Views have no instances and take no services: `render` reads its input, and static APIs such as `Clock` or other views. `Http.currentContext()` gives the request to a view that cannot do without it.
 - `styx make:view --name Post` writes `post.view.ts` in the `views` folder of the module, and `styx routes:generate` types the routes rendered by a view with the schema of the view.
 

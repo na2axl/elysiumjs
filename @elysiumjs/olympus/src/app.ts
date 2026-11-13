@@ -56,6 +56,7 @@ import { applyHttpSecurity } from './security';
 import { Service } from './service';
 import { createTestingApp, createTestingHttpApp } from './testing';
 import { deepMerge, Symbols } from './utils';
+import { Views } from './view';
 
 /**
  * An application plugin, consisting of a function that returns an Elysia instance.
@@ -666,7 +667,13 @@ export abstract class Application extends InteractsWithConsole {
 			// ahead-of-time build it registers a static page, so the compiled route would differ from
 			// the one workerd mounts. Embedding the spec makes both register the same handler.
 			const workers = Runtime.find()?.name === 'workers';
-			this.#elysia.use(openapiPlugin(workers ? { embedSpec: true, ...openapi } : openapi));
+			const config = workers ? { embedSpec: true, ...openapi } : openapi;
+			// The operations of views that render another media type than JSON are documented under it.
+			const specPath = config.specPath ?? `${config.path ?? '/openapi'}/json`;
+			this.#elysia.onAfterHandle({ as: 'global' }, ({ path, responseValue }) => {
+				if (path === specPath) Views.documentMediaTypes(responseValue);
+			});
+			this.#elysia.use(openapiPlugin(config));
 		}
 
 		for (const plugin of plugins ?? []) {

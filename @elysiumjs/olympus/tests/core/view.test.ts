@@ -44,6 +44,33 @@ class PostView extends View(PostSchema) {
 
 class EmptyView extends View(t.Object({})) {}
 
+class PostPage extends View(t.String()) {
+	public static override readonly contentType = 'text/html; charset=utf-8';
+
+	public static override render(post: Post): string {
+		return `<h1>${post.title}</h1>`;
+	}
+}
+
+@Http.controller('/pages')
+class PageController {
+	@Http.get('/:id', { response: PostPage })
+	public show() {
+		return post('1');
+	}
+
+	@Http.post('/', { response: PostPage })
+	public create(@Http.context() c: { status: (code: number, value: unknown) => unknown }) {
+		return c.status(201, post('2'));
+	}
+}
+
+@Module.register({ controllers: [PageController] })
+class PageModule extends Module {}
+
+@Application.register({ modules: [PageModule], openapi: {} })
+class PageApp extends Application {}
+
 const at = new Date('2026-01-02T03:04:05.000Z');
 const post = (id: string): Post => ({ id, title: `post ${id}`, secret: 's', publishedAt: at });
 const rendered = (id: string) => ({
@@ -277,5 +304,25 @@ describe('View over HTTP', () => {
 		expect(await enveloped.json()).toEqual({ data: [rendered('1')] });
 		const sparse = await testing.http.get('/posts/one?fields=id');
 		expect(await sparse.json()).toEqual({ id: '1' });
+	});
+
+	it('sends the body and the media type of a view that does not render JSON', async () => {
+		testing = await Application.testing({ app: PageApp });
+		const page = await testing.http.get('/pages/1?fields=id');
+		expect(page.headers.get('content-type')).toBe('text/html; charset=utf-8');
+		expect(await page.text()).toBe('<h1>post 1</h1>');
+		const created = await testing.http.post('/pages');
+		expect(created.status).toBe(201);
+		expect(created.headers.get('content-type')).toBe('text/html; charset=utf-8');
+		expect(await created.text()).toBe('<h1>post 2</h1>');
+	});
+
+	it('documents the media type of a view in OpenAPI', async () => {
+		testing = await Application.testing({ app: PageApp });
+		const document = await (await testing.http.get('/openapi/json')).json();
+		const show = document.paths['/pages/{id}'].get;
+		expect(Object.keys(show.responses['200'].content)).toEqual(['text/html; charset=utf-8']);
+		expect(Views.rendersJson(PostView)).toBe(true);
+		expect(Views.rendersJson(PostPage)).toBe(false);
 	});
 });

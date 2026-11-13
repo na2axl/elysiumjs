@@ -101,6 +101,7 @@ type WithDates<T> = T extends string
 export type ViewClass<S extends TSchema = TSchema> = {
 	readonly name: string;
 	readonly schema: S;
+	readonly contentType: string;
 	render(input: never): unknown;
 	renderAll(inputs: readonly never[]): unknown[];
 	renderPage(page: never): unknown;
@@ -193,6 +194,13 @@ export const View = <S extends TSchema>(schema: S) => {
 		public static readonly schema: S = schema;
 
 		/**
+		 * The media type of what the view renders, sent as the `content-type` of its responses and
+		 * documented in OpenAPI. JSON by default; a view that renders a page of HTML, a CSV export
+		 * or a feed names its own, and renders the body as a string or bytes.
+		 */
+		public static readonly contentType: string = 'application/json';
+
+		/**
 		 * Renders one input. Every view defines it.
 		 * @param input What the route's handler returns.
 		 */
@@ -250,6 +258,34 @@ export const View = <S extends TSchema>(schema: S) => {
  * @author Axel Nana <ax.lnana@outlook.com>
  */
 export namespace Views {
+	/** The OpenAPI extension that names the media type of an operation rendered by a view. */
+	export const MEDIA_TYPE_KEYWORD = 'x-elysium-media-type';
+
+	/**
+	 * Documents the success responses of the operations rendered by a view that does not render
+	 * JSON under the media type of the view, in an OpenAPI document. The document is changed in
+	 * place.
+	 * @param document The OpenAPI document.
+	 */
+	export const documentMediaTypes = (document: unknown): void => {
+		const paths = (document as { paths?: Record<string, Record<string, unknown>> } | null)?.paths;
+		for (const item of Object.values(paths ?? {})) {
+			for (const operation of Object.values(item ?? {})) {
+				const op = operation as {
+					[MEDIA_TYPE_KEYWORD]?: string;
+					responses?: Record<string, { content?: Record<string, unknown> }>;
+				};
+				const mediaType = op?.[MEDIA_TYPE_KEYWORD];
+				if (typeof mediaType !== 'string') continue;
+				for (const [status, response] of Object.entries(op.responses ?? {})) {
+					if (!/^2/.test(status) || !response?.content) continue;
+					const [entry] = Object.values(response.content);
+					if (entry !== undefined) response.content = { [mediaType]: entry };
+				}
+			}
+		}
+	};
+
 	/** Whether a value is a view class. */
 	export const isView = (value: unknown): value is ViewClass =>
 		typeof value === 'function' && (value as unknown as Record<symbol, unknown>)[VIEW] === true;
@@ -304,6 +340,14 @@ export namespace Views {
 							pageResponseSchema(view.schema, 'cursor'),
 							pageResponseSchema(view.schema, 'offset')
 						]);
+
+	/**
+	 * Whether a view renders JSON: its responses are serialized through its schema, with sparse
+	 * fieldsets. Other views send what `render` answers as their body.
+	 * @param view The view class.
+	 */
+	export const rendersJson = (view: ViewClass): boolean =>
+		/^application\/(?:[\w.+-]+\+)?json\b/i.test(view.contentType);
 
 	/**
 	 * Whether a view class defines its own `render` method.
