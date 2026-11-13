@@ -213,7 +213,7 @@ export {
 	validationExtensions
 } from './problem';
 export { type ExceptionFilter, type FilterClass, type FilterContext, Catch } from './filter';
-export { type ResponseSchemas, Resource } from './resource';
+export { type JsonForm, type ResponseSchemas, Resource } from './resource';
 export {
 	type AppRateLimitOptions,
 	type RateLimitHit,

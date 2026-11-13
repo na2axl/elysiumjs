@@ -20,6 +20,8 @@ import Emittery from 'emittery';
 import { ElysiumError, ModuleContext, Service } from '../index';
 import { Metadata } from '../metadata';
 import { Symbols } from '../utils';
+import { Models } from './model';
+import { Listing } from './query';
 import { UnitOfWork } from './unit-of-work';
 
 /**
@@ -289,12 +291,15 @@ const createRepository = <TModel extends ModelClass>(
 	options: RepositoryOptions<TModel['$inferSelect']> = {}
 ) => {
 	type TSelect = TModel['$inferSelect'];
+	type TEntity = InstanceType<TModel>;
 	type TInsert = TModel['$inferInsert'];
 	type TUpdate = TModel['$inferUpdate'];
 	type TTable = TModel['table'];
 	type TKey = RowKey | Partial<TSelect>;
 	type TScope = ScopeOf<TTable>;
-	type TEvents = RepositoryEvents<TSelect, TInsert, TUpdate>;
+	type TEvents = RepositoryEvents<TEntity, TInsert, TUpdate>;
+
+	Models.register(model);
 
 	const adapter = (): RepositoryAdapter<TTable, ConnectionOf<TTable>, TScope> => {
 		const found = model.adapter?.repository;
@@ -332,6 +337,14 @@ const createRepository = <TModel extends ModelClass>(
 		}
 		return Object.fromEntries(columns.map((column) => [column, values[column]]));
 	};
+
+	/** The instances of the model for rows: one row, a list of rows, or `null`. */
+	function hydrate(row: Row): TEntity;
+	function hydrate(row: Row | null): TEntity | null;
+	function hydrate(rows: readonly Row[]): TEntity[];
+	function hydrate(row: Row | readonly Row[] | null): unknown {
+		return (model.hydrate as (row: unknown) => unknown).call(model, row);
+	}
 
 	/** The connection name of a repository instance. */
 	const connectionOf = (repository: object): string =>
@@ -378,7 +391,7 @@ const createRepository = <TModel extends ModelClass>(
 		} else await emit();
 	};
 
-	abstract class R implements RepositoryInterface<TSelect, TInsert, TUpdate, TKey> {
+	abstract class R implements RepositoryInterface<TEntity, TInsert, TUpdate, TKey, TSelect> {
 		/**
 		 * The model class wrapped by this repository.
 		 */
@@ -438,9 +451,27 @@ const createRepository = <TModel extends ModelClass>(
 			return adapter().run(connectionOf(this), operation);
 		}
 
+		/**
+		 * Creates instances of the model from rows, such as those a custom query on `this.db`
+		 * returns: one row, a list of rows, or `null`.
+		 * @param row The row, the rows, or `null`.
+		 * @example
+		 * ```ts
+		 * public async published() {
+		 * 	return this.hydrate(await this.db.select().from(books).where(eq(books.published, true)));
+		 * }
+		 * ```
+		 */
+		public hydrate(row: Row): TEntity;
+		public hydrate(row: Row | null): TEntity | null;
+		public hydrate(rows: readonly Row[]): TEntity[];
+		public hydrate(row: Row | readonly Row[] | null): unknown {
+			return hydrate(row as Row);
+		}
+
 		/** Retrieves every row. */
-		public async all(): Promise<TSelect[]> {
-			return (await adapter().all(targetOf(this))) as TSelect[];
+		public async all(): Promise<TEntity[]> {
+			return hydrate(await adapter().all(targetOf(this)));
 		}
 
 		/**
@@ -448,8 +479,8 @@ const createRepository = <TModel extends ModelClass>(
 		 * @param id The key: its value, or an object of the key column values.
 		 * @returns The row, or `null` when none has that key.
 		 */
-		public async find(id: TKey): Promise<TSelect | null> {
-			return (await adapter().find(targetOf(this), keyValues(id))) as TSelect | null;
+		public async find(id: TKey): Promise<TEntity | null> {
+			return hydrate(await adapter().find(targetOf(this), keyValues(id)));
 		}
 
 		/**
@@ -461,8 +492,8 @@ const createRepository = <TModel extends ModelClass>(
 		public async findBy<TColumn extends keyof TSelect>(
 			column: TColumn,
 			value: TSelect[TColumn]
-		): Promise<TSelect | null> {
-			return (await adapter().findBy(targetOf(this), column as string, value)) as TSelect | null;
+		): Promise<TEntity | null> {
+			return hydrate(await adapter().findBy(targetOf(this), column as string, value));
 		}
 
 		/**
@@ -471,10 +502,10 @@ const createRepository = <TModel extends ModelClass>(
 		 * @param data The data.
 		 * @returns The inserted row.
 		 */
-		public async insert(data: TInsert): Promise<TSelect> {
+		public async insert(data: TInsert): Promise<TEntity> {
 			const payload = { data: { ...(data as Row) } };
 			await before(this, 'creating', payload);
-			const row = (await adapter().insert(targetOf(this), payload.data)) as TSelect;
+			const row = hydrate(await adapter().insert(targetOf(this), payload.data));
 			await after(this, 'created', row);
 			return row;
 		}
@@ -486,11 +517,11 @@ const createRepository = <TModel extends ModelClass>(
 		 * @param data The changes.
 		 * @returns The updated row, or `null` when none has that key.
 		 */
-		public async update(id: TKey, data: TUpdate): Promise<TSelect | null> {
+		public async update(id: TKey, data: TUpdate): Promise<TEntity | null> {
 			const values = keyValues(id);
 			const payload = { key: id, data: { ...(data as Row) } };
 			await before(this, 'updating', payload);
-			const row = (await adapter().update(targetOf(this), values, payload.data)) as TSelect | null;
+			const row = hydrate(await adapter().update(targetOf(this), values, payload.data));
 			if (row) await after(this, 'updated', row);
 			return row;
 		}
@@ -500,8 +531,8 @@ const createRepository = <TModel extends ModelClass>(
 		 * @param data The changes.
 		 * @returns The updated rows.
 		 */
-		public async updateAll(data: TUpdate): Promise<TSelect[]> {
-			return (await adapter().updateAll(targetOf(this), data as Row)) as TSelect[];
+		public async updateAll(data: TUpdate): Promise<TEntity[]> {
+			return hydrate(await adapter().updateAll(targetOf(this), data as Row));
 		}
 
 		/**
@@ -510,10 +541,10 @@ const createRepository = <TModel extends ModelClass>(
 		 * @param id The key.
 		 * @returns The deleted row, or `null` when none has that key.
 		 */
-		public async delete(id: TKey): Promise<TSelect | null> {
+		public async delete(id: TKey): Promise<TEntity | null> {
 			const values = keyValues(id);
 			await before(this, 'deleting', { key: id });
-			const row = (await adapter().delete(targetOf(this), values)) as TSelect | null;
+			const row = hydrate(await adapter().delete(targetOf(this), values));
 			if (row) await after(this, 'deleted', row);
 			return row;
 		}
@@ -522,8 +553,8 @@ const createRepository = <TModel extends ModelClass>(
 		 * Deletes every row, without events.
 		 * @returns The deleted rows.
 		 */
-		public async deleteAll(): Promise<TSelect[]> {
-			return (await adapter().deleteAll(targetOf(this))) as TSelect[];
+		public async deleteAll(): Promise<TEntity[]> {
+			return hydrate(await adapter().deleteAll(targetOf(this)));
 		}
 
 		/**
@@ -558,11 +589,12 @@ const createRepository = <TModel extends ModelClass>(
 		 * terms.
 		 * @returns The rows of the page and the cursor of the next one, or the page and the total.
 		 */
-		public async list(query: ParsedQuery<'offset'>, scope?: TScope): Promise<OffsetPage<TSelect>>;
-		public async list(query: ParsedQuery<'cursor'>, scope?: TScope): Promise<CursorPage<TSelect>>;
-		public async list(query: ParsedQuery, scope?: TScope): Promise<Page<TSelect>>;
-		public async list(query: ParsedQuery, scope?: TScope): Promise<Page<TSelect>> {
-			return (await adapter().list(targetOf(this), query, scope)) as Page<TSelect>;
+		public async list(query: ParsedQuery<'offset'>, scope?: TScope): Promise<OffsetPage<TEntity>>;
+		public async list(query: ParsedQuery<'cursor'>, scope?: TScope): Promise<CursorPage<TEntity>>;
+		public async list(query: ParsedQuery, scope?: TScope): Promise<Page<TEntity>>;
+		public async list(query: ParsedQuery, scope?: TScope): Promise<Page<TEntity>> {
+			const page = await adapter().list(targetOf(this), query, scope);
+			return Listing.mapPage(page, (row) => hydrate(row));
 		}
 
 		/**

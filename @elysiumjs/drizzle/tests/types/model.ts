@@ -83,3 +83,29 @@ export class WrongObserver {
 		return data;
 	}
 }
+
+// Repositories answer instances of the model: its columns, getters and methods.
+const people = pgTable('people', { id: integer().primaryKey(), name: text().notNull() });
+export class Person extends DrizzleModel(people) {
+	public static override readonly hidden = ['name'] as const;
+	public static override readonly appends = ['initial'] as const;
+
+	public get initial(): string {
+		return this.name.charAt(0);
+	}
+}
+export class PersonRepository extends Repository(Person) {
+	public async named(name: string): Promise<Person[]> {
+		return this.hydrate(await this.db.select().from(people).where(eq(people.name, name)));
+	}
+}
+export const person = async (r: PersonRepository): Promise<string | undefined> => {
+	const p = await r.find(1);
+	const instance: Person | null = p;
+	return instance?.initial;
+};
+export const hydrated: Person = Person.hydrate({ id: 1, name: 'Ada' });
+// @ts-expect-error hidden names columns
+export class BadHidden extends DrizzleModel(people) {
+	public static override readonly hidden = ['nope'] as const;
+}

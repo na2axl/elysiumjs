@@ -42,7 +42,7 @@ import { applyMiddlewares, enlist, executeMiddlewareChain, makeMiddlewares } fro
 import { ModuleContext } from './module-context';
 import { BadRequestError, DomainError, InternalError, validationProblemSchema } from './problem';
 import { enforceRateLimit, rateLimitOf, TooManyRequestsError } from './rate-limit';
-import { isSerializable, isStatusMap, readFields, Resource } from './resource';
+import { isSerializable, isStatusMap, readFields, Resource, toJsonForm } from './resource';
 import { Result } from './result';
 import { Runtime } from './runtime';
 import { PayloadTooLargeError } from './security';
@@ -1244,7 +1244,8 @@ export namespace Http {
 						 * past the validation of the full schema.
 						 */
 						const toBody = (c: Context, result: unknown): unknown => {
-							if (!successSchema || !isSerializable(result)) return result;
+							if (!isSerializable(result)) return result;
+							if (!successSchema) return toJsonForm(result);
 							const fields = readFields(c.query as Record<string, unknown>);
 							const body = Resource.serialize(successSchema, result, { fields });
 							if (!fields) return body;

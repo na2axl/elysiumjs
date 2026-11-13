@@ -238,7 +238,9 @@ describe('Cache.store()', () => {
 		// Check if Keyv was instantiated with the correct namespace
 		expect(keyvSpy).toHaveBeenCalledWith({
 			store: expect.any(Object),
-			namespace: 'cache__tag1__tag2'
+			namespace: 'cache__tag1__tag2',
+			serialize: expect.any(Function),
+			deserialize: expect.any(Function)
 		});
 
 		// Check if createCache was called
@@ -380,7 +382,9 @@ describe('Cache.memory', () => {
 		// Check if Keyv was instantiated with the correct namespace
 		expect(keyvSpy).toHaveBeenCalledWith({
 			store: expect.any(Object),
-			namespace: 'cache__tag1__tag2'
+			namespace: 'cache__tag1__tag2',
+			serialize: expect.any(Function),
+			deserialize: expect.any(Function)
 		});
 
 		// Check if createCache was called

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import type { ModelAdapter } from './interfaces';
+import type { TypedModel } from './model';
 import type { ParsedFilter, ParsedQuery } from './query';
 import type { RepositoryAdapter, RepositoryTarget, Row } from './repository';
 
@@ -376,10 +377,5 @@ export const MemoryModel = <TRow extends Row, TInsert = Partial<TRow>, TUpdate =
 	if (options.supportTenancy !== undefined) {
 		Object.defineProperty(Base, 'supportTenancy', { value: options.supportTenancy });
 	}
-	return Base as typeof Base & {
-		readonly $inferSelect: TRow;
-		readonly $inferInsert: TInsert;
-		readonly $inferUpdate: TUpdate;
-		readonly table: MemoryTable;
-	};
+	return Base as unknown as TypedModel<typeof Base, TRow, TInsert, TUpdate, MemoryTable>;
 };

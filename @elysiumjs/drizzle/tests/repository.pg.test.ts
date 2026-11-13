@@ -93,6 +93,7 @@ describe.skipIf(!url)('Repository on PostgreSQL', () => {
 	it('runs CRUD and listing', async () => {
 		const repository = new ArticleRepository();
 		expect(await repository.find(1)).toEqual({ id: 1, title: 'Article 1', views: 10 });
+		expect(await repository.find(1)).toBeInstanceOf(Article);
 		expect(await repository.update(1, { views: 99 })).toMatchObject({ views: 99 });
 		expect(await repository.exists(2)).toBe(true);
 		expect(await repository.delete(2)).toMatchObject({ id: 2 });
@@ -104,6 +105,8 @@ describe.skipIf(!url)('Repository on PostgreSQL', () => {
 		} as const;
 		const page = await repository.list(Listing.parse(spec, {}));
 		expect(page.data.map((row) => row.id)).toEqual([1, 5]);
+		expect(page.data[0]).toBeInstanceOf(Article);
+		expect(Article.modelName).toBe('public.pg_repo_articles');
 		expect(await repository.count(undefined, gt(articles.views, 30))).toBe(3);
 	});
 

@@ -15,8 +15,9 @@
 import type { TObject, TSchema } from '../index';
 import type { ModelClass } from './interfaces';
 
-import { Resource } from '../index';
 import { t } from 'elysia';
+
+import { Resource } from '../index';
 
 /**
  * Options of {@link ModelResource}.
@@ -36,7 +37,8 @@ export type ModelResourceOptions<TKey extends string = string> = {
 
 /**
  * The response schema of a model: its select schema, with hidden, picked and omitted columns
- * applied. Use it as a route's `response`: the handler can return model rows as they are, and
+ * applied. The model's own `hidden` columns are hidden too, and the getters in its `appends` are
+ * exposed, typed by `extend` when it names them. Use it as a route's `response`: the handler can return model rows as they are, and
  * the response holds only the exposed fields, with dates as ISO strings.
  * @author Axel Nana <ax.lnana@outlook.com>
  * @param model The model class.
@@ -56,7 +58,7 @@ export const ModelResource = <TModel extends ModelClass>(
 	options: ModelResourceOptions<Extract<keyof TModel['$inferSelect'], string>> = {}
 ): TObject => {
 	const select = model.selectSchema as unknown as { properties: Record<string, TSchema> };
-	const hidden = new Set<string>(options.hidden ?? []);
+	const hidden = new Set<string>([...(model.hidden ?? []), ...(options.hidden ?? [])]);
 	const omit = new Set<string>(options.omit ?? []);
 	const pick = options.pick ? new Set<string>(options.pick) : undefined;
 
@@ -64,6 +66,11 @@ export const ModelResource = <TModel extends ModelClass>(
 	for (const [name, schema] of Object.entries(select.properties)) {
 		if (omit.has(name) || (pick && !pick.has(name) && !hidden.has(name))) continue;
 		properties[name] = hidden.has(name) ? Resource.hidden(schema) : schema;
+	}
+	// The getters the model appends, typed by `extend` when it gives their schema.
+	for (const name of model.appends ?? []) {
+		if (hidden.has(name) || omit.has(name) || (pick && !pick.has(name))) continue;
+		properties[name] = t.Unknown();
 	}
 	return t.Object({ ...properties, ...options.extend });
 };

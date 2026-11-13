@@ -13,12 +13,104 @@
 // limitations under the License.
 
 import type { TSchema } from '../index';
-import type { ColumnMetadata, ModelAdapter } from './interfaces';
+import type { ColumnMetadata, ModelAdapter, ModelClass } from './interfaces';
 
 import { t } from 'elysia';
 
-import { Application } from '../index';
+import { Application, ElysiumError, Serializer } from '../index';
 import { getCurrentTenant, getTenancyStrategy } from './tenancy';
+
+/** Marks the prototype of the model classes, so that their instances are told apart. */
+const MODEL = Symbol.for('elysium:mnemosyne:model');
+
+/**
+ * Thrown when two model classes have the same `modelName`.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export class DuplicateModelError extends ElysiumError {
+	constructor(public readonly model: string) {
+		super(`Two model classes are named "${model}": give one of them another \`static modelName\`.`);
+	}
+}
+
+/**
+ * Thrown when a value names a model that is not registered, such as a cached model whose class
+ * this process has not loaded.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export class UnknownModelError extends ElysiumError {
+	constructor(public readonly model: string) {
+		super(
+			`No model is registered with the name "${model}": import its repository, or register ` +
+				'the model with Models.register().'
+		);
+	}
+}
+
+/** The registered model classes, by their `modelName`. */
+const registry = new Map<string, ModelClass>();
+
+/**
+ * The model classes known by name, so that their instances can be read back from JSON: from
+ * the cache, or from the input of a queued job. A model is registered when a repository is
+ * created over it, when it hydrates rows, and when one of its instances is written.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export namespace Models {
+	/**
+	 * Registers a model class under its `modelName`. Registering the same class again does
+	 * nothing.
+	 * @param model The model class.
+	 * @throws {DuplicateModelError} When another class has the name.
+	 */
+	export const register = <TModel extends ModelClass>(model: TModel): TModel => {
+		const existing = registry.get(model.modelName);
+		if (existing === model) return model;
+		if (existing) throw new DuplicateModelError(model.modelName);
+		registry.set(model.modelName, model);
+		return model;
+	};
+
+	/** The model class registered under a name, if any. */
+	export const find = (name: string): ModelClass | undefined => registry.get(name);
+
+	/** Whether a value is an instance of a model class. */
+	export const isInstance = (value: unknown): value is object =>
+		typeof value === 'object' && value !== null && (value as { [MODEL]?: boolean })[MODEL] === true;
+
+	/**
+	 * The column values of a model instance, without its getters.
+	 * @param instance The model instance.
+	 */
+	export const attributes = (instance: object): Record<string, unknown> => ({ ...instance });
+}
+
+/**
+ * Writes model instances as their model name and column values, read back as instances of the
+ * same class. The column values are written with `Json` again, so dates and the values of other
+ * serializers survive.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+@Serializer.register({ name: 'model' })
+export class ModelSerializer extends Serializer<
+	object,
+	{ model: string; attributes: Record<string, unknown> }
+> {
+	public supports(value: unknown): boolean {
+		return Models.isInstance(value);
+	}
+
+	public serialize(instance: object) {
+		const model = Models.register(instance.constructor as ModelClass);
+		return { model: model.modelName, attributes: Models.attributes(instance) };
+	}
+
+	public deserialize(value: { model: string; attributes: Record<string, unknown> }) {
+		const model = Models.find(value.model);
+		if (!model) throw new UnknownModelError(value.model);
+		return model.hydrate(value.attributes) as object;
+	}
+}
 
 /**
  * Creates a validation schema from normalized column metadata.
@@ -113,6 +205,80 @@ export const AbstractModel = <TTable, TColumns extends Record<string, unknown>>(
 
 	class M {
 		/**
+		 * Creates an instance holding the column values of a row. Repositories create them with
+		 * {@link M.hydrate}.
+		 * @param attributes The column values.
+		 */
+		public constructor(attributes?: Record<string, unknown>) {
+			if (attributes) Object.assign(this, attributes);
+		}
+
+		/**
+		 * The name the model is known by in cached values and queued jobs: unique, and stable
+		 * across deploys. Defaults to the table name, with its schema when the backend has
+		 * schemas (`public.posts`). Override it when two models share a table.
+		 */
+		public static readonly modelName: string = adapter.getModelName?.(baseTable) ?? tableName;
+
+		/**
+		 * The columns left out of {@link M.toJSON}, and hidden by `ModelResource()`.
+		 */
+		public static readonly hidden: readonly string[] = [];
+
+		/**
+		 * The getters written by {@link M.toJSON} besides the columns, and exposed by
+		 * `ModelResource()`.
+		 */
+		public static readonly appends: readonly string[] = [];
+
+		/**
+		 * Creates instances of the model from rows: one row, a list of rows, or `null`.
+		 * @param row The row, the rows, or `null`.
+		 */
+		public static hydrate<T extends new (...args: any[]) => any>(
+			this: T,
+			row: Record<string, unknown>
+		): InstanceType<T>;
+		public static hydrate<T extends new (...args: any[]) => any>(
+			this: T,
+			row: Record<string, unknown> | null
+		): InstanceType<T> | null;
+		public static hydrate<T extends new (...args: any[]) => any>(
+			this: T,
+			rows: readonly Record<string, unknown>[]
+		): InstanceType<T>[];
+		public static hydrate(
+			this: new (attributes?: Record<string, unknown>) => object,
+			row: Record<string, unknown> | readonly Record<string, unknown>[] | null
+		): unknown {
+			Models.register(this as unknown as ModelClass);
+			if (row === null || row === undefined) return null;
+			if (Array.isArray(row))
+				return row.map((item) => (item instanceof this ? item : new this(item)));
+			return row instanceof this ? row : new this(row as Record<string, unknown>);
+		}
+
+		/**
+		 * The JSON form of the instance: its columns and the getters in `appends`, without the
+		 * columns in `hidden`.
+		 */
+		public toJSON(): Record<string, unknown> {
+			const model = this.constructor as unknown as {
+				hidden: readonly string[];
+				appends: readonly string[];
+			};
+			const hidden = new Set(model.hidden);
+			const json: Record<string, unknown> = {};
+			for (const [key, value] of Object.entries(this)) {
+				if (!hidden.has(key)) json[key] = value;
+			}
+			for (const name of model.appends) {
+				if (!hidden.has(name)) json[name] = (this as Record<string, unknown>)[name];
+			}
+			return json;
+		}
+
+		/**
 		 * The data type returned by the select queries.
 		 */
 		public static readonly $inferSelect: unknown = undefined;
@@ -191,5 +357,45 @@ export const AbstractModel = <TTable, TColumns extends Record<string, unknown>>(
 		public static readonly adapter: ModelAdapter<TTable> = adapter;
 	}
 
+	Object.defineProperty(M.prototype, MODEL, { value: true });
+
 	return M;
+};
+
+/**
+ * An instance of a model: its column values, and a `toJSON()` typed as them, so that the routes
+ * answering instances are typed by their columns for clients. The getters in `appends` and the
+ * columns in `hidden` change the JSON at run time only: a response schema types a response precisely.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export type ModelInstance<TInstance, TSelect> = Omit<TInstance, 'toJSON'> &
+	TSelect & { toJSON(): TSelect };
+
+/**
+ * The type of a model class made by a backend's model helper: the statics of the base class, and
+ * instances holding the column values of a row, typed as the select type.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ * @template TBase The class made by {@link AbstractModel}.
+ * @template TSelect The type returned by select queries.
+ * @template TInsert The type needed by insert queries.
+ * @template TUpdate The type needed by update queries.
+ * @template TTable The table type.
+ */
+export type TypedModel<
+	TBase extends new (...args: any[]) => any,
+	TSelect,
+	TInsert,
+	TUpdate,
+	TTable
+> = Omit<
+	TBase,
+	'prototype' | '$inferSelect' | '$inferInsert' | '$inferUpdate' | 'table' | 'hidden'
+> & {
+	new (attributes?: Partial<TSelect>): ModelInstance<InstanceType<TBase>, TSelect>;
+	readonly prototype: ModelInstance<InstanceType<TBase>, TSelect>;
+	readonly $inferSelect: TSelect;
+	readonly $inferInsert: TInsert;
+	readonly $inferUpdate: TUpdate;
+	readonly table: TTable;
+	readonly hidden: readonly (keyof TSelect & string)[];
 };

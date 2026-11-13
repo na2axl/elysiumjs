@@ -336,6 +336,38 @@ export const isSerializable = (value: unknown): boolean =>
 	!(typeof value === 'object' && value !== null && Symbol.asyncIterator in value);
 
 /**
+ * The type a value has once written as JSON, as clients receive it: values with a `toJSON()`
+ * method, such as model instances, take the type it answers, at any depth. Dates, files and
+ * functions are kept, since clients read them on their own terms.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ * @template T The type of the value.
+ */
+export type JsonForm<T> = T extends Date | Blob | Function
+	? T
+	: T extends { toJSON(): infer J }
+		? JsonForm<J>
+		: T extends readonly unknown[]
+			? { [K in keyof T]: JsonForm<T[K]> }
+			: T extends object
+				? { [K in keyof T]: JsonForm<T[K]> }
+				: T;
+
+/**
+ * The JSON form of a class instance with a `toJSON()` method, such as a model instance, which
+ * the response would otherwise write as `[object Object]`. Plain objects, arrays and other values
+ * are answered as they are: `JSON.stringify` calls the `toJSON()` methods inside them.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export const toJsonForm = (value: unknown): unknown =>
+	typeof value === 'object' &&
+	value !== null &&
+	!Array.isArray(value) &&
+	!isPlainObject(value) &&
+	typeof (value as { toJSON?: unknown }).toJSON === 'function'
+		? (value as { toJSON(): unknown }).toJSON()
+		: value;
+
+/**
  * Reads a sparse fieldset from a query: `fields=id,title` (or repeated `fields`).
  * @author Axel Nana <ax.lnana@outlook.com>
  */
