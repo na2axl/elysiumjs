@@ -915,7 +915,7 @@ export namespace Moirai {
 	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @example
 	 * ```ts
-	 * type ProfileEffectError = Moirai.ErrorsOf<typeof UnblockCreatorProfile>;
+	 * type PublishError = Moirai.ErrorsOf<typeof PublishPost>;
 	 * ```
 	 */
 	export type ErrorsOf<C extends HandlerClass> = ErrorOf<OutcomeOf<C>>;

@@ -13,7 +13,7 @@ const post = (path, body) =>
 
 const ok = await post('/me/follows/abc', { note: 'hi' });
 const okBody = await ok.json();
-if (ok.status !== 200 || okBody.creatorProfileId !== 'abc' || okBody.note !== 'hi') {
+if (ok.status !== 200 || okBody.authorId !== 'abc' || okBody.note !== 'hi') {
 	throw new Error(`Unexpected response ${ok.status}: ${JSON.stringify(okBody)}`);
 }
 if (ok.headers.get('x-module') !== 'social') throw new Error('The module middleware did not run.');
