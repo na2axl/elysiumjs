@@ -38,8 +38,9 @@ export type ModelResourceOptions<TKey extends string = string> = {
 /**
  * The response schema of a model: its select schema, with hidden, picked and omitted columns
  * applied. The model's own `hidden` columns are hidden too, and the getters in its `appends` are
- * exposed, typed by `extend` when it names them. Use it as a route's `response`: the handler can return model rows as they are, and
- * the response holds only the exposed fields, with dates as ISO strings.
+ * exposed, `pick` or not, typed by `extend` when it names them. Use it as a route's `response`:
+ * the handler can return model instances as they are, and the response holds only the exposed
+ * fields, with dates as ISO strings.
  * @author Axel Nana <ax.lnana@outlook.com>
  * @param model The model class.
  * @param options The columns to hide, pick or omit, and extra fields.
@@ -69,7 +70,7 @@ export const ModelResource = <TModel extends ModelClass>(
 	}
 	// The getters the model appends, typed by `extend` when it gives their schema.
 	for (const name of model.appends ?? []) {
-		if (hidden.has(name) || omit.has(name) || (pick && !pick.has(name))) continue;
+		if (hidden.has(name) || omit.has(name)) continue;
 		properties[name] = t.Unknown();
 	}
 	return t.Object({ ...properties, ...options.extend });

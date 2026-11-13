@@ -13,6 +13,7 @@
 // limitations under the License.
 
 // Compile-time checks: run by `bun run typecheck`, not by `bun test`.
+import type { JsonForm } from '@elysiumjs/olympus';
 import type { ConnectionOf, ScopeOf } from '@elysiumjs/olympus/mnemosyne';
 import type { SQL } from 'drizzle-orm';
 import type { DrizzleConnection } from '../../src/database';
@@ -109,3 +110,16 @@ export const hydrated: Person = Person.hydrate({ id: 1, name: 'Ada' });
 export class BadHidden extends DrizzleModel(people) {
 	public static override readonly hidden = ['nope'] as const;
 }
+
+// Generated route types read the JSON form of what handlers answer.
+type Equal<A, B> =
+	(<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
+const expectType = <T extends true>(): T => true as T;
+type PersonRow = typeof Person.$inferSelect;
+export const jsonForms = () => {
+	expectType<Equal<JsonForm<Person>, PersonRow>>();
+	expectType<Equal<JsonForm<Person[]>, PersonRow[]>>();
+	expectType<Equal<JsonForm<{ data: Person[]; nextCursor: string | null }>['data'], PersonRow[]>>();
+	expectType<Equal<JsonForm<Response>, Response>>();
+	expectType<Equal<JsonForm<Date>, Date>>();
+};

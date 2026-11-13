@@ -21,6 +21,7 @@ import {
 	MemoryModel,
 	ModelResource,
 	Models,
+	Pruner,
 	Repository,
 	UnknownModelError
 } from '../../src/mnemosyne';
@@ -115,6 +116,9 @@ describe('Model instances', () => {
 		class Other extends MemoryModel<Article>('articles') {}
 		expect(() => Models.register(Other)).toThrow(DuplicateModelError);
 
+		class Admin extends ArticleModel {}
+		expect(() => Admin.hydrate(article('x'))).toThrow(/ArticleModel and Admin/);
+
 		class Renamed extends MemoryModel<Article>('articles') {
 			public static override readonly modelName = 'renamed-articles';
 		}
@@ -176,5 +180,114 @@ describe('ModelResource with models', () => {
 			properties: Record<string, Record<string | symbol, unknown>>;
 		};
 		expect(Object.keys(schema.properties)).toEqual(['id', 'secret', 'isPublished']);
+	});
+});
+
+describe('Model registry', () => {
+	it('replaces a class evaluated again, and forgets classes', () => {
+		const first = class Reloaded extends MemoryModel<Article>('reloaded') {};
+		const second = class Reloaded extends MemoryModel<Article>('reloaded') {};
+		Models.register(first);
+		expect(Models.register(second)).toBe(second);
+		expect(Models.find('reloaded')).toBe(second);
+
+		Models.unregister('reloaded');
+		expect(Models.find('reloaded')).toBeUndefined();
+	});
+});
+
+describe('Hydration', () => {
+	it('keeps the columns a subclass names again as class fields', () => {
+		class Fielded extends MemoryModel<{ id: string; name: string }>('fielded') {
+			public name!: string;
+			public extra = 1;
+		}
+		const instance = Fielded.hydrate({ id: '1', name: 'a' });
+		expect(instance.name).toBe('a');
+		expect(instance.extra).toBe(1);
+	});
+
+	it('writes a __proto__ column as a plain property', () => {
+		const crafted = JSON.parse(
+			'{"$type":"model","$value":{"model":"articles","attributes":{"id":"q","__proto__":{"evil":1}}}}'
+		);
+		const decoded = Json.decode<ArticleModel>(crafted);
+		expect(decoded).toBeInstanceOf(ArticleModel);
+		expect((decoded as unknown as { evil?: number }).evil).toBeUndefined();
+	});
+
+	it('lets a column shadow a getter of the same name', () => {
+		const instance = ArticleModel.hydrate({ ...article('g'), words: 99 });
+		expect(instance.words).toBe(99);
+	});
+});
+
+describe('Instances in events and pruners', () => {
+	it('gives instances to the -ed listeners', async () => {
+		class EventedRepository extends Repository(ArticleModel) {
+			public static override readonly afterCommit = false;
+		}
+		const seen: unknown[] = [];
+		EventedRepository.on('created', ({ row }) => {
+			seen.push(row);
+		});
+		EventedRepository.on('updated', ({ row }) => {
+			seen.push(row);
+		});
+		EventedRepository.on('deleted', ({ row }) => {
+			seen.push(row);
+		});
+		const repository = new EventedRepository();
+		await repository.insert(article('e1'));
+		await repository.update('e1', { title: 'x' });
+		await repository.delete('e1');
+		expect(seen).toHaveLength(3);
+		for (const row of seen) expect(row).toBeInstanceOf(ArticleModel);
+	});
+
+	it('gives instances to the pruning() hook, and from bulk methods', async () => {
+		const repository = new ArticleRepository();
+		await repository.insert(article('p1', null));
+		await repository.insert(article('p2', null));
+		expect((await repository.updateAll({ title: 'all' }))[0]).toBeInstanceOf(ArticleModel);
+
+		const seen: unknown[] = [];
+		class PruneDrafts extends Pruner(ArticleModel) {
+			protected get prunable() {
+				return (row: Article) => row.publishedAt === null;
+			}
+
+			protected override pruning(rows: ArticleModel[]) {
+				seen.push(...rows);
+			}
+		}
+		await new PruneDrafts().run();
+		expect(seen.length).toBeGreaterThan(0);
+		for (const row of seen) expect(row).toBeInstanceOf(ArticleModel);
+		expect(Array.isArray(await repository.deleteAll())).toBe(true);
+	});
+
+	it('keeps the pagination of listed pages', async () => {
+		const repository = new ArticleRepository();
+		await repository.insert(article('l1'));
+		const page = await repository.list(
+			Listing.parse(Listing.define(ArticleModel, { pagination: 'offset' }), {})
+		);
+		expect(page.data[0]).toBeInstanceOf(ArticleModel);
+		expect('total' in page).toBe(true);
+	});
+});
+
+describe('Byte arrays in the cache', () => {
+	it('reads back byte arrays and buffers', async () => {
+		const cache = makeCacheInterface(() => new Map() as never);
+		await cache.set('bytes', new Uint8Array([1, 2, 255]));
+		await cache.set('buffer', Buffer.from('hi'));
+		const bytes = await cache.get<Uint8Array>('bytes');
+		expect(bytes).toBeInstanceOf(Uint8Array);
+		expect([...bytes!]).toEqual([1, 2, 255]);
+		const buffer = await cache.get<Buffer>('buffer');
+		expect(Buffer.isBuffer(buffer)).toBe(true);
+		expect(buffer!.toString()).toBe('hi');
 	});
 });

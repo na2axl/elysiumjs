@@ -77,7 +77,7 @@ const registry: RegisteredSerializer[] = [];
  * `Json` again, so it may hold other serializable values; `deserialize()` receives it read back.
  *
  * Register a class with `@Serializer.register({ name })`; it is built once, without arguments.
- * Dates, maps, sets and bigints are supported out of the box.
+ * Dates, maps, sets, bigints and byte arrays are supported out of the box.
  * @author Axel Nana <ax.lnana@outlook.com>
  * @template TIn The values the serializer supports.
  * @template TOut What it turns them into.
@@ -237,5 +237,43 @@ export class BigIntSerializer extends Serializer<bigint, string> {
 
 	public deserialize(value: string): bigint {
 		return BigInt(value);
+	}
+}
+
+/** The `Buffer` class of the runtime, when it has one. */
+const BufferClass = (globalThis as { Buffer?: { from(bytes: Uint8Array): Uint8Array } }).Buffer;
+
+/**
+ * Writes a `Uint8Array`, a Node.js `Buffer` included, as its bytes in base64. A `Buffer` reads
+ * back as a `Buffer` on runtimes that have one, and as a `Uint8Array` elsewhere.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+@Serializer.register({ name: 'bytes' })
+export class BytesSerializer extends Serializer<Uint8Array, { base64: string; buffer?: true }> {
+	public supports(value: unknown): boolean {
+		if (!(value instanceof Uint8Array)) return false;
+		const prototype = Object.getPrototypeOf(value);
+		return (
+			prototype === Uint8Array.prototype ||
+			(BufferClass !== undefined && prototype === (BufferClass as unknown as Function).prototype)
+		);
+	}
+
+	public serialize(value: Uint8Array): { base64: string; buffer?: true } {
+		let binary = '';
+		for (let i = 0; i < value.length; i += 0x8000) {
+			binary += String.fromCharCode(...value.subarray(i, i + 0x8000));
+		}
+		const isBuffer =
+			BufferClass !== undefined &&
+			Object.getPrototypeOf(value) === (BufferClass as unknown as Function).prototype;
+		return isBuffer ? { base64: btoa(binary), buffer: true } : { base64: btoa(binary) };
+	}
+
+	public deserialize(value: { base64: string; buffer?: true }): Uint8Array {
+		const binary = atob(value.base64);
+		const bytes = new Uint8Array(binary.length);
+		for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+		return value.buffer && BufferClass ? BufferClass.from(bytes) : bytes;
 	}
 }

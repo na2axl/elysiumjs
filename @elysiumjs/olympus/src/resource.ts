@@ -336,13 +336,22 @@ export const isSerializable = (value: unknown): boolean =>
 	!(typeof value === 'object' && value !== null && Symbol.asyncIterator in value);
 
 /**
- * The type a value has once written as JSON, as clients receive it: values with a `toJSON()`
- * method, such as model instances, take the type it answers, at any depth. Dates, files and
- * functions are kept, since clients read them on their own terms.
+ * The type a value has once written as JSON, as clients receive it: class instances with a
+ * `toJSON()` method take the type it answers, at any depth. Dates, files, responses, streams,
+ * binary data, maps, sets and functions are kept, since clients read them on their own terms.
  * @author Axel Nana <ax.lnana@outlook.com>
  * @template T The type of the value.
  */
-export type JsonForm<T> = T extends Date | Blob | Function
+export type JsonForm<T> = T extends
+	| Date
+	| Blob
+	| Response
+	| ReadableStream
+	| ArrayBuffer
+	| ArrayBufferView
+	| Map<unknown, unknown>
+	| Set<unknown>
+	| Function
 	? T
 	: T extends { toJSON(): infer J }
 		? JsonForm<J>
@@ -353,9 +362,9 @@ export type JsonForm<T> = T extends Date | Blob | Function
 				: T;
 
 /**
- * The JSON form of a class instance with a `toJSON()` method, such as a model instance, which
- * the response would otherwise write as `[object Object]`. Plain objects, arrays and other values
- * are answered as they are: `JSON.stringify` calls the `toJSON()` methods inside them.
+ * The JSON form of a class instance with a `toJSON()` method, which a handler result without a
+ * response schema is answered as. Plain objects, arrays and other values are answered as they
+ * are: `JSON.stringify` calls the `toJSON()` methods inside them.
  * @author Axel Nana <ax.lnana@outlook.com>
  */
 export const toJsonForm = (value: unknown): unknown =>

@@ -28,8 +28,16 @@ const MODEL = Symbol.for('elysium:mnemosyne:model');
  * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class DuplicateModelError extends ElysiumError {
-	constructor(public readonly model: string) {
-		super(`Two model classes are named "${model}": give one of them another \`static modelName\`.`);
+	constructor(
+		public readonly model: string,
+		first?: string,
+		second?: string
+	) {
+		const classes = first && second ? ` (${first} and ${second})` : '';
+		super(
+			`Two model classes are named "${model}"${classes}: give one of them another ` +
+				'`static modelName`. A subclass of a model inherits its name.'
+		);
 	}
 }
 
@@ -47,8 +55,25 @@ export class UnknownModelError extends ElysiumError {
 	}
 }
 
-/** The registered model classes, by their `modelName`. */
-const registry = new Map<string, ModelClass>();
+/** The registered model classes, by their `modelName`, shared by every copy of the package. */
+const registry: Map<string, ModelClass> = ((globalThis as Record<symbol, unknown>)[
+	Symbol.for('elysium:mnemosyne:models')
+] ??= new Map<string, ModelClass>()) as Map<string, ModelClass>;
+
+/**
+ * Writes column values on an instance as its own properties. Own properties shadow the getters
+ * of the class, and a `__proto__` key stays a plain property instead of changing the prototype.
+ */
+const assign = (instance: object, attributes: Record<string, unknown>): void => {
+	for (const key of Object.keys(attributes)) {
+		Object.defineProperty(instance, key, {
+			value: attributes[key],
+			enumerable: true,
+			writable: true,
+			configurable: true
+		});
+	}
+};
 
 /**
  * The model classes known by name, so that their instances can be read back from JSON: from
@@ -66,9 +91,25 @@ export namespace Models {
 	export const register = <TModel extends ModelClass>(model: TModel): TModel => {
 		const existing = registry.get(model.modelName);
 		if (existing === model) return model;
-		if (existing) throw new DuplicateModelError(model.modelName);
+		// The same class evaluated again, such as on a reload, replaces the former one.
+		if (existing && (existing.name !== model.name || existing.tableName !== model.tableName)) {
+			throw new DuplicateModelError(model.modelName, existing.name, model.name);
+		}
 		registry.set(model.modelName, model);
 		return model;
+	};
+
+	/**
+	 * Forgets the model class registered under a name.
+	 * @param name The model name.
+	 */
+	export const unregister = (name: string): void => {
+		registry.delete(name);
+	};
+
+	/** Forgets every registered model class, such as between tests. */
+	export const clear = (): void => {
+		registry.clear();
 	};
 
 	/** The model class registered under a name, if any. */
@@ -210,13 +251,14 @@ export const AbstractModel = <TTable, TColumns extends Record<string, unknown>>(
 		 * @param attributes The column values.
 		 */
 		public constructor(attributes?: Record<string, unknown>) {
-			if (attributes) Object.assign(this, attributes);
+			if (attributes) assign(this, attributes);
 		}
 
 		/**
 		 * The name the model is known by in cached values and queued jobs: unique, and stable
-		 * across deploys. Defaults to the table name, with its schema when the backend has
-		 * schemas (`public.posts`). Override it when two models share a table.
+		 * across deploys. Defaults to the name the backend gives the table, such as the table
+		 * name with its schema. Override it when two models share a table, and in a subclass of
+		 * a model, which inherits it.
 		 */
 		public static readonly modelName: string = adapter.getModelName?.(baseTable) ?? tableName;
 
@@ -253,9 +295,16 @@ export const AbstractModel = <TTable, TColumns extends Record<string, unknown>>(
 		): unknown {
 			Models.register(this as unknown as ModelClass);
 			if (row === null || row === undefined) return null;
-			if (Array.isArray(row))
-				return row.map((item) => (item instanceof this ? item : new this(item)));
-			return row instanceof this ? row : new this(row as Record<string, unknown>);
+			// Built first and filled after, so that the class fields of a subclass do not reset
+			// the columns: a column a subclass names again is declared with `declare`.
+			const make = (item: Record<string, unknown>) => {
+				if (item instanceof this) return item;
+				const instance = new this();
+				assign(instance, item);
+				return instance;
+			};
+			if (Array.isArray(row)) return row.map(make);
+			return make(row as Record<string, unknown>);
 		}
 
 		/**
@@ -365,7 +414,8 @@ export const AbstractModel = <TTable, TColumns extends Record<string, unknown>>(
 /**
  * An instance of a model: its column values, and a `toJSON()` typed as them, so that the routes
  * answering instances are typed by their columns for clients. The getters in `appends` and the
- * columns in `hidden` change the JSON at run time only: a response schema types a response precisely.
+ * columns in `hidden` change the JSON at run time only: a response schema types a response
+ * precisely.
  * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type ModelInstance<TInstance, TSelect> = Omit<TInstance, 'toJSON'> &
