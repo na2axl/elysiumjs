@@ -22,8 +22,8 @@ import { createRuntime } from '../../src/index';
 
 @Service.register({ name: 'follows' })
 class FollowService {
-	public follow(creatorProfileId: string, note?: string) {
-		return { creatorProfileId, following: true, note: note ?? null };
+	public follow(authorId: string, note?: string) {
+		return { authorId, following: true, note: note ?? null };
 	}
 }
 

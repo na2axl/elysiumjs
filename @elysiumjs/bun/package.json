@@ -2,7 +2,7 @@
 	"name": "@elysiumjs/bun",
 	"version": "0.0.0",
 	"license": "Apache-2.0",
-	"description": "Bun runtime for the Elysium.js framework.",
+	"description": "Bun runtime for the Elysium.js framework: Argon2id password hashing and the local disk over Bun.file().",
 	"private": false,
 	"author": {
 		"name": "Axel Nana",
@@ -38,6 +38,12 @@
 	"type": "module",
 	"module": "dist/index.js",
 	"types": "dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
+	},
 	"files": [
 		"dist",
 		"CHANGELOG.md"

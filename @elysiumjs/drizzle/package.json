@@ -2,7 +2,7 @@
 	"name": "@elysiumjs/drizzle",
 	"version": "0.0.0",
 	"license": "Apache-2.0",
-	"description": "Drizzle ORM backend for the Elysium.js framework: database drivers, models, repositories, queries, migrations, tenancy, the moirai stores and the postgres lock.",
+	"description": "Drizzle ORM backend for the Elysium.js framework: database drivers, models, repositories, queries, migrations, tenancy, the moirai stores, the notification and file stores, abilities as SQL, and the postgres lock.",
 	"private": false,
 	"author": "Axel Nana <ax.lnana@outlook.com>",
 	"repository": {
