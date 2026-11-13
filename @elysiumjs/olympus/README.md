@@ -747,7 +747,9 @@ PithosModule.with({
 await Storage.disk().put('reports/2026-01.csv', csv, { contentType: 'text/csv' });
 ```
 
-A disk that cannot sign URLs itself, such as `memory` or `local`, signs them with `signing`, and `PithosModule` serves them on `/storage/:disk/*`: `GET` downloads the object and `PUT` uploads it, with the content type and size the URL was signed for: a `PUT` without a `content-length` header answers 411. Downloads are sent with `x-content-type-options: nosniff` and a sandboxing `content-security-policy`, so uploaded content never runs as a page of the application's origin. `signing.url` is that route followed by the name of the disk.
+`put()` also takes `cacheControl`, the `Cache-Control` header the object is served with, and `metadata`, string pairs kept with the object. `head()` and `get()` answer both.
+
+A disk that cannot sign URLs itself, such as `memory` or `local`, signs them with `signing`, and `PithosModule` serves them on `/storage/:disk/*`: `GET` downloads the object and `PUT` uploads it, with the content type and size the URL was signed for: a `PUT` without a `content-length` header answers 411. Downloads are sent with the object's `cache-control`, `x-content-type-options: nosniff` and a sandboxing `content-security-policy`, so uploaded content never runs as a page of the application's origin. `signing.url` is that route followed by the name of the disk.
 
 `Storage.fake(name?)` replaces a disk with an empty memory disk until `Storage.restore()`, which `PithosModule` also calls when the application stops.
 
@@ -799,6 +801,8 @@ PithosModule.with({
 	}
 });
 ```
+
+`uploadTtl`, `unclaimedTtl` and `maxPending` also take a function, called each time the value is used, so they can follow settings changed while the application runs: `maxPending: () => settings.maxPendingUploads`.
 
 Uploads are sent to `staging/<id>` keys, on the disk of the file unless `staging` names another. Staged objects are not checked yet, so on a public disk they can be read by their URL until they are finished or pruned: give a public disk a private staging disk. No purpose may be named `staging`.
 
@@ -858,7 +862,7 @@ async finish(@Http.param('id') id: string, @Auth.user() user: AuthUser) {
 
 `Uploads.open()` checks the request against its purpose (`UPLOAD_PURPOSE_UNKNOWN`, `UPLOAD_TYPE_NOT_ALLOWED` with `types`, `UPLOAD_TOO_LARGE` with `maxBytes`, `FORBIDDEN`, and `UPLOAD_TOO_MANY_PENDING` past `maxPending`; a size below 1 byte answers `BAD_REQUEST`), records a `pending` file, and answers a signed `PUT` URL for a staging key, signed for the declared content type and size. The URL never targets the key the file is served from, since a signed URL cannot be taken back.
 
-`Uploads.finish()` reads the staged object once, and refuses it for good (`UPLOAD_REJECTED`) unless its size, its stored content type and its first bytes, read with `file-type`, all match what was declared. Only then are those same bytes written to the file's key, the file made `ready`, and the staged object deleted, so an upload racing through the still valid URL cannot swap the bytes in between. Nothing uploaded yet answers `UPLOAD_MISSING`, and the client may upload and finish again; a finished upload, or one another call is finishing, answers `UPLOAD_NOT_PENDING` and an expired one `UPLOAD_EXPIRED`. A purpose whose types have no signature, such as `text/plain` or `image/svg+xml`, turns the content check off with `get sniff() { return false; }`.
+`Uploads.finish()` reads the staged object once, and refuses it for good (`UPLOAD_REJECTED`) unless its size, its stored content type and its first bytes, read with `file-type`, all match what was declared. Only then are those same bytes written to the file's key, the file made `ready`, and the staged object deleted, so an upload racing through the still valid URL cannot swap the bytes in between. Nothing uploaded yet answers `UPLOAD_MISSING`, and the client may upload and finish again; a finished upload, or one another call is finishing, answers `UPLOAD_NOT_PENDING` and an expired one `UPLOAD_EXPIRED`. A purpose whose types have no signature, such as `text/plain` or `image/svg+xml`, turns the content check off with `get sniff() { return false; }`. A purpose's `cacheControl` getter sets the `Cache-Control` header of its ready files; with the default `<purpose>/<id>` key, `public, max-age=31536000, immutable` is safe on a public disk.
 
 A ready file is served from `<purpose>/<id>` by default, so a new file is a new key and a served file can be cached for good. A purpose may override `key(file)`, as long as the key holds the id of the file, so two files never share an object, and does not start with `staging/`. `finish()` holds the file in memory while it checks it, so keep `maxBytes` to what a request may hold.
 

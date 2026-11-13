@@ -20,6 +20,7 @@ export type {
 	FilePatch,
 	FileRecord,
 	FilesOptions,
+	FilesSetting,
 	FileStatus,
 	FileStoreDriver
 } from './files';

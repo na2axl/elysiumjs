@@ -13,7 +13,6 @@
 // limitations under the License.
 
 import { Command, ConsoleFormat, InteractsWithConsole } from '../../index';
-
 import { JobRegistry } from '../registry';
 
 /**

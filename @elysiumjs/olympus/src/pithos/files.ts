@@ -188,16 +188,23 @@ export class MemoryFileStore implements FileStoreDriver {
 }
 
 /**
+ * A value of {@link FilesOptions}, or a function read each time the value is used, such as one
+ * that reads the application's configuration.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export type FilesSetting<T> = T | (() => T);
+
+/**
  * How files live, as `PithosModule.with({ files })` sets it.
  * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type FilesOptions = {
 	/** How long an upload URL works, in seconds. Defaults to 900 (15 minutes). */
-	readonly uploadTtl?: number;
+	readonly uploadTtl?: FilesSetting<number>;
 	/** How long a ready file nothing claims is kept, in seconds. Defaults to 86,400 (a day). */
-	readonly unclaimedTtl?: number;
+	readonly unclaimedTtl?: FilesSetting<number>;
 	/** The uploads one person may have in progress at once. Defaults to 10. */
-	readonly maxPending?: number;
+	readonly maxPending?: FilesSetting<number>;
 	/**
 	 * The disk uploads are staged on before `finish()` checks them; the disk of the purpose
 	 * without one. Give a private disk when files go to a public one, so that unchecked bytes are
@@ -215,7 +222,13 @@ export const PITHOS_FILES = 'pithos.files';
  */
 export type FilesSource = {
 	readonly store: FileStoreDriver;
-	readonly options: Required<Omit<FilesOptions, 'staging'>> & Pick<FilesOptions, 'staging'>;
+	/** The options, each read when used: a function given for one is called on every read. */
+	readonly options: {
+		readonly uploadTtl: number;
+		readonly unclaimedTtl: number;
+		readonly maxPending: number;
+		readonly staging?: string;
+	};
 };
 
 /** The defaults of {@link FilesOptions}. */
@@ -224,6 +237,28 @@ export const FILES_DEFAULTS = {
 	unclaimedTtl: 86_400,
 	maxPending: 10
 } as const satisfies FilesOptions;
+
+/**
+ * The options of `PithosModule.with({ files })` over their defaults, each read when used.
+ * @internal
+ */
+export const filesOptions = (options: FilesOptions): FilesSource['options'] => {
+	const read = <T>(setting: FilesSetting<T>): T =>
+		typeof setting === 'function' ? (setting as () => T)() : setting;
+	const { uploadTtl, unclaimedTtl, maxPending } = { ...FILES_DEFAULTS, ...options };
+	return {
+		get uploadTtl() {
+			return read(uploadTtl);
+		},
+		get unclaimedTtl() {
+			return read(unclaimedTtl);
+		},
+		get maxPending() {
+			return read(maxPending);
+		},
+		staging: options.staging
+	};
+};
 
 /** The file store and options; throws without `PithosModule`. */
 export const filesSource = (): FilesSource => {

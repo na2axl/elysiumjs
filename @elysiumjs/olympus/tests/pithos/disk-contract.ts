@@ -55,14 +55,21 @@ export const diskContract = (
 			const disk = make();
 			const info = await disk.put('avatars/42.txt', 'hello', {
 				contentType: 'text/plain',
+				cacheControl: 'public, max-age=60',
 				metadata: { owner: 'u1' }
 			});
-			expect(info).toMatchObject({ key: 'avatars/42.txt', size: 5, contentType: 'text/plain' });
+			expect(info).toMatchObject({
+				key: 'avatars/42.txt',
+				size: 5,
+				contentType: 'text/plain',
+				cacheControl: 'public, max-age=60'
+			});
 			const object = await disk.get('avatars/42.txt');
 			expect(await object?.text()).toBe('hello');
 			expect(object?.metadata).toEqual({ owner: 'u1' });
 			expect(await disk.head('avatars/42.txt')).toMatchObject({
 				size: 5,
+				cacheControl: 'public, max-age=60',
 				metadata: { owner: 'u1' }
 			});
 			expect(await disk.exists('avatars/42.txt')).toBe(true);
@@ -80,10 +87,15 @@ export const diskContract = (
 
 		it('replaces an object and its metadata', async () => {
 			const disk = make();
-			await disk.put('a', 'first', { contentType: 'text/plain', metadata: { v: '1' } });
+			await disk.put('a', 'first', {
+				contentType: 'text/plain',
+				cacheControl: 'no-store',
+				metadata: { v: '1' }
+			});
 			await disk.put('a', 'second!');
 			expect(await disk.head('a')).toMatchObject({ size: 7, metadata: {} });
 			expect((await disk.head('a'))?.contentType).toBeUndefined();
+			expect((await disk.head('a'))?.cacheControl).toBeUndefined();
 		});
 
 		it('lists by prefix, page by page', async () => {

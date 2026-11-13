@@ -17,9 +17,9 @@ import type { JobDispatchOptions } from '../queue';
 import type { Transport } from '../transport';
 import type { QueuedJob, QueueState, Worker, WorkerInfo, WorkerQueueOptions } from '../worker';
 
-import { InteractsWithConsole, Runtime } from '../../index';
 import { sort, uid } from 'radash';
 
+import { InteractsWithConsole, Runtime } from '../../index';
 import { JobStatus } from '../job';
 import { WorkerStatus } from '../worker';
 

@@ -33,6 +33,8 @@ export type ObjectInfo = {
 	/** The size, in bytes. */
 	readonly size: number;
 	readonly contentType?: string;
+	/** The `Cache-Control` header it is served with, when given to `put()`. */
+	readonly cacheControl?: string;
 	/** A tag that changes with the content, when the disk gives one. */
 	readonly etag?: string;
 	readonly lastModified: Date;
@@ -59,6 +61,11 @@ export type StoredObject = ObjectInfo & {
  */
 export type PutOptions = {
 	readonly contentType?: string;
+	/**
+	 * The `Cache-Control` header the object is served with, such as
+	 * `public, max-age=31536000, immutable` for an object whose key never holds other content.
+	 */
+	readonly cacheControl?: string;
 	readonly metadata?: Readonly<Record<string, string>>;
 };
 

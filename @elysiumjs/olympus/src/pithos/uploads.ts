@@ -125,6 +125,15 @@ export abstract class Upload {
 		return true;
 	}
 
+	/**
+	 * The `Cache-Control` header a ready file is served with. None by default. With the default
+	 * `key()`, a key never holds other content, so `public, max-age=31536000, immutable` is safe
+	 * for a public disk.
+	 */
+	public get cacheControl(): string | undefined {
+		return undefined;
+	}
+
 	/** Whether someone may upload a file for an owner. Everyone may by default. */
 	public authorize(_owner: FileOwner, _user: string | undefined): boolean | Promise<boolean> {
 		return true;
@@ -393,12 +402,20 @@ export namespace Uploads {
 			const bytes = await staged.bytes();
 			if (bytes.byteLength !== file.size) return refuse('the file does not have the declared size');
 			const cls = Upload.find(file.purpose);
-			const sniff = cls ? await withPurpose(cls, (purpose) => purpose.sniff) : true;
+			const { sniff, cacheControl } = cls
+				? await withPurpose(cls, (purpose) => ({
+						sniff: purpose.sniff,
+						cacheControl: purpose.cacheControl
+					}))
+				: { sniff: true, cacheControl: undefined };
 			if (sniff && (await detectType(bytes)) !== file.contentType) {
 				return refuse('the content of the file is not of the declared type');
 			}
 
-			await Storage.disk(file.disk).put(file.key, bytes, { contentType: file.contentType });
+			await Storage.disk(file.disk).put(file.key, bytes, {
+				contentType: file.contentType,
+				cacheControl
+			});
 		} catch (error) {
 			// The client may finish again; pruning removes what a stop half way leaves.
 			await back();

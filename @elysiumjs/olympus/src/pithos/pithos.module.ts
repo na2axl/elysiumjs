@@ -16,7 +16,7 @@ import type { FilesOptions, FilesSource, FileStoreDriver } from './files';
 import type { DiskSource, StorageDriver } from './storage';
 
 import { Module } from '../module';
-import { FILES_DEFAULTS, FileStore, PITHOS_FILES } from './files';
+import { filesOptions, FileStore, PITHOS_FILES } from './files';
 import { PITHOS_DISKS, Storage } from './storage';
 import { StorageController } from './storage.controller';
 
@@ -85,7 +85,7 @@ export type PithosModuleConfig = {
 				const option = store ?? (() => FileStore.for('memory'));
 				return {
 					store: typeof option === 'function' ? option() : option,
-					options: { ...FILES_DEFAULTS, ...options }
+					options: filesOptions(options)
 				};
 			}
 		}

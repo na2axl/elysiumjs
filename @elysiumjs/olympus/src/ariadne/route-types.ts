@@ -24,7 +24,6 @@ import type {
 import type { FlowAdvance, FlowRefusal } from './flow';
 
 import { Environments, Http, Service } from '../index';
-
 import { Flow } from './flow';
 
 /**

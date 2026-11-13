@@ -58,7 +58,7 @@ export type R2ObjectLike = {
 	readonly size: number;
 	readonly httpEtag: string;
 	readonly uploaded: Date;
-	readonly httpMetadata?: { contentType?: string };
+	readonly httpMetadata?: { contentType?: string; cacheControl?: string };
 	readonly customMetadata?: Record<string, string>;
 };
 
@@ -81,7 +81,7 @@ export interface R2BucketLike {
 		key: string,
 		value: string | ArrayBuffer | ArrayBufferView | Blob | ReadableStream | null,
 		options?: {
-			httpMetadata?: { contentType?: string };
+			httpMetadata?: { contentType?: string; cacheControl?: string };
 			customMetadata?: Record<string, string>;
 		}
 	): Promise<R2ObjectLike | null>;
@@ -146,6 +146,7 @@ const infoOf = (object: R2ObjectLike): ObjectInfo => ({
 	key: object.key,
 	size: object.size,
 	contentType: object.httpMetadata?.contentType,
+	cacheControl: object.httpMetadata?.cacheControl,
 	etag: object.httpEtag,
 	lastModified: object.uploaded,
 	metadata: { ...object.customMetadata }
@@ -192,7 +193,10 @@ export class R2Disk extends StorageDriver {
 			assertKey(key),
 			body instanceof ReadableStream ? await toBytes(body) : body,
 			{
-				httpMetadata: options.contentType ? { contentType: options.contentType } : {},
+				httpMetadata: {
+					...(options.contentType ? { contentType: options.contentType } : {}),
+					...(options.cacheControl ? { cacheControl: options.cacheControl } : {})
+				},
 				customMetadata: { ...options.metadata }
 			}
 		);

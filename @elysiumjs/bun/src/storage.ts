@@ -53,7 +53,7 @@ declare module '@elysiumjs/olympus' {
  */
 const META = '.pithos';
 
-type Meta = { contentType?: string; metadata: Record<string, string> };
+type Meta = { contentType?: string; cacheControl?: string; metadata: Record<string, string> };
 
 /**
  * Keeps objects as files in a folder, through `Bun.file()` and `Bun.write()`: the disk reads and
@@ -91,6 +91,7 @@ export class BunDisk extends StorageDriver {
 		await this.#moveInto(temporary, path);
 		await this.#writeMeta(key, {
 			contentType: options.contentType,
+			cacheControl: options.cacheControl,
 			metadata: { ...options.metadata }
 		});
 		return (await this.head(key))!;
@@ -114,6 +115,7 @@ export class BunDisk extends StorageDriver {
 			key,
 			size: stats.size,
 			contentType: meta.contentType,
+			cacheControl: meta.cacheControl,
 			etag: `${stats.mtimeMs}:${stats.size}`,
 			lastModified: stats.mtime,
 			metadata: meta.metadata

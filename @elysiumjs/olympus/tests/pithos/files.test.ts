@@ -83,6 +83,10 @@ class AvatarUpload extends Upload {
 		return ['user'];
 	}
 
+	public override get cacheControl() {
+		return 'public, max-age=31536000, immutable';
+	}
+
 	public override authorize(owner: FileOwner, user: string | undefined) {
 		return owner.id === user;
 	}
@@ -118,7 +122,7 @@ describe('Files and uploads', () => {
 
 	let staged: MemoryDisk;
 
-	const boot = async (files: { maxPending?: number; staging?: string } = {}) => {
+	const boot = async (files: { maxPending?: number | (() => number); staging?: string } = {}) => {
 		store = new MemoryFileStore();
 		uploads = new MemoryDisk({
 			url: 'https://cdn.example.com',
@@ -194,7 +198,9 @@ describe('Files and uploads', () => {
 		const file = finished.orThrow();
 		expect(file.status).toBe('ready');
 		expect(file.expiresAt!.getTime() - file.readyAt!.getTime()).toBe(3600_000);
-		expect([...((await (await uploads.get(file.key))?.bytes()) ?? [])]).toEqual([...PNG]);
+		const served = await uploads.get(file.key);
+		expect([...((await served?.bytes()) ?? [])]).toEqual([...PNG]);
+		expect(served?.cacheControl).toBe('public, max-age=31536000, immutable');
 		expect(await uploads.exists(stagingKey(file.id))).toBe(false);
 		expect(events).toEqual([{ event: PITHOS_FILE_READY, file }]);
 
@@ -227,6 +233,22 @@ describe('Files and uploads', () => {
 		expect((await open({ size: 0 })).error).toBeInstanceOf(BadRequestError);
 		expect((await open({})).check()).toBe(true);
 		expect((await open({})).error).toBeInstanceOf(UploadTooManyPendingError);
+	});
+
+	it('reads a setting given as a function each time it is used', async () => {
+		let maxPending = 1;
+		await boot({ maxPending: () => maxPending });
+		expect((await openAvatar()).file.status).toBe('pending');
+		const capped = await Uploads.open({
+			purpose: 'avatar',
+			contentType: 'image/png',
+			size: 10,
+			owner: alice,
+			user: 'alice'
+		});
+		expect(capped.error).toBeInstanceOf(UploadTooManyPendingError);
+		maxPending = 2;
+		expect((await openAvatar()).file.status).toBe('pending');
 	});
 
 	it('answers missing, expired and foreign uploads', async () => {

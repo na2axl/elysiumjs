@@ -15,8 +15,9 @@
 import type { TObject, TSchema } from '../index';
 import type { ModelClass } from './interfaces';
 
-import { Resource } from '../index';
 import { t } from 'elysia';
+
+import { Resource } from '../index';
 
 /**
  * Options of {@link ModelResource}.
