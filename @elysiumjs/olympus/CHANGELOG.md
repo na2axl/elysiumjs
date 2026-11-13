@@ -1,5 +1,11 @@
 # @elysiumjs/olympus
 
+## 0.26.1
+
+### Patch Changes
+
+- [#123](https://github.com/na2axl/elysiumjs/pull/123) [`f15e312`](https://github.com/na2axl/elysiumjs/commit/f15e312a0b9c6a686052d9f3b496389fdf68c48f) Thanks [@na2axl](https://github.com/na2axl)! - The routes of `StorageController` declare their responses: a download answers the bytes of the object (`StoredObjectView`) and an upload answers 204, so `styx routes:check` accepts an app with `PithosModule`. A `Response` a handler returns is answered with its own status, also on a route with a `status`.
+
 ## 0.26.0
 
 ### Minor Changes
