@@ -142,8 +142,37 @@ export const renderRoutes = (modules: ModuleRoutes[]): string => {
 			for (let i = 2; names.has(name); i++) name = `${preferred}$${i}`;
 			names.add(name);
 			local.set(controller, name);
-			use(controller.specifier, name, controller.exportName);
 		}
+	}
+
+	const body: string[] = [];
+	const moduleNames: string[] = [];
+	for (const module of modules) {
+		let name = `${identifier(module.id)}Routes`;
+		while (moduleNames.includes(name)) name = `_${name}`;
+		moduleNames.push(name);
+
+		const controllers = module.controllers.map((controller) => {
+			const chain = controller.routes
+				.map(
+					(route) =>
+						`\n\t\t\t\t${renderRoute(local.get(controller), route, controller.types?.[route.name])}`
+				)
+				.join('');
+			return `\n\t\t.use(\n\t\t\troutes(${quote(controller.path)})${chain}\n\t\t)`;
+		});
+		const prefix = module.prefix ? quote(module.prefix) : '';
+		body.push(`/** The routes of the module ${module.id}. */`);
+		body.push(`const ${name} = () =>\n\troutes(${prefix})${controllers.join('')};`, '');
+	}
+
+	// A controller is imported only when a route reads its methods: a route answered by a view takes
+	// its response from the view, and needs nothing of the controller without parameters or a body.
+	const rendered = body.join('\n');
+	for (const [controller, name] of local) {
+		if (controller.specifier === undefined || controller.exportName === undefined) continue;
+		const read = new RegExp(`(?<![\\w$])${name.replace(/\$/g, '\\$')}\\[`);
+		if (read.test(rendered)) use(controller.specifier, name, controller.exportName);
 	}
 
 	const lines = [
@@ -165,28 +194,9 @@ export const renderRoutes = (modules: ModuleRoutes[]): string => {
 		"declare function routes<const Prefix extends string = ''>(prefix?: Prefix): Elysia<Prefix>;",
 		'declare function schema<T>(): ReturnType<typeof t.Unsafe<T>>;',
 		'declare function returns<T>(): () => JsonForm<Awaited<T>>;',
-		''
+		'',
+		...body
 	);
-
-	const moduleNames: string[] = [];
-	for (const module of modules) {
-		let name = `${identifier(module.id)}Routes`;
-		while (moduleNames.includes(name)) name = `_${name}`;
-		moduleNames.push(name);
-
-		const controllers = module.controllers.map((controller) => {
-			const chain = controller.routes
-				.map(
-					(route) =>
-						`\n\t\t\t\t${renderRoute(local.get(controller), route, controller.types?.[route.name])}`
-				)
-				.join('');
-			return `\n\t\t.use(\n\t\t\troutes(${quote(controller.path)})${chain}\n\t\t)`;
-		});
-		const prefix = module.prefix ? quote(module.prefix) : '';
-		lines.push(`/** The routes of the module ${module.id}. */`);
-		lines.push(`const ${name} = () =>\n\troutes(${prefix})${controllers.join('')};`, '');
-	}
 
 	const uses = moduleNames.map((name) => `.use(${name}())`).join('');
 	lines.push(`const app = () => routes()${uses};`, '');
