@@ -23,6 +23,7 @@ import {
 	Models,
 	Pruner,
 	Repository,
+	StaleModelError,
 	UnknownModelError
 } from '../../src/mnemosyne';
 import { makeCacheInterface } from '../../src/mnemosyne/cache';
@@ -137,6 +138,14 @@ describe('ModelSerializer', () => {
 		expect(Json.survives(instance)).toBe(true);
 	});
 
+	it('throws when the instance was written with other columns than the model has', () => {
+		const text = Json.stringify(ArticleModel.hydrate(article('a7'))).replace(
+			`"hash":"${ArticleModel.schemaHash}"`,
+			'"hash":"before"'
+		);
+		expect(() => Json.parse(text)).toThrow(StaleModelError);
+	});
+
 	it('throws when the model is not registered', () => {
 		const text = JSON.stringify({ $type: 'model', $value: { model: 'nowhere', attributes: {} } });
 		expect(() => Json.parse(text)).toThrow(UnknownModelError);
@@ -156,6 +165,37 @@ describe('Cache with models', () => {
 
 		first!.title = 'changed';
 		expect((await cache.get<ArticleModel>('article'))!.title).toBe('Title a6');
+	});
+
+	it('misses an instance written with other columns than the model has', async () => {
+		const store = new Map<string, unknown>();
+		const cache = makeCacheInterface(() => store as never);
+		await cache.set('stale', ArticleModel.hydrate(article('a8')));
+		for (const [key, raw] of store) {
+			store.set(key, (raw as string).replace(`"hash":"${ArticleModel.schemaHash}"`, '"hash":"x"'));
+		}
+		expect(await cache.get('stale')).toBeUndefined();
+	});
+
+	it('keeps listing pages pages, with their pagination and instances', async () => {
+		const cache = makeCacheInterface(() => new Map() as never);
+		const cursor = Listing.page({ filters: [], sort: [], limit: 1 } as never, [
+			ArticleModel.hydrate(article('a9'))
+		]);
+		const offset = Listing.offsetPage(
+			{ filters: [], sort: [], limit: 1, page: 2 } as never,
+			[ArticleModel.hydrate(article('a10'))],
+			3
+		);
+		await cache.set('cursor', cursor);
+		await cache.set('offset', offset);
+		const back = await cache.get<typeof cursor>('cursor');
+		expect(Listing.isPage(back)).toBe(true);
+		expect(Listing.paginationOf(back!)).toBe('cursor');
+		expect(back!.data[0]).toBeInstanceOf(ArticleModel);
+		const backOffset = await cache.get<typeof offset>('offset');
+		expect(Listing.paginationOf(backOffset!)).toBe('offset');
+		expect(backOffset).toEqual(offset);
 	});
 
 	it('writes the store with Json', async () => {
