@@ -1,0 +1,6 @@
+---
+'@elysiumjs/olympus': minor
+'@elysiumjs/drizzle': minor
+---
+
+Repositories can read through a cache. `MnemosyneModule.with({ repositories: { cache: { store, ttl } } })` sets the cache of every repository, and a repository merges its own `static cache` over it or sets it to `false`; rows are kept for one hour by default. `find()` and `findBy()` read through the cache. Entries are kept per model, digest of the table's columns, tenant and connection, and stamped with the version of their row and the generation of the tenant's rows: writes, pruners, and transactions once they commit forget what they change in every store a repository of the model reads through, and a read that loaded a row while a write changed it does not cache it. Reads skip the cache inside a transaction, rows `Json` cannot keep are not cached, and a failing store costs a read of the database, never the call. `forgetCached()` and `forgetAllCached()` serve custom writes. The `memory` store lives in one process: apps that run several processes cache in a shared store. `AbstractDatabase` runs `afterCommit` hooks for the transactions it opens and those wrapped with `committing()`, which the Drizzle repository adapter and row-level security transactions use.
