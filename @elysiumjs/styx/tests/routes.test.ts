@@ -192,6 +192,37 @@ describe('renderRoutes', () => {
 			'const app = () => routes().use(a_moduleRoutes()).use(b_moduleRoutes());'
 		);
 	});
+
+	it('imports only the controllers whose methods a route reads', () => {
+		const output = renderRoutes([
+			{
+				id: 'AccountModule',
+				controllers: [
+					{
+						exportName: 'ProfileController',
+						specifier: './controllers/profile.controller',
+						path: '/profile',
+						routes: [route({ name: 'show' })],
+						types: {
+							show: { response: "ViewResponseOf<typeof ProfileView, 'one'>" }
+						}
+					},
+					{
+						exportName: 'MyProfileController',
+						specifier: './controllers/my-profile.controller',
+						path: '/me',
+						routes: [route({ name: 'show' })]
+					}
+				]
+			}
+		]);
+
+		expect(output).not.toContain("from './controllers/profile.controller'");
+		expect(output).toContain(
+			"import type { MyProfileController } from './controllers/my-profile.controller';"
+		);
+		expect(output).toContain(".get('/', {}, returns<ViewResponseOf<typeof ProfileView, 'one'>>())");
+	});
 });
 
 describe('route types contributors', () => {
