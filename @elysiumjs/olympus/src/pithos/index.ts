@@ -16,6 +16,7 @@ export type {
 	FileCondition,
 	FileEvent,
 	FileExpectation,
+	FileMetadata,
 	FileOwner,
 	FilePatch,
 	FileRecord,

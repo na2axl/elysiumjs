@@ -14,6 +14,7 @@
 
 import type {
 	FileCondition,
+	FileMetadata,
 	FilePatch,
 	FileRecord,
 	FileStatus,
@@ -24,7 +25,7 @@ import type { DrizzleStoreOptions, StoreTable } from './moirai';
 
 import { FileStore } from '@elysiumjs/olympus/pithos';
 import { and, asc, count, eq, gt, inArray, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
-import { bigint, index, pgSchema, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
+import { bigint, index, jsonb, pgSchema, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
 
 import { Database } from './database';
 
@@ -54,7 +55,8 @@ const fileColumns = () => ({
 	releasedAt: at('released_at'),
 	expiresAt: at('expires_at'),
 	deletedAt: at('deleted_at'),
-	rejection: text('rejection')
+	rejection: text('rejection'),
+	metadata: jsonb('metadata').$type<FileMetadata>().notNull().default({})
 });
 
 /**

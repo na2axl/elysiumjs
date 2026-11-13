@@ -214,7 +214,7 @@ export const notifications = notificationsTable(); // or notificationsTable('not
 HermesModule.with({ store: () => NotificationStore.for('drizzle', { table: notifications }) });
 ```
 
-The table keeps one row per delivery id, and has an index on the notifiable and the id, which pages use, and a partial index on unread notifications. Any table with the same columns works, given as `table`, with an optional `connection`.
+The table keeps one row per delivery id, and has an index on the notifiable and the id, which pages use, and a partial index on unread notifications. The `metadata` of a file is a `jsonb` column, `{}` by default. Any table with the same columns works, given as `table`, with an optional `connection`.
 
 ## File store
 

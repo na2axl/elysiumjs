@@ -114,6 +114,31 @@ class NoteUpload extends Upload {
 	}
 }
 
+@Upload.purpose('clip')
+class ClipUpload extends Upload<{ words: number }> {
+	public override get disk() {
+		return 'uploads';
+	}
+
+	public get types() {
+		return ['text/plain'];
+	}
+
+	public get maxBytes() {
+		return 100;
+	}
+
+	public override get sniff() {
+		return false;
+	}
+
+	public override metadata(_file: FileRecord, bytes: Uint8Array) {
+		const text = new TextDecoder().decode(bytes);
+		if (text.startsWith('broken')) throw new Error('the clip could not be read');
+		return { words: text.split(' ').length };
+	}
+}
+
 describe('Files and uploads', () => {
 	let testing: TestingHttpApp | undefined;
 	let store: MemoryFileStore;
@@ -349,6 +374,40 @@ describe('Files and uploads', () => {
 		expect(ticket.file.createdBy).toBeNull();
 		await put(ticket.url, 'hello', 'text/plain');
 		expect((await Uploads.finish(ticket.file.id)).orThrow().status).toBe('ready');
+	});
+
+	it('keeps what a purpose tells about a file, and adds to it later', async () => {
+		await boot();
+		const upload = async (text: string) => {
+			const ticket = (
+				await Uploads.open({
+					purpose: 'clip',
+					contentType: 'text/plain',
+					size: text.length,
+					owner: alice
+				})
+			).orThrow();
+			await put(ticket.url, text, 'text/plain');
+			return Uploads.finish(ticket.file.id);
+		};
+		const file = (await upload('three short words')).orThrow();
+		expect(file.metadata).toEqual({ words: 3 });
+		expect((await Files.find(file.id))?.metadata).toEqual({ words: 3 });
+
+		const described = await Files.describe(file.id, { durationSeconds: 12 }, { purpose: 'clip' });
+		expect(described.orThrow().metadata).toEqual({ words: 3, durationSeconds: 12 });
+		expect((await Files.describe(file.id, {}, { purpose: 'note' })).error).toBeInstanceOf(
+			FileNotReadyError
+		);
+
+		const broken = await upload('broken clip');
+		expect(broken.error).toBeInstanceOf(UploadRejectedError);
+		expect(broken.error?.message).toContain('the clip could not be read');
+		expect(events.at(-1)).toMatchObject({
+			event: PITHOS_FILE_REJECTED,
+			file: { rejection: 'the clip could not be read', metadata: {} }
+		});
+		expect((await Files.describe('nope', { a: 1 })).error).toBeInstanceOf(FileNotReadyError);
 	});
 
 	it('claims, checks, releases and deletes files', async () => {

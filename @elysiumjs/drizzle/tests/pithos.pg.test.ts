@@ -49,7 +49,8 @@ describe('filesTable', () => {
 			'released_at',
 			'expires_at',
 			'deleted_at',
-			'rejection'
+			'rejection',
+			'metadata'
 		]);
 		expect(config.indexes.map((i) => i.config.name)).toEqual([
 			'pg_pithos_files_owner_idx',
@@ -86,6 +87,7 @@ describe.skipIf(!url)('DrizzleFileStore on PostgreSQL', () => {
 		expiresAt: at(15),
 		deletedAt: null,
 		rejection: null,
+		metadata: {},
 		...patch
 	});
 
@@ -93,7 +95,7 @@ describe.skipIf(!url)('DrizzleFileStore on PostgreSQL', () => {
 		Service.instance('db.connection.default', db);
 		await db.execute(sql`drop table if exists pg_pithos_files`);
 		await db.execute(
-			sql`create table pg_pithos_files (id text primary key, purpose text not null, disk text not null, key text not null, content_type text not null, size bigint not null, owner_type text not null, owner_id text not null, created_by text, status text not null, created_at timestamptz not null, ready_at timestamptz, claimed_at timestamptz, released_at timestamptz, expires_at timestamptz, deleted_at timestamptz, rejection text)`
+			sql`create table pg_pithos_files (id text primary key, purpose text not null, disk text not null, key text not null, content_type text not null, size bigint not null, owner_type text not null, owner_id text not null, created_by text, status text not null, created_at timestamptz not null, ready_at timestamptz, claimed_at timestamptz, released_at timestamptz, expires_at timestamptz, deleted_at timestamptz, rejection text, metadata jsonb not null default '{}')`
 		);
 	});
 
@@ -127,6 +129,9 @@ describe.skipIf(!url)('DrizzleFileStore on PostgreSQL', () => {
 			await store.transition('f1', { status: ['ready'], live: at(60) }, { claimedAt: at(60) })
 		).toBeNull();
 		expect(await store.transition('f1', { status: ['ready'], due: at(59) }, {})).toBeNull();
+		expect(
+			await store.transition('f1', { status: ['ready'] }, { metadata: { durationSeconds: 12 } })
+		).toMatchObject({ metadata: { durationSeconds: 12 } });
 		expect(
 			await store.transition('f1', { status: ['ready'], due: at(60) }, { status: 'deleted' })
 		).toMatchObject({ status: 'deleted' });

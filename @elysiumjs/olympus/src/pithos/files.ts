@@ -43,6 +43,13 @@ export type FileStatus = 'pending' | 'finishing' | 'ready' | 'rejected' | 'expir
  * upload to its deletion.
  * @author Axel Nana <ax.lnana@outlook.com>
  */
+/**
+ * What a purpose tells about a file beyond its bytes, such as the length of a video: a JSON
+ * object, empty unless a purpose's `metadata()` or `Files.describe()` filled it.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export type FileMetadata = Readonly<Record<string, unknown>>;
+
 export type FileRecord = {
 	readonly id: string;
 	/** The upload purpose it was uploaded for. */
@@ -71,6 +78,8 @@ export type FileRecord = {
 	readonly deletedAt: Date | null;
 	/** Why the uploaded file was refused, on `rejected`. */
 	readonly rejection: string | null;
+	/** What its purpose tells about it, such as the length of a video. */
+	readonly metadata: FileMetadata;
 };
 
 /**
@@ -80,7 +89,14 @@ export type FileRecord = {
 export type FilePatch = Partial<
 	Pick<
 		FileRecord,
-		'status' | 'readyAt' | 'claimedAt' | 'releasedAt' | 'expiresAt' | 'deletedAt' | 'rejection'
+		| 'status'
+		| 'readyAt'
+		| 'claimedAt'
+		| 'releasedAt'
+		| 'expiresAt'
+		| 'deletedAt'
+		| 'rejection'
+		| 'metadata'
 	>
 >;
 
@@ -379,6 +395,26 @@ export namespace Files {
 			{ claimedAt: now, releasedAt: null, expiresAt: null }
 		);
 		return claimed ? R.pass(claimed) : R.fail(new FileNotReadyError());
+	};
+
+	/**
+	 * Adds to what is known about a ready file, such as the length a video service reports once
+	 * it has processed the file: the keys given replace those of the file's metadata, the others
+	 * stay. Two calls racing on one file may each keep only their own keys.
+	 */
+	export const describe = async (
+		id: string,
+		metadata: FileMetadata,
+		expect: FileExpectation = {}
+	): Promise<Result<FileRecord, FileNotReadyError>> => {
+		const checked = await ready(id, expect);
+		if (!checked.check()) return checked;
+		const described = await filesSource().store.transition(
+			id,
+			{ status: ['ready'], live: Clock.now() },
+			{ metadata: { ...checked.result.metadata, ...metadata } }
+		);
+		return described ? R.pass(described) : R.fail(new FileNotReadyError());
 	};
 
 	/**
