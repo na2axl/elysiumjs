@@ -91,6 +91,25 @@ describe('rulesToDrizzle', () => {
 		);
 	});
 
+	it('matches NULL for a null in $in and $nin lists, as CASL does', () => {
+		const ability = abilityWith(({ can }) => {
+			can('update', 'Post', { linkedId: { $in: [null, 'l1'] } });
+			can('update', 'Post', { linkedType: { $nin: [null, 'live'] } });
+			can('update', 'Post', { status: { $nin: [null] } });
+		});
+		expect(where(ability).sql).toBe(
+			'((("posts"."status" is not null)) or ' +
+				'(((("posts"."linked_type" is not null)) and ("posts"."linked_type" not in ($1)))) or ' +
+				'((("posts"."linked_id" in ($2)) or (("posts"."linked_id" is null)))))'
+		);
+	});
+
+	it('is false without an ability', () => {
+		expect(dialect.sqlToQuery(rulesToDrizzle(undefined, 'update', 'Post', posts)).sql).toBe(
+			'false'
+		);
+	});
+
 	it('refuses a field the table does not have', () => {
 		const ability = abilityWith(({ can }) => can('update', 'Post', { nope: 1 }));
 		expect(() => where(ability)).toThrow(UntranslatableRuleError);

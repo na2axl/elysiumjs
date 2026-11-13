@@ -243,10 +243,10 @@ const ability = await Cerberus.ability();
 const editable = await db
 	.select()
 	.from(posts)
-	.where(rulesToDrizzle(ability!, 'update', 'Post', posts));
+	.where(rulesToDrizzle(ability, 'update', 'Post', posts)); // false without an ability
 ```
 
-Rule fields are the properties of the table's columns. A `cannot` bounds every `can` before it, and a row whose column is `NULL` matches `$ne` and `$nin` and is not refused by a `cannot`, as in CASL. No rule allows the action: `false`; a rule without conditions: `true`. The operators are `$eq`, `$ne`, `$in`, `$nin`, `$lt`, `$lte`, `$gt`, `$gte`, `$exists`, `$and`, `$or` and `$not`; any other operator, or a field the table does not have, throws `UntranslatableRuleError`.
+Rule fields are the properties of the table's columns. A `cannot` bounds every `can` before it. `$eq`, `$ne`, `$in` and `$nin` treat `NULL` as CASL does, and a `cannot` never refuses a row whose condition is unknown because of a `NULL`; `$lt`, `$lte`, `$gt`, `$gte` and `$exists` follow SQL, where `NULL` compares to nothing, so keep the columns they read `NOT NULL` or add an explicit condition. No ability, or no rule that allows the action: `false`; a rule without conditions: `true`. The operators are `$eq`, `$ne`, `$in`, `$nin`, `$lt`, `$lte`, `$gt`, `$gte`, `$exists`, `$and`, `$or` and `$not`; any other operator, or a field the table does not have, throws `UntranslatableRuleError`.
 
 ## License
 

@@ -23,6 +23,9 @@ const ABILITY = Symbol.for('elysium:cerberus:ability');
 
 type Check = ['can' | 'cannot', AbilityAction, SubjectName];
 
+/** The ability of a request, and the actor it was built for. */
+type Memo = { readonly actor: string | undefined; readonly ability: Promise<Ability | undefined> };
+
 /**
  * Refuses a request, with `FORBIDDEN`, unless the ability of its actor passes the check of
  * `@Cerberus.can()` or `@Cerberus.cannot()`.
@@ -51,17 +54,21 @@ export namespace Cerberus {
 	 * without an actor, or for an actor without abilities.
 	 */
 	export const ability = async (): Promise<Ability | undefined> => {
-		const context = Http.currentContext<{ [ABILITY]?: Promise<Ability | undefined> }>();
-		if (context?.[ABILITY]) return context[ABILITY];
+		const context = Http.currentContext<{ [ABILITY]?: Memo }>();
 		const actor = cerberusConfig().actor();
-		const found = actor === undefined ? Promise.resolve(undefined) : Abilities.of(actor);
-		if (context) context[ABILITY] = found;
-		return found;
+		// Kept per actor: a check before the user is known does not stick to the request.
+		const memo = context?.[ABILITY];
+		if (memo && memo.actor === actor) return memo.ability;
+		const ability = actor === undefined ? Promise.resolve(undefined) : Abilities.of(actor);
+		if (context) context[ABILITY] = { actor, ability };
+		return ability;
 	};
 
 	/**
 	 * Whether the actor of the current request or call may do an action on a subject. False
-	 * without an actor.
+	 * without an actor. A check on a subject name passes when some rule allows the action on
+	 * some subjects of that name, whatever its conditions: check the instance, or filter with
+	 * `rulesToDrizzle()` of `@elysiumjs/drizzle`, before acting on a given one.
 	 * @param action The action, such as `update`.
 	 * @param subject The subject: a name, or an instance whose conditions are checked.
 	 */
@@ -70,7 +77,9 @@ export namespace Cerberus {
 
 	/**
 	 * The `authorize` hook of an action or a query: the call is refused with `CALL_FORBIDDEN`
-	 * unless the actor may do the action on the subject.
+	 * unless the actor may do the action on the subject. A subject name passes when some rule
+	 * allows the action on some subjects of that name, and the input is what the caller sent:
+	 * check a stored record in the handler, once it is loaded.
 	 * @param action The action, such as `update`.
 	 * @param subject The subject, or a function of the input that answers it.
 	 * @example
@@ -85,7 +94,8 @@ export namespace Cerberus {
 
 	/**
 	 * Lets a route, or every route of a controller, run only when the actor may do an action on
-	 * a subject; other requests answer `FORBIDDEN`.
+	 * some subjects of a name; other requests answer `FORBIDDEN`. It runs after the middlewares
+	 * of the controller, so put `@Auth()` there, or below this decorator on the route.
 	 * @param action The action, such as `create`.
 	 * @param subject The subject name.
 	 */
@@ -96,8 +106,9 @@ export namespace Cerberus {
 		Middleware.register(AbilityMiddleware.guards(['can', action, subject]));
 
 	/**
-	 * Lets a route, or every route of a controller, run only when the actor may not do an action
-	 * on a subject; other requests answer `FORBIDDEN`.
+	 * Lets a route, or every route of a controller, run only when the actor has an ability that
+	 * does not allow an action on a subject; requests without an actor, or allowed, answer
+	 * `FORBIDDEN`.
 	 * @param action The action.
 	 * @param subject The subject name.
 	 */

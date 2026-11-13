@@ -41,8 +41,9 @@ export type CerberusModuleConfig = {
 	/** The facts of an actor and their version, or `null` for an actor without abilities. */
 	facts(actorId: string): Promise<VersionedFacts | null> | VersionedFacts | null;
 	/**
-	 * The actor of the current request or call. Defaults to the `id` of the user of themis
-	 * (`Auth.currentUser()`).
+	 * The actor of the current request or call. Defaults to the user of themis
+	 * (`Auth.currentUser()`): its `id`, or the user itself when a guard answers an id, as a
+	 * string.
 	 */
 	actor?: () => string | undefined;
 	/**
@@ -52,6 +53,12 @@ export type CerberusModuleConfig = {
 	cache?: false | (() => CacheInterface);
 	/** The seconds a cached ability is kept. Defaults to 7 days. */
 	ttl?: number;
+	/**
+	 * Changes the fingerprint of the rules, so that abilities cached by other code are built
+	 * again: set it to a value that changes with each build, such as its commit, when rules read
+	 * helpers, constants or imported maps besides their `define` methods.
+	 */
+	rulesVersion?: string;
 };
 
 /** The configuration as cerberus reads it. */
@@ -60,6 +67,7 @@ export type CerberusSettings = {
 	readonly actor: () => string | undefined;
 	readonly cache: () => CacheInterface | undefined;
 	readonly ttl: number;
+	readonly rulesVersion?: string;
 };
 
 /**
@@ -76,9 +84,15 @@ export class CerberusUnavailableError extends ElysiumError {
 /** The seconds a cached ability is kept by default. */
 export const DEFAULT_ABILITY_TTL = 7 * 24 * 60 * 60;
 
+/** An id as cerberus keys actors: a string, or a number written as one. */
+const idOf = (value: unknown): string | undefined =>
+	typeof value === 'string' ? value : typeof value === 'number' ? String(value) : undefined;
+
+/** The id of the themis user: its `id`, or the user itself when a guard answers an id. */
 const themisActor = (): string | undefined => {
-	const id = (Auth.currentUser() as { id?: unknown } | undefined)?.id;
-	return typeof id === 'string' ? id : undefined;
+	const user = Auth.currentUser() as unknown;
+	if (typeof user === 'object' && user !== null) return idOf((user as { id?: unknown }).id);
+	return idOf(user);
 };
 
 /** Builds the settings from the configuration. */
@@ -91,7 +105,8 @@ export const settingsOf = (config: CerberusModuleConfig): CerberusSettings => {
 			cache === false
 				? () => undefined
 				: (cache ?? (() => Service.get<CacheInterface>(MEMORY_CACHE_SERVICE) ?? undefined)),
-		ttl: config.ttl ?? DEFAULT_ABILITY_TTL
+		ttl: config.ttl ?? DEFAULT_ABILITY_TTL,
+		rulesVersion: config.rulesVersion
 	};
 };
 

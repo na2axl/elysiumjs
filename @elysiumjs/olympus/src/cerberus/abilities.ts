@@ -18,8 +18,9 @@ import { AbilityBuilder, createMongoAbility, subject as tagSubject } from '@casl
 import { packRules, unpackRules } from '@casl/ability/extra';
 
 import { ElysiumError } from '../errors';
+import { getCurrentTenant } from '../mnemosyne/tenancy';
 import { Service } from '../service';
-import { cerberusConfig } from './config';
+import { CERBERUS_CONFIG, cerberusConfig } from './config';
 
 /**
  * What the rules know about an actor, such as its id and roles. It is empty until the app
@@ -165,7 +166,34 @@ const sha256 = async (value: string): Promise<string> => {
 	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 };
 
-const cacheKey = (actorId: string): string => `cerberus:ability:${actorId}`;
+/** The cache key of an actor, under the tenant in context, since two tenants may share ids. */
+const cacheKey = (actorId: string): string => {
+	const tenant = getCurrentTenant();
+	return tenant === null ? `cerberus:ability:${actorId}` : `cerberus:ability:${tenant}:${actorId}`;
+};
+
+/**
+ * Whether a value comes back the same through JSON, as a cache stores it: no `undefined`, no
+ * `Date` or other class instance, no number that is not finite.
+ */
+const isJson = (value: unknown): boolean => {
+	if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
+	if (typeof value === 'number') return Number.isFinite(value);
+	if (Array.isArray(value)) return value.every(isJson);
+	if (typeof value !== 'object') return false;
+	const prototype = Object.getPrototypeOf(value);
+	if (prototype !== Object.prototype && prototype !== null) return false;
+	return Object.values(value).every(isJson);
+};
+
+/** Runs a call on the cache, and answers `undefined` should the cache fail. */
+const quietly = async <T>(call: () => Promise<T> | undefined): Promise<T | undefined> => {
+	try {
+		return await call();
+	} catch {
+		return undefined;
+	}
+};
 
 /**
  * The abilities of the application: each domain declares its rules, and they are composed over
@@ -230,20 +258,28 @@ export namespace Abilities {
 			);
 
 	/**
-	 * A digest of the source of every domain's rules: an ability cached by other code, such as
-	 * before a deploy that changed a rule, is never served.
+	 * A digest of the source of every domain's `define` and of the `rulesVersion` of
+	 * `CerberusModule`: an ability cached by code whose `define` methods differ, such as before
+	 * a deploy that changed one, is never served. Rules that also read helpers, constants or
+	 * imported maps change without their `define` changing: give `rulesVersion` a value that
+	 * changes with each build, such as its commit.
 	 */
 	export const fingerprint = (): Promise<string> => {
-		const source = registered()
-			.map(([domain, domainRules]) => `${domain}\n${domainRules.define.toString()}`)
-			.join('\n\n');
+		const version = Service.get<{ rulesVersion?: string }>(CERBERUS_CONFIG)?.rulesVersion ?? '';
+		const source = [
+			version,
+			...registered().map(([domain, domainRules]) => `${domain}\n${domainRules.define.toString()}`)
+		].join('\n\n');
 		if (digest?.source !== source) {
 			digest = { source, value: sha256(source).then((hex) => hex.slice(0, 16)) };
 		}
 		return digest.value;
 	};
 
-	/** The compact form of an ability's rules. */
+	/**
+	 * The compact form of an ability's rules. It goes through JSON unchanged only when the
+	 * conditions hold JSON values: an `undefined` or a `Date` does not come back the same.
+	 */
 	export const pack = (ability: Ability): PackedAbility => packRules(ability.rules);
 
 	/** The ability of rules in compact form. */
@@ -263,8 +299,10 @@ export namespace Abilities {
 	/**
 	 * The ability of an actor, from the `facts` of `CerberusModule`. The cache serves it only
 	 * for the version of the facts and the fingerprint of the rules it was built for, so a fact
-	 * that changed or a rule that changed builds it again. Undefined when the actor has no facts,
-	 * such as one who is not active.
+	 * that changed or a rule that changed builds it again. Entries are kept per tenant in
+	 * context. Rules whose conditions hold values JSON cannot keep, such as `undefined` or a
+	 * `Date`, are not cached, and a cache that fails is skipped. Undefined when the actor has no
+	 * facts, such as one who is not active.
 	 * @param actorId The actor.
 	 */
 	export const of = async (actorId: string): Promise<Ability | undefined> => {
@@ -274,7 +312,8 @@ export namespace Abilities {
 		const cache = config.cache();
 		const fingerprint = await Abilities.fingerprint();
 		const key = cacheKey(actorId);
-		const cached = await cache?.get<CachedAbility>(key);
+		// A cache that fails costs a build, never the check.
+		const cached = cache ? await quietly(() => cache.get<CachedAbility>(key)) : undefined;
 		if (
 			cached?.version === found.version &&
 			cached.fingerprint === fingerprint &&
@@ -283,11 +322,19 @@ export namespace Abilities {
 			return unpack(cached.rules);
 		}
 		const ability = compose(found.facts);
-		await cache?.set<CachedAbility>(
-			key,
-			{ version: found.version, fingerprint, rules: pack(ability) },
-			config.ttl * 1000
-		);
+		const rules = pack(ability);
+		// Rules that would not come back the same from the cache, such as a condition on an
+		// undefined fact or a date, are built on each call instead: a changed condition could
+		// grant more.
+		if (cache && isJson(rules)) {
+			await quietly(() =>
+				cache.set<CachedAbility>(
+					key,
+					{ version: found.version, fingerprint, rules },
+					config.ttl * 1000
+				)
+			);
+		}
 		return ability;
 	};
 
@@ -298,6 +345,7 @@ export namespace Abilities {
 	 * @param actorId The actor.
 	 */
 	export const forget = async (actorId: string): Promise<void> => {
-		await cerberusConfig().cache()?.del(cacheKey(actorId));
+		const cache = cerberusConfig().cache();
+		if (cache) await quietly(() => cache.del(cacheKey(actorId)));
 	};
 }

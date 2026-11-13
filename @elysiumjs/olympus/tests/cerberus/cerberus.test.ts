@@ -26,7 +26,8 @@ import {
 	UnknownSubjectTypeError
 } from '../../src/cerberus';
 import { Application, Http, Module } from '../../src/index';
-import { MnemosyneModule } from '../../src/mnemosyne';
+import { MnemosyneModule, withTenant } from '../../src/mnemosyne';
+import { Auth, ThemisModule } from '../../src/themis';
 
 type TestFacts = { userId: string; roles: string[] };
 
@@ -88,6 +89,30 @@ class PostsController {
 @Module.register({ controllers: [PostsController] })
 class HttpModule extends Module {}
 
+@Abilities.rules('teams')
+class TeamRules implements AbilityRules {
+	public define(facts: Record<string, unknown>, can: GrantRule) {
+		can('update', 'Team', { teamId: facts.teamId });
+		can('read', 'Team', { createdAt: { $lte: new Date('2026-01-01T00:00:00Z') } });
+	}
+}
+
+@Module.register({ services: [TeamRules] })
+class TeamsModule extends Module {}
+
+@Http.controller('/signed')
+@Auth()
+class SignedController {
+	@Http.get('/')
+	@Cerberus.can('read', 'Post')
+	public read() {
+		return { ok: true };
+	}
+}
+
+@Module.register({ controllers: [SignedController] })
+class SignedModule extends Module {}
+
 /** A cache over a map, as the configuration of CerberusModule takes one. */
 const mapCache = () => {
 	const entries = new Map<string, unknown>();
@@ -109,7 +134,14 @@ describe('cerberus', () => {
 	const people: Record<string, VersionedFacts> = {};
 	let reads = 0;
 
-	const boot = async (options: { cache?: false | (() => never); mnemosyne?: boolean } = {}) => {
+	const boot = async (
+		options: {
+			cache?: false | (() => never);
+			mnemosyne?: boolean;
+			rulesVersion?: string;
+			modules?: (typeof Module)[];
+		} = {}
+	) => {
 		reads = 0;
 		people.ada = { version: 1, facts: { userId: 'ada', roles: [] } };
 		people.root = { version: 1, facts: { userId: 'root', roles: ['admin'] } };
@@ -122,11 +154,13 @@ describe('cerberus', () => {
 						return people[id] ?? null;
 					},
 					actor: () => Http.currentContext()?.request.headers.get('x-user') ?? undefined,
-					...(options.cache !== undefined && { cache: options.cache })
+					...(options.cache !== undefined && { cache: options.cache }),
+					...(options.rulesVersion !== undefined && { rulesVersion: options.rulesVersion })
 				}),
 				PostsModule,
 				StaffModule,
-				HttpModule
+				HttpModule,
+				...(options.modules ?? [])
 			],
 			openapi: false
 		})
@@ -209,6 +243,54 @@ describe('cerberus', () => {
 		expect(await Abilities.of('nobody')).toBeUndefined();
 	});
 
+	it('does not cache rules that JSON would change', async () => {
+		const { cache, entries } = mapCache();
+		await boot({ cache: () => cache, modules: [TeamsModule] });
+		const team = Abilities.subject('Team', {
+			teamId: 't2',
+			createdAt: new Date('2026-06-01T00:00:00Z')
+		});
+		for (let call = 0; call < 2; call++) {
+			const ability = await Abilities.of('ada');
+			expect(ability?.can('update', team)).toBe(false);
+			expect(ability?.can('read', team)).toBe(false);
+		}
+		expect(entries.size).toBe(0);
+	});
+
+	it('keeps entries per tenant, and builds when the cache fails', async () => {
+		const { cache, entries } = mapCache();
+		await boot({ cache: () => cache });
+		await withTenant('acme', () => Abilities.of('ada'));
+		expect(entries.has('cerberus:ability:acme:ada')).toBe(true);
+		await withTenant('acme', () => Abilities.forget('ada'));
+		expect(entries.size).toBe(0);
+
+		const failing = {
+			get: async () => {
+				throw new Error('down');
+			},
+			set: async () => {
+				throw new Error('down');
+			},
+			del: async () => {
+				throw new Error('down');
+			}
+		};
+		await testing!.shutdown();
+		await boot({ cache: () => failing as never });
+		expect((await Abilities.of('ada'))?.can('read', 'Post')).toBe(true);
+		await Abilities.forget('ada');
+	});
+
+	it('mixes the rules version in the fingerprint', async () => {
+		await boot({ cache: false });
+		const plain = await Abilities.fingerprint();
+		await testing!.shutdown();
+		await boot({ cache: false, rulesVersion: 'build-2' });
+		expect(await Abilities.fingerprint()).not.toBe(plain);
+	});
+
 	it('caches in the memory cache of MnemosyneModule by default', async () => {
 		await boot({ mnemosyne: true });
 		expect((await Abilities.of('ada'))?.can('read', 'Post')).toBe(true);
@@ -239,6 +321,36 @@ describe('cerberus', () => {
 
 		expect((await testing!.http.get('/posts/guest').headers(as('ada')).send()).status).toBe(200);
 		expect((await testing!.http.get('/posts/guest').headers(as('root')).send()).status).toBe(403);
+	});
+
+	it('reads the actor from the themis user by default', async () => {
+		@Application.register({
+			modules: [
+				ThemisModule.with({
+					secret: 's'.repeat(32),
+					guards: {
+						header: {
+							authenticate: (context) => {
+								const id = context.request.headers.get('x-user');
+								return id === 'root' ? { id: 'root' } : (id ?? undefined);
+							}
+						}
+					}
+				}),
+				CerberusModule.with({ facts: (id) => people[id] ?? null, cache: false }),
+				PostsModule,
+				SignedModule
+			],
+			openapi: false
+		})
+		class App extends Application {}
+		people.ada = { version: 1, facts: { userId: 'ada', roles: [] } };
+		people.root = { version: 1, facts: { userId: 'root', roles: ['admin'] } };
+		testing = await Application.testing({ app: App, boot: 'eager' });
+		const get = (user: string) => testing!.http.get('/signed').header('x-user', user).send();
+		expect((await get('ada')).status).toBe(200);
+		expect((await get('root')).status).toBe(200);
+		expect((await get('nobody')).status).toBe(403);
 	});
 
 	it('authorizes calls with the ability of the actor', async () => {

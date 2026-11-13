@@ -869,7 +869,7 @@ A ready file is served from `<purpose>/<id>` by default, so a new file is a new 
 Declare the facts and the subject names once, by declaration merging, then write the rules of a domain as a class listed in the services of its module:
 
 ```ts
-import type { AbilityRules, GrantRule } from '@elysiumjs/olympus/cerberus';
+import type { AbilityFacts, AbilityRules, GrantRule } from '@elysiumjs/olympus/cerberus';
 
 import { Abilities } from '@elysiumjs/olympus/cerberus';
 
@@ -895,7 +895,7 @@ export class PostRules implements AbilityRules {
 }
 ```
 
-`Abilities.compose(facts)` builds one ability from the rules of every domain, and `Abilities.from(rules)` from rules alone, such as in a domain's tests. A check on an instance reads the `static subjectName` of its class, and a plain object is tagged with `Abilities.subject('Post', post)`; class names are never read, since bundlers rename them. `Abilities.pack(ability)` gives a compact form of the rules, for a token or a response, and `Abilities.unpack(packed)` the ability back.
+`Abilities.compose(facts)` builds one ability from the rules of every domain, in the order of their modules: as in CASL, a later rule wins over an earlier one, so a `can('manage', 'all')` of a later domain lifts the `cannot` of an earlier one. A rules class that no module lists in its services is left out, and `Abilities.from(rules)` from rules alone, such as in a domain's tests. A check on an instance reads the `static subjectName` of its class, and a plain object is tagged with `Abilities.subject('Post', post)`; class names are never read, since bundlers rename them. `Abilities.pack(ability)` gives a compact form of the rules, for a token or a response, and `Abilities.unpack(packed)` the ability back.
 
 `CerberusModule` gives the facts of an actor, with a version that changes whenever a fact the rules read changes, such as a counter the app bumps in the same transaction:
 
@@ -908,31 +908,38 @@ CerberusModule.with({
 			: null;
 	},
 	cache: () => Cache.store('kv'), // the memory cache of MnemosyneModule by default; false for none
-	ttl: 604_800 // seconds a cached ability is kept (default 7 days)
+	ttl: 604_800, // seconds a cached ability is kept (default 7 days)
+	rulesVersion: env.BUILD_COMMIT // changes the fingerprint of the rules
 });
 ```
 
-`Abilities.of(actorId)` answers the ability of an actor, from the cache when it was built for the same version of the facts and the same rules (`Abilities.fingerprint()`, a digest of their source, so a deploy that changes a rule builds abilities again), or `undefined` for an actor without facts. `Abilities.forget(actorId)` drops the cached ability early, such as once a change of facts has committed.
+`Abilities.of(actorId)` answers the ability of an actor, from the cache when it was built for the same version of the facts and the same rules, or `undefined` for an actor without facts. `Abilities.fingerprint()` is a digest of the source of every `define` method and of `rulesVersion`: when rules also read helpers, constants or imported maps, set `rulesVersion` to a value that changes with each build, such as its commit. Entries are kept per tenant in context, rules whose conditions hold values JSON cannot keep, such as an `undefined` fact or a `Date`, are built on each call instead, and a cache that fails costs a build, never the check. `Abilities.forget(actorId)` drops the cached ability early, such as once a change of facts has committed.
 
-The checks read the ability of the current actor, the `id` of the themis user (`Auth.currentUser()`) unless `actor` says otherwise:
+The checks read the ability of the current actor: the themis user (`Auth.currentUser()`), its `id` or the user itself when a guard answers an id, unless `actor` says otherwise. A check on a subject name passes when some rule allows the action on some subjects of that name, whatever its conditions, so it fits routes and calls; check the record itself, once loaded, before acting on it:
 
 ```ts
 @Http.controller('/posts')
+@Auth() // the controller's middlewares run before the checks of its routes
 class PostsController {
 	@Http.post('/')
 	@Cerberus.can('create', 'Post') // FORBIDDEN otherwise; @Cerberus.cannot() for the opposite
 	public create() {}
 }
 
-const UpdatePostInput = t.Object({ id: t.String(), authorId: t.String(), title: t.String() });
+const UpdatePostInput = t.Object({ id: t.String(), title: t.String() });
 
 @Action.register({
 	input: UpdatePostInput,
-	errors: [],
-	authorize: Cerberus.may('update', (input) => Abilities.subject('Post', input))
+	errors: [ForbiddenError],
+	authorize: Cerberus.may('update', 'Post') // may update some posts
 })
 class UpdatePost extends Action<Static<typeof UpdatePostInput>> {
 	public async handle(input: Static<typeof UpdatePostInput>) {
+		const post = await posts.find(input.id);
+		// The stored post, never the input: a caller chooses what it sends.
+		if (!post || !(await Cerberus.check('update', Abilities.subject('Post', post)))) {
+			return new ForbiddenError('You cannot update this post.');
+		}
 		// ...
 	}
 }

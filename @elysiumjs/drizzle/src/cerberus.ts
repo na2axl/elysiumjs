@@ -92,15 +92,26 @@ const compile = (node: ConditionNode, table: PgTable): SQL => {
 				? isNotNull(columnOf(table, node.field))
 				: sql`${columnOf(table, node.field)} is distinct from ${node.value}`;
 		case 'in': {
-			const values = listOf(node.value);
-			return values.length === 0 ? FALSE : inArray(columnOf(table, node.field), values);
+			// A null in the list matches NULL, as it does in CASL; SQL's `in` never matches it.
+			const column = columnOf(table, node.field);
+			const all = listOf(node.value);
+			const values = all.filter((value) => value !== null);
+			const parts = [
+				...(values.length > 0 ? [inArray(column, values)] : []),
+				...(values.length < all.length ? [isNull(column)] : [])
+			];
+			return parts.length === 0 ? FALSE : (or(...parts) ?? FALSE);
 		}
 		case 'nin': {
-			const values = listOf(node.value);
-			if (values.length === 0) return TRUE;
+			// NULL matches unless the list holds a null, as it does in CASL.
 			const column = columnOf(table, node.field);
-			// NULL matches, as it does in CASL.
-			return or(notInArray(column, values), isNull(column)) ?? TRUE;
+			const all = listOf(node.value);
+			const values = all.filter((value) => value !== null);
+			const listsNull = values.length < all.length;
+			if (values.length === 0) return listsNull ? isNotNull(column) : TRUE;
+			return listsNull
+				? (and(isNotNull(column), notInArray(column, values)) ?? TRUE)
+				: (or(notInArray(column, values), isNull(column)) ?? TRUE);
 		}
 		case 'lt':
 			return lt(columnOf(table, node.field), node.value);
@@ -123,10 +134,11 @@ const compile = (node: ConditionNode, table: PgTable): SQL => {
  * The SQL condition that keeps the rows of `table` the ability allows `action` on, from its rules
  * about `subject`: a list query then answers only what the same rules let the caller act on. CASL
  * flattens the rules first, so a `cannot` bounds every `can` before it. Rule fields are the
- * properties of the table's columns. No rule allows the action: `false`; a rule without
- * conditions: `true`.
+ * properties of the table's columns. No ability, or no rule that allows the action: `false`; a
+ * rule without conditions: `true`. `$eq`, `$ne`, `$in` and `$nin` treat NULL as CASL does;
+ * `$lt`, `$lte`, `$gt`, `$gte` and `$exists` follow SQL, where NULL compares to nothing.
  * @author Axel Nana <ax.lnana@outlook.com>
- * @param ability The ability.
+ * @param ability The ability, or `undefined` for an actor without one.
  * @param action The action, such as `update`.
  * @param subject The subject the rules are about, such as `Post`.
  * @param table The table of that subject.
@@ -142,11 +154,12 @@ const compile = (node: ConditionNode, table: PgTable): SQL => {
  * ```
  */
 export const rulesToDrizzle = (
-	ability: AnyAbility,
+	ability: AnyAbility | undefined,
 	action: string,
 	subject: string,
 	table: PgTable
 ): SQL => {
+	if (!ability) return FALSE;
 	const ast = rulesToAST(ability, action, subject) as ConditionNode | null;
 	return ast ? compile(ast, table) : FALSE;
 };
