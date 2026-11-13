@@ -16,10 +16,12 @@ export type {
 	FileCondition,
 	FileEvent,
 	FileExpectation,
+	FileMetadata,
 	FileOwner,
 	FilePatch,
 	FileRecord,
 	FilesOptions,
+	FilesSetting,
 	FileStatus,
 	FileStoreDriver
 } from './files';

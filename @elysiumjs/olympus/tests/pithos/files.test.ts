@@ -83,6 +83,10 @@ class AvatarUpload extends Upload {
 		return ['user'];
 	}
 
+	public override get cacheControl() {
+		return 'public, max-age=31536000, immutable';
+	}
+
 	public override authorize(owner: FileOwner, user: string | undefined) {
 		return owner.id === user;
 	}
@@ -110,6 +114,31 @@ class NoteUpload extends Upload {
 	}
 }
 
+@Upload.purpose('clip')
+class ClipUpload extends Upload<{ words: number }> {
+	public override get disk() {
+		return 'uploads';
+	}
+
+	public get types() {
+		return ['text/plain'];
+	}
+
+	public get maxBytes() {
+		return 100;
+	}
+
+	public override get sniff() {
+		return false;
+	}
+
+	public override metadata(_file: FileRecord, bytes: Uint8Array) {
+		const text = new TextDecoder().decode(bytes);
+		if (text.startsWith('broken')) throw new Error('the clip could not be read');
+		return { words: text.split(' ').length };
+	}
+}
+
 describe('Files and uploads', () => {
 	let testing: TestingHttpApp | undefined;
 	let store: MemoryFileStore;
@@ -118,7 +147,7 @@ describe('Files and uploads', () => {
 
 	let staged: MemoryDisk;
 
-	const boot = async (files: { maxPending?: number; staging?: string } = {}) => {
+	const boot = async (files: { maxPending?: number | (() => number); staging?: string } = {}) => {
 		store = new MemoryFileStore();
 		uploads = new MemoryDisk({
 			url: 'https://cdn.example.com',
@@ -194,7 +223,9 @@ describe('Files and uploads', () => {
 		const file = finished.orThrow();
 		expect(file.status).toBe('ready');
 		expect(file.expiresAt!.getTime() - file.readyAt!.getTime()).toBe(3600_000);
-		expect([...((await (await uploads.get(file.key))?.bytes()) ?? [])]).toEqual([...PNG]);
+		const served = await uploads.get(file.key);
+		expect([...((await served?.bytes()) ?? [])]).toEqual([...PNG]);
+		expect(served?.cacheControl).toBe('public, max-age=31536000, immutable');
 		expect(await uploads.exists(stagingKey(file.id))).toBe(false);
 		expect(events).toEqual([{ event: PITHOS_FILE_READY, file }]);
 
@@ -227,6 +258,22 @@ describe('Files and uploads', () => {
 		expect((await open({ size: 0 })).error).toBeInstanceOf(BadRequestError);
 		expect((await open({})).check()).toBe(true);
 		expect((await open({})).error).toBeInstanceOf(UploadTooManyPendingError);
+	});
+
+	it('reads a setting given as a function each time it is used', async () => {
+		let maxPending = 1;
+		await boot({ maxPending: () => maxPending });
+		expect((await openAvatar()).file.status).toBe('pending');
+		const capped = await Uploads.open({
+			purpose: 'avatar',
+			contentType: 'image/png',
+			size: 10,
+			owner: alice,
+			user: 'alice'
+		});
+		expect(capped.error).toBeInstanceOf(UploadTooManyPendingError);
+		maxPending = 2;
+		expect((await openAvatar()).file.status).toBe('pending');
 	});
 
 	it('answers missing, expired and foreign uploads', async () => {
@@ -329,6 +376,40 @@ describe('Files and uploads', () => {
 		expect((await Uploads.finish(ticket.file.id)).orThrow().status).toBe('ready');
 	});
 
+	it('keeps what a purpose tells about a file, and adds to it later', async () => {
+		await boot();
+		const upload = async (text: string) => {
+			const ticket = (
+				await Uploads.open({
+					purpose: 'clip',
+					contentType: 'text/plain',
+					size: text.length,
+					owner: alice
+				})
+			).orThrow();
+			await put(ticket.url, text, 'text/plain');
+			return Uploads.finish(ticket.file.id);
+		};
+		const file = (await upload('three short words')).orThrow();
+		expect(file.metadata).toEqual({ words: 3 });
+		expect((await Files.find(file.id))?.metadata).toEqual({ words: 3 });
+
+		const described = await Files.describe(file.id, { durationSeconds: 12 }, { purpose: 'clip' });
+		expect(described.orThrow().metadata).toEqual({ words: 3, durationSeconds: 12 });
+		expect((await Files.describe(file.id, {}, { purpose: 'note' })).error).toBeInstanceOf(
+			FileNotReadyError
+		);
+
+		const broken = await upload('broken clip');
+		expect(broken.error).toBeInstanceOf(UploadRejectedError);
+		expect(broken.error?.message).toContain('the clip could not be read');
+		expect(events.at(-1)).toMatchObject({
+			event: PITHOS_FILE_REJECTED,
+			file: { rejection: 'the clip could not be read', metadata: {} }
+		});
+		expect((await Files.describe('nope', { a: 1 })).error).toBeInstanceOf(FileNotReadyError);
+	});
+
 	it('claims, checks, releases and deletes files', async () => {
 		await boot();
 		const ticket = await openAvatar();
@@ -345,7 +426,8 @@ describe('Files and uploads', () => {
 		expect(claimed.claimedAt).not.toBeNull();
 		expect((await Files.claim(id)).check()).toBe(true);
 
-		// A claimed file outlives its unclaimed time.
+		// A claimed file outlives its unclaimed time. The clock stops so the grace below is exact.
+		Clock.freeze();
 		Clock.travel(7200_000);
 		expect(await Files.prune()).toBe(0);
 

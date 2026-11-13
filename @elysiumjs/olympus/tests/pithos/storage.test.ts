@@ -124,7 +124,18 @@ describe('PithosModule', () => {
 		expect(downloaded.headers.get('content-type')).toBe('text/plain');
 		expect(downloaded.headers.get('x-content-type-options')).toBe('nosniff');
 		expect(downloaded.headers.get('content-security-policy')).toContain('sandbox');
+		expect(downloaded.headers.get('cache-control')).toBeNull();
 		expect(await downloaded.text()).toBe('hello');
+
+		// An object written with a Cache-Control header is served with it.
+		await uploads.put('cached.txt', 'cached', {
+			contentType: 'text/plain',
+			cacheControl: 'public, max-age=60'
+		});
+		const cached = await uploads.signedUrl('cached.txt', { method: 'GET', expiresIn: 60 });
+		expect((await testing!.http.get(path(cached)).send()).headers.get('cache-control')).toBe(
+			'public, max-age=60'
+		);
 		expect((await testing!.http.get(path(get).replace('a.txt', 'b.txt')).send()).status).toBe(403);
 		expect((await testing!.http.get('/storage/public/a').send()).status).toBe(404);
 	});

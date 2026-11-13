@@ -72,6 +72,7 @@ export class StorageController {
 			headers: {
 				'content-type': object.contentType ?? 'application/octet-stream',
 				'content-length': String(object.size),
+				...(object.cacheControl ? { 'cache-control': object.cacheControl } : {}),
 				// Uploaded content is served from the application's origin: never as a page that runs.
 				'x-content-type-options': 'nosniff',
 				'content-security-policy': "default-src 'none'; sandbox"

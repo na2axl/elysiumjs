@@ -72,6 +72,7 @@ export class MemoryDisk extends StorageDriver {
 			key: assertKey(key),
 			size: bytes.byteLength,
 			contentType: options.contentType,
+			cacheControl: options.cacheControl,
 			etag: String(Clock.epochMs()) + ':' + bytes.byteLength,
 			lastModified: Clock.now(),
 			metadata: { ...options.metadata }

@@ -43,6 +43,13 @@ export type FileStatus = 'pending' | 'finishing' | 'ready' | 'rejected' | 'expir
  * upload to its deletion.
  * @author Axel Nana <ax.lnana@outlook.com>
  */
+/**
+ * What a purpose tells about a file beyond its bytes, such as the length of a video: a JSON
+ * object, empty unless a purpose's `metadata()` or `Files.describe()` filled it.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export type FileMetadata = Readonly<Record<string, unknown>>;
+
 export type FileRecord = {
 	readonly id: string;
 	/** The upload purpose it was uploaded for. */
@@ -71,6 +78,8 @@ export type FileRecord = {
 	readonly deletedAt: Date | null;
 	/** Why the uploaded file was refused, on `rejected`. */
 	readonly rejection: string | null;
+	/** What its purpose tells about it, such as the length of a video. */
+	readonly metadata: FileMetadata;
 };
 
 /**
@@ -80,7 +89,14 @@ export type FileRecord = {
 export type FilePatch = Partial<
 	Pick<
 		FileRecord,
-		'status' | 'readyAt' | 'claimedAt' | 'releasedAt' | 'expiresAt' | 'deletedAt' | 'rejection'
+		| 'status'
+		| 'readyAt'
+		| 'claimedAt'
+		| 'releasedAt'
+		| 'expiresAt'
+		| 'deletedAt'
+		| 'rejection'
+		| 'metadata'
 	>
 >;
 
@@ -188,16 +204,23 @@ export class MemoryFileStore implements FileStoreDriver {
 }
 
 /**
+ * A value of {@link FilesOptions}, or a function read each time the value is used, such as one
+ * that reads the application's configuration.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export type FilesSetting<T> = T | (() => T);
+
+/**
  * How files live, as `PithosModule.with({ files })` sets it.
  * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type FilesOptions = {
 	/** How long an upload URL works, in seconds. Defaults to 900 (15 minutes). */
-	readonly uploadTtl?: number;
+	readonly uploadTtl?: FilesSetting<number>;
 	/** How long a ready file nothing claims is kept, in seconds. Defaults to 86,400 (a day). */
-	readonly unclaimedTtl?: number;
+	readonly unclaimedTtl?: FilesSetting<number>;
 	/** The uploads one person may have in progress at once. Defaults to 10. */
-	readonly maxPending?: number;
+	readonly maxPending?: FilesSetting<number>;
 	/**
 	 * The disk uploads are staged on before `finish()` checks them; the disk of the purpose
 	 * without one. Give a private disk when files go to a public one, so that unchecked bytes are
@@ -215,7 +238,13 @@ export const PITHOS_FILES = 'pithos.files';
  */
 export type FilesSource = {
 	readonly store: FileStoreDriver;
-	readonly options: Required<Omit<FilesOptions, 'staging'>> & Pick<FilesOptions, 'staging'>;
+	/** The options, each read when used: a function given for one is called on every read. */
+	readonly options: {
+		readonly uploadTtl: number;
+		readonly unclaimedTtl: number;
+		readonly maxPending: number;
+		readonly staging?: string;
+	};
 };
 
 /** The defaults of {@link FilesOptions}. */
@@ -224,6 +253,28 @@ export const FILES_DEFAULTS = {
 	unclaimedTtl: 86_400,
 	maxPending: 10
 } as const satisfies FilesOptions;
+
+/**
+ * The options of `PithosModule.with({ files })` over their defaults, each read when used.
+ * @internal
+ */
+export const filesOptions = (options: FilesOptions): FilesSource['options'] => {
+	const read = <T>(setting: FilesSetting<T>): T =>
+		typeof setting === 'function' ? (setting as () => T)() : setting;
+	const { uploadTtl, unclaimedTtl, maxPending } = { ...FILES_DEFAULTS, ...options };
+	return {
+		get uploadTtl() {
+			return read(uploadTtl);
+		},
+		get unclaimedTtl() {
+			return read(unclaimedTtl);
+		},
+		get maxPending() {
+			return read(maxPending);
+		},
+		staging: options.staging
+	};
+};
 
 /** The file store and options; throws without `PithosModule`. */
 export const filesSource = (): FilesSource => {
@@ -344,6 +395,26 @@ export namespace Files {
 			{ claimedAt: now, releasedAt: null, expiresAt: null }
 		);
 		return claimed ? R.pass(claimed) : R.fail(new FileNotReadyError());
+	};
+
+	/**
+	 * Adds to what is known about a ready file, such as the length a video service reports once
+	 * it has processed the file: the keys given replace those of the file's metadata, the others
+	 * stay. Two calls racing on one file may each keep only their own keys.
+	 */
+	export const describe = async (
+		id: string,
+		metadata: FileMetadata,
+		expect: FileExpectation = {}
+	): Promise<Result<FileRecord, FileNotReadyError>> => {
+		const checked = await ready(id, expect);
+		if (!checked.check()) return checked;
+		const described = await filesSource().store.transition(
+			id,
+			{ status: ['ready'], live: Clock.now() },
+			{ metadata: { ...checked.result.metadata, ...metadata } }
+		);
+		return described ? R.pass(described) : R.fail(new FileNotReadyError());
 	};
 
 	/**

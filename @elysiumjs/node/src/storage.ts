@@ -57,7 +57,7 @@ declare module '@elysiumjs/olympus' {
  */
 const META = '.pithos';
 
-type Meta = { contentType?: string; metadata: Record<string, string> };
+type Meta = { contentType?: string; cacheControl?: string; metadata: Record<string, string> };
 
 /**
  * Keeps objects as files in a folder, through `node:fs`. Each file is written aside then renamed
@@ -87,7 +87,11 @@ export class LocalDisk extends StorageDriver {
 
 	public async put(key: string, body: StorageBody, options: PutOptions = {}): Promise<ObjectInfo> {
 		const path = this.#path(key);
-		const meta: Meta = { contentType: options.contentType, metadata: { ...options.metadata } };
+		const meta: Meta = {
+			contentType: options.contentType,
+			cacheControl: options.cacheControl,
+			metadata: { ...options.metadata }
+		};
 		await this.#replace(path, await toBytes(body));
 		await this.#writeMeta(key, meta);
 		return (await this.head(key))!;
@@ -114,6 +118,7 @@ export class LocalDisk extends StorageDriver {
 			key,
 			size: stats.size,
 			contentType: meta.contentType,
+			cacheControl: meta.cacheControl,
 			etag: `${stats.mtimeMs}:${stats.size}`,
 			lastModified: stats.mtime,
 			metadata: meta.metadata

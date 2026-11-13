@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import type { Result } from '../result';
-import type { FileOwner, FileRecord } from './files';
+import type { FileMetadata, FileOwner, FileRecord } from './files';
 
 import { Clock } from '../clock';
 import { Metadata } from '../metadata';
@@ -53,7 +53,7 @@ import { assertKey, Storage } from './storage';
 const NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /** A class of upload purpose, whatever its constructor injects. */
-type UploadClass = new (...args: any[]) => Upload;
+type UploadClass = new (...args: any[]) => Upload<any>;
 
 const purposes = new Map<string, UploadClass>();
 const names = new WeakMap<UploadClass, string>();
@@ -78,7 +78,7 @@ const instances = new WeakMap<UploadClass, Upload>();
  * }
  * ```
  */
-export abstract class Upload {
+export abstract class Upload<TMetadata extends FileMetadata = FileMetadata> {
 	/**
 	 * Registers a class as an upload purpose.
 	 * @param name The kebab-case name of the purpose.
@@ -125,6 +125,26 @@ export abstract class Upload {
 		return true;
 	}
 
+	/**
+	 * The `Cache-Control` header a ready file is served with. None by default. With the default
+	 * `key()`, a key never holds other content, so `public, max-age=31536000, immutable` is safe
+	 * for a public disk.
+	 */
+	public get cacheControl(): string | undefined {
+		return undefined;
+	}
+
+	/**
+	 * What to keep about a file once it has passed its checks, such as the length of a video,
+	 * read from its bytes. Kept in the file's `metadata` when it is made ready. Throwing refuses
+	 * the file (`UPLOAD_REJECTED`, with the error's message). Nothing by default.
+	 * @param file The file being finished.
+	 * @param bytes The checked bytes of the file.
+	 */
+	public metadata(_file: FileRecord, _bytes: Uint8Array): TMetadata | Promise<TMetadata> {
+		return {} as TMetadata;
+	}
+
 	/** Whether someone may upload a file for an owner. Everyone may by default. */
 	public authorize(_owner: FileOwner, _user: string | undefined): boolean | Promise<boolean> {
 		return true;
@@ -141,7 +161,7 @@ export abstract class Upload {
 }
 
 /** Runs work with the instance of a purpose, built in its module when it is a service. */
-const withPurpose = async <R>(cls: UploadClass, work: (purpose: Upload) => R): Promise<R> => {
+const withPurpose = async <R>(cls: UploadClass, work: (purpose: Upload<any>) => R): Promise<R> => {
 	const [owner] = Service.ownersOf(cls);
 	if (owner) {
 		return ModuleContext.run(owner, async () => work((await Service.resolve(cls)) as Upload));
@@ -316,7 +336,8 @@ export namespace Uploads {
 				releasedAt: null,
 				expiresAt,
 				deletedAt: null,
-				rejection: null
+				rejection: null,
+				metadata: {}
 			};
 			const url = await Storage.disk(stagingDisk(diskName)).signedUrl(stagingKey(id), {
 				method: 'PUT',
@@ -374,6 +395,7 @@ export namespace Uploads {
 			return R.fail(new UploadRejectedError(reason));
 		};
 
+		let metadata: FileMetadata = {};
 		try {
 			// One read: the checks and the write use the same bytes, so an upload sent again
 			// through the still valid URL cannot swap them in between.
@@ -393,12 +415,28 @@ export namespace Uploads {
 			const bytes = await staged.bytes();
 			if (bytes.byteLength !== file.size) return refuse('the file does not have the declared size');
 			const cls = Upload.find(file.purpose);
-			const sniff = cls ? await withPurpose(cls, (purpose) => purpose.sniff) : true;
+			const { sniff, cacheControl } = cls
+				? await withPurpose(cls, (purpose) => ({
+						sniff: purpose.sniff,
+						cacheControl: purpose.cacheControl
+					}))
+				: { sniff: true, cacheControl: undefined };
 			if (sniff && (await detectType(bytes)) !== file.contentType) {
 				return refuse('the content of the file is not of the declared type');
 			}
+			if (cls) {
+				try {
+					metadata = await withPurpose(cls, (purpose) => purpose.metadata(finishing, bytes));
+				} catch (error) {
+					// A file the purpose cannot read, such as a broken video, is refused for good.
+					return refuse(error instanceof Error ? error.message : 'the file could not be read');
+				}
+			}
 
-			await Storage.disk(file.disk).put(file.key, bytes, { contentType: file.contentType });
+			await Storage.disk(file.disk).put(file.key, bytes, {
+				contentType: file.contentType,
+				cacheControl
+			});
 		} catch (error) {
 			// The client may finish again; pruning removes what a stop half way leaves.
 			await back();
@@ -407,7 +445,7 @@ export namespace Uploads {
 		const ready = await store.transition(
 			file.id,
 			{ status: ['finishing'] },
-			{ status: 'ready', readyAt: now, expiresAt: Files.unclaimedDeadline(now) }
+			{ status: 'ready', readyAt: now, expiresAt: Files.unclaimedDeadline(now), metadata }
 		);
 		if (!ready) {
 			// Pruning expired the file while it was checked: its object belongs to no file.
