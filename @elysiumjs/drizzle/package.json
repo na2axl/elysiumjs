@@ -75,6 +75,7 @@
 		"postgres": "^3.4.0"
 	},
 	"dependencies": {
+		"@casl/ability": "^7.0.2",
 		"drizzle-orm": "^1.0.0-rc.5",
 		"prompts": "^2.4.2",
 		"radash": "catalog:"

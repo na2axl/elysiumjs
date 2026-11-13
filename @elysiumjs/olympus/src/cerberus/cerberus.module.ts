@@ -1,4 +1,4 @@
-// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
+// Copyright (c) 2025-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -11,30 +11,29 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+import type { CerberusModuleConfig } from './config';
 
-import type { CerberusConfig } from './utils';
-
-import { Module } from '../index';
-
-import { CerberusMiddleware } from './cerberus.middleware';
-import { CERBERUS_CONFIG } from './cerberus.tokens';
+import { Module } from '../module';
+import { CERBERUS_CONFIG, settingsOf } from './config';
 
 /**
- * Configurable module providing the {@link CerberusMiddleware}. Bind a config with
- * `CerberusModule.with({ getSubject, ... })`; the middleware reads it by injection.
+ * Gives cerberus the facts of actors, and where their abilities are cached. List the rules of
+ * each domain, `@Abilities.rules()` classes, in the services of the domain's module.
  * @author Axel Nana <ax.lnana@outlook.com>
+ * @example
+ * ```ts
+ * CerberusModule.with({
+ * 	facts: async (userId) => {
+ * 		const user = await users.find(userId);
+ * 		return user ? { version: user.abilityVersion, facts: { userId, roles: user.roles } } : null;
+ * 	},
+ * 	cache: () => Cache.store('kv')
+ * });
+ * ```
  */
-@Module.register({
-	services: [CerberusMiddleware],
-	// `true` also exports the config token, which is what lets importing modules construct
-	// the middleware (it injects the config).
-	exports: true
+@Module.register<CerberusModuleConfig>({
+	services: (config) => [{ name: CERBERUS_CONFIG, global: true, factory: () => settingsOf(config) }]
 })
-export class CerberusModule extends Module.configurable<CerberusConfig>({
-	required: ['getSubject']
-}) {
-	/** Stable injection token of the config; it does not depend on the class name. */
-	public static override get config(): string {
-		return CERBERUS_CONFIG;
-	}
-}
+export class CerberusModule extends Module.configurable<CerberusModuleConfig>({
+	required: ['facts']
+}) {}

@@ -11,9 +11,25 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
-export { Cerberus } from './capability';
-export { CerberusMiddleware } from './cerberus.middleware';
-export { CERBERUS_CONFIG } from './cerberus.tokens';
+export type {
+	Ability,
+	AbilityAction,
+	AbilityFacts,
+	AbilityRules,
+	AbilitySubjects,
+	Facts,
+	GrantRule,
+	PackedAbility,
+	SubjectInput,
+	SubjectName
+} from './abilities';
+export {
+	Abilities,
+	detectSubjectType,
+	InvalidAbilityDomainError,
+	UnknownSubjectTypeError
+} from './abilities';
+export { AbilityMiddleware, Cerberus } from './cerberus';
 export { CerberusModule } from './cerberus.module';
-export type { CerberusConfig, Subject, Ability } from './utils';
+export type { CerberusModuleConfig, VersionedFacts } from './config';
+export { CERBERUS_CONFIG, CerberusUnavailableError, DEFAULT_ABILITY_TTL } from './config';

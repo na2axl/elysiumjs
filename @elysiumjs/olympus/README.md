@@ -22,7 +22,7 @@ Add a runtime package too: `@elysiumjs/bun`, `@elysiumjs/node` or `@elysiumjs/wo
 | `@elysiumjs/olympus/ariadne`         | Multi-step flows with server-side state and replayable steps.                                                                                                                                                           |
 | `@elysiumjs/olympus/themis`          | Authentication: sessions, guards, API keys, CSRF, TOTP, OAuth and passkeys.                                                                                                                                             |
 | `@elysiumjs/olympus/harpocrates`     | Secrets and cryptography: password hashing (`Password` and the `PasswordHasher` port), encryption (the `Cipher` port), JWTs, signed URLs and hashing helpers.                                                           |
-| `@elysiumjs/olympus/cerberus`        | Ability-based roles and permissions.                                                                                                                                                                                    |
+| `@elysiumjs/olympus/cerberus`        | Abilities: rules per domain composed over the facts of an actor, cached per version, and route and call checks.                                                                                                         |
 | `@elysiumjs/olympus/hermes`          | Notifications: channels with fallback chains, the inbox, mail and broadcast channels, queued notifications and test fakes.                                                                                              |
 | `@elysiumjs/olympus/hermes/heracles` | `NotificationJob`, which delivers queued notifications. List it in a module's `jobs`.                                                                                                                                   |
 | `@elysiumjs/olympus/pithos`          | Storage and files: disks (the `Storage` port and the `memory` disk), signed URLs, file records (the `FileStore` port), claims and deferred uploads.                                                                     |
@@ -861,6 +861,91 @@ async finish(@Http.param('id') id: string, @Auth.user() user: AuthUser) {
 `Uploads.finish()` reads the staged object once, and refuses it for good (`UPLOAD_REJECTED`) unless its size, its stored content type and its first bytes, read with `file-type`, all match what was declared. Only then are those same bytes written to the file's key, the file made `ready`, and the staged object deleted, so an upload racing through the still valid URL cannot swap the bytes in between. Nothing uploaded yet answers `UPLOAD_MISSING`, and the client may upload and finish again; a finished upload, or one another call is finishing, answers `UPLOAD_NOT_PENDING` and an expired one `UPLOAD_EXPIRED`. A purpose whose types have no signature, such as `text/plain` or `image/svg+xml`, turns the content check off with `get sniff() { return false; }`.
 
 A ready file is served from `<purpose>/<id>` by default, so a new file is a new key and a served file can be cached for good. A purpose may override `key(file)`, as long as the key holds the id of the file, so two files never share an object, and does not start with `staging/`. `finish()` holds the file in memory while it checks it, so keep `maxBytes` to what a request may hold.
+
+## Abilities
+
+`@elysiumjs/olympus/cerberus` decides what an actor may do with [CASL](https://casl.js.org) abilities. Each domain declares its rules, the app gives the facts of an actor, and the rules of every domain are composed over those facts. Rules read only the facts, never a service or the database, so a built ability can be cached.
+
+Declare the facts and the subject names once, by declaration merging, then write the rules of a domain as a class listed in the services of its module:
+
+```ts
+import type { AbilityFacts, AbilityRules, GrantRule } from '@elysiumjs/olympus/cerberus';
+
+import { Abilities } from '@elysiumjs/olympus/cerberus';
+
+declare module '@elysiumjs/olympus/cerberus' {
+	interface AbilityFacts {
+		userId: string;
+		roles: string[];
+	}
+
+	interface AbilitySubjects {
+		Post: true;
+	}
+}
+
+@Abilities.rules('posts')
+export class PostRules implements AbilityRules {
+	public define(facts: AbilityFacts, can: GrantRule, cannot: GrantRule) {
+		can('read', 'Post', { status: 'published' });
+		can('update', 'Post', { authorId: facts.userId });
+		if (facts.roles.includes('moderator')) can('delete', 'Post');
+		cannot('delete', 'Post', { locked: true });
+	}
+}
+```
+
+`Abilities.compose(facts)` builds one ability from the rules of every domain, in the order of their modules: as in CASL, a later rule wins over an earlier one, so a `can('manage', 'all')` of a later domain lifts the `cannot` of an earlier one. A rules class that no module lists in its services is left out, and `Abilities.from(rules)` from rules alone, such as in a domain's tests. A check on an instance reads the `static subjectName` of its class, and a plain object is tagged with `Abilities.subject('Post', post)`; class names are never read, since bundlers rename them. `Abilities.pack(ability)` gives a compact form of the rules, for a token or a response, and `Abilities.unpack(packed)` the ability back.
+
+`CerberusModule` gives the facts of an actor, with a version that changes whenever a fact the rules read changes, such as a counter the app bumps in the same transaction:
+
+```ts
+CerberusModule.with({
+	facts: async (userId) => {
+		const user = await users.find(userId);
+		return user?.active
+			? { version: user.abilityVersion, facts: { userId, roles: user.roles } }
+			: null;
+	},
+	cache: () => Cache.store('kv'), // the memory cache of MnemosyneModule by default; false for none
+	ttl: 604_800, // seconds a cached ability is kept (default 7 days)
+	rulesVersion: env.BUILD_COMMIT // changes the fingerprint of the rules
+});
+```
+
+`Abilities.of(actorId)` answers the ability of an actor, from the cache when it was built for the same version of the facts and the same rules, or `undefined` for an actor without facts. `Abilities.fingerprint()` is a digest of the source of every `define` method and of `rulesVersion`: when rules also read helpers, constants or imported maps, set `rulesVersion` to a value that changes with each build, such as its commit. Entries are kept per tenant in context, rules whose conditions hold values JSON cannot keep, such as an `undefined` fact or a `Date`, are built on each call instead, and a cache that fails costs a build, never the check. `Abilities.forget(actorId)` drops the cached ability early, such as once a change of facts has committed.
+
+The checks read the ability of the current actor: the themis user (`Auth.currentUser()`), its `id` or the user itself when a guard answers an id, unless `actor` says otherwise. A check on a subject name passes when some rule allows the action on some subjects of that name, whatever its conditions, so it fits routes and calls; check the record itself, once loaded, before acting on it:
+
+```ts
+@Http.controller('/posts')
+@Auth() // the controller's middlewares run before the checks of its routes
+class PostsController {
+	@Http.post('/')
+	@Cerberus.can('create', 'Post') // FORBIDDEN otherwise; @Cerberus.cannot() for the opposite
+	public create() {}
+}
+
+const UpdatePostInput = t.Object({ id: t.String(), title: t.String() });
+
+@Action.register({
+	input: UpdatePostInput,
+	errors: [ForbiddenError],
+	authorize: Cerberus.may('update', 'Post') // may update some posts
+})
+class UpdatePost extends Action<Static<typeof UpdatePostInput>> {
+	public async handle(input: Static<typeof UpdatePostInput>) {
+		const post = await posts.find(input.id);
+		// The stored post, never the input: a caller chooses what it sends.
+		if (!post || !(await Cerberus.check('update', Abilities.subject('Post', post)))) {
+			return new ForbiddenError('You cannot update this post.');
+		}
+		// ...
+	}
+}
+```
+
+`Cerberus.ability()` answers the ability of the current actor, built once per request, and `Cerberus.check(action, subject)` whether it allows an action. `@elysiumjs/drizzle` turns the same rules into a SQL condition with `rulesToDrizzle()`, so a list answers only the rows the actor may act on.
 
 ## Services
 

@@ -231,6 +231,23 @@ PithosModule.with({ disks, files: { store: () => FileStore.for('drizzle', { tabl
 
 Each change of a record is one conditional `UPDATE`, so only one of two racing requests wins. The table has an index on the owner, a partial index on pending uploads by uploader, which the cap on uploads in progress reads, and a partial index on the files whose time runs out (`pending`, `finishing` and `ready`), which pruning reads. Any table with the same columns works, given as `table`, with an optional `connection`.
 
+## Abilities as SQL
+
+`rulesToDrizzle(ability, action, subject, table)` turns the rules of an ability from `@elysiumjs/olympus/cerberus` into a condition over a table, so a list answers only the rows the same rules let the actor act on:
+
+```ts
+import { rulesToDrizzle } from '@elysiumjs/drizzle';
+import { Cerberus } from '@elysiumjs/olympus/cerberus';
+
+const ability = await Cerberus.ability();
+const editable = await db
+	.select()
+	.from(posts)
+	.where(rulesToDrizzle(ability, 'update', 'Post', posts)); // false without an ability
+```
+
+Rule fields are the properties of the table's columns. A `cannot` bounds every `can` before it. `$eq`, `$ne`, `$in` and `$nin` treat `NULL` as CASL does, and a `cannot` never refuses a row whose condition is unknown because of a `NULL`; `$lt`, `$lte`, `$gt`, `$gte` and `$exists` follow SQL, where `NULL` compares to nothing, so keep the columns they read `NOT NULL` or add an explicit condition. No ability, or no rule that allows the action: `false`; a rule without conditions: `true`. The operators are `$eq`, `$ne`, `$in`, `$nin`, `$lt`, `$lte`, `$gt`, `$gte`, `$exists`, `$and`, `$or` and `$not`; any other operator, or a field the table does not have, throws `UntranslatableRuleError`.
+
 ## License
 
 This project is licensed under the Apache License, Version 2.0. See the [LICENSE](../../LICENSE) file for more info.
