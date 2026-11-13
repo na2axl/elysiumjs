@@ -54,6 +54,22 @@ type CachedModel = { modelName: string; schemaHash: string; supportTenancy: bool
 /** Stores already reported as unavailable, so that each is logged once. */
 const reported = new Set<string>();
 
+/** Models whose rows were found not to survive `Json`, so that each is logged once. */
+const unkept = new Set<string>();
+
+/**
+ * The stores the repositories of each model cache in, with the longest TTL of each: writes forget
+ * in every one, and versions outlive the longest-lived entry.
+ */
+const known = new Map<string, Map<string, number>>();
+
+/** Remembers the store and TTL of a repository of a model. */
+const remember = (modelName: string, options: Resolved): void => {
+	const stores = known.get(modelName) ?? new Map<string, number>();
+	stores.set(options.store, Math.max(stores.get(options.store) ?? 0, options.ttl));
+	known.set(modelName, stores);
+};
+
 /** The default cache options of the module, if any. */
 const defaults = (): RepositoryCacheOptions | undefined => {
 	try {
@@ -124,7 +140,8 @@ const storeOf = (options: Resolved): Omit<CacheInterface, 'tags'> | undefined =>
  * row changes its version, and the writes without events change the generation. A read that
  * started before a write therefore never leaves the row it read in the cache, since it is
  * stamped with the version it saw. Versions and generations live twice as long as the entries,
- * so that none expires before the entries stamped with it.
+ * the longest TTL of the model's entries, so that none expires before the entries stamped with
+ * it, and a read writes its row only when no write changed them while it loaded.
  *
  * A cache that fails, or that is not available, costs a read of the database, never the call,
  * and is logged.
@@ -134,8 +151,16 @@ export class RepositoryCache {
 	private constructor(
 		private readonly cache: Omit<CacheInterface, 'tags'>,
 		private readonly ttl: number,
-		private readonly prefix: string
+		private readonly prefix: string,
+		private readonly modelName: string,
+		private readonly store: string
 	) {}
+
+	/** How long versions and generations live: twice the longest TTL of the model's entries. */
+	private get stampTtl(): number {
+		const longest = known.get(this.modelName)?.get(this.store) ?? 0;
+		return Math.max(this.ttl, longest) * 2;
+	}
 
 	/** Creates the cache of resolved options for a model and connection. */
 	private static make(
@@ -151,7 +176,8 @@ export class RepositoryCache {
 		const shared = !model.supportTenancy && getTenancyConfig().mode !== 'rls';
 		const tenant = shared ? '*' : (getCurrentTenant() ?? 'public');
 		const prefix = Json.stringify([model.modelName, model.schemaHash, tenant, connection]);
-		return new RepositoryCache(cache, options.ttl, prefix);
+		remember(model.modelName, options);
+		return new RepositoryCache(cache, options.ttl, prefix, model.modelName, options.store);
 	}
 
 	/**
@@ -169,17 +195,67 @@ export class RepositoryCache {
 	}
 
 	/**
-	 * The cache a repository class forgets its writes in, or `undefined` when there is none.
+	 * Remembers the cache a repository class reads through, so that the writes of every repository
+	 * of its model forget in it, even before it first reads.
 	 * @param repository The repository class.
+	 * @param model The model.
+	 */
+	public static remember(repository: Function, model: CachedModel): void {
+		const options = readOptions(repository);
+		if (options) remember(model.modelName, options);
+	}
+
+	/**
+	 * The caches the writes of a repository class forget in: its own, the defaults of the module,
+	 * and every store a repository of its model caches in. `undefined` when there is none.
+	 * @param repository The repository class, or `undefined` for writes outside a repository.
 	 * @param model The model.
 	 * @param connection The connection name.
 	 */
 	public static writing(
-		repository: Function,
+		repository: Function | undefined,
 		model: CachedModel,
 		connection: string
-	): RepositoryCache | undefined {
-		return RepositoryCache.make(writeOptions(repository), model, connection);
+	): RepositoryCacheWriter | undefined {
+		const own = repository ? writeOptions(repository) : undefined;
+		const base = defaults();
+		const all = new Map<string, Resolved>();
+		for (const options of [own, base ? complete(base) : undefined]) {
+			if (options) all.set(options.store, options);
+		}
+		for (const [store, ttl] of known.get(model.modelName) ?? []) {
+			if (!all.has(store)) all.set(store, { store, ttl });
+		}
+		const caches = [...all.values()]
+			.map((options) => RepositoryCache.make(options, model, connection))
+			.filter((cache): cache is RepositoryCache => cache !== undefined);
+		return caches.length > 0 ? new RepositoryCacheWriter(caches) : undefined;
+	}
+
+	/** Reads the generation and the version of a row: what an entry read now is stamped with. */
+	private async stampOf(
+		key: Record<string, unknown> | undefined
+	): Promise<{ g: string; v: string }> {
+		const [generation, version] = await this.cache.mget<unknown>(
+			key ? [this.generationKey, this.versionKey(key)] : [this.generationKey]
+		);
+		return {
+			g: (generation as string | undefined) ?? '0',
+			v: (version as string | undefined) ?? '0'
+		};
+	}
+
+	/** Whether a row read from the database can be cached as it is: `Json` keeps it. */
+	private keeps(row: unknown): boolean {
+		// The columns of an instance: the instance itself is always kept as its model and columns.
+		if (Json.survives({ ...(row as object) })) return true;
+		if (!unkept.has(this.modelName)) {
+			unkept.add(this.modelName);
+			getLogger().warn(
+				`Rows of ${this.modelName} hold values Json cannot keep: they are read from the database.`
+			);
+		}
+		return false;
 	}
 
 	private rowKey(key: Record<string, unknown>): string {
@@ -230,9 +306,13 @@ export class RepositoryCache {
 			this.failed('read a row', error);
 		}
 		const row = await load();
-		if (row !== null && stamp) {
+		if (row !== null && stamp && this.keeps(row)) {
 			try {
-				await this.cache.set(rowKey, { ...stamp, value: row }, this.ttl);
+				// A write that ran during the load changed a stamp: the row may be stale.
+				const now = await this.stampOf(key);
+				if (now.g === stamp.g && now.v === stamp.v) {
+					await this.cache.set(rowKey, { ...stamp, value: row }, this.ttl);
+				}
 			} catch (error) {
 				this.failed('write a row', error);
 			}
@@ -274,6 +354,7 @@ export class RepositoryCache {
 		const row = await load();
 		if (row !== null && generation !== undefined) {
 			try {
+				if ((await this.stampOf(undefined)).g !== generation) return row;
 				await this.cache.set(lookupKey, { g: generation, key: keyOf(row) }, this.ttl);
 			} catch (error) {
 				this.failed('write a lookup', error);
@@ -289,7 +370,7 @@ export class RepositoryCache {
 	 */
 	public async forget(key: Record<string, unknown>): Promise<void> {
 		try {
-			await this.cache.set(this.versionKey(key), crypto.randomUUID(), this.ttl * 2);
+			await this.cache.set(this.versionKey(key), crypto.randomUUID(), this.stampTtl);
 			await this.cache.del(this.rowKey(key));
 		} catch (error) {
 			this.failed('forget a row', error);
@@ -299,10 +380,31 @@ export class RepositoryCache {
 	/** Gives the tenant's rows a new generation, which makes every cached row a miss. */
 	public async invalidate(): Promise<void> {
 		try {
-			await this.cache.set(this.generationKey, crypto.randomUUID(), this.ttl * 2);
+			await this.cache.set(this.generationKey, crypto.randomUUID(), this.stampTtl);
 		} catch (error) {
 			this.failed('forget the rows', error);
 		}
+	}
+}
+
+/**
+ * Forgets writes in every cache of a model.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export class RepositoryCacheWriter {
+	public constructor(private readonly caches: RepositoryCache[]) {}
+
+	/**
+	 * Gives the row of a key a new version in every cache.
+	 * @param key The key column values.
+	 */
+	public async forget(key: Record<string, unknown>): Promise<void> {
+		await Promise.all(this.caches.map((cache) => cache.forget(key)));
+	}
+
+	/** Gives the tenant's rows a new generation in every cache. */
+	public async invalidate(): Promise<void> {
+		await Promise.all(this.caches.map((cache) => cache.invalidate()));
 	}
 }
 

@@ -84,6 +84,15 @@ describe('RLS isolation', () => {
 			});
 		});
 
+		it('runs the after-commit callbacks of its transaction once it commits', async () => {
+			const calls: string[] = [];
+			await new DrizzleRLSTenancy().withIsolation(fake.connection, 'acme', async () => {
+				expect(Database.afterCommit('default', () => void calls.push('committed'))).toBe(true);
+				calls.push('inside');
+			});
+			expect(calls).toEqual(['inside', 'committed']);
+		});
+
 		it('leaves the current context store untouched', async () => {
 			const store = new Map<any, unknown>([['tenant', 'outer']]);
 
