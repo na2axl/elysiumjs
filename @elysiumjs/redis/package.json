@@ -1,6 +1,6 @@
 {
 	"name": "@elysiumjs/redis",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"license": "Apache-2.0",
 	"description": "Redis backend for the Elysium.js framework: connections, caches, rate limits, locks, Heracles queues and workers, flow and session stores.",
 	"private": false,
