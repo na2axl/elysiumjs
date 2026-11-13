@@ -50,7 +50,8 @@ export {
 	type QueryParams,
 	type QuerySchemaProperties,
 	type QuerySpec,
-	Listing
+	Listing,
+	PageSerializer
 } from './query';
 
 export {

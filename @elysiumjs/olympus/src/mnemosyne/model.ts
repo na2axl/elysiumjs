@@ -42,8 +42,20 @@ export class DuplicateModelError extends ElysiumError {
 }
 
 /**
- * Thrown when a value names a model that is not registered, such as a cached model whose class
- * this process has not loaded.
+ * Thrown when a written model instance was written with another digest of the model's columns,
+ * such as an instance cached before a deploy that changed its table. Caches read it as a miss.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export class StaleModelError extends ElysiumError {
+	constructor(public readonly model: string) {
+		super(
+			`An instance of the model "${model}" was written with other columns than the model has now.`
+		);
+	}
+}
+
+/**
+ * Thrown when a written model instance names a model that is not registered.
  * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class UnknownModelError extends ElysiumError {
@@ -145,7 +157,7 @@ export namespace Models {
 @Serializer.register({ name: 'model' })
 export class ModelSerializer extends Serializer<
 	object,
-	{ model: string; attributes: Record<string, unknown> }
+	{ model: string; hash?: string; attributes: Record<string, unknown> }
 > {
 	public supports(value: unknown): boolean {
 		return Models.isInstance(value);
@@ -153,12 +165,19 @@ export class ModelSerializer extends Serializer<
 
 	public serialize(instance: object) {
 		const model = Models.register(instance.constructor as ModelClass);
-		return { model: model.modelName, attributes: Models.attributes(instance) };
+		return {
+			model: model.modelName,
+			hash: model.schemaHash,
+			attributes: Models.attributes(instance)
+		};
 	}
 
-	public deserialize(value: { model: string; attributes: Record<string, unknown> }) {
+	public deserialize(value: { model: string; hash?: string; attributes: Record<string, unknown> }) {
 		const model = Models.find(value.model);
 		if (!model) throw new UnknownModelError(value.model);
+		if (value.hash !== undefined && value.hash !== model.schemaHash) {
+			throw new StaleModelError(value.model);
+		}
 		return model.hydrate(value.attributes) as object;
 	}
 }
