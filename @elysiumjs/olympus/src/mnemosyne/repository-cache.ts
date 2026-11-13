@@ -14,12 +14,15 @@
 
 import type { CacheInterface } from './cache';
 
-import { Json, Service } from '../index';
+import { getLogger, Json, Service } from '../index';
 import { Cache } from './cache';
-import { getCurrentTenant } from './tenancy';
+import { getCurrentTenant, getTenancyConfig } from './tenancy';
 
 /** Name of the global service holding the default cache options of the repositories. */
 export const REPOSITORY_CACHE_SERVICE = 'mnemosyne.repositories.cache';
+
+/** How long a cached row is kept when no `ttl` is given: one hour. */
+export const DEFAULT_REPOSITORY_CACHE_TTL = 3_600_000;
 
 /**
  * How a repository caches its rows.
@@ -32,117 +35,172 @@ export type RepositoryCacheOptions = {
 	 */
 	store?: 'memory' | (string & {});
 
-	/** How long a row is kept, in milliseconds. Defaults to the store's own TTL. */
+	/** How long a row is kept, in milliseconds, above 0. Defaults to one hour. */
 	ttl?: number;
 };
 
-/** The resolved cache of a repository class. */
-type Resolved = { store: string; ttl?: number };
+/** The cache options of a repository class, resolved. */
+type Resolved = { store: string; ttl: number };
 
-/** The key of the generation of a tenant's rows, changed by the writes without events. */
-const GENERATION = '$generation';
-
-/** A cached row, with the generation it was read in. */
-type Entry = { g: string; value: unknown };
+/** A cached row, with the generation and the version of its row it was read in. */
+type Entry = { g: string; v: string; value: unknown };
 
 /** A cached key lookup of `findBy()`, with the generation it was read in. */
 type Lookup = { g: string; key: Record<string, unknown> };
 
-/**
- * The cache options of a repository class: its own `static cache` over the defaults of the
- * `MnemosyneModule`. `false` turns caching off; without either, the repository does not cache.
- */
-const resolve = (repository: Function): Resolved | undefined => {
-	const own = (repository as unknown as { cache?: RepositoryCacheOptions | false }).cache;
-	if (own === false) return undefined;
-	let defaults: RepositoryCacheOptions | null = null;
+/** The model a repository cache works for. */
+type CachedModel = { modelName: string; schemaHash: string; supportTenancy: boolean };
+
+/** Stores already reported as unavailable, so that each is logged once. */
+const reported = new Set<string>();
+
+/** The default cache options of the module, if any. */
+const defaults = (): RepositoryCacheOptions | undefined => {
 	try {
-		defaults = Service.get<RepositoryCacheOptions>(REPOSITORY_CACHE_SERVICE);
+		return Service.get<RepositoryCacheOptions>(REPOSITORY_CACHE_SERVICE) ?? undefined;
 	} catch {
-		defaults = null;
+		return undefined;
 	}
-	if (!own && !defaults) return undefined;
-	const options = { ...defaults, ...own };
-	return { store: options.store ?? 'memory', ttl: options.ttl };
+};
+
+/** Merges cache options over the defaults, with the default store and TTL. */
+const complete = (options: RepositoryCacheOptions): Resolved => {
+	const ttl = options.ttl ?? DEFAULT_REPOSITORY_CACHE_TTL;
+	return {
+		store: options.store ?? 'memory',
+		ttl: Number.isFinite(ttl) && ttl > 0 ? ttl : DEFAULT_REPOSITORY_CACHE_TTL
+	};
 };
 
 /**
- * The read-through cache of a repository: rows by key, and the keys of `findBy()` lookups,
- * per model, schema, tenant and connection. Updates and deletes forget their row, now and once
- * the unit of work commits; the writes without events change the generation of the tenant's
- * rows, which makes every entry read before them a miss. Reads skip the cache while a unit of
- * work or a transaction is open, so that it never holds rows that may roll back. A cache that
- * fails costs a read of the database, never the call.
+ * The cache a repository class reads through: its own `static cache` over the defaults of the
+ * `MnemosyneModule`. `false` turns reading off; without either, the repository does not cache.
+ */
+const readOptions = (repository: Function): Resolved | undefined => {
+	const own = (repository as unknown as { cache?: RepositoryCacheOptions | false }).cache;
+	if (own === false) return undefined;
+	const base = defaults();
+	if (!own && !base) return undefined;
+	return complete({ ...base, ...own });
+};
+
+/**
+ * The cache a repository class forgets its writes in: the one it reads through, or the
+ * defaults of the module when it does not read through one, so that a repository that does not
+ * cache still forgets what other repositories of its model cached.
+ */
+const writeOptions = (repository: Function): Resolved | undefined => {
+	const read = readOptions(repository);
+	if (read) return read;
+	const own = (repository as unknown as { cache?: RepositoryCacheOptions | false }).cache;
+	const base = defaults();
+	if (own && typeof own === 'object') return complete({ ...base, ...own });
+	return base ? complete(base) : undefined;
+};
+
+/** The store of resolved options, or `undefined`, logged once, when it is not available. */
+const storeOf = (options: Resolved): Omit<CacheInterface, 'tags'> | undefined => {
+	try {
+		const cache = options.store === 'memory' ? Cache.memory : Cache.store(options.store);
+		return cache.tags('repositories');
+	} catch (error) {
+		if (!reported.has(options.store)) {
+			reported.add(options.store);
+			getLogger().warn(
+				`The repository cache "${options.store}" is not available: rows are read from the database.`,
+				{ error }
+			);
+		}
+		return undefined;
+	}
+};
+
+/**
+ * The read-through cache of a repository: rows by key, and the keys of `findBy()` lookups, per
+ * model, digest of its columns, tenant and connection.
+ *
+ * Each row has a version, and each tenant's rows a generation, kept next to the entries. A
+ * cached row is a hit only while both are the ones it was read with: an update or delete of the
+ * row changes its version, and the writes without events change the generation. A read that
+ * started before a write therefore never leaves the row it read in the cache, since it is
+ * stamped with the version it saw. Versions and generations live twice as long as the entries,
+ * so that none expires before the entries stamped with it.
+ *
+ * A cache that fails, or that is not available, costs a read of the database, never the call,
+ * and is logged.
  * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class RepositoryCache {
 	private constructor(
 		private readonly cache: Omit<CacheInterface, 'tags'>,
-		private readonly ttl: number | undefined,
+		private readonly ttl: number,
 		private readonly prefix: string
 	) {}
 
-	/**
-	 * The cache of a repository class, or `undefined` when it does not cache.
-	 * @param repository The repository class.
-	 * @param model The model name and schema hash.
-	 * @param connection The connection name.
-	 */
-	public static for(
-		repository: Function,
-		model: { modelName: string; schemaHash: string },
+	/** Creates the cache of resolved options for a model and connection. */
+	private static make(
+		options: Resolved | undefined,
+		model: CachedModel,
 		connection: string
 	): RepositoryCache | undefined {
-		const options = resolve(repository);
 		if (!options) return undefined;
-		const store = options.store === 'memory' ? Cache.memory : Cache.store(options.store);
-		const tenant = getCurrentTenant() ?? 'public';
-		return new RepositoryCache(
-			store.tags(`model:${model.modelName}`),
-			options.ttl,
-			`${model.schemaHash}:${tenant}:${connection}:`
-		);
+		const cache = storeOf(options);
+		if (!cache) return undefined;
+		// Rows of a model without tenancy are shared by every tenant, unless rows are isolated by
+		// row-level security, where what a read finds depends on the tenant.
+		const shared = !model.supportTenancy && getTenancyConfig().mode !== 'rls';
+		const tenant = shared ? '*' : (getCurrentTenant() ?? 'public');
+		const prefix = Json.stringify([model.modelName, model.schemaHash, tenant, connection]);
+		return new RepositoryCache(cache, options.ttl, prefix);
 	}
 
-	/** The cache key of a row key. */
+	/**
+	 * The cache a repository class reads through, or `undefined` when it does not cache.
+	 * @param repository The repository class.
+	 * @param model The model.
+	 * @param connection The connection name.
+	 */
+	public static reading(
+		repository: Function,
+		model: CachedModel,
+		connection: string
+	): RepositoryCache | undefined {
+		return RepositoryCache.make(readOptions(repository), model, connection);
+	}
+
+	/**
+	 * The cache a repository class forgets its writes in, or `undefined` when there is none.
+	 * @param repository The repository class.
+	 * @param model The model.
+	 * @param connection The connection name.
+	 */
+	public static writing(
+		repository: Function,
+		model: CachedModel,
+		connection: string
+	): RepositoryCache | undefined {
+		return RepositoryCache.make(writeOptions(repository), model, connection);
+	}
+
 	private rowKey(key: Record<string, unknown>): string {
-		return `${this.prefix}row:${Json.stringify(Object.values(key))}`;
+		return `${this.prefix}:row:${Json.stringify(Object.values(key))}`;
 	}
 
-	/** The cache key of a `findBy()` lookup. */
+	private versionKey(key: Record<string, unknown>): string {
+		return `${this.prefix}:version:${Json.stringify(Object.values(key))}`;
+	}
+
 	private lookupKey(column: string, value: unknown): string {
-		return `${this.prefix}by:${column}:${Json.stringify(value)}`;
+		return `${this.prefix}:by:${column}:${Json.stringify(value)}`;
 	}
 
-	/** The generation key of the tenant's rows. */
 	private get generationKey(): string {
-		return `${this.prefix}${GENERATION}`;
+		return `${this.prefix}:generation`;
 	}
 
-	/** Reads entries with the current generation, or `undefined` when the cache fails. */
-	private async read<T extends { g: string }>(
-		key: string
-	): Promise<{ entry: T | undefined; generation: string } | undefined> {
-		try {
-			const [entry, current] = await this.cache.mget<unknown>([key, this.generationKey]);
-			if (typeof current === 'string')
-				return { entry: entry as T | undefined, generation: current };
-			// No generation yet, or it expired: a new one, so that no entry read before comes back.
-			const generation = crypto.randomUUID();
-			await this.cache.set(this.generationKey, generation);
-			return { entry: undefined, generation };
-		} catch {
-			return undefined;
-		}
-	}
-
-	/** Writes an entry, ignoring a cache that fails. */
-	private async write(key: string, value: unknown): Promise<void> {
-		try {
-			await this.cache.set(key, value, this.ttl);
-		} catch {
-			// The next read goes to the database.
-		}
+	/** Logs a cache that failed. */
+	private failed(action: string, error: unknown): void {
+		getLogger().warn(`The repository cache failed to ${action}.`, { error });
 	}
 
 	/**
@@ -154,17 +212,38 @@ export class RepositoryCache {
 		key: Record<string, unknown>,
 		load: () => Promise<T | null>
 	): Promise<T | null> {
-		const cacheKey = this.rowKey(key);
-		const read = await this.read<Entry>(cacheKey);
-		if (read?.entry && read.entry.g === read.generation) return read.entry.value as T;
+		const rowKey = this.rowKey(key);
+		let stamp: { g: string; v: string } | undefined;
+		try {
+			const [entry, generation, version] = await this.cache.mget<unknown>([
+				rowKey,
+				this.generationKey,
+				this.versionKey(key)
+			]);
+			stamp = {
+				g: (generation as string | undefined) ?? '0',
+				v: (version as string | undefined) ?? '0'
+			};
+			const cached = entry as Entry | undefined;
+			if (cached && cached.g === stamp.g && cached.v === stamp.v) return cached.value as T;
+		} catch (error) {
+			this.failed('read a row', error);
+		}
 		const row = await load();
-		if (row !== null && read) await this.write(cacheKey, { g: read.generation, value: row });
+		if (row !== null && stamp) {
+			try {
+				await this.cache.set(rowKey, { ...stamp, value: row }, this.ttl);
+			} catch (error) {
+				this.failed('write a row', error);
+			}
+		}
 		return row;
 	}
 
 	/**
 	 * Reads the first row whose column has a value through the cache: the key of the row is
-	 * cached, and the row is read by its key, then checked against the value.
+	 * cached, and the row is read by its key, then checked against the value. Made for unique
+	 * columns: for others, the cached row stays the answer while it keeps the value.
 	 * @param column The column.
 	 * @param value The value.
 	 * @param keyOf The key column values of a row.
@@ -178,46 +257,55 @@ export class RepositoryCache {
 		find: (key: Record<string, unknown>) => Promise<T | null>,
 		load: () => Promise<T | null>
 	): Promise<T | null> {
-		const cacheKey = this.lookupKey(column, value);
-		const read = await this.read<Lookup>(cacheKey);
-		if (read?.entry && read.entry.g === read.generation) {
-			const row = await find(read.entry.key);
-			// The row may have changed its value since: the lookup is then a miss.
-			if (row !== null && sameValue((row as Record<string, unknown>)[column], value)) return row;
+		const lookupKey = this.lookupKey(column, value);
+		let generation: string | undefined;
+		try {
+			const [entry, current] = await this.cache.mget<unknown>([lookupKey, this.generationKey]);
+			generation = (current as string | undefined) ?? '0';
+			const lookup = entry as Lookup | undefined;
+			if (lookup && lookup.g === generation) {
+				const row = await find(lookup.key);
+				// The row may have changed its value since: the lookup is then a miss.
+				if (row !== null && sameValue((row as Record<string, unknown>)[column], value)) return row;
+			}
+		} catch (error) {
+			this.failed('read a lookup', error);
 		}
 		const row = await load();
-		if (row !== null && read) {
-			const key = keyOf(row);
-			await this.write(cacheKey, { g: read.generation, key });
-			await this.write(this.rowKey(key), { g: read.generation, value: row });
+		if (row !== null && generation !== undefined) {
+			try {
+				await this.cache.set(lookupKey, { g: generation, key: keyOf(row) }, this.ttl);
+			} catch (error) {
+				this.failed('write a lookup', error);
+			}
 		}
 		return row;
 	}
 
 	/**
-	 * Forgets the row of a key.
+	 * Gives the row of a key a new version, which makes its cached entry, and any entry a read
+	 * running meanwhile writes, a miss.
 	 * @param key The key column values.
 	 */
 	public async forget(key: Record<string, unknown>): Promise<void> {
 		try {
+			await this.cache.set(this.versionKey(key), crypto.randomUUID(), this.ttl * 2);
 			await this.cache.del(this.rowKey(key));
-		} catch {
-			// The entry expires with its TTL.
+		} catch (error) {
+			this.failed('forget a row', error);
 		}
 	}
 
-	/** Makes every entry of the tenant's rows read before now a miss. */
+	/** Gives the tenant's rows a new generation, which makes every cached row a miss. */
 	public async invalidate(): Promise<void> {
 		try {
-			await this.cache.set(this.generationKey, crypto.randomUUID());
-		} catch {
-			// The entries expire with their TTL.
+			await this.cache.set(this.generationKey, crypto.randomUUID(), this.ttl * 2);
+		} catch (error) {
+			this.failed('forget the rows', error);
 		}
 	}
 }
 
 /** Whether a column value read back equals the value looked up. */
 const sameValue = (a: unknown, b: unknown): boolean =>
-	a === b ||
-	(a instanceof Date && b instanceof Date && a.getTime() === b.getTime()) ||
-	Json.stringify(a) === Json.stringify(b);
+	a === b || Json.stringify(a) === Json.stringify(b);

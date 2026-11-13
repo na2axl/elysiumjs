@@ -14,10 +14,10 @@
 
 import type { ColumnMetadata, ModelClass } from '../../src/mnemosyne/interfaces';
 
+import { Resource } from '../../src/index';
 import { describe, expect, it } from 'bun:test';
 import { t } from 'elysia';
 
-import { Resource } from '../../src/index';
 import { createSchemaFromModel } from '../../src/mnemosyne/model';
 import { ModelResource } from '../../src/mnemosyne/resource';
 

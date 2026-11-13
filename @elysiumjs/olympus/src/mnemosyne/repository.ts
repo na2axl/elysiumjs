@@ -18,7 +18,7 @@ import type { RepositoryCacheOptions } from './repository-cache';
 
 import Emittery from 'emittery';
 
-import { ElysiumError, ModuleContext, Service } from '../index';
+import { ElysiumError, Json, ModuleContext, Service } from '../index';
 import { Metadata } from '../metadata';
 import { Symbols } from '../utils';
 import { Models } from './model';
@@ -123,6 +123,12 @@ export interface RepositoryAdapter<TTable = any, TConnection = unknown, TScope =
 	 * read past their cache meanwhile. Optional: without it, only units of work count.
 	 */
 	inTransaction?(name: string): boolean;
+	/**
+	 * Queues a callback to run once the transaction open on a connection commits. Answers
+	 * `false` when no transaction is open, or when the backend cannot tell: the callback is then
+	 * not queued. Optional.
+	 */
+	afterCommit?(name: string, hook: () => unknown): boolean;
 	all(target: RepositoryTarget<TTable>): Promise<Row[]>;
 	find(target: RepositoryTarget<TTable>, key: Row): Promise<Row | null>;
 	findBy(target: RepositoryTarget<TTable>, column: string, value: unknown): Promise<Row | null>;
@@ -365,33 +371,55 @@ const createRepository = <TModel extends ModelClass>(
 		key: key()
 	});
 
-	/** The cache of a repository instance, when its class caches. */
-	const cacheOf = (repository: object): RepositoryCache | undefined =>
-		RepositoryCache.for(repository.constructor, model, connectionOf(repository));
-
-	/** Whether reads may use the cache: not while a unit of work or a transaction is open. */
-	const readsCache = (repository: object): boolean =>
-		!UnitOfWork.active() && !adapter().inTransaction?.(connectionOf(repository));
-
-	/** Forgets the cached row of a key, now and once the unit of work commits. */
-	const forget = async (repository: object, key: Row): Promise<void> => {
-		const cache = cacheOf(repository);
-		if (!cache) return;
-		await cache.forget(key);
-		await UnitOfWork.afterCommit(() => cache.forget(key));
+	/** The cache a repository instance reads through, when its class caches and may read now. */
+	const readingCache = (repository: object): RepositoryCache | undefined => {
+		const cache = RepositoryCache.reading(repository.constructor, model, connectionOf(repository));
+		if (!cache) return undefined;
+		// Not while a unit of work or a transaction is open: the cache never holds rows that may
+		// roll back.
+		if (UnitOfWork.active() || adapter().inTransaction?.(connectionOf(repository)))
+			return undefined;
+		return cache;
 	};
 
-	/** Makes the cached rows of the tenant misses, now and once the unit of work commits. */
-	const invalidate = async (repository: object): Promise<void> => {
-		const cache = cacheOf(repository);
+	/** Runs a callback now, and again once the open unit of work or transaction commits. */
+	const nowAndAfterCommit = async (repository: object, callback: () => Promise<void>) => {
+		await callback();
+		if (UnitOfWork.active()) await UnitOfWork.afterCommit(callback);
+		else adapter().afterCommit?.(connectionOf(repository), callback);
+	};
+
+	/** Forgets the cached rows of keys, now and once the write commits. */
+	const forget = async (repository: object, ...keys: Row[]): Promise<void> => {
+		const cache = RepositoryCache.writing(repository.constructor, model, connectionOf(repository));
 		if (!cache) return;
-		await cache.invalidate();
-		await UnitOfWork.afterCommit(() => cache.invalidate());
+		await nowAndAfterCommit(repository, async () => {
+			for (const values of keys) await cache.forget(values);
+		});
+	};
+
+	/** Makes the cached rows of the tenant misses, now and once the write commits. */
+	const invalidate = async (repository: object): Promise<void> => {
+		const cache = RepositoryCache.writing(repository.constructor, model, connectionOf(repository));
+		if (!cache) return;
+		await nowAndAfterCommit(repository, () => cache.invalidate());
 	};
 
 	/** The key column values of a row. */
 	const keyOfRow = (row: unknown): Row =>
 		Object.fromEntries(key().map((column) => [column, (row as Row)[column]]));
+
+	/**
+	 * The keys to forget after a write: the one given, and the one of the row written when the
+	 * database read it differently, such as a number given as a string.
+	 */
+	const keysOf = (values: Row, row: unknown): Row[] => {
+		if (row === null || row === undefined) return [values];
+		const written = keyOfRow(row);
+		return Json.stringify(Object.values(written)) === Json.stringify(Object.values(values))
+			? [values]
+			: [values, written];
+	};
 
 	/**
 	 * Runs the listeners of a `-ing` event one after the other, on the payload itself so that
@@ -523,7 +551,7 @@ const createRepository = <TModel extends ModelClass>(
 		 * after a custom query changed it. Does nothing when the repository does not cache.
 		 * @param id The key.
 		 */
-		public forget(id: TKey): Promise<void> {
+		public forgetCached(id: TKey): Promise<void> {
 			return forget(this, keyValues(id));
 		}
 
@@ -532,7 +560,7 @@ const createRepository = <TModel extends ModelClass>(
 		 * commits, such as after a custom query changed many rows. Does nothing when the
 		 * repository does not cache.
 		 */
-		public forgetAll(): Promise<void> {
+		public forgetAllCached(): Promise<void> {
 			return invalidate(this);
 		}
 
@@ -549,7 +577,7 @@ const createRepository = <TModel extends ModelClass>(
 		public async find(id: TKey): Promise<TEntity | null> {
 			const values = keyValues(id);
 			const load = async () => hydrate(await adapter().find(targetOf(this), values));
-			const cache = readsCache(this) ? cacheOf(this) : undefined;
+			const cache = readingCache(this);
 			return cache ? cache.find(values, load) : load();
 		}
 
@@ -565,8 +593,8 @@ const createRepository = <TModel extends ModelClass>(
 		): Promise<TEntity | null> {
 			const load = async () =>
 				hydrate(await adapter().findBy(targetOf(this), column as string, value));
-			const cache = readsCache(this) ? cacheOf(this) : undefined;
-			if (!cache || key().length === 0) return load();
+			const cache = key().length > 0 ? readingCache(this) : undefined;
+			if (!cache) return load();
 			return cache.findBy(
 				column as string,
 				value,
@@ -603,7 +631,7 @@ const createRepository = <TModel extends ModelClass>(
 			const payload = { key: id, data: { ...(data as Row) } };
 			await before(this, 'updating', payload);
 			const row = hydrate(await adapter().update(targetOf(this), values, payload.data));
-			await forget(this, values);
+			await forget(this, ...keysOf(values, row));
 			if (row) await after(this, 'updated', row);
 			return row;
 		}
@@ -629,7 +657,7 @@ const createRepository = <TModel extends ModelClass>(
 			const values = keyValues(id);
 			await before(this, 'deleting', { key: id });
 			const row = hydrate(await adapter().delete(targetOf(this), values));
-			await forget(this, values);
+			await forget(this, ...keysOf(values, row));
 			if (row) await after(this, 'deleted', row);
 			return row;
 		}

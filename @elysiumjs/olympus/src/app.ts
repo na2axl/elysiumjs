@@ -163,7 +163,10 @@ export type ServerError = ErrorContext & { code?: string; error: any };
  * @author Axel Nana <ax.lnana@outlook.com>
  */
 export type AppContext = AsyncLocalStorage<
-	Map<'tenant' | 'http:context' | 'db:transactions' | 'db:tx' | 'uow:frame', unknown>
+	Map<
+		'tenant' | 'http:context' | 'db:transactions' | 'db:tx' | 'db:afterCommit' | 'uow:frame',
+		unknown
+	>
 >;
 
 /** Context used when no application instance exists, for instance under `Application.testing`. */

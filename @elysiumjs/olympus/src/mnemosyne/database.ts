@@ -134,9 +134,44 @@ export abstract class AbstractDatabase<TConnection, TConnectionConfig> {
 		const active = this.getActiveTransaction(connection);
 		if (active !== undefined) return callback(active);
 
-		return this.driver.withTransaction(connection, (tx) =>
-			this.runInTransaction(connection, tx, () => callback(tx))
+		const hooks: Array<() => unknown> = [];
+		const result = await this.driver.withTransaction(connection, (tx) =>
+			this.runInTransaction(connection, tx, () => {
+				const store = Application.context.getStore();
+				const pending = new Map(
+					store?.get('db:afterCommit') as Map<TConnection, Array<() => unknown>> | undefined
+				);
+				pending.set(connection, hooks);
+				const next = new Map(store);
+				next.set('db:afterCommit', pending);
+				return Application.context.run(next, () => callback(tx));
+			})
 		);
+		for (const hook of hooks) {
+			try {
+				await hook();
+			} catch {
+				// A failing hook never fails the committed transaction.
+			}
+		}
+		return result;
+	}
+
+	/**
+	 * Queues a callback to run once the transaction open on a connection by {@link transaction}
+	 * commits, such as forgetting cached rows it changed. A transaction that rolls back drops it.
+	 * @author Axel Nana <ax.lnana@outlook.com>
+	 * @param name The connection name.
+	 * @param hook The callback.
+	 * @returns `true` when the callback was queued, `false` when no such transaction is open.
+	 */
+	public afterCommit(name: string, hook: () => unknown): boolean {
+		const pending = Application.context.getStore()?.get('db:afterCommit') as
+			Map<TConnection, Array<() => unknown>> | undefined;
+		const hooks = pending?.get(this.getBaseConnection(name));
+		if (!hooks) return false;
+		hooks.push(hook);
+		return true;
 	}
 
 	/**

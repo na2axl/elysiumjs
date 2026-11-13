@@ -34,9 +34,29 @@ class BookModel extends MemoryModel<Book>('cached-books') {}
 /** Reads through the default cache of the module. */
 class BookRepository extends Repository(BookModel) {}
 
-/** Writes behind the cache's back, as another process would. */
+/** Does not read through the cache, but forgets its writes in it. */
 class DirectRepository extends Repository(BookModel) {
 	public static override readonly cache = false;
+}
+
+/** Changes a row behind the cache's back, as another process would. */
+const behind = (id: string, data: Partial<Book>) =>
+	BookModel.adapter!.repository!.update(
+		{ table: BookModel.table, model: 'BookModel', connection: 'default', key: ['id'] },
+		{ id },
+		data
+	);
+
+class TenantBookModel extends MemoryModel<Book>('cached-tenant-books', { supportTenancy: true }) {}
+class TenantBookRepository extends Repository(TenantBookModel) {}
+
+class PairModel extends MemoryModel<{ a: string; b: string; label: string }>('cached-pairs', {
+	key: ['a', 'b']
+}) {}
+class PairRepository extends Repository(PairModel) {}
+
+class MissingStoreRepository extends Repository(BookModel) {
+	public static override readonly cache = { store: 'nowhere' };
 }
 
 class ShortRepository extends Repository(BookModel) {
@@ -71,7 +91,7 @@ describe('Repository cache', () => {
 		await direct.insert(book('b1'));
 
 		const first = await books.find('b1');
-		await direct.update('b1', { title: 'behind the cache' });
+		await behind('b1', { title: 'behind the cache' });
 		const second = await books.find('b1');
 
 		expect(second).toBeInstanceOf(BookModel);
@@ -105,7 +125,9 @@ describe('Repository cache', () => {
 		await direct.insert(book('b4'));
 
 		expect((await books.findBy('isbn', 'isbn-b4'))!.id).toBe('b4');
-		await direct.update('b4', { title: 'behind' });
+		// The second lookup reads the row by its key, which caches it.
+		expect((await books.findBy('isbn', 'isbn-b4'))!.title).toBe('Book b4');
+		await behind('b4', { title: 'behind' });
 		expect((await books.findBy('isbn', 'isbn-b4'))!.title).toBe('Book b4');
 
 		// The row changed its value through the repository: the lookup is a miss.
@@ -120,7 +142,7 @@ describe('Repository cache', () => {
 		await direct.insert(book('b5'));
 		await books.find('b5');
 
-		await direct.update('b5', { title: 'behind' });
+		await behind('b5', { title: 'behind' });
 		await books.updateAll({ isbn: 'all' });
 		expect((await books.find('b5'))!.title).toBe('behind');
 
@@ -135,28 +157,86 @@ describe('Repository cache', () => {
 		await direct.insert(book('b12'));
 		await books.find('b11');
 		await books.find('b12');
-		await direct.update('b11', { title: 'one' });
-		await direct.update('b12', { title: 'two' });
+		await behind('b11', { title: 'one' });
+		await behind('b12', { title: 'two' });
 
-		await books.forget('b11');
+		await books.forgetCached('b11');
 		expect((await books.find('b11'))!.title).toBe('one');
 		expect((await books.find('b12'))!.title).toBe('Book b12');
 
-		await books.forgetAll();
+		await books.forgetAllCached();
 		expect((await books.find('b12'))!.title).toBe('two');
 	});
 
-	it('keeps tenants apart', async () => {
-		const books = new BookRepository();
-		await new DirectRepository().insert(book('b6'));
-		await books.find('b6');
-		await withTenant('acme', async () => {
-			expect(await books.find('b6')).not.toBeNull();
-			await books.deleteAll();
-		});
-		await new DirectRepository().update('b6', { title: 'public' });
+	it('keeps the tenants of a tenant-aware model apart', async () => {
+		const books = new TenantBookRepository();
+		await books.insert(book('t1'));
+		await books.find('t1');
+		// Tables are not split by tenant outside an application: the cache entries are.
+		await withTenant('acme', () => books.deleteAll());
 		// The tenant's write leaves the public entry as it was.
-		expect((await books.find('b6'))!.title).toBe('Book b6');
+		expect((await books.find('t1'))!.title).toBe('Book t1');
+	});
+
+	it('shares the rows of a model without tenancy between tenants', async () => {
+		const books = new BookRepository();
+		await books.insert(book('s1'));
+		await books.find('s1');
+		await withTenant('acme', () => books.update('s1', { title: 'from acme' }));
+		expect((await books.find('s1'))!.title).toBe('from acme');
+	});
+
+	it('forgets the writes of a repository that does not read through the cache', async () => {
+		const books = new BookRepository();
+		await books.insert(book('w1'));
+		await books.find('w1');
+		await new DirectRepository().update('w1', { title: 'direct' });
+		// DirectRepository forgets in the default cache, which BookRepository reads.
+		expect((await books.find('w1'))!.title).toBe('direct');
+	});
+
+	it('never keeps a row a read loaded while a write changed it', async () => {
+		const books = new BookRepository();
+		await books.insert(book('r1'));
+		let release!: () => void;
+		const gate = new Promise<void>((resolve) => (release = resolve));
+		const original = (books as unknown as { constructor: typeof BookRepository }).constructor;
+		// A read that loads the row, then waits while a write changes it.
+		const slowRead = (async () => {
+			const cache = await import('../../src/mnemosyne/repository-cache');
+			const reading = cache.RepositoryCache.reading(original, BookModel, 'default')!;
+			return reading.find({ id: 'r1' }, async () => {
+				const row = await new DirectRepository().find('r1');
+				await gate;
+				return row;
+			});
+		})();
+		await Bun.sleep(5);
+		await books.update('r1', { title: 'written' });
+		release();
+		expect((await slowRead)!.title).toBe('Book r1');
+		expect((await books.find('r1'))!.title).toBe('written');
+	});
+
+	it('forgets rows by composite keys, and after deleteWhere()', async () => {
+		const pairs = new PairRepository();
+		await pairs.insert({ a: '1', b: '2', label: 'x' });
+		await pairs.find({ a: '1', b: '2' });
+		await pairs.update({ a: '1', b: '2' }, { label: 'y' });
+		expect((await pairs.find({ a: '1', b: '2' }))!.label).toBe('y');
+
+		const books = new BookRepository();
+		await books.insert(book('d1'));
+		await books.find('d1');
+		expect(await books.deleteWhere((row: Book) => row.id === 'd1')).toBe(1);
+		expect(await books.find('d1')).toBeNull();
+	});
+
+	it('reads the database when the cache it names does not exist', async () => {
+		const books = new MissingStoreRepository();
+		await books.insert(book('m1'));
+		expect((await books.find('m1'))!.id).toBe('m1');
+		expect(await books.update('m1', { title: 'x' })).not.toBeNull();
 	});
 
 	it('merges the own options of a class over the defaults, and honours false', async () => {
@@ -164,7 +244,7 @@ describe('Repository cache', () => {
 		await direct.insert(book('b7'));
 		const short = new ShortRepository();
 		await short.find('b7');
-		await direct.update('b7', { title: 'later' });
+		await behind('b7', { title: 'later' });
 		await Bun.sleep(40);
 		expect((await short.find('b7'))!.title).toBe('later');
 	});
@@ -188,7 +268,7 @@ describe('Repository cache', () => {
 		const direct = new DirectRepository();
 		await direct.insert(book('b9'));
 		await books.find('b9');
-		await direct.update('b9', { title: 'behind' });
+		await behind('b9', { title: 'behind' });
 
 		await UnitOfWork.run(async () => {
 			expect((await books.find('b9'))!.title).toBe('behind');

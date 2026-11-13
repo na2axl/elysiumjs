@@ -135,6 +135,16 @@ describe.skipIf(!url)('Repository on PostgreSQL', () => {
 			});
 			await cached.update(1, { title: 'changed' });
 			expect((await cached.find(1))!.views).toBe(77);
+
+			// A write in a transaction is forgotten again once it commits.
+			let queued = false;
+			await Database.transaction(async () => {
+				await cached.update(1, { views: 88 });
+				queued = Database.afterCommit('default', () => undefined);
+			});
+			expect(queued).toBe(true);
+			expect((await cached.find(1))!.views).toBe(88);
+			expect(Database.afterCommit('default', () => undefined)).toBe(false);
 		} finally {
 			Service.remove(MEMORY_CACHE_SERVICE);
 		}

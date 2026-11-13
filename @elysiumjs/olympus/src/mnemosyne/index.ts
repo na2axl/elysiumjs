@@ -76,8 +76,8 @@ export {
 	MEMORY_CACHE_SERVICE
 } from './cache';
 export {
+	DEFAULT_REPOSITORY_CACHE_TTL,
 	REPOSITORY_CACHE_SERVICE,
-	RepositoryCache,
 	type RepositoryCacheOptions
 } from './repository-cache';
 export * from './mnemosyne.module';
