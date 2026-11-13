@@ -1,6 +1,6 @@
 {
 	"name": "@elysiumjs/bun",
-	"version": "0.0.0",
+	"version": "0.1.0",
 	"license": "Apache-2.0",
 	"description": "Bun runtime for the Elysium.js framework: Argon2id password hashing and the local disk over Bun.file().",
 	"private": false,

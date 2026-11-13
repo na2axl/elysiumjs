@@ -1,6 +1,6 @@
 {
 	"name": "@elysiumjs/olympus",
-	"version": "0.24.1",
+	"version": "0.25.0",
 	"license": "Apache-2.0",
 	"description": "A structured web framework built on ElysiaJS, for Bun, Node.js and Cloudflare Workers: the core, its domains and their ports.",
 	"private": false,
