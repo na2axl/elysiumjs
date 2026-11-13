@@ -1,5 +1,19 @@
 # @elysiumjs/styx
 
+## 0.17.0
+
+### Minor Changes
+
+- [#119](https://github.com/na2axl/elysiumjs/pull/119) [`01b9aee`](https://github.com/na2axl/elysiumjs/commit/01b9aee40eb1c432e253fdc47cb89d848e102228) Thanks [@na2axl](https://github.com/na2axl)! - Repositories answer model instances: each holds the columns of a row, typed by the model's select type, with the getters and methods of the model class. Models gain a stable `modelName` (`schema.table` with Drizzle), `hidden` and `appends`, which `toJSON()` and `ModelResource()` follow, and `hydrate()`; `this.hydrate(rows)` turns the rows of a custom query into instances, and `Pruner.pruning()` receives instances. Two model classes over the same table need distinct names: one sets `static modelName`, or creating their repositories throws `DuplicateModelError`. Instances survive `Json` through the `model` serializer and the `Models` registry, and the caches write their values with `Json` in every store, so a read answers a copy with its dates and instances. Instances are written with the digest of their table's columns: one written with other columns, such as before a deploy, is a miss in the caches and throws `StaleModelError` elsewhere. Listing pages keep their pagination through `Json`. A new `bytes` serializer keeps `Uint8Array` and `Buffer` values. A route without a response schema answers the JSON form of an instance, and `styx routes:generate` types handler results with `JsonForm`.
+
+- [#119](https://github.com/na2axl/elysiumjs/pull/119) [`01b9aee`](https://github.com/na2axl/elysiumjs/commit/01b9aee40eb1c432e253fdc47cb89d848e102228) Thanks [@na2axl](https://github.com/na2axl)! - Views show resources on the wire. `View(schema)` makes a static-only class with a schema and a static `render`, and `renderAll` and `renderPage` built on it. A route answers with a view by naming it as its `response`: `PostView` for one item, `PostView.list` for a list and `PostView.page` for a page, whose pagination is read from the route's query schema (either kind when it gives none). Routes with a view that cannot render, that send events or that skip serialization are refused when declared. `ViewOutput<S>` takes dates where the schema has strings, written as ISO strings. `styx make:view` writes a new view, and `styx routes:generate` types the routes rendered by a view with the schema of the view.
+
+### Patch Changes
+
+- Updated dependencies [[`01b9aee`](https://github.com/na2axl/elysiumjs/commit/01b9aee40eb1c432e253fdc47cb89d848e102228), [`2a23e4a`](https://github.com/na2axl/elysiumjs/commit/2a23e4aad9bcb3bddc8279f9ef358f70fa2ff149), [`01b9aee`](https://github.com/na2axl/elysiumjs/commit/01b9aee40eb1c432e253fdc47cb89d848e102228), [`b4f6567`](https://github.com/na2axl/elysiumjs/commit/b4f65674e19dc1a8c8b16a2160911c82044015ec), [`01b9aee`](https://github.com/na2axl/elysiumjs/commit/01b9aee40eb1c432e253fdc47cb89d848e102228)]:
+  - @elysiumjs/olympus@0.26.0
+  - @elysiumjs/bun@0.1.1
+
 ## 0.16.0
 
 ### Minor Changes

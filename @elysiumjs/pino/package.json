@@ -1,6 +1,6 @@
 {
 	"name": "@elysiumjs/pino",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"license": "Apache-2.0",
 	"description": "Pino logger for the Elysium.js framework: the pino driver of the Logger port, with pretty output in development.",
 	"private": false,
