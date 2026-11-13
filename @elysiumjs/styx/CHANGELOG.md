@@ -1,5 +1,13 @@
 # @elysiumjs/styx
 
+## 0.17.1
+
+### Patch Changes
+
+- [#124](https://github.com/na2axl/elysiumjs/pull/124) [`f00edb1`](https://github.com/na2axl/elysiumjs/commit/f00edb18159a28a5e807be319148695dec147319) Thanks [@na2axl](https://github.com/na2axl)! - `routes:generate` imports a controller only when a route reads its methods, so a route answered by a view without parameters, query or body no longer leaves an unused import in `routes.gen.ts`.
+- Updated dependencies [[`f15e312`](https://github.com/na2axl/elysiumjs/commit/f15e312a0b9c6a686052d9f3b496389fdf68c48f)]:
+  - @elysiumjs/olympus@0.26.1
+
 ## 0.17.0
 
 ### Minor Changes
