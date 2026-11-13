@@ -112,6 +112,8 @@ const run = async <T>(
 export const drizzleRepositoryAdapter: RepositoryAdapter<PgTable, DrizzleConnection, SQL> = {
 	primaryKey: primaryKeyOf,
 	connection: (name) => Database.getConnection(name),
+	inTransaction: (name) => Database.inTransaction(name),
+	afterCommit: (name, hook) => Database.afterCommit(name, hook),
 	run,
 
 	all(target) {

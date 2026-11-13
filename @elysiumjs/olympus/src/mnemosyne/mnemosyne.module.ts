@@ -14,12 +14,14 @@
 
 import type { KeyvStoreAdapter } from 'keyv';
 import type { ServiceFactoryDefinition } from '../index';
+import type { RepositoryCacheOptions } from './repository-cache';
 
 import { KeyvCacheableMemory } from 'cacheable';
 
 import { Module } from '../index';
 import { cacheStoreService, makeCacheInterface, MEMORY_CACHE_SERVICE } from './cache';
 import { DbSeedCommand } from './commands/db_seed.command';
+import { REPOSITORY_CACHE_SERVICE } from './repository-cache';
 
 /**
  * Configuration of the {@link MnemosyneModule}.
@@ -45,6 +47,22 @@ export type MnemosyneModuleConfig = {
 		 */
 		stores?: Record<string, () => KeyvStoreAdapter>;
 	};
+
+	/** The defaults of the repositories. */
+	repositories?: {
+		/**
+		 * The cache every repository reads through, unless its class sets `static cache` to
+		 * `false`. A class's own `static cache` is merged over it.
+		 * @example
+		 * ```ts
+		 * MnemosyneModule.with({
+		 * 	cache: { stores: { redis: () => new KeyvRedis({ connection: 'cache' }) } },
+		 * 	repositories: { cache: { store: 'redis', ttl: 300_000 } }
+		 * });
+		 * ```
+		 */
+		cache?: RepositoryCacheOptions;
+	};
 };
 
 /**
@@ -68,6 +86,11 @@ export type MnemosyneModuleConfig = {
 						() => new KeyvCacheableMemory({ ttl: memory.ttl, lruSize: memory.lruSize })
 					)
 			});
+		}
+
+		if (config.repositories?.cache) {
+			const defaults = config.repositories.cache;
+			services.push({ name: REPOSITORY_CACHE_SERVICE, global: true, factory: () => defaults });
 		}
 
 		for (const [name, createStore] of Object.entries(stores ?? {})) {

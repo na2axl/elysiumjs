@@ -388,7 +388,32 @@ class ArticleModel extends MemoryModel<Article>('articles') {
 }
 ```
 
-Each model has a `modelName`, unique and stable across deploys: the name the backend gives its table by default (`schema.table` with Drizzle). Instances are written by `Json` as their model name and columns, and read back as instances of the same class, so they survive the caches and the inputs of queued actions. A model is known by name once a repository is created over it, it hydrates rows, or one of its instances is written; `Models.register(Model)` registers one by hand. Two classes with the same name are refused: a subclass of a model inherits its name, so it gives itself another.
+Each model has a `modelName`, unique and stable across deploys: the name the backend gives its table by default (`schema.table` with Drizzle). Instances are written by `Json` as their model name, columns and the digest of the table's columns, and read back as instances of the same class, so they survive the caches and the inputs of queued actions. An instance written with other columns than its model has now, such as one cached before a deploy that changed the table, is a miss in the caches and throws `StaleModelError` elsewhere. The pages of `Listing.page()` and `Listing.offsetPage()` keep their pagination through `Json` too. A model is known by name once a repository is created over it, it hydrates rows, or one of its instances is written; `Models.register(Model)` registers one by hand. Two classes with the same name are refused: a subclass of a model inherits its name, so it gives itself another.
+
+Repositories can read through a cache. `MnemosyneModule.with({ repositories: { cache } })` sets the cache of every repository; a repository class merges its own `static cache` over it, or sets it to `false` to never cache. Without either, a repository does not cache.
+
+```ts
+MnemosyneModule.with({
+	cache: { stores: { redis: () => new KeyvRedis({ connection: 'cache' }) } },
+	repositories: { cache: { store: 'redis', ttl: 300_000 } }
+});
+
+export class SessionRepository extends Repository(SessionModel) {
+	public static override readonly cache = { ttl: 30_000 }; // over the defaults
+}
+
+export class LedgerRepository extends Repository(LedgerEntryModel) {
+	public static override readonly cache = false; // never cached
+}
+```
+
+`find()` reads a row by its key through the cache, and `findBy()` caches the key of the row it found, then reads the row by its key and checks its value, which suits unique columns. Rows are kept for `ttl` milliseconds, one hour by default, per model, digest of the table's columns, tenant and connection: a change of the columns never reads back rows cached before it, and the rows of a model without tenancy are shared by every tenant, unless tenancy uses row-level security. Missing rows are not cached, and `insert()` leaves the cache as it is.
+
+Each cached row is stamped with the version of its row and the generation of the tenant's rows. `update()` and `delete()` give their row a new version, right away and once the unit of work or the transaction commits; `updateAll()`, `deleteAll()`, `deleteWhere()` and the pruners of the model give the tenant's rows a new generation. A read that loaded a row while a write changed it therefore never leaves that row in the cache. Writes forget in the cache of the module and in every cache a repository of their model reads through, so that a repository that does not cache, or caches in another store, never leaves rows stale for the others; versions live twice as long as the longest-lived rows of the model. Rows holding values `Json` cannot keep, such as instances of unregistered classes, are not cached. Reads skip the cache while a unit of work or a transaction is open, so that it never holds rows that may roll back. A cache that fails, or that does not exist, costs a read of the database, never the call, and is logged.
+
+The `memory` store lives in one process: an app that runs several processes, such as a web server and a worker, caches in a shared store such as Redis, so that the writes of one process are forgotten in the others. Two model classes over the same table keep separate entries, and a row written through one is not forgotten for the other.
+
+Custom queries on `this.db` do not go through the cache: a repository that writes with them calls `this.forgetCached(id)` or `this.forgetAllCached()` for what they change.
 
 `find`, `update`, `delete` and `exists` take the key of a row: its value, or an object of the values of its key columns when the key spans several. Custom queries use `this.db`, the backend's own connection, typed for it (the Drizzle connection for Drizzle models). The scope that `list()`, `count()` and `deleteWhere()` take is a condition in the backend's terms: an SQL condition with Drizzle, a predicate in memory. `deleteWhere()` needs a scope: `deleteAll()` deletes every row. The memory backend refuses a second row with the same key, compares values strictly (dates by time, arrays and objects by content) and sorts missing values last in ascending order, as PostgreSQL does. It does not join transactions: a rolled-back unit of work keeps its rows.
 

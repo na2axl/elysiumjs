@@ -42,8 +42,20 @@ export class DuplicateModelError extends ElysiumError {
 }
 
 /**
- * Thrown when a value names a model that is not registered, such as a cached model whose class
- * this process has not loaded.
+ * Thrown when a written model instance was written with another digest of the model's columns,
+ * such as an instance cached before a deploy that changed its table. Caches read it as a miss.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export class StaleModelError extends ElysiumError {
+	constructor(public readonly model: string) {
+		super(
+			`An instance of the model "${model}" was written with other columns than the model has now.`
+		);
+	}
+}
+
+/**
+ * Thrown when a written model instance names a model that is not registered.
  * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class UnknownModelError extends ElysiumError {
@@ -54,6 +66,16 @@ export class UnknownModelError extends ElysiumError {
 		);
 	}
 }
+
+/** A short, stable digest of a text (32-bit FNV-1a, in hexadecimal). */
+const hashOf = (text: string): string => {
+	let hash = 0x811c9dc5;
+	for (let i = 0; i < text.length; i++) {
+		hash ^= text.charCodeAt(i);
+		hash = Math.imul(hash, 0x01000193);
+	}
+	return (hash >>> 0).toString(16).padStart(8, '0');
+};
 
 /** The registered model classes, by their `modelName`, shared by every copy of the package. */
 const registry: Map<string, ModelClass> = ((globalThis as Record<symbol, unknown>)[
@@ -135,7 +157,7 @@ export namespace Models {
 @Serializer.register({ name: 'model' })
 export class ModelSerializer extends Serializer<
 	object,
-	{ model: string; attributes: Record<string, unknown> }
+	{ model: string; hash?: string; attributes: Record<string, unknown> }
 > {
 	public supports(value: unknown): boolean {
 		return Models.isInstance(value);
@@ -143,12 +165,19 @@ export class ModelSerializer extends Serializer<
 
 	public serialize(instance: object) {
 		const model = Models.register(instance.constructor as ModelClass);
-		return { model: model.modelName, attributes: Models.attributes(instance) };
+		return {
+			model: model.modelName,
+			hash: model.schemaHash,
+			attributes: Models.attributes(instance)
+		};
 	}
 
-	public deserialize(value: { model: string; attributes: Record<string, unknown> }) {
+	public deserialize(value: { model: string; hash?: string; attributes: Record<string, unknown> }) {
 		const model = Models.find(value.model);
 		if (!model) throw new UnknownModelError(value.model);
+		if (value.hash !== undefined && value.hash !== model.schemaHash) {
+			throw new StaleModelError(value.model);
+		}
 		return model.hydrate(value.attributes) as object;
 	}
 }
@@ -261,6 +290,14 @@ export const AbstractModel = <TTable, TColumns extends Record<string, unknown>>(
 		 * a model, which inherits it.
 		 */
 		public static readonly modelName: string = adapter.getModelName?.(baseTable) ?? tableName;
+
+		/**
+		 * A digest of the table's columns, part of the keys of cached rows, so that a change of
+		 * the columns never reads back rows cached before it.
+		 */
+		public static readonly schemaHash: string = hashOf(
+			JSON.stringify({ tableName, columns: columnMetadata })
+		);
 
 		/**
 		 * The columns left out of {@link M.toJSON}, and hidden by `ModelResource()`.
