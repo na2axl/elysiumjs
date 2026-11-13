@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ColumnMetadata, ModelAdapter } from '@elysiumjs/olympus/mnemosyne';
+import type { ColumnMetadata, ModelAdapter, TypedModel } from '@elysiumjs/olympus/mnemosyne';
 import type { InferInsertModel, InferSelectModel } from 'drizzle-orm';
 import type { PgColumn, PgTable, PgTableWithColumns } from 'drizzle-orm/pg-core';
 
@@ -78,6 +78,11 @@ const mapDrizzleDataType = (col: PgColumn): ColumnMetadata['dataType'] => {
 export const drizzleAdapter: ModelAdapter<PgTableWithColumns<any>> = {
 	getTableName(table) {
 		return getTableConfig(table).name;
+	},
+
+	getModelName(table) {
+		const config = getTableConfig(table);
+		return `${config.schema ?? 'public'}.${config.name}`;
 	},
 
 	getColumns(table): ColumnMetadata[] {
@@ -149,7 +154,8 @@ export interface DrizzleModelOptions {
 // ============================================================================
 
 /**
- * Creates a model class backed by a Drizzle pgTable.
+ * Creates a model class backed by a Drizzle pgTable. Its repositories answer instances of the
+ * model, typed as the table's select type: add getters and methods to the subclass.
  *
  * @author Axel Nana <ax.lnana@outlook.com>
  * @param table The Drizzle table (created with enhanced pgTable).
@@ -179,10 +185,5 @@ export const DrizzleModel = <TTable extends PgTable>(
 		(Base as any).supportTenancy = options.supportTenancy;
 	}
 
-	return Base as typeof Base & {
-		readonly $inferSelect: TSelect;
-		readonly $inferInsert: TInsert;
-		readonly $inferUpdate: Partial<TInsert>;
-		readonly table: TTable;
-	};
+	return Base as unknown as TypedModel<typeof Base, TSelect, TInsert, Partial<TInsert>, TTable>;
 };

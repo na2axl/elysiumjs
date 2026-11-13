@@ -19,7 +19,7 @@ import { Application } from '../../src/app';
 import { Http } from '../../src/http';
 import { Module } from '../../src/module';
 import { DomainError } from '../../src/problem';
-import { Resource } from '../../src/resource';
+import { Resource, toJsonForm } from '../../src/resource';
 import { createTestingHttpApp } from '../../src/testing';
 
 const dateTime = () =>
@@ -241,5 +241,33 @@ describe('serialized routes', () => {
 		const response = await http.get('/users/raw/u1');
 
 		expect(await response.json()).toEqual({ id: 'u1' });
+	});
+});
+
+describe('toJsonForm', () => {
+	class Point {
+		constructor(
+			public x: number,
+			public y: number
+		) {}
+
+		public toJSON() {
+			return { x: this.x, y: this.y, kind: 'point' };
+		}
+	}
+
+	it('answers the JSON form of a class instance with toJSON()', () => {
+		expect(toJsonForm(new Point(1, 2))).toEqual({ x: 1, y: 2, kind: 'point' });
+	});
+
+	it('answers plain objects and arrays as they are, which JSON.stringify writes in full', () => {
+		const page = { data: [new Point(1, 2)], nextCursor: null };
+		expect(toJsonForm(page)).toBe(page);
+		expect(JSON.parse(JSON.stringify(toJsonForm(page)))).toEqual({
+			data: [{ x: 1, y: 2, kind: 'point' }],
+			nextCursor: null
+		});
+		const list = [new Point(3, 4)];
+		expect(toJsonForm(list)).toBe(list);
 	});
 });

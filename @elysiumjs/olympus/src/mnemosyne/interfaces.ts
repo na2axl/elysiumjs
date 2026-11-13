@@ -124,6 +124,13 @@ export interface ModelAdapter<TTable = unknown> {
 	getTableName(table: TTable): string;
 
 	/**
+	 * Returns the default model name of the models over a table, such as the table name with
+	 * its schema. Defaults to the table name.
+	 * @param table The table.
+	 */
+	getModelName?(table: TTable): string;
+
+	/**
 	 * Returns the normalized column metadata for the given table.
 	 * @param table The table to extract columns from.
 	 * @returns An array of column metadata.
@@ -286,8 +293,9 @@ export type RowKey = IdType | Readonly<Record<string, unknown>>;
  * @template TInsert The type needed by insert queries.
  * @template TUpdate The type needed by update queries.
  * @template TId The primary key type: a value, or an object of the key columns.
+ * @template TRow The column values of a record, which `findBy()` searches.
  */
-export interface RepositoryInterface<TSelect, TInsert, TUpdate, TId = RowKey> {
+export interface RepositoryInterface<TSelect, TInsert, TUpdate, TId = RowKey, TRow = TSelect> {
 	/**
 	 * Retrieves all the records in the database.
 	 * @returns All the records in the database.
@@ -307,7 +315,7 @@ export interface RepositoryInterface<TSelect, TInsert, TUpdate, TId = RowKey> {
 	 * @param value The value the column should match.
 	 * @returns The first record with a column matching the given value, or `null`.
 	 */
-	findBy<TKey extends keyof TSelect>(column: TKey, value: TSelect[TKey]): Promise<TSelect | null>;
+	findBy<TKey extends keyof TRow>(column: TKey, value: TRow[TKey]): Promise<TSelect | null>;
 
 	/**
 	 * Inserts a new record in the database.
@@ -430,11 +438,37 @@ export type ModelClass<
 	readonly adapter?: ModelAdapter<TTable>;
 
 	/**
+	 * The name the model is known by in cached values and queued jobs.
+	 */
+	readonly modelName: string;
+
+	/**
+	 * A digest of the table's columns, part of the keys of cached rows.
+	 */
+	readonly schemaHash: string;
+
+	/**
+	 * The columns left out of the JSON form of the instances.
+	 */
+	readonly hidden: readonly string[];
+
+	/**
+	 * The getters written in the JSON form of the instances besides the columns.
+	 */
+	readonly appends: readonly string[];
+
+	/**
+	 * Creates an instance of the model from a row.
+	 * @param row The row.
+	 */
+	hydrate(row: Record<string, unknown>): unknown;
+
+	/**
 	 * Creates a new instance of the model.
 	 * @param args The arguments to pass to the constructor.
 	 * @returns A new instance of the model.
 	 */
-	new (...args: unknown[]): unknown;
+	new (...args: any[]): unknown;
 };
 
 // ============================================================================
@@ -468,5 +502,5 @@ export type RepositoryClass<TModel extends ModelClass = ModelClass> = {
 	 */
 	new (
 		...args: unknown[]
-	): RepositoryInterface<TModel['$inferSelect'], TModel['$inferInsert'], TModel['$inferUpdate']>;
+	): RepositoryInterface<InstanceType<TModel>, TModel['$inferInsert'], TModel['$inferUpdate']>;
 };

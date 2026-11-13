@@ -15,8 +15,9 @@
 import type { ProblemValidationError, TObject, TOptional, TSchema, TString } from '../index';
 import type { ModelClass } from './interfaces';
 
-import { BadRequestError } from '../index';
 import { t } from 'elysia';
+
+import { BadRequestError, PAGE_SCHEMA_KEYWORD, pageResponseSchema, Serializer } from '../index';
 
 /**
  * A filter operator of the query DSL.
@@ -217,7 +218,7 @@ const DEFAULT_LIMIT = 20;
 const DEFAULT_MAX_LIMIT = 100;
 
 /** The JSON Schema keyword that marks the schema of a page, with its pagination. */
-const PAGE_KEYWORD = 'x-elysium-page';
+const PAGE_KEYWORD = PAGE_SCHEMA_KEYWORD;
 
 /** The symbol that marks a page built by {@link Listing.page} or {@link Listing.offsetPage}. */
 const PAGE = Symbol.for('elysium:mnemosyne:page');
@@ -633,11 +634,7 @@ export namespace Listing {
 	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param item The schema of one row.
 	 */
-	export const pageSchema = <S extends TSchema>(item: S) =>
-		t.Object(
-			{ data: t.Array(item), nextCursor: t.Nullable(t.String()) },
-			{ [PAGE_KEYWORD]: 'cursor' }
-		);
+	export const pageSchema = <S extends TSchema>(item: S) => pageResponseSchema(item, 'cursor');
 
 	/**
 	 * The response schema of a page of resources from offset pagination.
@@ -645,15 +642,7 @@ export namespace Listing {
 	 * @param item The schema of one row.
 	 */
 	export const offsetPageSchema = <S extends TSchema>(item: S) =>
-		t.Object(
-			{
-				data: t.Array(item),
-				page: t.Integer({ minimum: 1 }),
-				limit: t.Integer({ minimum: 1 }),
-				total: t.Integer({ minimum: 0 })
-			},
-			{ [PAGE_KEYWORD]: 'offset' }
-		);
+		pageResponseSchema(item, 'offset');
 
 	/**
 	 * The pagination of a schema made by {@link pageSchema} or {@link offsetPageSchema}, or
@@ -682,4 +671,27 @@ export namespace Listing {
 	 */
 	export const itemSchemaOf = (schema: TSchema): TSchema | undefined =>
 		(schema as { properties?: { data?: { items?: TSchema } } }).properties?.data?.items;
+}
+
+/**
+ * Writes the pages built by {@link Listing.page} and {@link Listing.offsetPage} with their
+ * pagination, so that a page read back from a cache or a queued input is still a page.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+@Serializer.register({ name: 'page' })
+export class PageSerializer extends Serializer<
+	Page<unknown>,
+	{ pagination: QueryPagination; page: Record<string, unknown> }
+> {
+	public supports(value: unknown): boolean {
+		return Listing.isPage(value);
+	}
+
+	public serialize(page: Page<unknown>) {
+		return { pagination: Listing.paginationOf(page), page: { ...page } };
+	}
+
+	public deserialize(value: { pagination: QueryPagination; page: Record<string, unknown> }) {
+		return brand(value.page, value.pagination) as unknown as Page<unknown>;
+	}
 }

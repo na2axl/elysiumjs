@@ -13,6 +13,7 @@
 // limitations under the License.
 
 // Compile-time checks: run by `bun run typecheck`, not by `bun test`.
+import type { JsonForm } from '@elysiumjs/olympus';
 import type { ConnectionOf, ScopeOf } from '@elysiumjs/olympus/mnemosyne';
 import type { SQL } from 'drizzle-orm';
 import type { DrizzleConnection } from '../../src/database';
@@ -83,3 +84,42 @@ export class WrongObserver {
 		return data;
 	}
 }
+
+// Repositories answer instances of the model: its columns, getters and methods.
+const people = pgTable('people', { id: integer().primaryKey(), name: text().notNull() });
+export class Person extends DrizzleModel(people) {
+	public static override readonly hidden = ['name'] as const;
+	public static override readonly appends = ['initial'] as const;
+
+	public get initial(): string {
+		return this.name.charAt(0);
+	}
+}
+export class PersonRepository extends Repository(Person) {
+	public async named(name: string): Promise<Person[]> {
+		return this.hydrate(await this.db.select().from(people).where(eq(people.name, name)));
+	}
+}
+export const person = async (r: PersonRepository): Promise<string | undefined> => {
+	const p = await r.find(1);
+	const instance: Person | null = p;
+	return instance?.initial;
+};
+export const hydrated: Person = Person.hydrate({ id: 1, name: 'Ada' });
+// @ts-expect-error hidden names columns
+export class BadHidden extends DrizzleModel(people) {
+	public static override readonly hidden = ['nope'] as const;
+}
+
+// Generated route types read the JSON form of what handlers answer.
+type Equal<A, B> =
+	(<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
+const expectType = <T extends true>(): T => true as T;
+type PersonRow = typeof Person.$inferSelect;
+export const jsonForms = () => {
+	expectType<Equal<JsonForm<Person>, PersonRow>>();
+	expectType<Equal<JsonForm<Person[]>, PersonRow[]>>();
+	expectType<Equal<JsonForm<{ data: Person[]; nextCursor: string | null }>['data'], PersonRow[]>>();
+	expectType<Equal<JsonForm<Response>, Response>>();
+	expectType<Equal<JsonForm<Date>, Date>>();
+};

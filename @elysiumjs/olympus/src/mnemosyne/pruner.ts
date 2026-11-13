@@ -17,6 +17,7 @@ import type { RepositoryAdapter, RepositoryTarget, Row, ScopeOf } from './reposi
 
 import { Job } from '../heracles/job';
 import { MissingRepositoryAdapterError, RepositoryKeyError } from './repository';
+import { RepositoryCache } from './repository-cache';
 
 /**
  * The base of the classes {@link Pruner} creates: a job that deletes the rows of its model that
@@ -74,12 +75,30 @@ export abstract class PrunerJob<TSelect = Row, TScope = unknown> extends Job {
 			);
 		}
 
+		try {
+			await this.prune(model, adapter, target, scope, size);
+		} finally {
+			// Deleted rows are forgotten in the repository caches of the model.
+			if (this.pruned > 0) {
+				await RepositoryCache.writing(undefined, model, connection)?.invalidate();
+			}
+		}
+	}
+
+	/** Deletes the rows of the scope, chunk by chunk. */
+	private async prune(
+		model: ModelClass,
+		adapter: RepositoryAdapter<unknown, unknown, TScope>,
+		target: RepositoryTarget,
+		scope: TScope,
+		size: number
+	): Promise<void> {
 		for (;;) {
 			let deleted: number;
 			if (this.pruning) {
 				const rows = await adapter.findWhere(target, scope, size);
 				if (rows.length === 0) break;
-				await this.pruning(rows as TSelect[]);
+				await this.pruning(model.hydrate(rows as never) as unknown as TSelect[]);
 				const keys = rows.map((row) =>
 					Object.fromEntries(target.key.map((column) => [column, row[column]]))
 				);
@@ -130,10 +149,10 @@ export type PrunerClass<TSelect, TScope> = (abstract new () => PrunerJob<TSelect
  * ```
  */
 export const Pruner = <TModel extends ModelClass>(model: TModel) => {
-	abstract class P extends PrunerJob<TModel['$inferSelect'], ScopeOf<TModel['table']>> {
+	abstract class P extends PrunerJob<InstanceType<TModel>, ScopeOf<TModel['table']>> {
 		public static override readonly Model: ModelClass = model;
 	}
 	// Typed without the protected statics of the console mixin, so that apps that emit
 	// declarations can export their pruners.
-	return P as unknown as PrunerClass<TModel['$inferSelect'], ScopeOf<TModel['table']>>;
+	return P as unknown as PrunerClass<InstanceType<TModel>, ScopeOf<TModel['table']>>;
 };

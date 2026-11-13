@@ -177,6 +177,71 @@ const Envelope = TransformInterceptor.with(
 );
 ```
 
+### Views
+
+A view shows a resource on the wire. It is a class made with `View(schema)`: the schema of what it renders, and one static `render` method from what a handler returns, such as a model instance, to that schema. A route names the view as its `response`: `PostView` renders one item, `PostView.list` a list and `PostView.page` a page. The response schema of the route is the view's, documented, validated and serialized as any other.
+
+```typescript
+import type { ViewOutput } from '@elysiumjs/olympus';
+
+import { Http, NotFoundError, Service, t, View } from '@elysiumjs/olympus';
+import { Listing } from '@elysiumjs/olympus/mnemosyne';
+
+export class PostView extends View(
+	t.Object({
+		id: t.String({ format: 'uuid' }),
+		title: t.String(),
+		author: t.String(),
+		publishedAt: t.Nullable(t.String({ format: 'date-time' }))
+	})
+) {
+	public static override render(post: PostModel): ViewOutput<typeof PostView.schema> {
+		return {
+			id: post.id,
+			title: post.title,
+			author: post.authorName,
+			publishedAt: post.publishedAt
+		};
+	}
+}
+
+@Http.controller('/posts')
+export class PostController {
+	public constructor(@Service.inject() private readonly posts: PostRepository) {}
+
+	@Http.get('/:id', { response: PostView, errors: [NotFoundError] })
+	public async show(@Http.param('id') id: string) {
+		return (await this.posts.find(id)) ?? new NotFoundError('No such post.');
+	}
+
+	@Http.get('/', { response: PostView.page })
+	public list(@Http.query(Listing.schema(PostListing)) query: Listing.Params<typeof PostListing>) {
+		return this.posts.list(Listing.parse(PostListing, query));
+	}
+}
+```
+
+- `render` answers the static type of the schema, where a string field may also be a `Date`: dates are written as ISO strings, or as their day for a field of format `date`.
+- `renderAll(items)` and `renderPage(page)` render with `render`, and a page keeps its cursor, or its page, limit and total.
+- `PostView.page` reads its pagination from the query schema of the route: offset when the query has a `page` parameter, as `Listing.schema` of an offset listing does, and cursor when it has a `cursor` parameter. A route whose query has neither answers pages of either. A page of the other pagination, or a value that is not a list for `PostView.list`, fails the request.
+- The handler's value is rendered before the route's interceptors see it. A `Response`, a stream or a problem is answered as it is. `null` and `undefined` are not rendered and fail the response schema, so a handler answers a missing item with a problem such as `NotFoundError`.
+- A view must define `render`, and a route that answers with a view always serializes its result and cannot send events: the route is refused when it is declared. Generator handlers are answered as they are. A status the handler sets with `c.status(201, post)` keeps its code, and its body is rendered by the view.
+- The return type of the handler is not checked against the input of `render`: annotate it, as in `show(): Promise<PostModel | NotFoundError>`.
+- A view renders JSON unless it names another media type in `contentType`. A view of HTML, CSV or a feed renders a string or bytes, and its response is sent as rendered with that `content-type`, which the OpenAPI document gives as the media type of its success responses. A sparse fieldset (`?fields=id,title`) applies only to JSON views.
+
+```ts
+export class PostPage extends View(t.String()) {
+	public static override readonly contentType = 'text/html; charset=utf-8';
+
+	public static override render(post: PostModel): string {
+		return `<article><h1>${escapeHtml(post.title)}</h1>${post.html}</article>`;
+	}
+}
+```
+
+- Views have no instances and take no services: `render` reads its input, and static APIs such as `Clock` or other views. `Http.currentContext()` gives the request to a view that cannot do without it.
+- `styx make:view --name Post` writes `post.view.ts` in the `views` folder of the module, and `styx routes:generate` types the routes rendered by a view with the schema of the view.
+
 ### Results
 
 A check or a call that may fail returns a `Result`: the value it passed with, or the `DomainError` it failed with. A handler may return one: a passed result answers its value, a failed one its problem. `AsyncResult` is the result to come of a promise, with the same methods, and a handler may return it too.
@@ -254,7 +319,7 @@ Clock.reset();
 
 ## JSON and serializers
 
-`Json` writes and reads JSON that keeps more than JSON does, for values that leave the process and come back. Each value a registered serializer supports is written as `{ "$type": "<name>", "$value": <serialized> }` and read back as it was, at any depth. Dates, maps, sets and bigints are supported out of the box (subclasses of `Map` and `Set` are not, since they would read back as plain ones); a plain object that already has the shape of a tagged value is escaped, so that it reads back unchanged.
+`Json` writes and reads JSON that keeps more than JSON does, for values that leave the process and come back. Each value a registered serializer supports is written as `{ "$type": "<name>", "$value": <serialized> }` and read back as it was, at any depth. Dates, maps, sets, bigints and byte arrays (`Uint8Array`, and `Buffer` where the runtime has it) are supported out of the box (subclasses of `Map` and `Set` are not, since they would read back as plain ones), and `@elysiumjs/olympus/mnemosyne` adds model instances; a plain object that already has the shape of a tagged value is escaped, so that it reads back unchanged.
 
 ```ts
 import { Json } from '@elysiumjs/olympus';
@@ -265,6 +330,8 @@ Json.parse<{ remindAt: Date }>(text).remindAt; // a Date
 Json.parse<{ tags: Set<string> }>(Json.stringify({ tags: new Set(['a']) })).tags; // a Set
 Json.survives({ cache: new WeakMap() }); // false: no serializer supports a weak map
 ```
+
+The caches of `@elysiumjs/olympus/mnemosyne` write their values with `Json` in every store, the memory store included, so a read answers a copy, with its dates, model instances and the values of the registered serializers.
 
 A serializer extends `Serializer<TIn, TOut>` and is registered with a name, which every written value carries, so keep it stable across deploys:
 
@@ -372,6 +439,46 @@ const book = await books.insert({ title: 'Dune', authorId: 'a-1' });
 await books.update(book.id, { title: 'Dune Messiah' });
 const page = await books.list(query); // a ParsedQuery from Listing.parse()
 ```
+
+Repositories answer instances of their model: each holds the column values of a row as its own properties, typed by the model's select type, with the getters and methods of the model class. `hidden` names the columns left out of the JSON form of an instance, and `appends` the getters written in it; `ModelResource(Model)` follows both. A custom query on `this.db` answers rows: `this.hydrate(rows)` turns them into instances. A column a model class names again is declared with `declare`, so that a class field does not reset it.
+
+```ts
+class ArticleModel extends MemoryModel<Article>('articles') {
+	public static override readonly hidden = ['editToken'] as const;
+	public static override readonly appends = ['isPublished'] as const;
+
+	public get isPublished(): boolean {
+		return this.publishedAt !== null;
+	}
+}
+```
+
+Each model has a `modelName`, unique and stable across deploys: the name the backend gives its table by default (`schema.table` with Drizzle). Instances are written by `Json` as their model name, columns and the digest of the table's columns, and read back as instances of the same class, so they survive the caches and the inputs of queued actions. An instance written with other columns than its model has now, such as one cached before a deploy that changed the table, is a miss in the caches and throws `StaleModelError` elsewhere. The pages of `Listing.page()` and `Listing.offsetPage()` keep their pagination through `Json` too. A model is known by name once a repository is created over it, it hydrates rows, or one of its instances is written; `Models.register(Model)` registers one by hand. Two classes with the same name are refused: a subclass of a model inherits its name, so it gives itself another.
+
+Repositories can read through a cache. `MnemosyneModule.with({ repositories: { cache } })` sets the cache of every repository; a repository class merges its own `static cache` over it, or sets it to `false` to never cache. Without either, a repository does not cache.
+
+```ts
+MnemosyneModule.with({
+	cache: { stores: { redis: () => new KeyvRedis({ connection: 'cache' }) } },
+	repositories: { cache: { store: 'redis', ttl: 300_000 } }
+});
+
+export class SessionRepository extends Repository(SessionModel) {
+	public static override readonly cache = { ttl: 30_000 }; // over the defaults
+}
+
+export class LedgerRepository extends Repository(LedgerEntryModel) {
+	public static override readonly cache = false; // never cached
+}
+```
+
+`find()` reads a row by its key through the cache, and `findBy()` caches the key of the row it found, then reads the row by its key and checks its value, which suits unique columns. Rows are kept for `ttl` milliseconds, one hour by default, per model, digest of the table's columns, tenant and connection: a change of the columns never reads back rows cached before it, and the rows of a model without tenancy are shared by every tenant, unless tenancy uses row-level security. Missing rows are not cached, and `insert()` leaves the cache as it is.
+
+Each cached row is stamped with the version of its row and the generation of the tenant's rows. `update()` and `delete()` give their row a new version, right away and once the unit of work or the transaction commits; `updateAll()`, `deleteAll()`, `deleteWhere()` and the pruners of the model give the tenant's rows a new generation. A read that loaded a row while a write changed it therefore never leaves that row in the cache. Writes forget in the cache of the module and in every cache a repository of their model reads through, so that a repository that does not cache, or caches in another store, never leaves rows stale for the others; versions live twice as long as the longest-lived rows of the model. Rows holding values `Json` cannot keep, such as instances of unregistered classes, are not cached. Reads skip the cache while a unit of work or a transaction is open, so that it never holds rows that may roll back. A cache that fails, or that does not exist, costs a read of the database, never the call, and is logged.
+
+The `memory` store lives in one process: an app that runs several processes, such as a web server and a worker, caches in a shared store such as Redis, so that the writes of one process are forgotten in the others. Two model classes over the same table keep separate entries, and a row written through one is not forgotten for the other.
+
+Custom queries on `this.db` do not go through the cache: a repository that writes with them calls `this.forgetCached(id)` or `this.forgetAllCached()` for what they change.
 
 `find`, `update`, `delete` and `exists` take the key of a row: its value, or an object of the values of its key columns when the key spans several. Custom queries use `this.db`, the backend's own connection, typed for it (the Drizzle connection for Drizzle models). The scope that `list()`, `count()` and `deleteWhere()` take is a condition in the backend's terms: an SQL condition with Drizzle, a predicate in memory. `deleteWhere()` needs a scope: `deleteAll()` deletes every row. The memory backend refuses a second row with the same key, compares values strictly (dates by time, arrays and objects by content) and sorts missing values last in ascending order, as PostgreSQL does. It does not join transactions: a rolled-back unit of work keeps its rows.
 

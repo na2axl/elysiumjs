@@ -14,12 +14,16 @@
 
 import type { ModelClass, RepositoryInterface, RowKey } from './interfaces';
 import type { CursorPage, OffsetPage, Page, ParsedQuery } from './query';
+import type { RepositoryCacheOptions } from './repository-cache';
 
 import Emittery from 'emittery';
 
-import { ElysiumError, ModuleContext, Service } from '../index';
+import { ElysiumError, Json, ModuleContext, Service } from '../index';
 import { Metadata } from '../metadata';
 import { Symbols } from '../utils';
+import { Models } from './model';
+import { Listing } from './query';
+import { RepositoryCache } from './repository-cache';
 import { UnitOfWork } from './unit-of-work';
 
 /**
@@ -114,6 +118,17 @@ export interface RepositoryAdapter<TTable = any, TConnection = unknown, TScope =
 	 * tenant isolation of row-level security.
 	 */
 	run<T>(name: string, operation: (db: TConnection) => Promise<T>): Promise<T>;
+	/**
+	 * Whether a transaction is open on a connection in the current async context. Repositories
+	 * read past their cache meanwhile. Optional: without it, only units of work count.
+	 */
+	inTransaction?(name: string): boolean;
+	/**
+	 * Queues a callback to run once the transaction open on a connection commits. Answers
+	 * `false` when no transaction is open, or when the backend cannot tell: the callback is then
+	 * not queued. Optional.
+	 */
+	afterCommit?(name: string, hook: () => unknown): boolean;
 	all(target: RepositoryTarget<TTable>): Promise<Row[]>;
 	find(target: RepositoryTarget<TTable>, key: Row): Promise<Row | null>;
 	findBy(target: RepositoryTarget<TTable>, column: string, value: unknown): Promise<Row | null>;
@@ -289,12 +304,15 @@ const createRepository = <TModel extends ModelClass>(
 	options: RepositoryOptions<TModel['$inferSelect']> = {}
 ) => {
 	type TSelect = TModel['$inferSelect'];
+	type TEntity = InstanceType<TModel>;
 	type TInsert = TModel['$inferInsert'];
 	type TUpdate = TModel['$inferUpdate'];
 	type TTable = TModel['table'];
 	type TKey = RowKey | Partial<TSelect>;
 	type TScope = ScopeOf<TTable>;
-	type TEvents = RepositoryEvents<TSelect, TInsert, TUpdate>;
+	type TEvents = RepositoryEvents<TEntity, TInsert, TUpdate>;
+
+	Models.register(model);
 
 	const adapter = (): RepositoryAdapter<TTable, ConnectionOf<TTable>, TScope> => {
 		const found = model.adapter?.repository;
@@ -333,6 +351,14 @@ const createRepository = <TModel extends ModelClass>(
 		return Object.fromEntries(columns.map((column) => [column, values[column]]));
 	};
 
+	/** The instances of the model for rows: one row, a list of rows, or `null`. */
+	function hydrate(row: Row): TEntity;
+	function hydrate(row: Row | null): TEntity | null;
+	function hydrate(rows: readonly Row[]): TEntity[];
+	function hydrate(row: Row | readonly Row[] | null): unknown {
+		return (model.hydrate as (row: unknown) => unknown).call(model, row);
+	}
+
 	/** The connection name of a repository instance. */
 	const connectionOf = (repository: object): string =>
 		(repository.constructor as unknown as { connection: string }).connection;
@@ -344,6 +370,56 @@ const createRepository = <TModel extends ModelClass>(
 		connection: connectionOf(repository),
 		key: key()
 	});
+
+	/** The cache a repository instance reads through, when its class caches and may read now. */
+	const readingCache = (repository: object): RepositoryCache | undefined => {
+		const cache = RepositoryCache.reading(repository.constructor, model, connectionOf(repository));
+		if (!cache) return undefined;
+		// Not while a unit of work or a transaction is open: the cache never holds rows that may
+		// roll back.
+		if (UnitOfWork.active() || adapter().inTransaction?.(connectionOf(repository)))
+			return undefined;
+		return cache;
+	};
+
+	/** Runs a callback now, and again once the open unit of work or transaction commits. */
+	const nowAndAfterCommit = async (repository: object, callback: () => Promise<void>) => {
+		await callback();
+		if (UnitOfWork.active()) await UnitOfWork.afterCommit(callback);
+		else adapter().afterCommit?.(connectionOf(repository), callback);
+	};
+
+	/** Forgets the cached rows of keys, now and once the write commits. */
+	const forget = async (repository: object, ...keys: Row[]): Promise<void> => {
+		const cache = RepositoryCache.writing(repository.constructor, model, connectionOf(repository));
+		if (!cache) return;
+		await nowAndAfterCommit(repository, async () => {
+			for (const values of keys) await cache.forget(values);
+		});
+	};
+
+	/** Makes the cached rows of the tenant misses, now and once the write commits. */
+	const invalidate = async (repository: object): Promise<void> => {
+		const cache = RepositoryCache.writing(repository.constructor, model, connectionOf(repository));
+		if (!cache) return;
+		await nowAndAfterCommit(repository, () => cache.invalidate());
+	};
+
+	/** The key column values of a row. */
+	const keyOfRow = (row: unknown): Row =>
+		Object.fromEntries(key().map((column) => [column, (row as Row)[column]]));
+
+	/**
+	 * The keys to forget after a write: the one given, and the one of the row written when the
+	 * database read it differently, such as a number given as a string.
+	 */
+	const keysOf = (values: Row, row: unknown): Row[] => {
+		if (row === null || row === undefined) return [values];
+		const written = keyOfRow(row);
+		return Json.stringify(Object.values(written)) === Json.stringify(Object.values(values))
+			? [values]
+			: [values, written];
+	};
 
 	/**
 	 * Runs the listeners of a `-ing` event one after the other, on the payload itself so that
@@ -378,7 +454,7 @@ const createRepository = <TModel extends ModelClass>(
 		} else await emit();
 	};
 
-	abstract class R implements RepositoryInterface<TSelect, TInsert, TUpdate, TKey> {
+	abstract class R implements RepositoryInterface<TEntity, TInsert, TUpdate, TKey, TSelect> {
 		/**
 		 * The model class wrapped by this repository.
 		 */
@@ -395,8 +471,27 @@ const createRepository = <TModel extends ModelClass>(
 		 */
 		public static readonly afterCommit: boolean = true;
 
+		/**
+		 * How this repository caches its rows: `find()` and `findBy()` read through the cache, and
+		 * writes forget what they change. Given options are merged over the defaults of
+		 * `MnemosyneModule.with({ repositories: { cache } })`, and `false` turns caching off.
+		 * Without either, the repository does not cache.
+		 * @example
+		 * ```ts
+		 * export class SessionRepository extends Repository(SessionModel) {
+		 * 	public static override readonly cache = { ttl: 30_000 };
+		 * }
+		 * ```
+		 */
+		public static readonly cache: RepositoryCacheOptions | false | undefined = undefined;
+
 		/** The events of this repository class, for typing only. */
 		declare public static readonly $events: TEvents;
+
+		public constructor() {
+			// The writes of every repository of the model forget in the cache this one reads through.
+			RepositoryCache.remember(new.target, model);
+		}
 
 		/**
 		 * Subscribes a listener to an event of this repository class.
@@ -438,9 +533,45 @@ const createRepository = <TModel extends ModelClass>(
 			return adapter().run(connectionOf(this), operation);
 		}
 
+		/**
+		 * Creates instances of the model from rows, such as those a custom query on `this.db`
+		 * returns: one row, a list of rows, or `null`.
+		 * @param row The row, the rows, or `null`.
+		 * @example
+		 * ```ts
+		 * public async published() {
+		 * 	return this.hydrate(await this.db.select().from(books).where(eq(books.published, true)));
+		 * }
+		 * ```
+		 */
+		public hydrate(row: Row): TEntity;
+		public hydrate(row: Row | null): TEntity | null;
+		public hydrate(rows: readonly Row[]): TEntity[];
+		public hydrate(row: Row | readonly Row[] | null): unknown {
+			return hydrate(row as Row);
+		}
+
+		/**
+		 * Forgets the cached row of a key, right away and once the unit of work commits, such as
+		 * after a custom query changed it. Does nothing when the repository does not cache.
+		 * @param id The key.
+		 */
+		public forgetCached(id: TKey): Promise<void> {
+			return forget(this, keyValues(id));
+		}
+
+		/**
+		 * Makes every cached row of the tenant a miss, right away and once the unit of work
+		 * commits, such as after a custom query changed many rows. Does nothing when the
+		 * repository does not cache.
+		 */
+		public forgetAllCached(): Promise<void> {
+			return invalidate(this);
+		}
+
 		/** Retrieves every row. */
-		public async all(): Promise<TSelect[]> {
-			return (await adapter().all(targetOf(this))) as TSelect[];
+		public async all(): Promise<TEntity[]> {
+			return hydrate(await adapter().all(targetOf(this)));
 		}
 
 		/**
@@ -448,8 +579,11 @@ const createRepository = <TModel extends ModelClass>(
 		 * @param id The key: its value, or an object of the key column values.
 		 * @returns The row, or `null` when none has that key.
 		 */
-		public async find(id: TKey): Promise<TSelect | null> {
-			return (await adapter().find(targetOf(this), keyValues(id))) as TSelect | null;
+		public async find(id: TKey): Promise<TEntity | null> {
+			const values = keyValues(id);
+			const load = async () => hydrate(await adapter().find(targetOf(this), values));
+			const cache = readingCache(this);
+			return cache ? cache.find(values, load) : load();
 		}
 
 		/**
@@ -461,8 +595,19 @@ const createRepository = <TModel extends ModelClass>(
 		public async findBy<TColumn extends keyof TSelect>(
 			column: TColumn,
 			value: TSelect[TColumn]
-		): Promise<TSelect | null> {
-			return (await adapter().findBy(targetOf(this), column as string, value)) as TSelect | null;
+		): Promise<TEntity | null> {
+			const load = async () =>
+				hydrate(await adapter().findBy(targetOf(this), column as string, value));
+			const cache = key().length > 0 ? readingCache(this) : undefined;
+			if (!cache) return load();
+			return cache.findBy(
+				column as string,
+				value,
+				keyOfRow,
+				(values) =>
+					cache.find(values, async () => hydrate(await adapter().find(targetOf(this), values))),
+				load
+			);
 		}
 
 		/**
@@ -471,10 +616,10 @@ const createRepository = <TModel extends ModelClass>(
 		 * @param data The data.
 		 * @returns The inserted row.
 		 */
-		public async insert(data: TInsert): Promise<TSelect> {
+		public async insert(data: TInsert): Promise<TEntity> {
 			const payload = { data: { ...(data as Row) } };
 			await before(this, 'creating', payload);
-			const row = (await adapter().insert(targetOf(this), payload.data)) as TSelect;
+			const row = hydrate(await adapter().insert(targetOf(this), payload.data));
 			await after(this, 'created', row);
 			return row;
 		}
@@ -486,11 +631,12 @@ const createRepository = <TModel extends ModelClass>(
 		 * @param data The changes.
 		 * @returns The updated row, or `null` when none has that key.
 		 */
-		public async update(id: TKey, data: TUpdate): Promise<TSelect | null> {
+		public async update(id: TKey, data: TUpdate): Promise<TEntity | null> {
 			const values = keyValues(id);
 			const payload = { key: id, data: { ...(data as Row) } };
 			await before(this, 'updating', payload);
-			const row = (await adapter().update(targetOf(this), values, payload.data)) as TSelect | null;
+			const row = hydrate(await adapter().update(targetOf(this), values, payload.data));
+			await forget(this, ...keysOf(values, row));
 			if (row) await after(this, 'updated', row);
 			return row;
 		}
@@ -500,8 +646,10 @@ const createRepository = <TModel extends ModelClass>(
 		 * @param data The changes.
 		 * @returns The updated rows.
 		 */
-		public async updateAll(data: TUpdate): Promise<TSelect[]> {
-			return (await adapter().updateAll(targetOf(this), data as Row)) as TSelect[];
+		public async updateAll(data: TUpdate): Promise<TEntity[]> {
+			const rows = hydrate(await adapter().updateAll(targetOf(this), data as Row));
+			await invalidate(this);
+			return rows;
 		}
 
 		/**
@@ -510,10 +658,11 @@ const createRepository = <TModel extends ModelClass>(
 		 * @param id The key.
 		 * @returns The deleted row, or `null` when none has that key.
 		 */
-		public async delete(id: TKey): Promise<TSelect | null> {
+		public async delete(id: TKey): Promise<TEntity | null> {
 			const values = keyValues(id);
 			await before(this, 'deleting', { key: id });
-			const row = (await adapter().delete(targetOf(this), values)) as TSelect | null;
+			const row = hydrate(await adapter().delete(targetOf(this), values));
+			await forget(this, ...keysOf(values, row));
 			if (row) await after(this, 'deleted', row);
 			return row;
 		}
@@ -522,8 +671,10 @@ const createRepository = <TModel extends ModelClass>(
 		 * Deletes every row, without events.
 		 * @returns The deleted rows.
 		 */
-		public async deleteAll(): Promise<TSelect[]> {
-			return (await adapter().deleteAll(targetOf(this))) as TSelect[];
+		public async deleteAll(): Promise<TEntity[]> {
+			const rows = hydrate(await adapter().deleteAll(targetOf(this)));
+			await invalidate(this);
+			return rows;
 		}
 
 		/**
@@ -538,7 +689,9 @@ const createRepository = <TModel extends ModelClass>(
 					`deleteWhere() on ${model.name} needs a scope: use deleteAll() to delete every row.`
 				);
 			}
-			return adapter().deleteWhere(targetOf(this), scope, limit);
+			const deleted = await adapter().deleteWhere(targetOf(this), scope, limit);
+			if (deleted > 0) await invalidate(this);
+			return deleted;
 		}
 
 		/**
@@ -558,11 +711,12 @@ const createRepository = <TModel extends ModelClass>(
 		 * terms.
 		 * @returns The rows of the page and the cursor of the next one, or the page and the total.
 		 */
-		public async list(query: ParsedQuery<'offset'>, scope?: TScope): Promise<OffsetPage<TSelect>>;
-		public async list(query: ParsedQuery<'cursor'>, scope?: TScope): Promise<CursorPage<TSelect>>;
-		public async list(query: ParsedQuery, scope?: TScope): Promise<Page<TSelect>>;
-		public async list(query: ParsedQuery, scope?: TScope): Promise<Page<TSelect>> {
-			return (await adapter().list(targetOf(this), query, scope)) as Page<TSelect>;
+		public async list(query: ParsedQuery<'offset'>, scope?: TScope): Promise<OffsetPage<TEntity>>;
+		public async list(query: ParsedQuery<'cursor'>, scope?: TScope): Promise<CursorPage<TEntity>>;
+		public async list(query: ParsedQuery, scope?: TScope): Promise<Page<TEntity>>;
+		public async list(query: ParsedQuery, scope?: TScope): Promise<Page<TEntity>> {
+			const page = await adapter().list(targetOf(this), query, scope);
+			return Listing.mapPage(page, (row) => hydrate(row));
 		}
 
 		/**

@@ -50,7 +50,8 @@ export {
 	type QueryParams,
 	type QuerySchemaProperties,
 	type QuerySpec,
-	Listing
+	Listing,
+	PageSerializer
 } from './query';
 
 export {
@@ -68,6 +69,17 @@ export { DbSeedCommand } from './commands/db_seed.command';
 export * from './tenancy';
 export type { TenancyConfig, TenancyMode, ModelTenancyConfig } from './tenancy';
 
-export { Cache, type CacheInterface, cacheStoreService, MEMORY_CACHE_SERVICE } from './cache';
+export {
+	Cache,
+	type CacheInterface,
+	cacheStoreService,
+	makeCacheInterface,
+	MEMORY_CACHE_SERVICE
+} from './cache';
+export {
+	DEFAULT_REPOSITORY_CACHE_TTL,
+	REPOSITORY_CACHE_SERVICE,
+	type RepositoryCacheOptions
+} from './repository-cache';
 export * from './mnemosyne.module';
 export { CacheInterceptor, type CacheInterceptorOptions } from './cache.interceptor';

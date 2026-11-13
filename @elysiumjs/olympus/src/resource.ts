@@ -168,7 +168,10 @@ export namespace Resource {
 		const fields = options.fields?.filter(Boolean);
 		if (!fields?.length) return serializeNode(node, value);
 
-		const target = fieldsTarget(node);
+		// A union, such as pages of either pagination: the fieldset applies to the branch of the value.
+		const union = node.anyOf ?? node.oneOf;
+		const chosen = union ? (branchFor(union, value) ?? node) : node;
+		const target = fieldsTarget(chosen);
 		if (!target) return serializeNode(node, value);
 		const allowed = Object.keys(target.properties!).filter(
 			(key) => !isHidden(target.properties![key])
@@ -191,7 +194,7 @@ export namespace Resource {
 				),
 				required: (object.required ?? []).filter((key) => selected.has(key))
 			});
-		return serializeNode(replaceTarget(node, target, narrow(target)), value);
+		return serializeNode(replaceTarget(chosen, target, narrow(target)), value);
 	};
 }
 
@@ -334,6 +337,47 @@ export const isSerializable = (value: unknown): boolean =>
 	!(value instanceof ReadableStream) &&
 	!(value instanceof Blob) &&
 	!(typeof value === 'object' && value !== null && Symbol.asyncIterator in value);
+
+/**
+ * The type a value has once written as JSON, as clients receive it: class instances with a
+ * `toJSON()` method take the type it answers, at any depth. Dates, files, responses, streams,
+ * binary data, maps, sets and functions are kept, since clients read them on their own terms.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ * @template T The type of the value.
+ */
+export type JsonForm<T> = T extends
+	| Date
+	| Blob
+	| Response
+	| ReadableStream
+	| ArrayBuffer
+	| ArrayBufferView
+	| Map<unknown, unknown>
+	| Set<unknown>
+	| Function
+	? T
+	: T extends { toJSON(): infer J }
+		? JsonForm<J>
+		: T extends readonly unknown[]
+			? { [K in keyof T]: JsonForm<T[K]> }
+			: T extends object
+				? { [K in keyof T]: JsonForm<T[K]> }
+				: T;
+
+/**
+ * The JSON form of a class instance with a `toJSON()` method, which a handler result without a
+ * response schema is answered as. Plain objects, arrays and other values are answered as they
+ * are: `JSON.stringify` calls the `toJSON()` methods inside them.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export const toJsonForm = (value: unknown): unknown =>
+	typeof value === 'object' &&
+	value !== null &&
+	!Array.isArray(value) &&
+	!isPlainObject(value) &&
+	typeof (value as { toJSON?: unknown }).toJSON === 'function'
+		? (value as { toJSON(): unknown }).toJSON()
+		: value;
 
 /**
  * Reads a sparse fieldset from a query: `fields=id,title` (or repeated `fields`).

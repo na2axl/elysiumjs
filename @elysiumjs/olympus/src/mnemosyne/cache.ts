@@ -18,7 +18,8 @@ import { createCache } from 'cache-manager';
 import { Keyv } from 'keyv';
 import { alphabetical } from 'radash';
 
-import { Service, ServiceNotFoundError } from '../index';
+import { Json, Service, ServiceNotFoundError } from '../index';
+import { StaleModelError } from './model';
 
 /** Name of the global service backing `Cache.memory`. */
 export const MEMORY_CACHE_SERVICE = 'mnemosyne.cache.memory';
@@ -121,7 +122,24 @@ export interface CacheInterface {
 }
 
 /**
+ * Reads a cached value. A model instance written with other columns than its model has now,
+ * such as before a deploy, makes the entry a miss.
+ */
+const readCached = <T>(text: string): T | undefined => {
+	try {
+		return Json.parse<T>(text);
+	} catch (error) {
+		if (error instanceof StaleModelError) return undefined;
+		throw error;
+	}
+};
+
+/**
  * Makes a cache interface over stores built by the given factory.
+ *
+ * Values are written with `Json` in every store, the memory store included: dates, model
+ * instances and the values of the registered serializers read back as they were, and a read
+ * answers a copy, so that changing it leaves the cached value as it was.
  *
  * Keyv writes its namespace on the store adapter it wraps, so adapters cannot be shared between
  * namespaces: the last namespace would win for every Keyv using the adapter, and `clear()` would
@@ -133,7 +151,14 @@ export interface CacheInterface {
 export const makeCacheInterface = (createStore: () => KeyvStoreAdapter): CacheInterface => {
 	const makeNamespace = (namespace: string) =>
 		createCache({
-			stores: [new Keyv({ store: createStore(), namespace })]
+			stores: [
+				new Keyv({
+					store: createStore(),
+					namespace,
+					serialize: (data) => Json.stringify(data),
+					deserialize: (text) => readCached(text)
+				})
+			]
 		}) as Omit<CacheInterface, 'tags'>;
 
 	const base = makeNamespace('cache');

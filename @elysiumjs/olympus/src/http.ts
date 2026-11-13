@@ -26,8 +26,9 @@ import type { ProblemClass } from './problem';
 import type { AppRateLimitOptions, RateLimitOptions } from './rate-limit';
 import type { ResponseSchemas } from './resource';
 import type { Injection } from './token';
+import type { ViewClass, ViewKind, ViewPagination, ViewResponse } from './view';
 
-import { Elysia, sse as esse, t } from 'elysia';
+import { Elysia, ElysiaStatus, sse as esse, t } from 'elysia';
 import { assign, isEmpty, objectify } from 'radash';
 
 import { Application } from './app';
@@ -42,12 +43,13 @@ import { applyMiddlewares, enlist, executeMiddlewareChain, makeMiddlewares } fro
 import { ModuleContext } from './module-context';
 import { BadRequestError, DomainError, InternalError, validationProblemSchema } from './problem';
 import { enforceRateLimit, rateLimitOf, TooManyRequestsError } from './rate-limit';
-import { isSerializable, isStatusMap, readFields, Resource } from './resource';
+import { isSerializable, isStatusMap, readFields, Resource, toJsonForm } from './resource';
 import { Result } from './result';
 import { Runtime } from './runtime';
 import { PayloadTooLargeError } from './security';
 import { Service } from './service';
 import { nextTick, Symbols } from './utils';
+import { ViewNotRenderableError, Views } from './view';
 
 /**
  * A route is a string that starts with a forward slash.
@@ -136,6 +138,12 @@ type HttpRequestHandlerMetadata = {
 	 * The response schema.
 	 */
 	response?: TSchema | Record<number, TSchema>;
+
+	/**
+	 * The view that renders the handler's result, whether it renders one item, a list or a page,
+	 * and the pagination of a page, when the route's query gives one.
+	 */
+	view?: { view: ViewClass; kind: ViewKind; pagination?: ViewPagination };
 
 	/** The status of a successful response. */
 	status?: number;
@@ -237,7 +245,6 @@ type HttpRequestHandlerRegistrationProps = Pick<
 	| 'path'
 	| 'method'
 	| 'handler'
-	| 'response'
 	| 'errors'
 	| 'operationId'
 	| 'description'
@@ -249,6 +256,7 @@ type HttpRequestHandlerRegistrationProps = Pick<
 	| 'parse'
 	| 'status'
 > & {
+	response?: TSchema | Record<number, TSchema> | ViewClass | ViewResponse;
 	target: Object;
 	propertyKey: string | symbol;
 };
@@ -456,6 +464,30 @@ const headersSchema = (route: HttpRequestHandlerMetadata): TObject | undefined =
 	return isEmpty(properties) ? undefined : t.Object(properties, { additionalProperties: true });
 };
 
+/**
+ * Checks a route that answers with a view, as it is declared: the view renders, and the route
+ * neither sends events nor skips serialization.
+ */
+const checkViewRoute = (
+	method: string,
+	options: HttpRouteOptions,
+	target: Object,
+	propertyKey: string | symbol
+) => {
+	const named = Views.of(options.response);
+	if (!named) return;
+	const route = `${target.constructor.name}.${String(propertyKey)}`;
+	if (!Views.isRenderable(named.view)) throw new ViewNotRenderableError(named.view.name);
+	if (method === 'elysium:SSE') {
+		throw new ElysiumError(`The route ${route} sends events: it cannot answer with a view.`);
+	}
+	if (options.serialize === false) {
+		throw new ElysiumError(
+			`The route ${route} answers with a view: its result is always serialized.`
+		);
+	}
+};
+
 const registerHttpRequestHandler = (props: HttpRequestHandlerRegistrationProps) => {
 	const body = Metadata.get('http:body', props.target, props.propertyKey);
 	const params = Metadata.get('http:params', props.target, props.propertyKey) ?? [];
@@ -488,6 +520,16 @@ const registerHttpRequestHandler = (props: HttpRequestHandlerRegistrationProps) 
 	const metadata: HttpRequestHandlerMetadata[] =
 		Metadata.get(Symbols.http, target.constructor) ?? [];
 
+	// A view in `response` renders the result; the response schema is the view's.
+	const named = Views.of(response);
+	const view = named && {
+		...named,
+		...(named.kind === 'page' ? { pagination: Views.paginationOf(query?.schema) } : {})
+	};
+	const responseSchema = view
+		? Views.schemaOf(view.view, view.kind, view.pagination)
+		: (response as TSchema | Record<number, TSchema> | undefined);
+
 	metadata.push({
 		name: String(props.propertyKey),
 		path,
@@ -501,7 +543,8 @@ const registerHttpRequestHandler = (props: HttpRequestHandlerRegistrationProps) 
 		rawContext,
 		handler,
 		middlewares,
-		response,
+		response: responseSchema,
+		view,
 		errors,
 		operationId,
 		description,
@@ -592,8 +635,16 @@ export type HttpRouteOptions = {
 	 * The schema of the response body: the handler's result, or one schema per status. Interceptors
 	 * that change the shape of results (see `TransformInterceptor.with()`) give the schema of what
 	 * the client receives from it.
+	 *
+	 * A view renders the handler's result first: `PostView` renders one item, `PostView.list` a
+	 * list and `PostView.page` a page (see `View`), and the response schema is the view's.
+	 * @example
+	 * ```ts
+	 * @Http.get('/:id', { response: PostView })
+	 * @Http.get('/', { response: PostView.page })
+	 * ```
 	 */
-	response?: TSchema | Record<number, TSchema>;
+	response?: TSchema | Record<number, TSchema> | ViewClass | ViewResponse;
 
 	/**
 	 * The status of a successful response, such as `201` for a creation or `204` for a route that
@@ -711,6 +762,11 @@ export type HttpRouteDescription = {
 	status?: number;
 	/** Whether the route declares the schema of its success response. */
 	responds: boolean;
+	/**
+	 * The view that renders the route's result, when its `response` names one, with the pagination
+	 * of a page when the route's query gives one.
+	 */
+	view?: { view: ViewClass; kind: ViewKind; pagination?: ViewPagination };
 };
 
 /**
@@ -991,7 +1047,8 @@ export namespace Http {
 					query: route.query?.index,
 					params: route.params.map(({ slug, index }) => ({ slug, index })),
 					status: route.status,
-					responds: declaresSuccess(route.response)
+					responds: declaresSuccess(route.response),
+					...(route.view ? { view: { ...route.view } } : {})
 				};
 			})
 		};
@@ -1177,6 +1234,26 @@ export namespace Http {
 							const returned = await callHandler<Promise<unknown>>(c, args);
 							const result = Result.is(returned) ? returned.orThrow() : returned;
 							if (result instanceof DomainError) throw result;
+							if (route.view && result != null) {
+								const { view, kind, pagination } = route.view;
+								const json = Views.rendersJson(view);
+								if (isSerializable(result)) {
+									if (!json) c.set.headers['content-type'] ??= view.contentType;
+									return Views.render(view, kind, result, pagination) as TResult;
+								}
+								// A status the handler set, such as `c.status(201, post)`: its body is rendered
+								// by the view, and keeps its status and headers.
+								if (result instanceof ElysiaStatus && result.response != null) {
+									const rendered = Views.render(view, kind, result.response, pagination);
+									const body = json
+										? Resource.serialize(Views.schemaOf(view, kind, pagination), rendered)
+										: rendered;
+									const headers = json
+										? result.headers
+										: { 'content-type': view.contentType, ...result.headers };
+									return new ElysiaStatus(result.status, body, headers) as TResult;
+								}
+							}
 							return result as TResult;
 						};
 
@@ -1244,7 +1321,10 @@ export namespace Http {
 						 * past the validation of the full schema.
 						 */
 						const toBody = (c: Context, result: unknown): unknown => {
-							if (!successSchema || !isSerializable(result)) return result;
+							if (!isSerializable(result)) return result;
+							// A view that renders another media type, such as HTML, sends what it rendered.
+							if (route.view && !Views.rendersJson(route.view.view)) return result;
+							if (!successSchema) return toJsonForm(result);
 							const fields = readFields(c.query as Record<string, unknown>);
 							const body = Resource.serialize(successSchema, result, { fields });
 							if (!fields) return body;
@@ -1399,7 +1479,11 @@ export namespace Http {
 							detail: {
 								tags: props.tags,
 								description: route.description,
-								operationId: route.operationId
+								operationId: route.operationId,
+								// The media type of a view that does not render JSON, for the OpenAPI document.
+								...(route.view && !Views.rendersJson(route.view.view)
+									? { [Views.MEDIA_TYPE_KEYWORD]: route.view.view.contentType }
+									: {})
 							},
 							...(route.parse && { parse: route.parse }),
 							body: isValidator ? route.body?.validator?.schema : route.body?.schema,
@@ -1519,6 +1603,7 @@ export namespace Http {
 		options: HttpRouteOptions = {}
 	): MethodDecorator => {
 		return function (target, propertyKey, descriptor) {
+			checkViewRoute(method, options, target, propertyKey);
 			queueMicrotask(() => {
 				registerHttpRequestHandler({
 					method,
