@@ -24,6 +24,7 @@ export type {
 export { pgTable, getTableBuilders } from './table';
 
 // Re-exports
+export { rulesToDrizzle, UntranslatableRuleError } from './cerberus';
 export { Database, DEFAULT_CACHE_TTL, DrizzleDatabaseCache, TenantMismatchError } from './database';
 export type { DrizzleConnectionProps, DrizzleConnection, DrizzleQueryResultHKT } from './database';
 export {
