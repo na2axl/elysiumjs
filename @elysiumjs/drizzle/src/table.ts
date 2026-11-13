@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import type { AnyPgColumnBuilder, PgTableWithColumns } from 'drizzle-orm/pg-core';
+import type { BuiltPgTable } from './built-table';
 
 import { pgTable as drizzlePgTable } from 'drizzle-orm/pg-core';
 
@@ -63,7 +64,7 @@ export const pgTable = <
 	tableName: TTableName,
 	columns: TColumns,
 	extraConfig?: (table: any) => any
-) => {
+): BuiltPgTable<TTableName, undefined, TColumns> => {
 	const table = drizzlePgTable(tableName, columns, extraConfig);
 	tableRegistry.set(table, columns);
 	return table;

@@ -24,6 +24,7 @@ import type {
 	ProjectionStorage,
 	StoredEventRecord
 } from '@elysiumjs/olympus/moirai';
+import type { BuiltPgTable } from './built-table';
 
 import { Clock } from '@elysiumjs/olympus';
 import { ConcurrencyConflictError, IdempotencyConflictError } from '@elysiumjs/olympus/moirai';
@@ -67,6 +68,76 @@ export type MoiraiTablesOptions = {
 	partitioned?: boolean;
 };
 
+/** The columns of `idempotency_keys`. */
+const idempotencyKeyColumns = () => ({
+	key: text('key').primaryKey(),
+	action: text('action').notNull(),
+	requestHash: text('request_hash').notNull(),
+	response: jsonb('response'),
+	createdAt: at('created_at').notNull().defaultNow()
+});
+
+/** The columns of `outbox`; a partitioned table keys its rows with `created_at` too. */
+const outboxColumns = (partitioned: boolean) => ({
+	id: partitioned ? uuid('id').notNull() : uuid('id').primaryKey(),
+	kind: text('kind').notNull(),
+	payload: jsonb('payload').notNull(),
+	createdAt: at('created_at').notNull().defaultNow(),
+	availableAt: at('available_at').notNull().defaultNow(),
+	attempts: integer('attempts').notNull().default(0),
+	lastError: text('last_error'),
+	dispatchedAt: at('dispatched_at'),
+	deadAt: at('dead_at')
+});
+
+/** The columns of `inbox`. */
+const inboxColumns = () => ({
+	messageId: text('message_id').notNull(),
+	consumer: text('consumer').notNull(),
+	recordedAt: at('recorded_at').notNull().defaultNow()
+});
+
+/** The columns of `events`; a partitioned table keys its rows with `occurred_at` too. */
+const eventColumns = (partitioned: boolean) => ({
+	position: partitioned
+		? bigserial('position', { mode: 'bigint' }).notNull()
+		: bigserial('position', { mode: 'bigint' }).primaryKey(),
+	transactionId: xid8('transaction_id')
+		.notNull()
+		.default(sql`pg_current_xact_id()`),
+	aggregateId: text('aggregate_id').notNull(),
+	aggregateType: text('aggregate_type').notNull(),
+	version: integer('version').notNull(),
+	type: text('type').notNull(),
+	schemaVersion: integer('schema_version').notNull().default(1),
+	data: jsonb('data').notNull(),
+	metadata: jsonb('metadata').notNull(),
+	occurredAt: at('occurred_at').notNull()
+});
+
+/** The columns of `projections`. */
+const projectionColumns = () => ({
+	name: text('name').primaryKey(),
+	version: integer('version').notNull(),
+	builtAt: at('built_at').notNull().defaultNow()
+});
+
+/**
+ * The tables `moiraiTables()` builds.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export type MoiraiTables = {
+	idempotencyKeys: BuiltPgTable<
+		'idempotency_keys',
+		undefined,
+		ReturnType<typeof idempotencyKeyColumns>
+	>;
+	outbox: BuiltPgTable<'outbox', undefined, ReturnType<typeof outboxColumns>>;
+	inbox: BuiltPgTable<'inbox', undefined, ReturnType<typeof inboxColumns>>;
+	events: BuiltPgTable<'events', undefined, ReturnType<typeof eventColumns>>;
+	projections: BuiltPgTable<'projections', undefined, ReturnType<typeof projectionColumns>>;
+};
+
 /**
  * Builds the tables of the moirai stores: `idempotency_keys`, `outbox`, `inbox` and `events`, in a schema
  * when one is given (one set of tables per domain schema, for example). Export them from the
@@ -75,89 +146,39 @@ export type MoiraiTablesOptions = {
  * @param schema The Postgres schema of the tables. Defaults to the search path.
  * @param options How the tables are built.
  */
-export const moiraiTables = (schema?: string, options: MoiraiTablesOptions = {}) => {
+export const moiraiTables = (schema?: string, options: MoiraiTablesOptions = {}): MoiraiTables => {
 	const table = (schema ? pgSchema(schema).table : pgTable) as typeof pgTable;
 	const partitioned = options.partitioned ?? false;
 	const partition = <T extends PgTable>(range: string, target: T): T =>
 		partitioned ? DrizzleTable.define(DrizzleTable.partitioned({ range }))(target) : target;
 	return {
-		idempotencyKeys: table('idempotency_keys', {
-			key: text('key').primaryKey(),
-			action: text('action').notNull(),
-			requestHash: text('request_hash').notNull(),
-			response: jsonb('response'),
-			createdAt: at('created_at').notNull().defaultNow()
-		}),
+		idempotencyKeys: table('idempotency_keys', idempotencyKeyColumns()),
 		outbox: partition(
 			'created_at',
-			table(
-				'outbox',
-				{
-					id: partitioned ? uuid('id').notNull() : uuid('id').primaryKey(),
-					kind: text('kind').notNull(),
-					payload: jsonb('payload').notNull(),
-					createdAt: at('created_at').notNull().defaultNow(),
-					availableAt: at('available_at').notNull().defaultNow(),
-					attempts: integer('attempts').notNull().default(0),
-					lastError: text('last_error'),
-					dispatchedAt: at('dispatched_at'),
-					deadAt: at('dead_at')
-				},
-				(t) => [
-					...(partitioned ? [primaryKey({ columns: [t.id, t.createdAt] })] : []),
-					index('outbox_due_idx')
-						.on(t.availableAt)
-						.where(sql`${t.dispatchedAt} is null and ${t.deadAt} is null`)
-				]
-			)
+			table('outbox', outboxColumns(partitioned), (t) => [
+				...(partitioned ? [primaryKey({ columns: [t.id, t.createdAt] })] : []),
+				index('outbox_due_idx')
+					.on(t.availableAt)
+					.where(sql`${t.dispatchedAt} is null and ${t.deadAt} is null`)
+			])
 		),
-		inbox: table(
-			'inbox',
-			{
-				messageId: text('message_id').notNull(),
-				consumer: text('consumer').notNull(),
-				recordedAt: at('recorded_at').notNull().defaultNow()
-			},
-			(t) => [primaryKey({ columns: [t.messageId, t.consumer] })]
-		),
+		inbox: table('inbox', inboxColumns(), (t) => [
+			primaryKey({ columns: [t.messageId, t.consumer] })
+		]),
 		events: partition(
 			'occurred_at',
-			table(
-				'events',
-				{
-					position: partitioned
-						? bigserial('position', { mode: 'bigint' }).notNull()
-						: bigserial('position', { mode: 'bigint' }).primaryKey(),
-					transactionId: xid8('transaction_id')
-						.notNull()
-						.default(sql`pg_current_xact_id()`),
-					aggregateId: text('aggregate_id').notNull(),
-					aggregateType: text('aggregate_type').notNull(),
-					version: integer('version').notNull(),
-					type: text('type').notNull(),
-					schemaVersion: integer('schema_version').notNull().default(1),
-					data: jsonb('data').notNull(),
-					metadata: jsonb('metadata').notNull(),
-					occurredAt: at('occurred_at').notNull()
-				},
-				(t) =>
-					partitioned
-						? [
-								primaryKey({ columns: [t.position, t.occurredAt] }),
-								unique('events_aggregate_version_uq').on(t.aggregateId, t.version, t.occurredAt)
-							]
-						: [unique('events_aggregate_version_uq').on(t.aggregateId, t.version)]
+			table('events', eventColumns(partitioned), (t) =>
+				partitioned
+					? [
+							primaryKey({ columns: [t.position, t.occurredAt] }),
+							unique('events_aggregate_version_uq').on(t.aggregateId, t.version, t.occurredAt)
+						]
+					: [unique('events_aggregate_version_uq').on(t.aggregateId, t.version)]
 			)
 		),
-		projections: table('projections', {
-			name: text('name').primaryKey(),
-			version: integer('version').notNull(),
-			builtAt: at('built_at').notNull().defaultNow()
-		})
+		projections: table('projections', projectionColumns())
 	};
 };
-
-export type MoiraiTables = ReturnType<typeof moiraiTables>;
 
 /**
  * Where a Drizzle store works: its table, and the connection whose open transaction it joins.

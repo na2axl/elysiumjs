@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import type { DatabaseCacheConfig, DatabaseDriver } from '@elysiumjs/olympus/mnemosyne';
-import type { DrizzleConfig } from 'drizzle-orm';
+import type { AnyRelations, DrizzleConfig, EmptyRelations } from 'drizzle-orm';
 import type { PgAsyncDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core';
 import type { DrizzleDriver } from './driver';
 
@@ -39,11 +39,12 @@ export { DEFAULT_CACHE_TTL, DrizzleDatabaseCache } from './cache';
  * or `client` connect with Bun SQL, on Bun only.
  *
  * @author Axel Nana <ax.lnana@outlook.com>
- * @template TSchema The Drizzle schema type.
+ * @template TRelations The Drizzle relations of the connection, from `defineRelations()`.
  */
-export type DrizzleConnectionProps<
-	TSchema extends Record<string, unknown> = Record<string, never>
-> = Omit<DrizzleConfig<TSchema>, 'cache'> &
+export type DrizzleConnectionProps<TRelations extends AnyRelations = EmptyRelations> = Omit<
+	DrizzleConfig<TRelations>,
+	'cache'
+> &
 	(
 		| { driver: DrizzleDriver }
 		| { connection: string | ({ url?: string } & Record<string, unknown>) }
