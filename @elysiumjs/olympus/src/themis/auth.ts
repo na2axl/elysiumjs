@@ -162,8 +162,7 @@ const OPTIONAL = Symbol.for('elysium:themis:auth-optional');
 
 /**
  * Authenticates the requests of a route or a controller with the guards of ThemisModule, and puts
- * the user in the request (`Auth.currentUser()`, and `currentUser` in the context, which cerberus can
- * read with `getSubject: (ctx) => ctx.currentUser`).
+ * the user in the request (`Auth.currentUser()`, which cerberus reads for the actor of a request).
  *
  * It tries the guards named with `AuthMiddleware.guards([...])`, in order, or all of them.
  * @author Axel Nana <ax.lnana@outlook.com>
