@@ -1,6 +1,6 @@
 {
 	"name": "@elysiumjs/workers",
-	"version": "0.0.0",
+	"version": "0.1.0",
 	"license": "Apache-2.0",
 	"description": "Cloudflare Workers backend for the Elysium.js framework: the runtime, bindings, Queues and cron jobs, KV caches and sessions, rate limits, Durable Object flows and locks, and the R2 disk.",
 	"private": false,

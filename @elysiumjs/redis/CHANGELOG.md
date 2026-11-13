@@ -1,5 +1,16 @@
 # @elysiumjs/redis
 
+## 0.2.0
+
+### Minor Changes
+
+- [#112](https://github.com/na2axl/elysiumjs/pull/112) [`72f76ff`](https://github.com/na2axl/elysiumjs/commit/72f76ff2f514aa15dce74d2bc29f0f8429cf5023) Thanks [@na2axl](https://github.com/na2axl)! - Works with `@elysiumjs/olympus`: connections, the `redis` lock driver, a cache store, rate limits, the job transport and worker, and flow and session stores, in one package.
+
+### Patch Changes
+
+- Updated dependencies [[`72f76ff`](https://github.com/na2axl/elysiumjs/commit/72f76ff2f514aa15dce74d2bc29f0f8429cf5023), [`72f76ff`](https://github.com/na2axl/elysiumjs/commit/72f76ff2f514aa15dce74d2bc29f0f8429cf5023)]:
+  - @elysiumjs/olympus@0.25.0
+
 ## 0.1.13
 
 ### Patch Changes

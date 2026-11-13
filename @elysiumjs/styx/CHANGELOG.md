@@ -1,5 +1,18 @@
 # @elysiumjs/styx
 
+## 0.16.0
+
+### Minor Changes
+
+- [#112](https://github.com/na2axl/elysiumjs/pull/112) [`72f76ff`](https://github.com/na2axl/elysiumjs/commit/72f76ff2f514aa15dce74d2bc29f0f8429cf5023) Thanks [@na2axl](https://github.com/na2axl)! - Generated projects and code import `@elysiumjs/olympus` and its subpaths, and the runtime package of their target: `@elysiumjs/bun`, `@elysiumjs/node` or `@elysiumjs/workers`.
+
+### Patch Changes
+
+- [#112](https://github.com/na2axl/elysiumjs/pull/112) [`72f76ff`](https://github.com/na2axl/elysiumjs/commit/72f76ff2f514aa15dce74d2bc29f0f8429cf5023) Thanks [@na2axl](https://github.com/na2axl)! - The package declares its `exports`, so Node.js resolves it without a bundler.
+- Updated dependencies [[`72f76ff`](https://github.com/na2axl/elysiumjs/commit/72f76ff2f514aa15dce74d2bc29f0f8429cf5023), [`72f76ff`](https://github.com/na2axl/elysiumjs/commit/72f76ff2f514aa15dce74d2bc29f0f8429cf5023), [`72f76ff`](https://github.com/na2axl/elysiumjs/commit/72f76ff2f514aa15dce74d2bc29f0f8429cf5023), [`72f76ff`](https://github.com/na2axl/elysiumjs/commit/72f76ff2f514aa15dce74d2bc29f0f8429cf5023)]:
+  - @elysiumjs/bun@0.1.0
+  - @elysiumjs/olympus@0.25.0
+
 ## 0.15.0
 
 ### Minor Changes
