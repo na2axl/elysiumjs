@@ -2,7 +2,7 @@
 	"name": "@elysiumjs/node",
 	"version": "0.0.0",
 	"license": "Apache-2.0",
-	"description": "Node.js runtime and HTTP server for the Elysium.js framework.",
+	"description": "Node.js runtime and HTTP server for the Elysium.js framework, and the local disk over node:fs.",
 	"private": false,
 	"author": {
 		"name": "Axel Nana",
@@ -38,6 +38,12 @@
 	"type": "module",
 	"module": "dist/index.js",
 	"types": "dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
+	},
 	"files": [
 		"dist",
 		"CHANGELOG.md"
