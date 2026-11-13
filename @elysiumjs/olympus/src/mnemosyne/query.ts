@@ -15,8 +15,9 @@
 import type { ProblemValidationError, TObject, TOptional, TSchema, TString } from '../index';
 import type { ModelClass } from './interfaces';
 
-import { BadRequestError, PAGE_SCHEMA_KEYWORD, pageResponseSchema } from '../index';
 import { t } from 'elysia';
+
+import { BadRequestError, PAGE_SCHEMA_KEYWORD, pageResponseSchema, Serializer } from '../index';
 
 /**
  * A filter operator of the query DSL.
@@ -670,4 +671,27 @@ export namespace Listing {
 	 */
 	export const itemSchemaOf = (schema: TSchema): TSchema | undefined =>
 		(schema as { properties?: { data?: { items?: TSchema } } }).properties?.data?.items;
+}
+
+/**
+ * Writes the pages built by {@link Listing.page} and {@link Listing.offsetPage} with their
+ * pagination, so that a page read back from a cache or a queued input is still a page.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+@Serializer.register({ name: 'page' })
+export class PageSerializer extends Serializer<
+	Page<unknown>,
+	{ pagination: QueryPagination; page: Record<string, unknown> }
+> {
+	public supports(value: unknown): boolean {
+		return Listing.isPage(value);
+	}
+
+	public serialize(page: Page<unknown>) {
+		return { pagination: Listing.paginationOf(page), page: { ...page } };
+	}
+
+	public deserialize(value: { pagination: QueryPagination; page: Record<string, unknown> }) {
+		return brand(value.page, value.pagination) as unknown as Page<unknown>;
+	}
 }

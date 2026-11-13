@@ -19,6 +19,7 @@ import { Keyv } from 'keyv';
 import { alphabetical } from 'radash';
 
 import { Json, Service, ServiceNotFoundError } from '../index';
+import { StaleModelError } from './model';
 
 /** Name of the global service backing `Cache.memory`. */
 export const MEMORY_CACHE_SERVICE = 'mnemosyne.cache.memory';
@@ -121,6 +122,19 @@ export interface CacheInterface {
 }
 
 /**
+ * Reads a cached value. A model instance written with other columns than its model has now,
+ * such as before a deploy, makes the entry a miss.
+ */
+const readCached = <T>(text: string): T | undefined => {
+	try {
+		return Json.parse<T>(text);
+	} catch (error) {
+		if (error instanceof StaleModelError) return undefined;
+		throw error;
+	}
+};
+
+/**
  * Makes a cache interface over stores built by the given factory.
  *
  * Values are written with `Json` in every store, the memory store included: dates, model
@@ -142,7 +156,7 @@ export const makeCacheInterface = (createStore: () => KeyvStoreAdapter): CacheIn
 					store: createStore(),
 					namespace,
 					serialize: (data) => Json.stringify(data),
-					deserialize: (text) => Json.parse(text)
+					deserialize: (text) => readCached(text)
 				})
 			]
 		}) as Omit<CacheInterface, 'tags'>;
