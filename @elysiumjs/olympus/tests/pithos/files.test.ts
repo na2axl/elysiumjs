@@ -426,7 +426,8 @@ describe('Files and uploads', () => {
 		expect(claimed.claimedAt).not.toBeNull();
 		expect((await Files.claim(id)).check()).toBe(true);
 
-		// A claimed file outlives its unclaimed time.
+		// A claimed file outlives its unclaimed time. The clock stops so the grace below is exact.
+		Clock.freeze();
 		Clock.travel(7200_000);
 		expect(await Files.prune()).toBe(0);
 
