@@ -28,7 +28,7 @@ import type { ResponseSchemas } from './resource';
 import type { Injection } from './token';
 import type { ViewClass, ViewKind, ViewPagination, ViewResponse } from './view';
 
-import { Elysia, sse as esse, t } from 'elysia';
+import { Elysia, ElysiaStatus, sse as esse, t } from 'elysia';
 import { assign, isEmpty, objectify } from 'radash';
 
 import { Application } from './app';
@@ -1234,9 +1234,20 @@ export namespace Http {
 							const returned = await callHandler<Promise<unknown>>(c, args);
 							const result = Result.is(returned) ? returned.orThrow() : returned;
 							if (result instanceof DomainError) throw result;
-							if (route.view && result != null && isSerializable(result)) {
+							if (route.view && result != null) {
 								const { view, kind, pagination } = route.view;
-								return Views.render(view, kind, result, pagination) as TResult;
+								if (isSerializable(result)) {
+									return Views.render(view, kind, result, pagination) as TResult;
+								}
+								// A status the handler set, such as `c.status(201, post)`: its body is rendered
+								// and serialized through the view, and keeps its status and headers.
+								if (result instanceof ElysiaStatus && result.response != null) {
+									const body = Resource.serialize(
+										Views.schemaOf(view, kind, pagination),
+										Views.render(view, kind, result.response, pagination)
+									);
+									return new ElysiaStatus(result.status, body, result.headers) as TResult;
+								}
 							}
 							return result as TResult;
 						};

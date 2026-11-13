@@ -101,6 +101,11 @@ class PostController {
 		return new NotFoundError('No such post.');
 	}
 
+	@Http.post('/created', { response: PostView })
+	public created(@Http.context() c: { status: (code: number, value: unknown) => unknown }) {
+		return c.status(201, post('1'));
+	}
+
 	@Http.get('/result', { response: PostView })
 	public result() {
 		return Result.pass(post('1'));
@@ -245,6 +250,9 @@ describe('View over HTTP', () => {
 		expect(await offset.json()).toEqual({ data: [rendered('1')], page: 1, limit: 1, total: 1 });
 		const cursor = await testing.http.get('/posts/either/cursor');
 		expect(await cursor.json()).toEqual({ data: [rendered('1')], nextCursor: null });
+		const sparse = await testing.http.get('/posts/either/offset?fields=id');
+		expect(await sparse.json()).toEqual({ data: [{ id: '1' }], page: 1, limit: 1, total: 1 });
+		expect((await testing.http.get('/posts/either/cursor?fields=nope')).status).toBe(400);
 	});
 
 	it('fails a page of the other pagination, or an item for a list', async () => {
@@ -258,6 +266,9 @@ describe('View over HTTP', () => {
 		const missing = await testing.http.get('/posts/missing');
 		expect(missing.status).toBe(404);
 		expect(await (await testing.http.get('/posts/result')).json()).toEqual(rendered('1'));
+		const created = await testing.http.post('/posts/created');
+		expect(created.status).toBe(201);
+		expect(await created.json()).toEqual(rendered('1'));
 	});
 
 	it('renders before the interceptors, and serializes sparse fieldsets', async () => {

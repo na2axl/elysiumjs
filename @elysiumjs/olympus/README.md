@@ -225,7 +225,8 @@ export class PostController {
 - `renderAll(items)` and `renderPage(page)` render with `render`, and a page keeps its cursor, or its page, limit and total.
 - `PostView.page` reads its pagination from the query schema of the route: offset when the query has a `page` parameter, as `Listing.schema` of an offset listing does, and cursor when it has a `cursor` parameter. A route whose query has neither answers pages of either. A page of the other pagination, or a value that is not a list for `PostView.list`, fails the request.
 - The handler's value is rendered before the route's interceptors see it. A `Response`, a stream or a problem is answered as it is. `null` and `undefined` are not rendered and fail the response schema, so a handler answers a missing item with a problem such as `NotFoundError`.
-- A view must define `render`, and a route that answers with a view always serializes its result and cannot send events: the route is refused when it is declared. Generator handlers are answered as they are.
+- A view must define `render`, and a route that answers with a view always serializes its result and cannot send events: the route is refused when it is declared. Generator handlers are answered as they are. A status the handler sets with `c.status(201, post)` keeps its code, and its body is rendered by the view.
+- The return type of the handler is not checked against the input of `render`: annotate it, as in `show(): Promise<PostModel | NotFoundError>`.
 - Views have no instances and take no services: `render` reads its input, and static APIs such as `Clock` or other views. `Http.currentContext()` gives the request to a view that cannot do without it.
 - `styx make:view --name Post` writes `post.view.ts` in the `views` folder of the module, and `styx routes:generate` types the routes rendered by a view with the schema of the view.
 
