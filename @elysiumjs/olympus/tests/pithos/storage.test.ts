@@ -16,7 +16,7 @@ import type { TestingHttpApp } from '../../src/index';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { Application } from '../../src/index';
+import { Application, Http } from '../../src/index';
 import {
 	DiskCannotSignError,
 	DiskNotPublicError,
@@ -25,6 +25,8 @@ import {
 	ObjectNotFoundError,
 	PithosModule,
 	Storage,
+	StorageController,
+	StoredObjectView,
 	UnknownDiskError
 } from '../../src/pithos/index';
 import { contractUrls, diskContract } from './disk-contract';
@@ -89,6 +91,13 @@ describe('PithosModule', () => {
 		expect(await uploads.exists('a')).toBe(false);
 		Storage.restore();
 		expect(Storage.disk('uploads')).toBe(uploads);
+	});
+
+	it('declares the responses of its routes: the bytes of an object, and none for an upload', () => {
+		const routes = Http.describe(StorageController)!.routes;
+		expect(routes.find((r) => r.method === 'GET')).toMatchObject({ responds: true });
+		expect(routes.find((r) => r.method === 'PUT')).toMatchObject({ status: 204 });
+		expect(StoredObjectView.contentType).toBe('application/octet-stream');
 	});
 
 	it('serves the signed URLs of a disk that cannot', async () => {

@@ -238,6 +238,11 @@ class ReceiptController {
 		return 'accepted';
 	}
 
+	@Http.put('/:id/file', { status: 204 })
+	public upload() {
+		return new Response(null, { status: 403 });
+	}
+
 	@Http.post('/conflict', { status: 201, errors: [ConflictError] })
 	public conflict() {
 		return new ConflictError('Taken.');
@@ -279,6 +284,13 @@ describe('route success status', () => {
 		const response = await testing.http.post('/receipts/r1/accept').send();
 
 		expect(response.status).toBe(202);
+	});
+
+	it('answers a response the handler made with its own status', async () => {
+		testing = await createTestingHttpApp({ app: ReceiptApp });
+		const response = await testing.http.put('/receipts/r1/file').send();
+
+		expect(response.status).toBe(403);
 	});
 
 	it('answers a problem with its own status', async () => {

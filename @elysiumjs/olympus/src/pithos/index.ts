@@ -68,7 +68,7 @@ export {
 } from './files';
 export { MemoryDisk } from './memory';
 export { PithosModule } from './pithos.module';
-export { StorageController } from './storage.controller';
+export { StorageController, StoredObjectView } from './storage.controller';
 export {
 	FINISH_UPLOAD_ERRORS,
 	type FinishUploadErrors,

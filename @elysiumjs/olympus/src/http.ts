@@ -1340,6 +1340,8 @@ export namespace Http {
 							const before = c.set.status;
 							const handler = initInterceptedHandler(c);
 							const result = await handler(...(await getParameters(c)));
+							// A response the handler made is answered as it is, with its own status.
+							if (result instanceof Response) return result;
 							if (route.status !== undefined && c.set.status === before)
 								c.set.status = route.status;
 							if (c.set.status === 204) return undefined;

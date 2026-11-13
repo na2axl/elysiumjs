@@ -16,8 +16,11 @@ import type { Context } from 'elysia';
 import type { ServedSigning } from './signing';
 import type { StorageDriver } from './storage';
 
+import { t } from 'elysia';
+
 import { SignedUrl } from '../harpocrates/signed-url';
 import { Http } from '../http';
+import { View } from '../view';
 import { Storage } from './storage';
 
 /** The disk of a request, and its signing options, or `null` when it does not serve URLs. */
@@ -54,6 +57,18 @@ const check = async (
 };
 
 /**
+ * What a signed URL downloads: the bytes of the object, sent with the object's own content type.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export class StoredObjectView extends View(t.Uint8Array()) {
+	public static override readonly contentType: string = 'application/octet-stream';
+
+	public static override render(bytes: Uint8Array): Uint8Array {
+		return bytes;
+	}
+}
+
+/**
  * Serves the signed URLs of disks that cannot serve them themselves, such as `memory` and
  * `local`: `GET` downloads the object, and `PUT` uploads it. Give such a disk
  * `signing: { url, secret }`, where `url` is this route followed by the name of the disk, such as
@@ -62,7 +77,10 @@ const check = async (
  */
 @Http.controller('/storage')
 export class StorageController {
-	@Http.get('/:disk/*', { description: 'Downloads an object through a signed URL.' })
+	@Http.get('/:disk/*', {
+		response: StoredObjectView,
+		description: 'Downloads an object through a signed URL.'
+	})
 	public async download(@Http.context() ctx: Context): Promise<Response> {
 		const checked = await check(ctx, 'GET');
 		if (typeof checked === 'number') return new Response(null, { status: checked });
@@ -80,7 +98,11 @@ export class StorageController {
 		});
 	}
 
-	@Http.put('/:disk/*', { parse: 'none', description: 'Uploads an object through a signed URL.' })
+	@Http.put('/:disk/*', {
+		parse: 'none',
+		status: 204,
+		description: 'Uploads an object through a signed URL.'
+	})
 	public async upload(@Http.context() ctx: Context): Promise<Response> {
 		const checked = await check(ctx, 'PUT');
 		if (typeof checked === 'number') return new Response(null, { status: checked });
