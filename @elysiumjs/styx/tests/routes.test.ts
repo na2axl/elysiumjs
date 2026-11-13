@@ -223,6 +223,20 @@ describe('route types contributors', () => {
 		expect(health!.specifier).toBeUndefined();
 	});
 
+	it('types the routes rendered by a view with the schema of the view', async () => {
+		const { modules } = await collectRoutes(fixtureDir, ContribApp, out);
+		const articles = modules[0]!.controllers.find((c) => c.path === '/articles')!;
+		const imports = [
+			{ from: '@elysiumjs/olympus', names: ['ViewResponseOf'] },
+			{ from: './article', names: ['ArticleView'] }
+		];
+		expect(articles.types).toEqual({
+			show: { response: "ViewResponseOf<typeof ArticleView, 'one'>", imports },
+			list: { response: "ViewResponseOf<typeof ArticleView, 'list'>", imports },
+			page: { response: "ViewResponseOf<typeof ArticleView, 'offset'>", imports }
+		});
+	});
+
 	it('renders the types of contributors, which compile', async () => {
 		const { modules } = await collectRoutes(fixtureDir, ContribApp, out);
 		const output = renderRoutes(modules);
@@ -246,6 +260,11 @@ describe('route types contributors', () => {
 				"export const reply: Routes['greetings']['hello']['get']['response'][200] = { reply: 'hi' };",
 				'// @ts-expect-error The reply of /hello is a string.',
 				"export const wrong: Routes['greetings']['hello']['get']['response'][200] = { reply: 1 };",
+				"type Article = Routes['articles'][':id']['get']['response'][200];",
+				"export const article: Article = { id: '1', title: 'a', publishedAt: '2026-01-01T00:00:00Z' };",
+				'// @ts-expect-error Clients receive dates as strings.',
+				"export const dated: Article = { id: '1', title: 'a', publishedAt: new Date() };",
+				"export const page: Routes['articles']['page']['get']['response'][200] = { data: [article], page: 1, limit: 20, total: 1 };",
 				''
 			].join('\n')
 		);

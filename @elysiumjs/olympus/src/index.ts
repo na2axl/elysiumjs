@@ -215,6 +215,21 @@ export {
 export { type ExceptionFilter, type FilterClass, type FilterContext, Catch } from './filter';
 export { type JsonForm, type ResponseSchemas, Resource } from './resource';
 export {
+	pageResponseSchema,
+	PAGE_SCHEMA_KEYWORD,
+	View,
+	type ViewClass,
+	type ViewInput,
+	type ViewKind,
+	ViewNotRenderableError,
+	type ViewOutput,
+	type ViewPage,
+	type ViewPagination,
+	type ViewResponse,
+	type ViewResponseOf,
+	Views
+} from './view';
+export {
 	type AppRateLimitOptions,
 	type RateLimitHit,
 	type RateLimitKeyContext,

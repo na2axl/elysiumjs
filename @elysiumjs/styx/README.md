@@ -42,6 +42,7 @@ styx make:repository --name UserRepository
 styx make:seeder --name CountriesSeeder
 styx make:service --name UserService
 styx make:validator --name CreateUser
+styx make:view --name Post
 styx module:new --name billing
 styx module:rename --module billing --name payments
 ```
@@ -63,7 +64,7 @@ const api = treaty<AppRoutes>('http://localhost:3000');
 const { data } = await api.users({ id }).get();
 ```
 
-The types come from the controller methods: the parameters decorated with `@Http.param`, `@Http.query` and `@Http.body` give the request types, and the return type gives the response type, so annotate the return type of methods that return different shapes. The file holds types only and is written again by `typecheck` in new projects, so keep it out of git.
+The types come from the controller methods: the parameters decorated with `@Http.param`, `@Http.query` and `@Http.body` give the request types, and the return type gives the response type, so annotate the return type of methods that return different shapes. A route whose `response` is a view (`PostView`, `PostView.list` or `PostView.page`) takes its response type from the schema of the view, when a project file exports the view by name. The file holds types only and is written again by `typecheck` in new projects, so keep it out of git.
 
 `styx routes:check` fails when a route declares no schema for its success response, so that clients and the OpenAPI document know what it returns. Set the `response` option of the route, either one schema or a map of statuses with at least one 2xx status. Server-sent events routes and routes answering 204 are left out. Run it in CI next to `typecheck`.
 

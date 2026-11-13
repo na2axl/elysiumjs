@@ -23,6 +23,7 @@ export * from './make_repository.command';
 export * from './make_seeder.command';
 export * from './make_service.command';
 export * from './make_validator.command';
+export * from './make_view.command';
 
 export * from './module_new.command';
 export * from './module_rename.command';

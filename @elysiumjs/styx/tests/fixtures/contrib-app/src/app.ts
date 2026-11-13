@@ -14,12 +14,13 @@
 
 import { Application, Module } from '@elysiumjs/olympus';
 
+import { ArticleController } from './article';
 import { GreetingController, makeHealthController } from './greeting';
 import { PingRouteTypes } from './pingable';
 
 @Module.register({
 	services: [PingRouteTypes],
-	controllers: [GreetingController, makeHealthController()]
+	controllers: [GreetingController, makeHealthController(), ArticleController]
 })
 export class PingModule extends Module {}
 

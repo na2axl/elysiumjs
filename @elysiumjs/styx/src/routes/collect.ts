@@ -153,6 +153,28 @@ const specifierFor = (outFile: string, file: string): string => {
 };
 
 /**
+ * The response type of a route rendered by a view: the static type of the view's schema, for
+ * one item, a list or a page. `undefined` when no project file exports the view by name, and the
+ * route's type then comes from its handler.
+ */
+const viewTypesOf = (
+	view: NonNullable<HttpRouteDescription['view']>,
+	located: Map<Function, { file: string; exportName: string; className: string }>,
+	outFile: string
+): HttpRouteTypes | undefined => {
+	const source = located.get(view.view as unknown as Function);
+	if (!source || source.exportName === 'default') return undefined;
+	const kind = view.kind === 'page' ? view.pagination : view.kind;
+	return {
+		response: `ViewResponseOf<typeof ${source.exportName}, ${quote(kind)}>`,
+		imports: [
+			{ from: '@elysiumjs/olympus', names: ['ViewResponseOf'] },
+			{ from: specifierFor(outFile, source.file), names: [source.exportName] }
+		]
+	};
+};
+
+/**
  * Reads the modules, controllers and routes of an app, without booting it.
  * @author Axel Nana <ax.lnana@outlook.com>
  * @param projectPath The project folder.
@@ -195,6 +217,10 @@ export const collectRoutes = async (
 						types[route.name] = given;
 						break;
 					}
+				}
+				if (!types[route.name] && route.view) {
+					const viewTypes = viewTypesOf(route.view, located, outFile);
+					if (viewTypes) types[route.name] = viewTypes;
 				}
 			}
 
