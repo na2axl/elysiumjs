@@ -269,11 +269,13 @@ export class DrizzleRLSTenancy implements TenancyStrategy<PgTable, DrizzleConnec
 			return withTenant(tenant, callback);
 		}
 
-		return connection.transaction(async (tx) => {
-			await bindTransactionTenant(tx as unknown as DrizzleConnection, tenant);
-			return withTenant(tenant, () =>
-				Database.runInTransaction(connection, tx as unknown as DrizzleConnection, callback)
-			);
-		});
+		return Database.committing(connection, () =>
+			connection.transaction(async (tx) => {
+				await bindTransactionTenant(tx as unknown as DrizzleConnection, tenant);
+				return withTenant(tenant, () =>
+					Database.runInTransaction(connection, tx as unknown as DrizzleConnection, callback)
+				);
+			})
+		);
 	}
 }
