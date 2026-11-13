@@ -15,9 +15,8 @@
 import type { ProblemValidationError, TObject, TOptional, TSchema, TString } from '../index';
 import type { ModelClass } from './interfaces';
 
-import { t } from 'elysia';
-
 import { BadRequestError } from '../index';
+import { t } from 'elysia';
 
 /**
  * A filter operator of the query DSL.

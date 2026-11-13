@@ -19,6 +19,7 @@ import type { StoredEventRecord } from './stores';
 
 import { AsyncResult, Clock, DATABASE_TRANSACTION_SERVICE, Result, Service } from '../index';
 import { UnitOfWork } from '../mnemosyne/index';
+
 import { Aggregates } from './aggregate';
 import { eventStore, options } from './config';
 import { runProjections } from './projection';

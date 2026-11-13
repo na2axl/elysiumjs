@@ -15,6 +15,7 @@
 import type { ThemisConfig } from './config';
 
 import { Http, Service } from '../index';
+
 import { THEMIS_CONFIG } from './config';
 import { MissingThemisConfigError } from './errors';
 
