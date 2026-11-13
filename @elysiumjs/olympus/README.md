@@ -177,6 +177,59 @@ const Envelope = TransformInterceptor.with(
 );
 ```
 
+### Views
+
+A view shows a resource on the wire. It is a class made with `View(schema)`: the schema of what it renders, and one static `render` method from what a handler returns, such as a model instance, to that schema. A route names the view as its `response`: `PostView` renders one item, `PostView.list` a list and `PostView.page` a page. The response schema of the route is the view's, documented, validated and serialized as any other.
+
+```typescript
+import type { ViewOutput } from '@elysiumjs/olympus';
+
+import { Http, NotFoundError, Service, t, View } from '@elysiumjs/olympus';
+import { Listing } from '@elysiumjs/olympus/mnemosyne';
+
+export class PostView extends View(
+	t.Object({
+		id: t.String({ format: 'uuid' }),
+		title: t.String(),
+		author: t.String(),
+		publishedAt: t.Nullable(t.String({ format: 'date-time' }))
+	})
+) {
+	public static override render(post: PostModel): ViewOutput<typeof PostView.schema> {
+		return {
+			id: post.id,
+			title: post.title,
+			author: post.authorName,
+			publishedAt: post.publishedAt
+		};
+	}
+}
+
+@Http.controller('/posts')
+export class PostController {
+	public constructor(@Service.inject() private readonly posts: PostRepository) {}
+
+	@Http.get('/:id', { response: PostView, errors: [NotFoundError] })
+	public async show(@Http.param('id') id: string) {
+		return (await this.posts.find(id)) ?? new NotFoundError('No such post.');
+	}
+
+	@Http.get('/', { response: PostView.page })
+	public list(@Http.query(Listing.schema(PostListing)) query: Listing.Params<typeof PostListing>) {
+		return this.posts.list(Listing.parse(PostListing, query));
+	}
+}
+```
+
+- `render` answers the static type of the schema, where a string field may also be a `Date`: dates are written as ISO strings, or as their day for a field of format `date`.
+- `renderAll(items)` and `renderPage(page)` render with `render`, and a page keeps its cursor, or its page, limit and total.
+- `PostView.page` reads its pagination from the query schema of the route: offset when the query has a `page` parameter, as `Listing.schema` of an offset listing does, and cursor when it has a `cursor` parameter. A route whose query has neither answers pages of either. A page of the other pagination, or a value that is not a list for `PostView.list`, fails the request.
+- The handler's value is rendered before the route's interceptors see it. A `Response`, a stream or a problem is answered as it is. `null` and `undefined` are not rendered and fail the response schema, so a handler answers a missing item with a problem such as `NotFoundError`.
+- A view must define `render`, and a route that answers with a view always serializes its result and cannot send events: the route is refused when it is declared. Generator handlers are answered as they are. A status the handler sets with `c.status(201, post)` keeps its code, and its body is rendered by the view.
+- The return type of the handler is not checked against the input of `render`: annotate it, as in `show(): Promise<PostModel | NotFoundError>`.
+- Views have no instances and take no services: `render` reads its input, and static APIs such as `Clock` or other views. `Http.currentContext()` gives the request to a view that cannot do without it.
+- `styx make:view --name Post` writes `post.view.ts` in the `views` folder of the module, and `styx routes:generate` types the routes rendered by a view with the schema of the view.
+
 ### Results
 
 A check or a call that may fail returns a `Result`: the value it passed with, or the `DomainError` it failed with. A handler may return one: a passed result answers its value, a failed one its problem. `AsyncResult` is the result to come of a promise, with the same methods, and a handler may return it too.

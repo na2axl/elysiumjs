@@ -21,6 +21,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { MakeModelCommand } from '../src/commands/make_model.command';
 import { MakeServiceCommand } from '../src/commands/make_service.command';
 import { MakeValidatorCommand } from '../src/commands/make_validator.command';
+import { MakeViewCommand } from '../src/commands/make_view.command';
 import { addToModuleHint, getModulePath } from '../src/config';
 import { createModule, fileName } from '../src/utils';
 
@@ -29,7 +30,7 @@ const importPattern = /^import \{([^}]+)\} from '(@elysiumjs\/[^']+)';$/gm;
 
 describe('stub imports', () => {
 	it('has stubs to check', async () => {
-		expect((await readdir(stubsDir)).filter((f) => f.endsWith('.stub'))).toHaveLength(13);
+		expect((await readdir(stubsDir)).filter((f) => f.endsWith('.stub'))).toHaveLength(14);
 	});
 
 	for (const file of [
@@ -44,6 +45,7 @@ describe('stub imports', () => {
 		'validator',
 		'validator.authorize',
 		'validator.validate',
+		'view',
 		'wamp.controller',
 		'ws.controller'
 	]) {
@@ -183,6 +185,15 @@ describe('generator output', () => {
 			);
 			expect(text).toContain('public static authorize(ctx: Context<SignInRequest>)');
 			expect(text).toContain('public static validate(ctx: Context<SignInRequest>)');
+		});
+
+		it('writes a view in views/, named with the View suffix', async () => {
+			await make(new MakeViewCommand(), '--name', 'post');
+			const text = await Bun.file(join(dir, 'src/views/post.view.ts')).text();
+			expect(text).toContain('export class PostView extends View(');
+			expect(text).toContain(
+				'public static override render(input: unknown): ViewOutput<typeof PostView.schema>'
+			);
 		});
 
 		it('leaves supportTenancy out of a model that is not tenant-scoped', async () => {

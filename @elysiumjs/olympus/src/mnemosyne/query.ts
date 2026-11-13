@@ -17,7 +17,7 @@ import type { ModelClass } from './interfaces';
 
 import { t } from 'elysia';
 
-import { BadRequestError, Serializer } from '../index';
+import { BadRequestError, PAGE_SCHEMA_KEYWORD, pageResponseSchema, Serializer } from '../index';
 
 /**
  * A filter operator of the query DSL.
@@ -218,7 +218,7 @@ const DEFAULT_LIMIT = 20;
 const DEFAULT_MAX_LIMIT = 100;
 
 /** The JSON Schema keyword that marks the schema of a page, with its pagination. */
-const PAGE_KEYWORD = 'x-elysium-page';
+const PAGE_KEYWORD = PAGE_SCHEMA_KEYWORD;
 
 /** The symbol that marks a page built by {@link Listing.page} or {@link Listing.offsetPage}. */
 const PAGE = Symbol.for('elysium:mnemosyne:page');
@@ -634,11 +634,7 @@ export namespace Listing {
 	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param item The schema of one row.
 	 */
-	export const pageSchema = <S extends TSchema>(item: S) =>
-		t.Object(
-			{ data: t.Array(item), nextCursor: t.Nullable(t.String()) },
-			{ [PAGE_KEYWORD]: 'cursor' }
-		);
+	export const pageSchema = <S extends TSchema>(item: S) => pageResponseSchema(item, 'cursor');
 
 	/**
 	 * The response schema of a page of resources from offset pagination.
@@ -646,15 +642,7 @@ export namespace Listing {
 	 * @param item The schema of one row.
 	 */
 	export const offsetPageSchema = <S extends TSchema>(item: S) =>
-		t.Object(
-			{
-				data: t.Array(item),
-				page: t.Integer({ minimum: 1 }),
-				limit: t.Integer({ minimum: 1 }),
-				total: t.Integer({ minimum: 0 })
-			},
-			{ [PAGE_KEYWORD]: 'offset' }
-		);
+		pageResponseSchema(item, 'offset');
 
 	/**
 	 * The pagination of a schema made by {@link pageSchema} or {@link offsetPageSchema}, or

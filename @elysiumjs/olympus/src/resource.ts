@@ -168,7 +168,10 @@ export namespace Resource {
 		const fields = options.fields?.filter(Boolean);
 		if (!fields?.length) return serializeNode(node, value);
 
-		const target = fieldsTarget(node);
+		// A union, such as pages of either pagination: the fieldset applies to the branch of the value.
+		const union = node.anyOf ?? node.oneOf;
+		const chosen = union ? (branchFor(union, value) ?? node) : node;
+		const target = fieldsTarget(chosen);
 		if (!target) return serializeNode(node, value);
 		const allowed = Object.keys(target.properties!).filter(
 			(key) => !isHidden(target.properties![key])
@@ -191,7 +194,7 @@ export namespace Resource {
 				),
 				required: (object.required ?? []).filter((key) => selected.has(key))
 			});
-		return serializeNode(replaceTarget(node, target, narrow(target)), value);
+		return serializeNode(replaceTarget(chosen, target, narrow(target)), value);
 	};
 }
 

@@ -153,6 +153,30 @@ const specifierFor = (outFile: string, file: string): string => {
 };
 
 /**
+ * The response type of a route rendered by a view: the static type of the view's schema, for
+ * one item, a list or a page. The view is named by an inline type import of the file that exports
+ * it, so views of the same name in different files never clash. A view that no project file
+ * exports gives `unknown`: the handler returns what the view renders, not what clients receive.
+ */
+const viewTypesOf = (
+	view: NonNullable<HttpRouteDescription['view']>,
+	located: Map<Function, { file: string; exportName: string; className: string }>,
+	outFile: string
+): HttpRouteTypes => {
+	const source = located.get(view.view as unknown as Function);
+	if (!source) return { response: 'unknown' };
+	const kind = view.kind === 'page' ? (view.pagination ?? 'page') : view.kind;
+	const member = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(source.exportName)
+		? `.${source.exportName}`
+		: `[${quote(source.exportName)}]`;
+	const ref = `typeof import(${quote(specifierFor(outFile, source.file))})${member}`;
+	return {
+		response: `ViewResponseOf<${ref}, ${quote(kind)}>`,
+		imports: [{ from: '@elysiumjs/olympus', names: ['ViewResponseOf'] }]
+	};
+};
+
+/**
  * Reads the modules, controllers and routes of an app, without booting it.
  * @author Axel Nana <ax.lnana@outlook.com>
  * @param projectPath The project folder.
@@ -195,6 +219,17 @@ export const collectRoutes = async (
 						types[route.name] = given;
 						break;
 					}
+				}
+				// A view types the response, unless a contributor gave it.
+				const typed = types[route.name];
+				if (route.view && typed?.response === undefined) {
+					const viewTypes = viewTypesOf(route.view, located, outFile);
+					const imports = [...(typed?.imports ?? []), ...(viewTypes.imports ?? [])];
+					types[route.name] = {
+						...typed,
+						...viewTypes,
+						...(imports.length > 0 ? { imports } : {})
+					};
 				}
 			}
 

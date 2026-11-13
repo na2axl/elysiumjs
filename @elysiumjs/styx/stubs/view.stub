@@ -1,0 +1,32 @@
+import type { ViewOutput } from '@elysiumjs/olympus';
+
+import { View } from '@elysiumjs/olympus';
+import { t } from 'elysia';
+
+export class {name} extends View(
+    /**
+     * The schema of what the view renders: the response schema of the routes that answer with it.
+     *
+     * @example
+     * ```ts
+     * t.Object({
+     *     id: t.String({ format: 'uuid' }),
+     *     title: t.String(),
+     *     publishedAt: t.Nullable(t.String({ format: 'date-time' }))
+     * })
+     * ```
+     */
+    t.Object({})
+) {
+    /**
+     * Renders one item: what the route's handler returns, such as a model instance. A
+     * `date-time` field may be given as a `Date`.
+     *
+     * Routes answer with `{name}` for one item, `{name}.list` for a list and `{name}.page` for a
+     * page.
+     */
+    public static override render(input: unknown): ViewOutput<typeof {name}.schema> {
+        void input;
+        return {};
+    }
+}
