@@ -49,7 +49,7 @@ import { Runtime } from './runtime';
 import { PayloadTooLargeError } from './security';
 import { Service } from './service';
 import { nextTick, Symbols } from './utils';
-import { Views } from './view';
+import { ViewNotRenderableError, Views } from './view';
 
 /**
  * A route is a string that starts with a forward slash.
@@ -139,8 +139,11 @@ type HttpRequestHandlerMetadata = {
 	 */
 	response?: TSchema | Record<number, TSchema>;
 
-	/** The view that renders the handler's result, and whether it renders one item, a list or a page. */
-	view?: { view: ViewClass; kind: ViewKind };
+	/**
+	 * The view that renders the handler's result, whether it renders one item, a list or a page,
+	 * and the pagination of a page, when the route's query gives one.
+	 */
+	view?: { view: ViewClass; kind: ViewKind; pagination?: ViewPagination };
 
 	/** The status of a successful response. */
 	status?: number;
@@ -461,6 +464,30 @@ const headersSchema = (route: HttpRequestHandlerMetadata): TObject | undefined =
 	return isEmpty(properties) ? undefined : t.Object(properties, { additionalProperties: true });
 };
 
+/**
+ * Checks a route that answers with a view, as it is declared: the view renders, and the route
+ * neither sends events nor skips serialization.
+ */
+const checkViewRoute = (
+	method: string,
+	options: HttpRouteOptions,
+	target: Object,
+	propertyKey: string | symbol
+) => {
+	const named = Views.of(options.response);
+	if (!named) return;
+	const route = `${target.constructor.name}.${String(propertyKey)}`;
+	if (!Views.isRenderable(named.view)) throw new ViewNotRenderableError(named.view.name);
+	if (method === 'elysium:SSE') {
+		throw new ElysiumError(`The route ${route} sends events: it cannot answer with a view.`);
+	}
+	if (options.serialize === false) {
+		throw new ElysiumError(
+			`The route ${route} answers with a view: its result is always serialized.`
+		);
+	}
+};
+
 const registerHttpRequestHandler = (props: HttpRequestHandlerRegistrationProps) => {
 	const body = Metadata.get('http:body', props.target, props.propertyKey);
 	const params = Metadata.get('http:params', props.target, props.propertyKey) ?? [];
@@ -494,9 +521,13 @@ const registerHttpRequestHandler = (props: HttpRequestHandlerRegistrationProps) 
 		Metadata.get(Symbols.http, target.constructor) ?? [];
 
 	// A view in `response` renders the result; the response schema is the view's.
-	const view = Views.of(response);
+	const named = Views.of(response);
+	const view = named && {
+		...named,
+		...(named.kind === 'page' ? { pagination: Views.paginationOf(query?.schema) } : {})
+	};
 	const responseSchema = view
-		? Views.schemaOf(view.view, view.kind, Views.paginationOf(query?.schema))
+		? Views.schemaOf(view.view, view.kind, view.pagination)
 		: (response as TSchema | Record<number, TSchema> | undefined);
 
 	metadata.push({
@@ -731,8 +762,11 @@ export type HttpRouteDescription = {
 	status?: number;
 	/** Whether the route declares the schema of its success response. */
 	responds: boolean;
-	/** The view that renders the route's result, when its `response` names one. */
-	view?: { view: ViewClass; kind: ViewKind; pagination: ViewPagination };
+	/**
+	 * The view that renders the route's result, when its `response` names one, with the pagination
+	 * of a page when the route's query gives one.
+	 */
+	view?: { view: ViewClass; kind: ViewKind; pagination?: ViewPagination };
 };
 
 /**
@@ -1014,15 +1048,7 @@ export namespace Http {
 					params: route.params.map(({ slug, index }) => ({ slug, index })),
 					status: route.status,
 					responds: declaresSuccess(route.response),
-					...(route.view
-						? {
-								view: {
-									view: route.view.view,
-									kind: route.view.kind,
-									pagination: Views.paginationOf(route.query?.schema)
-								}
-							}
-						: {})
+					...(route.view ? { view: { ...route.view } } : {})
 				};
 			})
 		};
@@ -1208,8 +1234,9 @@ export namespace Http {
 							const returned = await callHandler<Promise<unknown>>(c, args);
 							const result = Result.is(returned) ? returned.orThrow() : returned;
 							if (result instanceof DomainError) throw result;
-							if (route.view && isSerializable(result)) {
-								return Views.render(route.view.view, route.view.kind, result) as TResult;
+							if (route.view && result != null && isSerializable(result)) {
+								const { view, kind, pagination } = route.view;
+								return Views.render(view, kind, result, pagination) as TResult;
 							}
 							return result as TResult;
 						};
@@ -1554,6 +1581,7 @@ export namespace Http {
 		options: HttpRouteOptions = {}
 	): MethodDecorator => {
 		return function (target, propertyKey, descriptor) {
+			checkViewRoute(method, options, target, propertyKey);
 			queueMicrotask(() => {
 				registerHttpRequestHandler({
 					method,

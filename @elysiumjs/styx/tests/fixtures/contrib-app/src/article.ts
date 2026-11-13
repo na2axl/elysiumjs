@@ -25,6 +25,13 @@ export class ArticleView extends View(
 	}
 }
 
+/** A view no file exports. */
+class HiddenView extends View(t.Object({ id: t.String() })) {
+	public static override render(article: Article) {
+		return { id: article.id };
+	}
+}
+
 const article = (): Article => ({ id: '1', title: 'Hello', publishedAt: new Date() });
 
 @Http.controller('/articles')
@@ -42,5 +49,15 @@ export class ArticleController {
 	@Http.get('/page', { response: ArticleView.page })
 	public page(@Http.query(t.Object({ page: t.Optional(t.String()) })) _query: unknown) {
 		return { data: [article()], page: 1, limit: 20, total: 1 };
+	}
+
+	@Http.get('/either', { response: ArticleView.page })
+	public either() {
+		return { data: [article()], nextCursor: null };
+	}
+
+	@Http.get('/hidden', { response: HiddenView })
+	public hidden(): Article {
+		return article();
 	}
 }

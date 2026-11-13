@@ -117,6 +117,11 @@ export class MakeViewCommand extends BaseCommand {
 			return;
 		}
 
+		answers.name = String(answers.name)
+			.split(/[^A-Za-z0-9]+/)
+			.filter(Boolean)
+			.map((part) => part[0]!.toUpperCase() + part.slice(1))
+			.join('');
 		if (!answers.name.endsWith('View')) {
 			answers.name += 'View';
 		}

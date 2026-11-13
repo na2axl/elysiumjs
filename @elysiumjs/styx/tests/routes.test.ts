@@ -226,14 +226,14 @@ describe('route types contributors', () => {
 	it('types the routes rendered by a view with the schema of the view', async () => {
 		const { modules } = await collectRoutes(fixtureDir, ContribApp, out);
 		const articles = modules[0]!.controllers.find((c) => c.path === '/articles')!;
-		const imports = [
-			{ from: '@elysiumjs/olympus', names: ['ViewResponseOf'] },
-			{ from: './article', names: ['ArticleView'] }
-		];
+		const imports = [{ from: '@elysiumjs/olympus', names: ['ViewResponseOf'] }];
+		const view = "typeof import('./article').ArticleView";
 		expect(articles.types).toEqual({
-			show: { response: "ViewResponseOf<typeof ArticleView, 'one'>", imports },
-			list: { response: "ViewResponseOf<typeof ArticleView, 'list'>", imports },
-			page: { response: "ViewResponseOf<typeof ArticleView, 'offset'>", imports }
+			show: { response: `ViewResponseOf<${view}, 'one'>`, imports },
+			list: { response: `ViewResponseOf<${view}, 'list'>`, imports },
+			page: { response: `ViewResponseOf<${view}, 'offset'>`, imports },
+			either: { response: `ViewResponseOf<${view}, 'page'>`, imports },
+			hidden: { response: 'unknown' }
 		});
 	});
 
@@ -265,6 +265,7 @@ describe('route types contributors', () => {
 				'// @ts-expect-error Clients receive dates as strings.',
 				"export const dated: Article = { id: '1', title: 'a', publishedAt: new Date() };",
 				"export const page: Routes['articles']['page']['get']['response'][200] = { data: [article], page: 1, limit: 20, total: 1 };",
+				"export const either: Routes['articles']['either']['get']['response'][200] = { data: [article], nextCursor: null };",
 				''
 			].join('\n')
 		);

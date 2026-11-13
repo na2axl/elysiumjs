@@ -221,6 +221,7 @@ export {
 	type ViewClass,
 	type ViewInput,
 	type ViewKind,
+	ViewInputError,
 	ViewNotRenderableError,
 	type ViewOutput,
 	type ViewPage,

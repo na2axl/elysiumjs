@@ -154,23 +154,25 @@ const specifierFor = (outFile: string, file: string): string => {
 
 /**
  * The response type of a route rendered by a view: the static type of the view's schema, for
- * one item, a list or a page. `undefined` when no project file exports the view by name, and the
- * route's type then comes from its handler.
+ * one item, a list or a page. The view is named by an inline type import of the file that exports
+ * it, so views of the same name in different files never clash. A view that no project file
+ * exports gives `unknown`: the handler returns what the view renders, not what clients receive.
  */
 const viewTypesOf = (
 	view: NonNullable<HttpRouteDescription['view']>,
 	located: Map<Function, { file: string; exportName: string; className: string }>,
 	outFile: string
-): HttpRouteTypes | undefined => {
+): HttpRouteTypes => {
 	const source = located.get(view.view as unknown as Function);
-	if (!source || source.exportName === 'default') return undefined;
-	const kind = view.kind === 'page' ? view.pagination : view.kind;
+	if (!source) return { response: 'unknown' };
+	const kind = view.kind === 'page' ? (view.pagination ?? 'page') : view.kind;
+	const member = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(source.exportName)
+		? `.${source.exportName}`
+		: `[${quote(source.exportName)}]`;
+	const ref = `typeof import(${quote(specifierFor(outFile, source.file))})${member}`;
 	return {
-		response: `ViewResponseOf<typeof ${source.exportName}, ${quote(kind)}>`,
-		imports: [
-			{ from: '@elysiumjs/olympus', names: ['ViewResponseOf'] },
-			{ from: specifierFor(outFile, source.file), names: [source.exportName] }
-		]
+		response: `ViewResponseOf<${ref}, ${quote(kind)}>`,
+		imports: [{ from: '@elysiumjs/olympus', names: ['ViewResponseOf'] }]
 	};
 };
 
@@ -218,9 +220,16 @@ export const collectRoutes = async (
 						break;
 					}
 				}
-				if (!types[route.name] && route.view) {
+				// A view types the response, unless a contributor gave it.
+				const typed = types[route.name];
+				if (route.view && typed?.response === undefined) {
 					const viewTypes = viewTypesOf(route.view, located, outFile);
-					if (viewTypes) types[route.name] = viewTypes;
+					const imports = [...(typed?.imports ?? []), ...(viewTypes.imports ?? [])];
+					types[route.name] = {
+						...typed,
+						...viewTypes,
+						...(imports.length > 0 ? { imports } : {})
+					};
 				}
 			}
 

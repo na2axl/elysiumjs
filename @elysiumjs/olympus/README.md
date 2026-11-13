@@ -184,7 +184,7 @@ A view shows a resource on the wire. It is a class made with `View(schema)`: the
 ```typescript
 import type { ViewOutput } from '@elysiumjs/olympus';
 
-import { Http, Service, t, View } from '@elysiumjs/olympus';
+import { Http, NotFoundError, Service, t, View } from '@elysiumjs/olympus';
 import { Listing } from '@elysiumjs/olympus/mnemosyne';
 
 export class PostView extends View(
@@ -209,9 +209,9 @@ export class PostView extends View(
 export class PostController {
 	public constructor(@Service.inject() private readonly posts: PostRepository) {}
 
-	@Http.get('/:id', { response: PostView })
-	public show(@Http.param('id') id: string) {
-		return this.posts.find(id);
+	@Http.get('/:id', { response: PostView, errors: [NotFoundError] })
+	public async show(@Http.param('id') id: string) {
+		return (await this.posts.find(id)) ?? new NotFoundError('No such post.');
 	}
 
 	@Http.get('/', { response: PostView.page })
@@ -223,10 +223,11 @@ export class PostController {
 
 - `render` answers the static type of the schema, where a string field may also be a `Date`: dates are written as ISO strings, or as their day for a field of format `date`.
 - `renderAll(items)` and `renderPage(page)` render with `render`, and a page keeps its cursor, or its page, limit and total.
-- `PostView.page` reads its pagination from the query schema of the route: offset when the query has a `page` parameter, as `Listing.schema` of an offset listing does, cursor otherwise.
-- The handler's value is rendered before the route's interceptors see it. A `Response`, a stream or a problem is answered as it is.
+- `PostView.page` reads its pagination from the query schema of the route: offset when the query has a `page` parameter, as `Listing.schema` of an offset listing does, and cursor when it has a `cursor` parameter. A route whose query has neither answers pages of either. A page of the other pagination, or a value that is not a list for `PostView.list`, fails the request.
+- The handler's value is rendered before the route's interceptors see it. A `Response`, a stream or a problem is answered as it is. `null` and `undefined` are not rendered and fail the response schema, so a handler answers a missing item with a problem such as `NotFoundError`.
+- A view must define `render`, and a route that answers with a view always serializes its result and cannot send events: the route is refused when it is declared. Generator handlers are answered as they are.
 - Views have no instances and take no services: `render` reads its input, and static APIs such as `Clock` or other views. `Http.currentContext()` gives the request to a view that cannot do without it.
-- `styx make:view --name Post` writes `views/post.view.ts`, and `styx routes:generate` types the routes rendered by a view with the schema of the view.
+- `styx make:view --name Post` writes `post.view.ts` in the `views` folder of the module, and `styx routes:generate` types the routes rendered by a view with the schema of the view.
 
 ### Results
 

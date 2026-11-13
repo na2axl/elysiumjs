@@ -63,6 +63,20 @@ export class ViewNotRenderableError extends ElysiumError {
 }
 
 /**
+ * Thrown when a handler answers a value a view cannot render: an item where a list or a page is
+ * expected, or a page of the other pagination.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export class ViewInputError extends ElysiumError {
+	constructor(view: string, expected: string) {
+		super(`The view ${view} expected ${expected} from the route's handler.`);
+	}
+}
+
+/** Marks the `render` method of the base class, which every view replaces. */
+const BASE_RENDER = Symbol.for('elysium:view:base-render');
+
+/**
  * The value a view's `render` answers: the static type of its schema, where a string field may
  * also be given as a `Date`. A date is written as its ISO string when the response is
  * serialized, or as its day for a field of format `date`.
@@ -77,14 +91,15 @@ type WithDates<T> = T extends string
 		: T
 	: T extends Date
 		? T
-		: T extends readonly (infer U)[]
-			? WithDates<U>[]
+		: T extends readonly unknown[]
+			? { -readonly [K in keyof T]: WithDates<T[K]> }
 			: T extends object
 				? { [K in keyof T]: WithDates<T[K]> }
 				: T;
 
 /** A view class, as routes take it. */
 export type ViewClass<S extends TSchema = TSchema> = {
+	readonly name: string;
 	readonly schema: S;
 	render(input: never): unknown;
 	renderAll(inputs: readonly never[]): unknown[];
@@ -110,29 +125,31 @@ export type ViewInput<V> = V extends { render(input: infer I): unknown } ? I : n
 
 /** A page of items: cursor or offset. */
 export type ViewPage<T> =
-	| { data: T[]; nextCursor: string | null }
-	| { data: T[]; page: number; limit: number; total: number };
+	| { data: readonly T[]; nextCursor: string | null }
+	| { data: readonly T[]; page: number; limit: number; total: number };
 
 /**
  * The response type of a route rendered by a view, as clients receive it: the static type of
  * the view's schema, for one item, a list or a page.
  * @author Axel Nana <ax.lnana@outlook.com>
  * @template V The view class.
- * @template K One item, a list, or a cursor or offset page.
+ * @template K One item, a list, a cursor or offset page, or a page of either (`page`).
  */
 export type ViewResponseOf<
 	V extends { schema: TSchema },
-	K extends 'one' | 'list' | ViewPagination
+	K extends 'one' | 'list' | 'page' | ViewPagination
 > = K extends 'one'
 	? Static<V['schema']>
 	: K extends 'list'
 		? Static<V['schema']>[]
 		: K extends 'offset'
 			? { data: Static<V['schema']>[]; page: number; limit: number; total: number }
-			: { data: Static<V['schema']>[]; nextCursor: string | null };
+			: K extends 'cursor'
+				? { data: Static<V['schema']>[]; nextCursor: string | null }
+				: ViewResponseOf<V, ViewPagination>;
 
 /** Copies the members of a page, its symbols included, with other items. */
-const withItems = <T>(page: { data: readonly unknown[] }, items: T[]) => {
+const withItems = <T>(page: object, items: T[]) => {
 	const copy = { ...page, data: items } as Record<string | symbol, unknown>;
 	for (const symbol of Object.getOwnPropertySymbols(page)) {
 		const descriptor = Object.getOwnPropertyDescriptor(page, symbol)!;
@@ -200,15 +217,15 @@ export const View = <S extends TSchema>(schema: S) => {
 		 * Renders the items of a page, and keeps its cursor, or its page and total, as they are.
 		 * @param page The page.
 		 */
-		public static renderPage<T extends { render(input: never): unknown }>(
-			this: T,
-			page: ViewPage<ViewInput<T>>
-		): ViewPage<ReturnType<T['render']>> {
+		public static renderPage<
+			T extends { render(input: never): unknown },
+			P extends { data: readonly ViewInput<T>[] }
+		>(this: T, page: P): Omit<P, 'data'> & { data: ReturnType<T['render']>[] } {
 			const render = this.render as (input: unknown) => ReturnType<T['render']>;
 			return withItems(
 				page,
 				page.data.map((input) => render.call(this, input))
-			) as ViewPage<ReturnType<T['render']>>;
+			) as unknown as Omit<P, 'data'> & { data: ReturnType<T['render']>[] };
 		}
 
 		/** The response of a route that renders a list with this view. */
@@ -223,6 +240,7 @@ export const View = <S extends TSchema>(schema: S) => {
 	}
 
 	Object.defineProperty(V, VIEW, { value: true });
+	Object.defineProperty(V.render, BASE_RENDER, { value: true });
 
 	return V;
 };
@@ -254,13 +272,16 @@ export namespace Views {
 
 	/**
 	 * The pagination of a route's pages, read from its query schema: offset when it has a `page`
-	 * parameter, cursor otherwise.
+	 * parameter, cursor when it has a `cursor` parameter, and `undefined` otherwise, when the route
+	 * answers pages of either.
 	 * @param query The query schema of the route.
 	 */
-	export const paginationOf = (query: TSchema | undefined): ViewPagination =>
-		(query as { properties?: Record<string, unknown> } | undefined)?.properties?.page !== undefined
-			? 'offset'
-			: 'cursor';
+	export const paginationOf = (query: TSchema | undefined): ViewPagination | undefined => {
+		const properties = (query as { properties?: Record<string, unknown> } | undefined)?.properties;
+		if (properties?.page !== undefined) return 'offset';
+		if (properties?.cursor !== undefined) return 'cursor';
+		return undefined;
+	};
 
 	/**
 	 * The response schema of a route rendered by a view.
@@ -271,23 +292,60 @@ export namespace Views {
 	export const schemaOf = (
 		view: ViewClass,
 		kind: ViewKind,
-		pagination: ViewPagination = 'cursor'
+		pagination?: ViewPagination
 	): TSchema =>
 		kind === 'one'
 			? view.schema
 			: kind === 'list'
 				? t.Array(view.schema)
-				: pageResponseSchema(view.schema, pagination);
+				: pagination
+					? pageResponseSchema(view.schema, pagination)
+					: t.Union([
+							pageResponseSchema(view.schema, 'cursor'),
+							pageResponseSchema(view.schema, 'offset')
+						]);
+
+	/**
+	 * Whether a view class defines its own `render` method.
+	 * @param view The view class.
+	 */
+	export const isRenderable = (view: ViewClass): boolean =>
+		(view.render as unknown as Record<symbol, unknown>)[BASE_RENDER] !== true;
 
 	/**
 	 * Renders what a handler returned with a view.
 	 * @param view The view class.
 	 * @param kind One item, a list or a page.
 	 * @param value What the handler returned.
+	 * @param pagination The pagination of a page: either when the route's query gives none.
+	 * @throws {ViewInputError} When the value is not a list, or a page of the pagination, a list or
+	 * a page route expects.
 	 */
-	export const render = (view: ViewClass, kind: ViewKind, value: unknown): unknown => {
-		if (kind === 'list') return view.renderAll(value as never[]);
-		if (kind === 'page') return view.renderPage(value as never);
+	export const render = (
+		view: ViewClass,
+		kind: ViewKind,
+		value: unknown,
+		pagination?: ViewPagination
+	): unknown => {
+		if (kind === 'list') {
+			if (!Array.isArray(value)) throw new ViewInputError(view.name, 'a list');
+			return view.renderAll(value as never[]);
+		}
+		if (kind === 'page') {
+			const page = value as Record<string, unknown> | null;
+			const actual =
+				page && Array.isArray(page.data)
+					? 'nextCursor' in page
+						? 'cursor'
+						: 'total' in page
+							? 'offset'
+							: undefined
+					: undefined;
+			if (!actual || (pagination && actual !== pagination)) {
+				throw new ViewInputError(view.name, `a ${pagination ?? 'cursor or offset'} page`);
+			}
+			return view.renderPage(value as never);
+		}
 		return view.render(value as never);
 	};
 }

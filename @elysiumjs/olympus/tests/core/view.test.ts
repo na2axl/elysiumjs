@@ -14,7 +14,19 @@
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { Application, Http, Module, t, View, ViewNotRenderableError, Views } from '../../src/index';
+import {
+	Application,
+	Http,
+	Module,
+	NotFoundError,
+	Result,
+	t,
+	TransformInterceptor,
+	View,
+	ViewInputError,
+	ViewNotRenderableError,
+	Views
+} from '../../src/index';
 
 type Post = { id: string; title: string; secret: string; publishedAt: Date };
 
@@ -66,6 +78,45 @@ class PostController {
 	public response() {
 		return new Response('raw');
 	}
+
+	@Http.get('/either/:kind', { response: PostView.page })
+	public either(@Http.param('kind') kind: string) {
+		return kind === 'offset'
+			? { data: [post('1')], page: 1, limit: 1, total: 1 }
+			: { data: [post('1')], nextCursor: null };
+	}
+
+	@Http.get('/mismatch', { response: PostView.page })
+	public mismatch(@Http.query(t.Object({ page: t.Optional(t.String()) })) _query: unknown) {
+		return { data: [post('1')], nextCursor: null };
+	}
+
+	@Http.get('/not-a-list', { response: PostView.list })
+	public notAList() {
+		return post('1') as unknown as Post[];
+	}
+
+	@Http.get('/missing', { response: PostView, errors: [NotFoundError] })
+	public missing() {
+		return new NotFoundError('No such post.');
+	}
+
+	@Http.get('/result', { response: PostView })
+	public result() {
+		return Result.pass(post('1'));
+	}
+
+	@Http.get('/enveloped', {
+		response: PostView.list,
+		interceptors: [
+			TransformInterceptor.with((result) => ({ data: result }), {
+				schema: (schema) => t.Object({ data: schema })
+			})
+		]
+	})
+	public enveloped() {
+		return [post('1')];
+	}
 }
 
 @Module.register({ controllers: [PostController] })
@@ -94,6 +145,45 @@ describe('View', () => {
 		expect(() => EmptyView.render({})).toThrow(ViewNotRenderableError);
 	});
 
+	it('refuses a route with a view without render, an events route or serialize: false', () => {
+		const declare = (decorate: () => void) => decorate;
+		expect(
+			declare(() => {
+				class A {
+					@Http.get('/', { response: EmptyView })
+					public a() {}
+				}
+				return A;
+			})
+		).toThrow(ViewNotRenderableError);
+		expect(
+			declare(() => {
+				class B {
+					@Http.sse('/', { response: PostView })
+					public b() {}
+				}
+				return B;
+			})
+		).toThrow('cannot answer with a view');
+		expect(
+			declare(() => {
+				class C {
+					@Http.get('/', { response: PostView, serialize: false })
+					public c() {}
+				}
+				return C;
+			})
+		).toThrow('always serialized');
+	});
+
+	it('refuses values a list or a page route cannot render', () => {
+		expect(() => Views.render(PostView, 'list', post('1'))).toThrow(ViewInputError);
+		expect(() => Views.render(PostView, 'page', [post('1')])).toThrow(ViewInputError);
+		expect(() => Views.render(PostView, 'page', { data: [], nextCursor: null }, 'offset')).toThrow(
+			ViewInputError
+		);
+	});
+
 	it('describes list and page responses, and tells views apart', () => {
 		expect(Views.isView(PostView)).toBe(true);
 		expect(Views.isView(class {})).toBe(false);
@@ -105,7 +195,8 @@ describe('View', () => {
 	it('reads the pagination of a page from the query schema', () => {
 		expect(Views.paginationOf(t.Object({ page: t.Optional(t.String()) }))).toBe('offset');
 		expect(Views.paginationOf(t.Object({ cursor: t.Optional(t.String()) }))).toBe('cursor');
-		expect(Views.paginationOf(undefined)).toBe('cursor');
+		expect(Views.paginationOf(t.Object({ q: t.Optional(t.String()) }))).toBeUndefined();
+		expect(Views.paginationOf(undefined)).toBeUndefined();
 	});
 });
 
@@ -140,10 +231,40 @@ describe('View over HTTP', () => {
 	it('describes the view of each route, with the pagination of its pages', () => {
 		const routes = Http.describe(PostController)!.routes;
 		const view = (name: string) => routes.find((route) => route.name === name)?.view;
-		expect(view('one')).toEqual({ view: PostView, kind: 'one', pagination: 'cursor' });
-		expect(view('list')).toEqual({ view: PostView, kind: 'list', pagination: 'cursor' });
+		expect(view('one')).toEqual({ view: PostView, kind: 'one' });
+		expect(view('list')).toEqual({ view: PostView, kind: 'list' });
 		expect(view('offset')).toEqual({ view: PostView, kind: 'page', pagination: 'offset' });
+		expect(view('either')).toEqual({ view: PostView, kind: 'page', pagination: undefined });
 		expect(view('response')).toBeUndefined();
 		expect(routes.find((route) => route.name === 'one')?.responds).toBe(true);
+	});
+
+	it('answers pages of either pagination when the query gives none', async () => {
+		testing = await Application.testing({ app: PostApp });
+		const offset = await testing.http.get('/posts/either/offset');
+		expect(await offset.json()).toEqual({ data: [rendered('1')], page: 1, limit: 1, total: 1 });
+		const cursor = await testing.http.get('/posts/either/cursor');
+		expect(await cursor.json()).toEqual({ data: [rendered('1')], nextCursor: null });
+	});
+
+	it('fails a page of the other pagination, or an item for a list', async () => {
+		testing = await Application.testing({ app: PostApp });
+		expect((await testing.http.get('/posts/mismatch')).status).toBe(500);
+		expect((await testing.http.get('/posts/not-a-list')).status).toBe(500);
+	});
+
+	it('answers problems and results as other routes do', async () => {
+		testing = await Application.testing({ app: PostApp });
+		const missing = await testing.http.get('/posts/missing');
+		expect(missing.status).toBe(404);
+		expect(await (await testing.http.get('/posts/result')).json()).toEqual(rendered('1'));
+	});
+
+	it('renders before the interceptors, and serializes sparse fieldsets', async () => {
+		testing = await Application.testing({ app: PostApp });
+		const enveloped = await testing.http.get('/posts/enveloped');
+		expect(await enveloped.json()).toEqual({ data: [rendered('1')] });
+		const sparse = await testing.http.get('/posts/one?fields=id');
+		expect(await sparse.json()).toEqual({ id: '1' });
 	});
 });

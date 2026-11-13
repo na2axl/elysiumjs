@@ -99,3 +99,30 @@ export class PostController {
 		return { data: [] as Post[], nextCursor: null };
 	}
 }
+
+// renderPage keeps the kind of its page, and takes readonly items.
+const items: readonly Post[] = [];
+export const cursorPage: string | null = PostView.renderPage({
+	data: items,
+	nextCursor: null
+}).nextCursor;
+export const offsetTotal: number = PostView.renderPage({
+	data: items,
+	page: 1,
+	limit: 1,
+	total: 0
+}).total;
+// @ts-expect-error a cursor page has no total
+PostView.renderPage({ data: items, nextCursor: null }).total;
+
+// Tuples keep their positions.
+export class PairView extends View(t.Object({ pair: t.Tuple([t.String(), t.Number()]) })) {
+	public static override render(): ViewOutput<typeof PairView.schema> {
+		return { pair: [new Date(), 1] };
+	}
+}
+// @ts-expect-error the second position is a number
+export const badPair: ViewOutput<typeof PairView.schema> = { pair: ['a', 'b'] };
+
+// A page of either pagination, for a route whose query gives none.
+export const either: ViewResponseOf<typeof PostView, 'page'>[] = [cursor, offset];

@@ -188,7 +188,7 @@ describe('generator output', () => {
 		});
 
 		it('writes a view in views/, named with the View suffix', async () => {
-			await make(new MakeViewCommand(), '--name', 'Post');
+			await make(new MakeViewCommand(), '--name', 'post');
 			const text = await Bun.file(join(dir, 'src/views/post.view.ts')).text();
 			expect(text).toContain('export class PostView extends View(');
 			expect(text).toContain(
