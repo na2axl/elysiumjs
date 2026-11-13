@@ -49,6 +49,8 @@ export class UserRepository extends Repository(UserModel) {}
 
 `Repository(Model)` comes from `@elysiumjs/olympus/mnemosyne` and runs on the Drizzle repository adapter for the models of `DrizzleModel()`: `this.db` is the Drizzle connection (or the transaction open on it), and the scope of `list()`, `count()`, `deleteWhere()` and `Pruner` is an SQL condition. Statements honour the tenant isolation of row-level security; a custom query that must too goes through `this.withConnection((db) => ...)`.
 
+Repositories answer instances of the model, typed by the table's select type: add getters and methods to the model class, and turn the rows of a custom query into instances with `this.hydrate(rows)`. The model name of a `DrizzleModel` is its table name with its schema (`public.users`).
+
 The repository finds rows by the table's primary key. A table without an `id` column, or with a composite primary key, takes the key as an object; `key` names other columns to use instead:
 
 ```ts

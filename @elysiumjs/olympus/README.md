@@ -254,7 +254,7 @@ Clock.reset();
 
 ## JSON and serializers
 
-`Json` writes and reads JSON that keeps more than JSON does, for values that leave the process and come back. Each value a registered serializer supports is written as `{ "$type": "<name>", "$value": <serialized> }` and read back as it was, at any depth. Dates, maps, sets and bigints are supported out of the box (subclasses of `Map` and `Set` are not, since they would read back as plain ones); a plain object that already has the shape of a tagged value is escaped, so that it reads back unchanged.
+`Json` writes and reads JSON that keeps more than JSON does, for values that leave the process and come back. Each value a registered serializer supports is written as `{ "$type": "<name>", "$value": <serialized> }` and read back as it was, at any depth. Dates, maps, sets, bigints and byte arrays (`Uint8Array`, and `Buffer` where the runtime has it) are supported out of the box (subclasses of `Map` and `Set` are not, since they would read back as plain ones), and `@elysiumjs/olympus/mnemosyne` adds model instances; a plain object that already has the shape of a tagged value is escaped, so that it reads back unchanged.
 
 ```ts
 import { Json } from '@elysiumjs/olympus';
@@ -265,6 +265,8 @@ Json.parse<{ remindAt: Date }>(text).remindAt; // a Date
 Json.parse<{ tags: Set<string> }>(Json.stringify({ tags: new Set(['a']) })).tags; // a Set
 Json.survives({ cache: new WeakMap() }); // false: no serializer supports a weak map
 ```
+
+The caches of `@elysiumjs/olympus/mnemosyne` write their values with `Json` in every store, the memory store included, so a read answers a copy, with its dates, model instances and the values of the registered serializers.
 
 A serializer extends `Serializer<TIn, TOut>` and is registered with a name, which every written value carries, so keep it stable across deploys:
 
@@ -372,6 +374,21 @@ const book = await books.insert({ title: 'Dune', authorId: 'a-1' });
 await books.update(book.id, { title: 'Dune Messiah' });
 const page = await books.list(query); // a ParsedQuery from Listing.parse()
 ```
+
+Repositories answer instances of their model: each holds the column values of a row as its own properties, typed by the model's select type, with the getters and methods of the model class. `hidden` names the columns left out of the JSON form of an instance, and `appends` the getters written in it; `ModelResource(Model)` follows both. A custom query on `this.db` answers rows: `this.hydrate(rows)` turns them into instances. A column a model class names again is declared with `declare`, so that a class field does not reset it.
+
+```ts
+class ArticleModel extends MemoryModel<Article>('articles') {
+	public static override readonly hidden = ['editToken'] as const;
+	public static override readonly appends = ['isPublished'] as const;
+
+	public get isPublished(): boolean {
+		return this.publishedAt !== null;
+	}
+}
+```
+
+Each model has a `modelName`, unique and stable across deploys: the name the backend gives its table by default (`schema.table` with Drizzle). Instances are written by `Json` as their model name and columns, and read back as instances of the same class, so they survive the caches and the inputs of queued actions. A model is known by name once a repository is created over it, it hydrates rows, or one of its instances is written; `Models.register(Model)` registers one by hand. Two classes with the same name are refused: a subclass of a model inherits its name, so it gives itself another.
 
 `find`, `update`, `delete` and `exists` take the key of a row: its value, or an object of the values of its key columns when the key spans several. Custom queries use `this.db`, the backend's own connection, typed for it (the Drizzle connection for Drizzle models). The scope that `list()`, `count()` and `deleteWhere()` take is a condition in the backend's terms: an SQL condition with Drizzle, a predicate in memory. `deleteWhere()` needs a scope: `deleteAll()` deletes every row. The memory backend refuses a second row with the same key, compares values strictly (dates by time, arrays and objects by content) and sorts missing values last in ascending order, as PostgreSQL does. It does not join transactions: a rolled-back unit of work keeps its rows.
 

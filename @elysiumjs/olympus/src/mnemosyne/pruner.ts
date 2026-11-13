@@ -79,7 +79,7 @@ export abstract class PrunerJob<TSelect = Row, TScope = unknown> extends Job {
 			if (this.pruning) {
 				const rows = await adapter.findWhere(target, scope, size);
 				if (rows.length === 0) break;
-				await this.pruning(rows as TSelect[]);
+				await this.pruning(model.hydrate(rows as never) as unknown as TSelect[]);
 				const keys = rows.map((row) =>
 					Object.fromEntries(target.key.map((column) => [column, row[column]]))
 				);
@@ -130,10 +130,10 @@ export type PrunerClass<TSelect, TScope> = (abstract new () => PrunerJob<TSelect
  * ```
  */
 export const Pruner = <TModel extends ModelClass>(model: TModel) => {
-	abstract class P extends PrunerJob<TModel['$inferSelect'], ScopeOf<TModel['table']>> {
+	abstract class P extends PrunerJob<InstanceType<TModel>, ScopeOf<TModel['table']>> {
 		public static override readonly Model: ModelClass = model;
 	}
 	// Typed without the protected statics of the console mixin, so that apps that emit
 	// declarations can export their pruners.
-	return P as unknown as PrunerClass<TModel['$inferSelect'], ScopeOf<TModel['table']>>;
+	return P as unknown as PrunerClass<InstanceType<TModel>, ScopeOf<TModel['table']>>;
 };
