@@ -62,7 +62,8 @@
 	"sideEffects": [
 		"./dist/index.js",
 		"./src/index.ts",
-		"./src/lock.ts"
+		"./src/lock.ts",
+		"./src/storage.ts"
 	],
 	"devDependencies": {
 		"@elysiumjs/olympus": "workspace:*",

@@ -42,7 +42,11 @@
 		"dist",
 		"CHANGELOG.md"
 	],
-	"sideEffects": false,
+	"sideEffects": [
+		"./src/index.ts",
+		"./src/storage.ts",
+		"./dist/index.js"
+	],
 	"devDependencies": {
 		"@elysiumjs/olympus": "workspace:*",
 		"elysia": "^2.0.0-rc.1"

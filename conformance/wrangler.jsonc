@@ -5,6 +5,8 @@
 	"compatibility_date": "2025-09-01",
 	"compatibility_flags": ["nodejs_compat"],
 	"kv_namespaces": [{ "binding": "CACHE", "id": "elysium-conformance-cache" }],
+	// The bucket of the R2 disk of @elysiumjs/workers.
+	"r2_buckets": [{ "binding": "MEDIA", "bucket_name": "elysium-conformance-media" }],
 	// The `jobs` consumer is declared for parity with a deployed Worker: the queue tests call
 	// `worker.queue()` directly with a batch from `createMessageBatch()`.
 	"queues": {

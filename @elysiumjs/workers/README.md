@@ -224,6 +224,42 @@ if (!run.acquired) return; // another isolate builds it
 
 The binding defaults to `LOCKS`; pass `{ binding: 'OTHER' }`, the binding itself, or a function that returns it. The time to live must be finite, since it sets the object's alarm. A wait (`acquire(key, ttl, { wait })`) asks the object again every `retryDelay` milliseconds (50 by default), and each try is a billed request, so prefer short, bounded waits. Durable Object RPC needs a `compatibility_date` of `2024-04-03` or later.
 
+## Files in R2
+
+The `r2` disk of the `Storage` port of `@elysiumjs/olympus/pithos` keeps objects in an R2 bucket, through its binding, read from the current invocation on every call:
+
+```jsonc
+// wrangler.jsonc
+{ "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "media" }] }
+```
+
+```ts
+import { PithosModule, Storage } from '@elysiumjs/olympus/pithos';
+import { Workers } from '@elysiumjs/workers';
+
+PithosModule.with({
+	disks: {
+		media: () =>
+			Storage.for('r2', {
+				binding: 'MEDIA',
+				url: 'https://media.example.com', // the custom domain of the bucket, for public objects
+				s3: {
+					accountId: '<account id>',
+					bucket: 'media',
+					accessKeyId: () => Workers.env<Env>().R2_ACCESS_KEY_ID,
+					secretAccessKey: () => Workers.env<Env>().R2_SECRET_ACCESS_KEY
+				}
+			})
+	}
+});
+```
+
+R2 bindings cannot sign URLs. With `s3`, the credentials of an R2 API token, the disk presigns URLs on the S3 API of R2 (AWS Signature Version 4, over Web Crypto), so clients upload and download straight from the bucket; the content type and size of an upload are signed, and R2 refuses a request that sends others. Without `s3`, give the disk `signing` and `PithosModule` serves its signed URLs through the Worker. `presignS3Url()` is exported for other S3 requests. A presigned URL lasts from 1 second to 7 days.
+
+Browsers upload to a presigned URL from another origin, so the bucket needs a CORS rule that allows `PUT` from the application's origin with the `content-type` header. Browsers set `content-length` themselves from the body: send the file as it is, such as a `File` or a `Blob`, and leave that header out.
+
+R2 needs the length of what it stores, so a stream written to the disk is read in full first, and `copy()` reads and writes the object, since bindings have no copy.
+
 ## Sessions in KV
 
 `KvSessionStore` keeps the sessions of `@elysiumjs/olympus/themis` in a KV namespace:

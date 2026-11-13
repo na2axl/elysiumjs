@@ -150,7 +150,25 @@ export const ELYSIUM_PROBLEM_CODES = {
 	/** 409: a step the flow does not accept now; carries `nextSteps`, `backSteps`, `answer` (ariadne). */
 	FLOW_UNEXPECTED_STEP: 'FLOW_UNEXPECTED_STEP',
 	/** 409: another request is running the same step (ariadne). */
-	FLOW_STEP_IN_PROGRESS: 'FLOW_STEP_IN_PROGRESS'
+	FLOW_STEP_IN_PROGRESS: 'FLOW_STEP_IN_PROGRESS',
+	/** 422: an upload purpose that does not exist, or that does not take this owner (pithos). */
+	UPLOAD_PURPOSE_UNKNOWN: 'UPLOAD_PURPOSE_UNKNOWN',
+	/** 415: a content type the purpose does not take; carries `types` (pithos). */
+	UPLOAD_TYPE_NOT_ALLOWED: 'UPLOAD_TYPE_NOT_ALLOWED',
+	/** 413: a file larger than the purpose takes; carries `maxBytes` (pithos). */
+	UPLOAD_TOO_LARGE: 'UPLOAD_TOO_LARGE',
+	/** 429: too many uploads started and not finished (pithos). */
+	UPLOAD_TOO_MANY_PENDING: 'UPLOAD_TOO_MANY_PENDING',
+	/** 409: the upload is finished, rejected or expired already (pithos). */
+	UPLOAD_NOT_PENDING: 'UPLOAD_NOT_PENDING',
+	/** 410: the time to upload the file is over (pithos). */
+	UPLOAD_EXPIRED: 'UPLOAD_EXPIRED',
+	/** 409: nothing was uploaded yet: upload the file, then finish again (pithos). */
+	UPLOAD_MISSING: 'UPLOAD_MISSING',
+	/** 422: the uploaded file is not what was declared; start again (pithos). */
+	UPLOAD_REJECTED: 'UPLOAD_REJECTED',
+	/** 422: the file is not stored and ready for this use (pithos). */
+	FILE_NOT_READY: 'FILE_NOT_READY'
 } as const;
 
 /**
@@ -451,7 +469,9 @@ export class ConflictError extends DomainError.for('CONFLICT', 409) {}
  * @author Axel Nana <ax.lnana@outlook.com>
  */
 export class InternalError extends DomainError.for('INTERNAL_ERROR', 500, {
-	extensions: { stack: t.Optional(t.Array(t.String(), { description: 'In development and test only.' })) }
+	extensions: {
+		stack: t.Optional(t.Array(t.String(), { description: 'In development and test only.' }))
+	}
 }) {}
 
 /**

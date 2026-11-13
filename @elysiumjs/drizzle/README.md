@@ -216,6 +216,21 @@ HermesModule.with({ store: () => NotificationStore.for('drizzle', { table: notif
 
 The table keeps one row per delivery id, and has an index on the notifiable and the id, which pages use, and a partial index on unread notifications. Any table with the same columns works, given as `table`, with an optional `connection`.
 
+## File store
+
+`filesTable()` builds the table of the file store of `@elysiumjs/olympus/pithos`, and `DrizzleFileStore` (the `drizzle` driver of `FileStore`) keeps the file records in it:
+
+```ts
+import { filesTable } from '@elysiumjs/drizzle';
+import { FileStore, PithosModule } from '@elysiumjs/olympus/pithos';
+
+export const files = filesTable(); // or filesTable('files', 'media')
+
+PithosModule.with({ disks, files: { store: () => FileStore.for('drizzle', { table: files }) } });
+```
+
+Each change of a record is one conditional `UPDATE`, so only one of two racing requests wins. The table has an index on the owner, a partial index on pending uploads by uploader, which the cap on uploads in progress reads, and a partial index on the files whose time runs out (`pending`, `finishing` and `ready`), which pruning reads. Any table with the same columns works, given as `table`, with an optional `connection`.
+
 ## License
 
 This project is licensed under the Apache License, Version 2.0. See the [LICENSE](../../LICENSE) file for more info.

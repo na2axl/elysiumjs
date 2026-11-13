@@ -22,6 +22,30 @@ The package exports `runtime`; rename it at import if you like: `import { runtim
 
 Uses `Bun.env`, `Bun.sleep`, Elysia's `listen`, `process.exit` and `SIGINT`/`SIGTERM` handlers.
 
+## Local disk
+
+Importing the package registers `local`, a disk of the `Storage` port of `@elysiumjs/olympus/pithos` that keeps objects as files in a folder, through `Bun.file()` and `Bun.write()`. Reads and writes stream, so large objects are not held in memory. `@elysiumjs/node` registers a `local` disk too, through `node:fs`, so the same configuration works on either runtime; an application imports one runtime package, never both:
+
+```ts
+import '@elysiumjs/bun';
+
+import { PithosModule, Storage } from '@elysiumjs/olympus/pithos';
+
+PithosModule.with({
+	disks: {
+		public: () =>
+			Storage.for('local', { root: './storage/public', url: 'https://cdn.example.com' }),
+		private: () =>
+			Storage.for('local', {
+				root: './storage/private',
+				signing: { url: 'https://api.example.com/storage/private', secret: env.STORAGE_SECRET }
+			})
+	}
+});
+```
+
+The content type and metadata of each object are kept in a `.pithos` folder under the root, which listings leave out. `url` makes the disk public: the folder is served by something else at that URL. With `signing`, its signed URLs go through the `/storage` route of `PithosModule`.
+
 ## Argon2id passwords
 
 Importing the package registers `bun`, a driver of the `PasswordHasher` port that hashes with Argon2id through `Bun.password`. Make it the hasher of new passwords; hashes of the other drivers still verify, and `Password.needsRehash()` tells when to replace them:

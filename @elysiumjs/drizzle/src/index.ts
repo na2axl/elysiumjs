@@ -75,6 +75,7 @@ export {
 } from './tenancy';
 export { PgAdvisoryLock } from './lock';
 export { DrizzleNotificationStore, notificationsTable, type NotificationsTable } from './hermes';
+export { DrizzleFileStore, filesTable, type FilesTable } from './pithos';
 export {
 	DrizzleEventStore,
 	DrizzleIdempotencyStore,
