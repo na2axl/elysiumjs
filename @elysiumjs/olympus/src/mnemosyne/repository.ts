@@ -488,6 +488,11 @@ const createRepository = <TModel extends ModelClass>(
 		/** The events of this repository class, for typing only. */
 		declare public static readonly $events: TEvents;
 
+		public constructor() {
+			// The writes of every repository of the model forget in the cache this one reads through.
+			RepositoryCache.remember(new.target, model);
+		}
+
 		/**
 		 * Subscribes a listener to an event of this repository class.
 		 * @author Axel Nana <ax.lnana@outlook.com>

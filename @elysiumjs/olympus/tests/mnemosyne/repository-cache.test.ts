@@ -19,13 +19,14 @@ import {
 	MEMORY_CACHE_SERVICE,
 	MemoryDatabase,
 	MemoryModel,
+	Pruner,
 	Repository,
 	REPOSITORY_CACHE_SERVICE,
 	UnitOfWork,
 	withTenant,
 	withUnitOfWork
 } from '../../src/mnemosyne';
-import { makeCacheInterface } from '../../src/mnemosyne/cache';
+import { cacheStoreService, makeCacheInterface } from '../../src/mnemosyne/cache';
 
 type Book = { id: string; title: string; isbn: string; at: Date };
 
@@ -59,6 +60,16 @@ class MissingStoreRepository extends Repository(BookModel) {
 	public static override readonly cache = { store: 'nowhere' };
 }
 
+class OtherStoreRepository extends Repository(BookModel) {
+	public static override readonly cache = { store: 'other' };
+}
+
+class Money {
+	public constructor(public readonly amount: number) {}
+}
+class PriceModel extends MemoryModel<{ id: string; price: Money }>('cached-prices') {}
+class PriceRepository extends Repository(PriceModel) {}
+
 class ShortRepository extends Repository(BookModel) {
 	public static override readonly cache = { ttl: 20 };
 }
@@ -79,6 +90,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	MemoryDatabase.reset();
+	Service.remove(cacheStoreService('other'));
 	Service.remove(MEMORY_CACHE_SERVICE);
 	Service.remove(REPOSITORY_CACHE_SERVICE);
 	Service.remove(DATABASE_TRANSACTION_SERVICE);
@@ -216,6 +228,50 @@ describe('Repository cache', () => {
 		release();
 		expect((await slowRead)!.title).toBe('Book r1');
 		expect((await books.find('r1'))!.title).toBe('written');
+	});
+
+	it('forgets the rows a pruner deletes', async () => {
+		const books = new BookRepository();
+		await books.insert(book('p1'));
+		await books.find('p1');
+		class PruneAll extends Pruner(BookModel) {
+			protected get prunable() {
+				return () => true;
+			}
+		}
+		const job = new PruneAll();
+		await job.run();
+		expect(job.pruned).toBe(1);
+		expect(await books.find('p1')).toBeNull();
+	});
+
+	it('forgets writes in every store a repository of the model reads through', async () => {
+		Service.instance(cacheStoreService('other'), store());
+		const books = new BookRepository();
+		const other = new OtherStoreRepository();
+		await books.insert(book('s1'));
+		await other.find('s1');
+		await books.update('s1', { title: 'new' });
+		expect((await other.find('s1'))!.title).toBe('new');
+	});
+
+	it('keeps versions as long as the longest-lived entries of the model', async () => {
+		const books = new BookRepository();
+		const short = new ShortRepository();
+		await books.insert(book('t1'));
+		await books.find('t1');
+		// A write through the 20 ms repository: its version must outlive the 60 s entries.
+		await short.update('t1', { title: 'new' });
+		await Bun.sleep(60);
+		expect((await books.find('t1'))!.title).toBe('new');
+	});
+
+	it('does not cache rows that Json cannot keep', async () => {
+		const { RepositoryCache } = await import('../../src/mnemosyne/repository-cache');
+		const reading = RepositoryCache.reading(PriceRepository, PriceModel, 'default')!;
+		const load = async () => PriceModel.hydrate({ id: 'm1', price: new Money(5) });
+		await reading.find({ id: 'm1' }, load);
+		expect((await reading.find({ id: 'm1' }, load))!.price).toBeInstanceOf(Money);
 	});
 
 	it('forgets rows by composite keys, and after deleteWhere()', async () => {

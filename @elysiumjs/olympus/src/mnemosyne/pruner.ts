@@ -17,6 +17,7 @@ import type { RepositoryAdapter, RepositoryTarget, Row, ScopeOf } from './reposi
 
 import { Job } from '../heracles/job';
 import { MissingRepositoryAdapterError, RepositoryKeyError } from './repository';
+import { RepositoryCache } from './repository-cache';
 
 /**
  * The base of the classes {@link Pruner} creates: a job that deletes the rows of its model that
@@ -74,6 +75,24 @@ export abstract class PrunerJob<TSelect = Row, TScope = unknown> extends Job {
 			);
 		}
 
+		try {
+			await this.prune(model, adapter, target, scope, size);
+		} finally {
+			// Deleted rows are forgotten in the repository caches of the model.
+			if (this.pruned > 0) {
+				await RepositoryCache.writing(undefined, model, connection)?.invalidate();
+			}
+		}
+	}
+
+	/** Deletes the rows of the scope, chunk by chunk. */
+	private async prune(
+		model: ModelClass,
+		adapter: RepositoryAdapter<unknown, unknown, TScope>,
+		target: RepositoryTarget,
+		scope: TScope,
+		size: number
+	): Promise<void> {
 		for (;;) {
 			let deleted: number;
 			if (this.pruning) {
