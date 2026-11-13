@@ -13,6 +13,7 @@
 // limitations under the License.
 import type { ExtractSubjectType, MongoAbility, MongoQuery } from '@casl/ability';
 import type { PackRule } from '@casl/ability/extra';
+import type { ServiceTag } from '../token';
 
 import { AbilityBuilder, createMongoAbility, subject as tagSubject } from '@casl/ability';
 import { packRules, unpackRules } from '@casl/ability/extra';
@@ -147,7 +148,13 @@ export const detectSubjectType = (subject: SubjectInput): ExtractSubjectType<Sub
 	throw new UnknownSubjectTypeError();
 };
 
-const Domains = Service.extension<AbilityRules<Partial<Facts>>>('elysium.cerberus.rules');
+/** The rules of one domain, as the extension keeps them: over the facts the app declares. */
+type DomainRules = AbilityRules<Partial<Facts>>;
+
+/** A class of domain rules, whatever its constructor injects. */
+type DomainRulesClass = new (...args: any[]) => DomainRules;
+
+const Domains = Service.extension<DomainRules>('elysium.cerberus.rules');
 
 const build = (define: (can: GrantRule, cannot: GrantRule) => void): Ability => {
 	const builder = new AbilityBuilder<Ability>((rules) =>
@@ -202,7 +209,7 @@ const quietly = async <T>(call: () => Promise<T> | undefined): Promise<T | undef
  */
 export namespace Abilities {
 	/** The tag every domain's rules are registered with. */
-	export const tag = Domains.tag;
+	export const tag: ServiceTag<DomainRules> = Domains.tag;
 
 	/**
 	 * Declares a class as the rules of a domain: a singleton service to list in the services of
@@ -221,7 +228,9 @@ export namespace Abilities {
 	 * }
 	 * ```
 	 */
-	export const rules = (domain: string) => {
+	// Typed explicitly, so that the published types keep `Facts`, which the app declares later,
+	// instead of the facts it resolves to while the package is built.
+	export const rules = (domain: string): (<C extends DomainRulesClass>(target: C) => C) => {
 		if (!DOMAIN.test(domain)) throw new InvalidAbilityDomainError(domain);
 		return Domains.register({ name: domain });
 	};

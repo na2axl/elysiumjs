@@ -52,7 +52,8 @@ import { assertKey, Storage } from './storage';
 /** The kebab-case name of a purpose, which prefixes the keys of its files by default. */
 const NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-type UploadClass = new () => Upload;
+/** A class of upload purpose, whatever its constructor injects. */
+type UploadClass = new (...args: any[]) => Upload;
 
 const purposes = new Map<string, UploadClass>();
 const names = new WeakMap<UploadClass, string>();

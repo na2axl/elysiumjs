@@ -19,7 +19,7 @@ styx hephaestus:build
 styx list
 ```
 
-The build settings live in `hephaestus.config.ts` (`styx create --features hephaestus` writes one).
+The build settings live in `hephaestus.config.ts` (`styx create my-app --features hephaestus` writes one).
 
 `styx build` runs `hephaestus:build`. With `--target workers`, it bundles a Cloudflare Worker instead of a binary: the entry (`workers.entry`, `./src/worker.ts` by default, or `--entry`) is compiled ahead of time with `elysia/plugin/aot`, written to `output.dir` as `workers.outfile` (`worker.js` by default), and refused if it still generates code at runtime. The entry exports the Worker handlers as default and the root Elysia app as `app`, as `createWorker()` from `@elysiumjs/workers` lets it. This target needs no config file.
 
@@ -33,7 +33,7 @@ With `--target node`, it bundles the app into one ES module for Node.js: the ent
 
 ```bash
 styx build --target node
-node dist/server.js
+node dist/server.js serve
 ```
 
 Bun plugins listed in `build.plugins` run in the Workers and Node builds, after the built-in ones. Plugins are functions, so they need a `hephaestus.config.ts` (or `.js`); a JSON config refuses them. The binary target does not run them.
