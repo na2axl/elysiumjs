@@ -19,7 +19,12 @@ import { KeyvCacheableMemory } from 'cacheable';
 
 import { Application, Service, ServiceNotFoundError } from '../../src/index';
 import * as pkg from '../../src/mnemosyne';
-import { Cache, cacheStoreService, MnemosyneModule } from '../../src/mnemosyne';
+import {
+	Cache,
+	cacheStoreService,
+	MnemosyneModule,
+	REPOSITORY_CACHE_SERVICE
+} from '../../src/mnemosyne';
 import { AbstractDatabase } from '../../src/mnemosyne/database';
 import { getTenancyConfig, getTenancyStrategy } from '../../src/mnemosyne/tenancy';
 
@@ -90,6 +95,18 @@ describe('MnemosyneModule', () => {
 		await app.get('mnemosyne.cache.memory');
 		expect(Service.exists('mnemosyne.cache.redis')).toBe(false);
 		expect(() => Cache.store('redis')).toThrow(ServiceNotFoundError);
+	});
+
+	it('provides the default cache of the repositories when it is set', async () => {
+		app = await Application.testing({
+			modules: [MnemosyneModule.with({ repositories: { cache: { store: 'memory', ttl: 500 } } })]
+		});
+		expect(await app.get(REPOSITORY_CACHE_SERVICE)).toEqual({ store: 'memory', ttl: 500 });
+	});
+
+	it('provides no default cache of the repositories without one', async () => {
+		app = await Application.testing({ modules: [MnemosyneModule] });
+		expect(Service.exists(REPOSITORY_CACHE_SERVICE)).toBe(false);
 	});
 
 	it('registers no memory cache when it is set to false', async () => {

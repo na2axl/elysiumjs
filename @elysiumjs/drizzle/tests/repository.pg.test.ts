@@ -16,11 +16,18 @@
 // DATABASE_URL=postgres://postgres:postgres@localhost:5432/elysium_test bun test.
 
 import { Service } from '@elysiumjs/olympus';
-import { Listing, Pruner, Repository } from '@elysiumjs/olympus/mnemosyne';
+import {
+	Listing,
+	makeCacheInterface,
+	MEMORY_CACHE_SERVICE,
+	Pruner,
+	Repository
+} from '@elysiumjs/olympus/mnemosyne';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 import { eq, gt, sql } from 'drizzle-orm';
 import * as d from 'drizzle-orm/pg-core';
 
+import { Database } from '../src/database';
 import { bunSql } from '../src/drivers/bun-sql';
 import { DrizzleModel } from '../src/model';
 import { pgTable } from '../src/table';
@@ -47,6 +54,9 @@ const events = pgTable(
 
 class Article extends DrizzleModel(articles) {}
 class ArticleRepository extends Repository(Article) {}
+class CachedArticleRepository extends Repository(Article) {
+	public static override readonly cache = { ttl: 60_000 };
+}
 class Tag extends DrizzleModel(tags) {}
 class TagRepository extends Repository(Tag) {}
 class Event extends DrizzleModel(events) {}
@@ -108,6 +118,26 @@ describe.skipIf(!url)('Repository on PostgreSQL', () => {
 		expect(page.data[0]).toBeInstanceOf(Article);
 		expect(Article.modelName).toBe('public.pg_repo_articles');
 		expect(await repository.count(undefined, gt(articles.views, 30))).toBe(3);
+	});
+
+	it('reads through its cache, and past it in a transaction', async () => {
+		Service.instance(
+			MEMORY_CACHE_SERVICE,
+			makeCacheInterface(() => new Map() as never)
+		);
+		try {
+			const cached = new CachedArticleRepository();
+			expect((await cached.find(1))!.views).toBe(10);
+			await db.execute(sql`update pg_repo_articles set views = 77 where id = 1`);
+			expect((await cached.find(1))!.views).toBe(10);
+			await Database.transaction(async () => {
+				expect((await cached.find(1))!.views).toBe(77);
+			});
+			await cached.update(1, { title: 'changed' });
+			expect((await cached.find(1))!.views).toBe(77);
+		} finally {
+			Service.remove(MEMORY_CACHE_SERVICE);
+		}
 	});
 
 	it('sorts numbers as numbers', async () => {

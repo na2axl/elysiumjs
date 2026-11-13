@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Application, Service, ServiceNotFoundError } from '../../src/index';
 import { afterEach, describe, expect, it, jest, mock, spyOn } from 'bun:test';
 
+import { Application, Service, ServiceNotFoundError } from '../../src/index';
 import { AbstractDatabase } from '../../src/mnemosyne/database';
 
 const mockDriver = {

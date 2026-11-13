@@ -443,6 +443,11 @@ export type ModelClass<
 	readonly modelName: string;
 
 	/**
+	 * A digest of the table's columns, part of the keys of cached rows.
+	 */
+	readonly schemaHash: string;
+
+	/**
 	 * The columns left out of the JSON form of the instances.
 	 */
 	readonly hidden: readonly string[];

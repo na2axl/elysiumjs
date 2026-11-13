@@ -55,6 +55,16 @@ export class UnknownModelError extends ElysiumError {
 	}
 }
 
+/** A short, stable digest of a text (32-bit FNV-1a, in hexadecimal). */
+const hashOf = (text: string): string => {
+	let hash = 0x811c9dc5;
+	for (let i = 0; i < text.length; i++) {
+		hash ^= text.charCodeAt(i);
+		hash = Math.imul(hash, 0x01000193);
+	}
+	return (hash >>> 0).toString(16).padStart(8, '0');
+};
+
 /** The registered model classes, by their `modelName`, shared by every copy of the package. */
 const registry: Map<string, ModelClass> = ((globalThis as Record<symbol, unknown>)[
 	Symbol.for('elysium:mnemosyne:models')
@@ -261,6 +271,14 @@ export const AbstractModel = <TTable, TColumns extends Record<string, unknown>>(
 		 * a model, which inherits it.
 		 */
 		public static readonly modelName: string = adapter.getModelName?.(baseTable) ?? tableName;
+
+		/**
+		 * A digest of the table's columns, part of the keys of cached rows, so that a change of
+		 * the columns never reads back rows cached before it.
+		 */
+		public static readonly schemaHash: string = hashOf(
+			JSON.stringify({ tableName, columns: columnMetadata })
+		);
 
 		/**
 		 * The columns left out of {@link M.toJSON}, and hidden by `ModelResource()`.

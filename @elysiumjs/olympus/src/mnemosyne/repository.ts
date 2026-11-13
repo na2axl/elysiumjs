@@ -14,6 +14,7 @@
 
 import type { ModelClass, RepositoryInterface, RowKey } from './interfaces';
 import type { CursorPage, OffsetPage, Page, ParsedQuery } from './query';
+import type { RepositoryCacheOptions } from './repository-cache';
 
 import Emittery from 'emittery';
 
@@ -22,6 +23,7 @@ import { Metadata } from '../metadata';
 import { Symbols } from '../utils';
 import { Models } from './model';
 import { Listing } from './query';
+import { RepositoryCache } from './repository-cache';
 import { UnitOfWork } from './unit-of-work';
 
 /**
@@ -116,6 +118,11 @@ export interface RepositoryAdapter<TTable = any, TConnection = unknown, TScope =
 	 * tenant isolation of row-level security.
 	 */
 	run<T>(name: string, operation: (db: TConnection) => Promise<T>): Promise<T>;
+	/**
+	 * Whether a transaction is open on a connection in the current async context. Repositories
+	 * read past their cache meanwhile. Optional: without it, only units of work count.
+	 */
+	inTransaction?(name: string): boolean;
 	all(target: RepositoryTarget<TTable>): Promise<Row[]>;
 	find(target: RepositoryTarget<TTable>, key: Row): Promise<Row | null>;
 	findBy(target: RepositoryTarget<TTable>, column: string, value: unknown): Promise<Row | null>;
@@ -358,6 +365,34 @@ const createRepository = <TModel extends ModelClass>(
 		key: key()
 	});
 
+	/** The cache of a repository instance, when its class caches. */
+	const cacheOf = (repository: object): RepositoryCache | undefined =>
+		RepositoryCache.for(repository.constructor, model, connectionOf(repository));
+
+	/** Whether reads may use the cache: not while a unit of work or a transaction is open. */
+	const readsCache = (repository: object): boolean =>
+		!UnitOfWork.active() && !adapter().inTransaction?.(connectionOf(repository));
+
+	/** Forgets the cached row of a key, now and once the unit of work commits. */
+	const forget = async (repository: object, key: Row): Promise<void> => {
+		const cache = cacheOf(repository);
+		if (!cache) return;
+		await cache.forget(key);
+		await UnitOfWork.afterCommit(() => cache.forget(key));
+	};
+
+	/** Makes the cached rows of the tenant misses, now and once the unit of work commits. */
+	const invalidate = async (repository: object): Promise<void> => {
+		const cache = cacheOf(repository);
+		if (!cache) return;
+		await cache.invalidate();
+		await UnitOfWork.afterCommit(() => cache.invalidate());
+	};
+
+	/** The key column values of a row. */
+	const keyOfRow = (row: unknown): Row =>
+		Object.fromEntries(key().map((column) => [column, (row as Row)[column]]));
+
 	/**
 	 * Runs the listeners of a `-ing` event one after the other, on the payload itself so that
 	 * they may change its data, and throws the error the first refusing one returned.
@@ -407,6 +442,20 @@ const createRepository = <TModel extends ModelClass>(
 		 * commit. Override it with `false` to run them right after the write.
 		 */
 		public static readonly afterCommit: boolean = true;
+
+		/**
+		 * How this repository caches its rows: `find()` and `findBy()` read through the cache, and
+		 * writes forget what they change. Given options are merged over the defaults of
+		 * `MnemosyneModule.with({ repositories: { cache } })`, and `false` turns caching off.
+		 * Without either, the repository does not cache.
+		 * @example
+		 * ```ts
+		 * export class SessionRepository extends Repository(SessionModel) {
+		 * 	public static override readonly cache = { ttl: 30_000 };
+		 * }
+		 * ```
+		 */
+		public static readonly cache: RepositoryCacheOptions | false | undefined = undefined;
 
 		/** The events of this repository class, for typing only. */
 		declare public static readonly $events: TEvents;
@@ -469,6 +518,24 @@ const createRepository = <TModel extends ModelClass>(
 			return hydrate(row as Row);
 		}
 
+		/**
+		 * Forgets the cached row of a key, right away and once the unit of work commits, such as
+		 * after a custom query changed it. Does nothing when the repository does not cache.
+		 * @param id The key.
+		 */
+		public forget(id: TKey): Promise<void> {
+			return forget(this, keyValues(id));
+		}
+
+		/**
+		 * Makes every cached row of the tenant a miss, right away and once the unit of work
+		 * commits, such as after a custom query changed many rows. Does nothing when the
+		 * repository does not cache.
+		 */
+		public forgetAll(): Promise<void> {
+			return invalidate(this);
+		}
+
 		/** Retrieves every row. */
 		public async all(): Promise<TEntity[]> {
 			return hydrate(await adapter().all(targetOf(this)));
@@ -480,7 +547,10 @@ const createRepository = <TModel extends ModelClass>(
 		 * @returns The row, or `null` when none has that key.
 		 */
 		public async find(id: TKey): Promise<TEntity | null> {
-			return hydrate(await adapter().find(targetOf(this), keyValues(id)));
+			const values = keyValues(id);
+			const load = async () => hydrate(await adapter().find(targetOf(this), values));
+			const cache = readsCache(this) ? cacheOf(this) : undefined;
+			return cache ? cache.find(values, load) : load();
 		}
 
 		/**
@@ -493,7 +563,18 @@ const createRepository = <TModel extends ModelClass>(
 			column: TColumn,
 			value: TSelect[TColumn]
 		): Promise<TEntity | null> {
-			return hydrate(await adapter().findBy(targetOf(this), column as string, value));
+			const load = async () =>
+				hydrate(await adapter().findBy(targetOf(this), column as string, value));
+			const cache = readsCache(this) ? cacheOf(this) : undefined;
+			if (!cache || key().length === 0) return load();
+			return cache.findBy(
+				column as string,
+				value,
+				keyOfRow,
+				(values) =>
+					cache.find(values, async () => hydrate(await adapter().find(targetOf(this), values))),
+				load
+			);
 		}
 
 		/**
@@ -522,6 +603,7 @@ const createRepository = <TModel extends ModelClass>(
 			const payload = { key: id, data: { ...(data as Row) } };
 			await before(this, 'updating', payload);
 			const row = hydrate(await adapter().update(targetOf(this), values, payload.data));
+			await forget(this, values);
 			if (row) await after(this, 'updated', row);
 			return row;
 		}
@@ -532,7 +614,9 @@ const createRepository = <TModel extends ModelClass>(
 		 * @returns The updated rows.
 		 */
 		public async updateAll(data: TUpdate): Promise<TEntity[]> {
-			return hydrate(await adapter().updateAll(targetOf(this), data as Row));
+			const rows = hydrate(await adapter().updateAll(targetOf(this), data as Row));
+			await invalidate(this);
+			return rows;
 		}
 
 		/**
@@ -545,6 +629,7 @@ const createRepository = <TModel extends ModelClass>(
 			const values = keyValues(id);
 			await before(this, 'deleting', { key: id });
 			const row = hydrate(await adapter().delete(targetOf(this), values));
+			await forget(this, values);
 			if (row) await after(this, 'deleted', row);
 			return row;
 		}
@@ -554,7 +639,9 @@ const createRepository = <TModel extends ModelClass>(
 		 * @returns The deleted rows.
 		 */
 		public async deleteAll(): Promise<TEntity[]> {
-			return hydrate(await adapter().deleteAll(targetOf(this)));
+			const rows = hydrate(await adapter().deleteAll(targetOf(this)));
+			await invalidate(this);
+			return rows;
 		}
 
 		/**
@@ -569,7 +656,9 @@ const createRepository = <TModel extends ModelClass>(
 					`deleteWhere() on ${model.name} needs a scope: use deleteAll() to delete every row.`
 				);
 			}
-			return adapter().deleteWhere(targetOf(this), scope, limit);
+			const deleted = await adapter().deleteWhere(targetOf(this), scope, limit);
+			if (deleted > 0) await invalidate(this);
+			return deleted;
 		}
 
 		/**

@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Application } from '../../src/index';
 import { describe, expect, it } from 'bun:test';
 
+import { Application } from '../../src/index';
 import {
 	getCurrentTenant,
 	isValidTenantId,

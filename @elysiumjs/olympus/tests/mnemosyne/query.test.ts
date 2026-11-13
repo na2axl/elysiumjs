@@ -15,9 +15,9 @@
 import type { Static } from '../../src/index';
 import type { ColumnMetadata, ModelClass } from '../../src/mnemosyne/interfaces';
 
-import { DomainError } from '../../src/index';
 import { describe, expect, expectTypeOf, it } from 'bun:test';
 
+import { DomainError } from '../../src/index';
 import { createSchemaFromModel } from '../../src/mnemosyne/model';
 import { Listing } from '../../src/mnemosyne/query';
 
