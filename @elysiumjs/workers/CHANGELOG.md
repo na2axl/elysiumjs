@@ -1,5 +1,13 @@
 # @elysiumjs/workers
 
+## 0.1.2
+
+### Patch Changes
+
+- [#127](https://github.com/na2axl/elysiumjs/pull/127) [`5d5a0bd`](https://github.com/na2axl/elysiumjs/commit/5d5a0bd13f4b4912aa857fc69c2fa03c36218026) Thanks [@na2axl](https://github.com/na2axl)! - The published declarations resolve under `moduleResolution: node16` and `nodenext`: their relative imports carry the `.js` extension, so the exported types no longer become `any` in those projects.
+- Updated dependencies [[`5d5a0bd`](https://github.com/na2axl/elysiumjs/commit/5d5a0bd13f4b4912aa857fc69c2fa03c36218026)]:
+  - @elysiumjs/olympus@0.26.2
+
 ## 0.1.1
 
 ### Patch Changes
