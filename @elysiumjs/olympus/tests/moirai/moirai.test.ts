@@ -998,6 +998,67 @@ describe('Moirai.lock', () => {
 		expect(calls).toEqual(['acquire wallet:9 1234', 'release wallet:9 after COMMIT']);
 	});
 
+	it('is reentrant within one unit of work: a key it holds is not taken again', async () => {
+		const calls: string[] = [];
+		class SpyLock extends MemoryLock {
+			public override async acquire(key: string, ttl: number, opts?: { wait?: number }) {
+				calls.push(`acquire ${key}`);
+				return super.acquire(key, ttl, opts);
+			}
+			public override async release(handle: { key: string; token: string }) {
+				calls.push(`release ${handle.key}`);
+				return super.release(handle);
+			}
+		}
+		Service.remove(MOIRAI_ACTION_LOCK);
+		Service.instance(MOIRAI_ACTION_LOCK, new SpyLock());
+
+		@Action.register({
+			errors: [],
+			input: t.Object({ profile: t.String() }),
+			serializeBy: (i) => `billing:${i.profile}`
+		})
+		class Issue extends Action {
+			public async handle(input: { profile: string }) {
+				await Moirai.lock(`billing:${input.profile}`);
+				return `issued ${input.profile}`;
+			}
+		}
+		@Action.register({
+			errors: [],
+			input: t.Object({ profile: t.String() }),
+			serializeBy: (i) => `billing:${i.profile}`
+		})
+		class Roll extends Action {
+			public async handle(input: { profile: string }) {
+				return Moirai.execute(Issue, { profile: input.profile }).orThrow();
+			}
+		}
+
+		const outcome = await Promise.race([
+			Moirai.execute(Roll, { profile: 'p' }).orError(),
+			Bun.sleep(500).then(() => 'deadlock')
+		]);
+		expect(outcome).toBe('issued p');
+		expect(calls).toEqual(['acquire billing:p', 'release billing:p']);
+	});
+
+	it('takes a key again in the next unit of work, and in another one at the same time', async () => {
+		const order: string[] = [];
+		const twice = (name: string, wait: number) =>
+			UnitOfWork.run(async () => {
+				await Moirai.lock('wallet:3');
+				order.push(`${name} in`);
+				await Moirai.lock('wallet:3');
+				await new Promise((resolve) => setTimeout(resolve, wait));
+				order.push(`${name} out`);
+			});
+
+		await Promise.all([twice('a', 10), twice('b', 0)]);
+		await twice('c', 0);
+		expect(order).toEqual(['a in', 'a out', 'b in', 'b out', 'c in', 'c out']);
+	});
+
 	it('locks from an action handler, on a key read in the handler', async () => {
 		const seen: string[] = [];
 		@Action.register({ errors: [], input: t.Object({ id: t.String() }) })

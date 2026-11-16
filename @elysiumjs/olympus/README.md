@@ -419,6 +419,27 @@ if (run.acquired) console.log(run.value);
 
 The locks of `serializeBy` and `Moirai.lock()` are let go when their unit of work commits or rolls back. In case their holder dies first, they also end after `lockTtl` milliseconds (`MoiraiModule.with({ lockTtl: 30_000 })`, 60 seconds by default): keep it longer than your slowest unit of work.
 
+Within one unit of work, these locks are reentrant, whatever the driver: a key the unit of work already holds is not taken again. An action with `serializeBy` can then call another action locked on the same key, such as a scheduled step that runs the step a rollover also runs:
+
+```ts
+@Action.register({ input: BillInput, serializeBy: (i) => `billing:${i.profileId}` })
+class IssueRenewal extends Action<BillInput, Outcome> {
+	public async handle(input: BillInput) {
+		// ...
+	}
+}
+
+@Action.register({ input: BillInput, serializeBy: (i) => `billing:${i.profileId}` })
+class RollPeriod extends Action<BillInput, Outcome> {
+	public async handle(input: BillInput) {
+		// Runs at once: this unit of work already holds `billing:<profileId>`.
+		return Moirai.execute(IssueRenewal, input).orThrow();
+	}
+}
+```
+
+Outside a unit of work, as in an action with `transactional: false`, the lock of `serializeBy` ends with the call, so a nested call on the same key waits for it: do not nest them there.
+
 ## Repositories
 
 `Repository(Model)` from `@elysiumjs/olympus/mnemosyne` gives a model its CRUD, listing and counting. The backend comes from the model: `DrizzleModel()` from `@elysiumjs/drizzle` runs on PostgreSQL, and `MemoryModel()` keeps rows in the process, for tests and prototypes. Writes join the transaction open on the connection, and the table is resolved for the current tenant on each call.

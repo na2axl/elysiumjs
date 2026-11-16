@@ -23,8 +23,11 @@ import {
 /** A callback run once the unit of work has committed or rolled back. */
 type Hook = () => unknown | Promise<unknown>;
 
-/** The outermost unit of work of an async context, which collects the hooks. */
-type Frame = { afterCommit: Hook[]; afterRollback: Hook[] };
+/**
+ * The outermost unit of work of an async context, which collects the hooks and the lock keys it
+ * holds, per lock driver.
+ */
+type Frame = { afterCommit: Hook[]; afterRollback: Hook[]; locks: Map<object, Set<string>> };
 
 const FRAME = 'uow:frame';
 
@@ -62,7 +65,7 @@ export const withUnitOfWork =
 	async <T>(callback: () => Promise<T>, connection?: string): Promise<T> => {
 		if (currentFrame()) return transaction(callback, connection);
 
-		const frame: Frame = { afterCommit: [], afterRollback: [] };
+		const frame: Frame = { afterCommit: [], afterRollback: [], locks: new Map() };
 		const store = new Map(Application.context.getStore());
 		store.set(FRAME, frame);
 		let result: T;
@@ -83,6 +86,20 @@ export const withUnitOfWork =
 		await runHooks(frame.afterCommit, 'afterCommit');
 		return result;
 	};
+
+/**
+ * The keys that the current unit of work holds with the lock driver `owner`, which it fills as it
+ * takes them; undefined outside a unit of work. Lets a lock taken twice in one unit of work be
+ * taken once.
+ * @internal
+ */
+export const heldLockKeys = (owner: object): Set<string> | undefined => {
+	const frame = currentFrame();
+	if (!frame) return undefined;
+	let keys = frame.locks.get(owner);
+	if (!keys) frame.locks.set(owner, (keys = new Set()));
+	return keys;
+};
 
 export namespace UnitOfWork {
 	/**
