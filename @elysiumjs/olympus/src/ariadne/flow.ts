@@ -12,14 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type {
-	DomainError,
-	HttpControllerProps,
-	RequestHandlerDecoratorProps
-} from '../index.js';
+import type { DomainError, HttpControllerProps, RequestHandlerDecoratorProps } from '../index.js';
 
 import { Http, Metadata, t } from '../index.js';
-
 import { FlowEngine } from './engine.js';
 import { InvalidFlowError } from './errors.js';
 import {

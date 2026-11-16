@@ -15,7 +15,6 @@
 import type { Kernel } from '../../index.js';
 
 import { Command, CommandArgumentType, KERNEL_SERVICE, Runtime, Service } from '../../index.js';
-
 import { Seeder } from '../seeder.js';
 
 /**

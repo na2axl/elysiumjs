@@ -15,7 +15,6 @@
 import type { OutboxRow } from './stores.js';
 
 import { Background, Clock, Service } from '../index.js';
-
 import { inOwnerModule } from './config.js';
 import { DuplicateEventConsumerError, UnknownEventConsumerError } from './errors.js';
 import { uuidv7 } from './ids.js';

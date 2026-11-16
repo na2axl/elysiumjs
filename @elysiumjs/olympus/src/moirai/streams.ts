@@ -19,7 +19,6 @@ import type { StoredEventRecord } from './stores.js';
 
 import { AsyncResult, Clock, DATABASE_TRANSACTION_SERVICE, Result, Service } from '../index.js';
 import { UnitOfWork } from '../mnemosyne/index.js';
-
 import { Aggregates } from './aggregate.js';
 import { eventStore, options } from './config.js';
 import { runProjections } from './projection.js';

@@ -13,7 +13,6 @@
 // limitations under the License.
 
 import { Command, CommandArgumentType, ConsoleFormat } from '../../index.js';
-
 import { Projection } from '../projection.js';
 
 /**

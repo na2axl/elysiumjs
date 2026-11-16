@@ -15,7 +15,6 @@
 import type { FlowOptions } from './engine.js';
 
 import { Module } from '../index.js';
-
 import { ARIADNE_OPTIONS } from './engine.js';
 import { FlowRouteTypes } from './route-types.js';
 

@@ -12,11 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { FlowAdvance, FlowContext, FlowDescription, FlowRefusal, FlowStepRun } from './flow.js';
+import type {
+	FlowAdvance,
+	FlowContext,
+	FlowDescription,
+	FlowRefusal,
+	FlowStepRun
+} from './flow.js';
 import type { FlowRecord, FlowStore } from './store.js';
 
 import { DomainError, Http, Result, Service, userIdOf } from '../index.js';
-
 import {
 	FlowCompletedError,
 	FlowExpiredError,

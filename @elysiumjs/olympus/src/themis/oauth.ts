@@ -20,9 +20,9 @@ import type {
 	UserInfoResponse
 } from 'oauth4webapi';
 
-import { DomainError, getLogger } from '../index.js';
 import * as oauth from 'oauth4webapi';
 
+import { DomainError, getLogger } from '../index.js';
 import { Session } from './session.js';
 
 /**
