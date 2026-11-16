@@ -141,7 +141,6 @@ jobs:
       - name: Build
         run: bun run build
 
-      # Consumers compile the published declarations under nodenext, node16 and bundler.
       - name: Declarations resolve for consumers
         run: bun run check:declarations
 
