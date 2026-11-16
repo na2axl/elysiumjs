@@ -1,5 +1,12 @@
 # @elysiumjs/redis
 
+## 0.2.3
+
+### Patch Changes
+
+- Updated dependencies [[`d9c7abe`](https://github.com/na2axl/elysiumjs/commit/d9c7abe5ebd3bed2cad9536e1d57cf87ac906f20)]:
+  - @elysiumjs/olympus@0.27.0
+
 ## 0.2.2
 
 ### Patch Changes

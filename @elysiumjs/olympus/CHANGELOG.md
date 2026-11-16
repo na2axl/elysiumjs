@@ -1,5 +1,11 @@
 # @elysiumjs/olympus
 
+## 0.27.0
+
+### Minor Changes
+
+- [#129](https://github.com/na2axl/elysiumjs/pull/129) [`d9c7abe`](https://github.com/na2axl/elysiumjs/commit/d9c7abe5ebd3bed2cad9536e1d57cf87ac906f20) Thanks [@na2axl](https://github.com/na2axl)! - Make the locks of `serializeBy` and `Moirai.lock()` reentrant within one unit of work, whatever the lock driver: a key the unit of work already holds is not taken again, so an action locked on a key can call another action locked on the same key.
+
 ## 0.26.2
 
 ### Patch Changes
