@@ -38,6 +38,7 @@ import {
 	Service
 } from '../index.js';
 import { UnitOfWork } from '../mnemosyne/index.js';
+import { heldLockKeys } from '../mnemosyne/unit-of-work.js';
 import { actionLock, idempotencyStore, inOwnerModule, options } from './config.js';
 import {
 	CallForbiddenError,
@@ -78,6 +79,20 @@ const releaseWhenDone = async (lock: LockDriver, handle: LockHandle): Promise<vo
 	if (!UnitOfWork.active()) return release();
 	await UnitOfWork.afterCommit(release);
 	UnitOfWork.afterRollback(release);
+};
+
+/**
+ * Takes the lock of a key, waiting for the other holders, unless the current unit of work already
+ * holds it: a lock is reentrant within one unit of work, whatever the driver. Answers the handle
+ * to release, or undefined when there is nothing to release.
+ */
+const takeLock = async (lock: LockDriver, key: string): Promise<LockHandle | undefined> => {
+	const held = heldLockKeys(lock);
+	if (held?.has(key)) return undefined;
+	const handle = await lock.acquire(key, options().lockTtl, { wait: Infinity });
+	if (!handle) return undefined;
+	held?.add(key);
+	return handle;
 };
 
 export type HandlerContext = {
@@ -368,7 +383,10 @@ export type ActionOptions<
 	connection?: string;
 	/**
 	 * Serializes the calls that give the same key, so that a double tap waits for the first call
-	 * and replays it instead of racing it. Needs a `lock` store.
+	 * and replays it instead of racing it. Needs a `lock` store. In a unit of work, the lock lasts
+	 * until it ends and is reentrant: an action called from one that holds the key runs at once.
+	 * Outside a unit of work, the lock ends with the call, and a nested call on the same key waits
+	 * for it.
 	 */
 	serializeBy?: (input: Static<S>) => string;
 	/**
@@ -761,8 +779,9 @@ export namespace Moirai {
 	 * holders of the key and holds it until the unit of work ends, with the `lock` of the module
 	 * (the `postgres` driver takes a transaction-scoped advisory lock).
 	 *
-	 * Take the locks of one unit of work in the same order everywhere, and do not take a key twice
-	 * in one unit of work: the memory driver is not reentrant.
+	 * Take the locks of one unit of work in the same order everywhere. A key that the unit of work
+	 * already holds, through this function or the `serializeBy` of an action it runs, is not taken
+	 * again: the lock is reentrant within one unit of work.
 	 * @author Axel Nana <ax.lnana@outlook.com>
 	 * @param key The key, such as `wallet:${walletId}`.
 	 * @throws {LockOutsideUnitOfWorkError} Outside a unit of work.
@@ -775,7 +794,7 @@ export namespace Moirai {
 	export const lock = async (key: string): Promise<void> => {
 		if (!UnitOfWork.active()) throw new LockOutsideUnitOfWorkError(key);
 		const lock = actionLock();
-		const handle = await lock.acquire(key, options().lockTtl, { wait: Infinity });
+		const handle = await takeLock(lock, key);
 		if (!handle) return;
 		await releaseWhenDone(lock, handle);
 	};
@@ -827,9 +846,7 @@ export namespace Moirai {
 
 		const body = async (attempt: number): Promise<ResultOf<C>> => {
 			const lock = props.serializeBy ? actionLock() : undefined;
-			const handle = lock
-				? await lock.acquire(props.serializeBy!(value), options().lockTtl, { wait: Infinity })
-				: undefined;
+			const handle = lock ? await takeLock(lock, props.serializeBy!(value)) : undefined;
 			try {
 				const handler = instanceOf(action);
 				const context: HandlerContext = { name, idempotencyKey: key, attempt };
