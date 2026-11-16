@@ -19,9 +19,9 @@ import type { PgColumn, PgTable, PgTableWithColumns } from 'drizzle-orm/pg-core'
 import { AbstractModel, createSchemaFromModel } from '@elysiumjs/olympus/mnemosyne';
 import { getTableConfig } from 'drizzle-orm/pg-core';
 
-import { drizzleRepositoryAdapter } from './repository';
-import { getTableBuilders } from './table';
-import { wrapTenantSchema } from './tenancy';
+import { drizzleRepositoryAdapter } from './repository.js';
+import { getTableBuilders } from './table.js';
+import { wrapTenantSchema } from './tenancy.js';
 
 // ============================================================================
 // Column Type Mapping

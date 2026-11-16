@@ -12,17 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Result } from '../result';
-import type { DiskSource, SignedUrlOptions } from './storage';
+import type { Result } from '../result.js';
+import type { DiskSource, SignedUrlOptions } from './storage.js';
 
-import { Clock } from '../clock';
-import { Lifecycle } from '../lifecycle';
-import { getLogger } from '../logger';
-import { Port } from '../port';
-import { Result as R } from '../result';
-import { Service } from '../service';
-import { FileNotReadyError, FilesUnavailableError } from './errors';
-import { PITHOS_DISKS, Storage } from './storage';
+import { Clock } from '../clock.js';
+import { Lifecycle } from '../lifecycle.js';
+import { getLogger } from '../logger.js';
+import { Port } from '../port.js';
+import { Result as R } from '../result.js';
+import { Service } from '../service.js';
+import { FileNotReadyError, FilesUnavailableError } from './errors.js';
+import { PITHOS_DISKS, Storage } from './storage.js';
 
 /**
  * Who a file belongs to: a kind of owner, such as `user`, and its id.
@@ -129,7 +129,7 @@ export interface FileStoreDriver {
 	due(now: Date, limit: number): Promise<FileRecord[]>;
 }
 
-declare module '../port' {
+declare module '../port.js' {
 	interface Ports {
 		'file-store': FileStoreDriver;
 	}

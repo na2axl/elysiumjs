@@ -24,15 +24,20 @@ export type {
 	RepositoryClass,
 	RepositoryInterface,
 	TenancyStrategy
-} from './interfaces';
+} from './interfaces.js';
 
-export * from './database';
-export * from './model';
-export * from './repository';
-export * from './memory';
-export * from './pruner';
-export { ModelResource, type ModelResourceOptions } from './resource';
-export { type TransactionRunner, Transactional, UnitOfWork, withUnitOfWork } from './unit-of-work';
+export * from './database.js';
+export * from './model.js';
+export * from './repository.js';
+export * from './memory.js';
+export * from './pruner.js';
+export { ModelResource, type ModelResourceOptions } from './resource.js';
+export {
+	type TransactionRunner,
+	Transactional,
+	UnitOfWork,
+	withUnitOfWork
+} from './unit-of-work.js';
 export {
 	type CursorPage,
 	type OffsetPage,
@@ -52,7 +57,7 @@ export {
 	type QuerySpec,
 	Listing,
 	PageSerializer
-} from './query';
+} from './query.js';
 
 export {
 	DuplicateSeederError,
@@ -63,11 +68,11 @@ export {
 	type SeederInput,
 	type SeederProps,
 	UnknownSeederError
-} from './seeder';
-export { DbSeedCommand } from './commands/db_seed.command';
+} from './seeder.js';
+export { DbSeedCommand } from './commands/db_seed.command.js';
 
-export * from './tenancy';
-export type { TenancyConfig, TenancyMode, ModelTenancyConfig } from './tenancy';
+export * from './tenancy.js';
+export type { TenancyConfig, TenancyMode, ModelTenancyConfig } from './tenancy.js';
 
 export {
 	Cache,
@@ -75,11 +80,11 @@ export {
 	cacheStoreService,
 	makeCacheInterface,
 	MEMORY_CACHE_SERVICE
-} from './cache';
+} from './cache.js';
 export {
 	DEFAULT_REPOSITORY_CACHE_TTL,
 	REPOSITORY_CACHE_SERVICE,
 	type RepositoryCacheOptions
-} from './repository-cache';
-export * from './mnemosyne.module';
-export { CacheInterceptor, type CacheInterceptorOptions } from './cache.interceptor';
+} from './repository-cache.js';
+export * from './mnemosyne.module.js';
+export { CacheInterceptor, type CacheInterceptorOptions } from './cache.interceptor.js';

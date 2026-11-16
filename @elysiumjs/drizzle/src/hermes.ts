@@ -20,15 +20,15 @@ import type {
 	StoredNotification
 } from '@elysiumjs/olympus/hermes';
 import type { SQL } from 'drizzle-orm';
-import type { BuiltPgTable } from './built-table';
-import type { DrizzleStoreOptions, StoreTable } from './moirai';
+import type { BuiltPgTable } from './built-table.js';
+import type { DrizzleStoreOptions, StoreTable } from './moirai.js';
 
 import { Clock } from '@elysiumjs/olympus';
 import { DEFAULT_INBOX_LIMIT, NotificationStore } from '@elysiumjs/olympus/hermes';
 import { and, count, desc, eq, inArray, isNull, lt } from 'drizzle-orm';
 import { index, jsonb, pgSchema, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 
-import { Database } from './database';
+import { Database } from './database.js';
 
 declare module '@elysiumjs/olympus' {
 	interface PortDrivers {

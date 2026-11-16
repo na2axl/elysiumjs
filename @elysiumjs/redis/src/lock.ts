@@ -13,11 +13,11 @@
 // limitations under the License.
 
 import type { LockAcquireOptions, LockHandle } from '@elysiumjs/olympus';
-import type { RedisConnection } from './connection';
+import type { RedisConnection } from './connection.js';
 
 import { Lock, LockDriver } from '@elysiumjs/olympus';
 
-import { Redis } from './redis';
+import { Redis } from './redis.js';
 
 /**
  * Options of {@link RedisLock}.

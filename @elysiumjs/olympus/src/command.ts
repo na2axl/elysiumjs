@@ -13,14 +13,14 @@
 // limitations under the License.
 
 import type { Class } from 'type-fest';
-import type { Environment } from './environments';
+import type { Environment } from './environments.js';
 
 import { isArray, trim } from 'radash';
 
-import { ConsoleFormat, InteractsWithConsole } from './console';
-import { Environments } from './environments';
-import { Metadata } from './metadata';
-import { Symbols } from './utils';
+import { ConsoleFormat, InteractsWithConsole } from './console.js';
+import { Environments } from './environments.js';
+import { Metadata } from './metadata.js';
+import { Symbols } from './utils.js';
 
 /**
  * Supported command argument types.

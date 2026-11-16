@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ChannelName, NotificationChannel } from './channel';
-import type { Notifiable, NotifiableResolver } from './notifiable';
-import type { Notification } from './notification';
+import type { ChannelName, NotificationChannel } from './channel.js';
+import type { Notifiable, NotifiableResolver } from './notifiable.js';
+import type { Notification } from './notification.js';
 
-import { Metadata } from '../metadata';
-import { ModuleContext } from '../module-context';
-import { Service } from '../service';
-import { Symbols } from '../utils';
-import { MissingHermesServiceError } from './errors';
+import { Metadata } from '../metadata.js';
+import { ModuleContext } from '../module-context.js';
+import { Service } from '../service.js';
+import { Symbols } from '../utils.js';
+import { MissingHermesServiceError } from './errors.js';
 
 /**
  * How a notification class is registered.

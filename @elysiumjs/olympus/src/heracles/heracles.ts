@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Job, JobClass } from './job';
-import type { JobDispatchId, JobDispatchOptions } from './queue';
+import type { Job, JobClass } from './job.js';
+import type { JobDispatchId, JobDispatchOptions } from './queue.js';
 
 import { uid } from 'radash';
 
-import { Service } from '../index';
-import { Queue } from './queue';
-import { QUEUES_SERVICE } from './registry';
-import { getJobMetadata } from './utils';
+import { Service } from '../index.js';
+import { Queue } from './queue.js';
+import { QUEUES_SERVICE } from './registry.js';
+import { getJobMetadata } from './utils.js';
 
 export namespace Heracles {
 	/**

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { InvalidModuleConfigError } from './errors';
+import { InvalidModuleConfigError } from './errors.js';
 
 const DEFAULT = 'default';
 

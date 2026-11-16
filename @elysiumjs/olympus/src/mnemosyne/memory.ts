@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ModelAdapter } from './interfaces';
-import type { TypedModel } from './model';
-import type { ParsedFilter, ParsedQuery } from './query';
-import type { RepositoryAdapter, RepositoryTarget, Row } from './repository';
+import type { ModelAdapter } from './interfaces.js';
+import type { TypedModel } from './model.js';
+import type { ParsedFilter, ParsedQuery } from './query.js';
+import type { RepositoryAdapter, RepositoryTarget, Row } from './repository.js';
 
-import { AbstractModel } from './model';
-import { Listing } from './query';
-import { RepositoryKeyError } from './repository';
+import { AbstractModel } from './model.js';
+import { Listing } from './query.js';
+import { RepositoryKeyError } from './repository.js';
 
 /**
  * A table of the in-memory backend: a name and the key columns.
@@ -45,7 +45,7 @@ export class MemoryTable {
  */
 export type MemoryScope = (row: any) => boolean;
 
-declare module './repository' {
+declare module './repository.js' {
 	interface RepositoryDrivers {
 		memory: { table: MemoryTable; connection: MemoryDatabase; scope: MemoryScope };
 	}

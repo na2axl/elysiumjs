@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { PasswordHasherDriver } from './password';
+import type { PasswordHasherDriver } from './password.js';
 
-import { fromBase64Url, randomBytes, safeEqual, toBase64Url, utf8 } from './crypto';
-import { PasswordHasher } from './password';
+import { fromBase64Url, randomBytes, safeEqual, toBase64Url, utf8 } from './crypto.js';
+import { PasswordHasher } from './password.js';
 
 /** Workers cap PBKDF2 at 100,000 iterations. */
 const onWorkers = (): boolean => globalThis.navigator?.userAgent === 'Cloudflare-Workers';

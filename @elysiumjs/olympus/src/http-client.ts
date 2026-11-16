@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { ElysiumError } from './errors';
+import { ElysiumError } from './errors.js';
 
 /**
  * Sends a request to an application and returns its response, e.g. `(r) => elysia.handle(r)` or a

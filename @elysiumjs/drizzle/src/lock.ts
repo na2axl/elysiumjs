@@ -17,7 +17,7 @@ import type { LockAcquireOptions, LockHandle } from '@elysiumjs/olympus';
 import { Lock, LockDriver } from '@elysiumjs/olympus';
 import { sql } from 'drizzle-orm';
 
-import { Database } from './database';
+import { Database } from './database.js';
 
 declare module '@elysiumjs/olympus' {
 	interface PortDrivers {

@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { OutputLevel } from './runtime';
+import type { OutputLevel } from './runtime.js';
 
 import { isEmpty, omit } from 'radash';
 
-import { Runtime, RuntimeNotSupportedError } from './runtime';
+import { Runtime, RuntimeNotSupportedError } from './runtime.js';
 
 /**
  * ANSI color codes and styles for console output.

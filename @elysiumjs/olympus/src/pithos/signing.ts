@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Secret } from '../harpocrates/secret';
-import type { SignedUrlOptions } from './storage';
+import type { Secret } from '../harpocrates/secret.js';
+import type { SignedUrlOptions } from './storage.js';
 
-import { SignedUrl } from '../harpocrates/signed-url';
+import { SignedUrl } from '../harpocrates/signed-url.js';
 
 /**
  * How a disk that cannot sign URLs itself, such as `memory` or `local`, makes signed URLs that

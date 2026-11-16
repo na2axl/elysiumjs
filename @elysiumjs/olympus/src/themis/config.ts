@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Secret } from '../harpocrates/secret';
-import type { Guard, GuardClass } from './auth';
-import type { CookieOptions } from './context';
-import type { SessionStore } from './session';
+import type { Secret } from '../harpocrates/secret.js';
+import type { Guard, GuardClass } from './auth.js';
+import type { CookieOptions } from './context.js';
+import type { SessionStore } from './session.js';
 
 /** The service name of the Themis configuration. */
 export const THEMIS_CONFIG = 'themis.settings';

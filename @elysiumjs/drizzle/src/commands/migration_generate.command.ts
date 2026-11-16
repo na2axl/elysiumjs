@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import type { PgTable } from 'drizzle-orm/pg-core';
-import type { SchemaExport } from './schema';
+import type { SchemaExport } from './schema.js';
 
 import { access, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -23,10 +23,10 @@ import { Command, CommandArgumentType } from '@elysiumjs/olympus';
 import { is } from 'drizzle-orm';
 import { PgTable as PgTableClass } from 'drizzle-orm/pg-core';
 
-import { stripPublicSchema } from '../migrations';
-import { applyTableMarkers } from '../table-markers';
-import { getMigrationsPath, getProjectPath } from './project';
-import { collectAppSchema, renderSchemaEntry } from './schema';
+import { stripPublicSchema } from '../migrations.js';
+import { applyTableMarkers } from '../table-markers.js';
+import { getMigrationsPath, getProjectPath } from './project.js';
+import { collectAppSchema, renderSchemaEntry } from './schema.js';
 
 /** Whether a path exists. `node:fs/promises` has no `exists` outside Bun, and this module loads on every runtime. */
 const exists = (path: string): Promise<boolean> =>

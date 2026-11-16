@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ServedSigning } from './signing';
+import type { ServedSigning } from './signing.js';
 
-import { ElysiumError } from '../errors';
-import { Port } from '../port';
-import { Service } from '../service';
+import { ElysiumError } from '../errors.js';
+import { Port } from '../port.js';
+import { Service } from '../service.js';
 
 /**
  * What a disk stores: bytes, text, a blob or a stream.
@@ -257,7 +257,7 @@ export abstract class StorageDriver {
 	}
 }
 
-declare module '../port' {
+declare module '../port.js' {
 	interface Ports {
 		storage: StorageDriver;
 	}

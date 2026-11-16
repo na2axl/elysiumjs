@@ -24,7 +24,7 @@ import type {
 	ProjectionStorage,
 	StoredEventRecord
 } from '@elysiumjs/olympus/moirai';
-import type { BuiltPgTable } from './built-table';
+import type { BuiltPgTable } from './built-table.js';
 
 import { Clock } from '@elysiumjs/olympus';
 import { ConcurrencyConflictError, IdempotencyConflictError } from '@elysiumjs/olympus/moirai';
@@ -46,8 +46,8 @@ import {
 	uuid
 } from 'drizzle-orm/pg-core';
 
-import { Database } from './database';
-import { DrizzleTable } from './table-markers';
+import { Database } from './database.js';
+import { DrizzleTable } from './table-markers.js';
 
 const at = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' });
 

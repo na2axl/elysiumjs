@@ -37,8 +37,8 @@ import {
 	toBytes
 } from '@elysiumjs/olympus/pithos';
 
-import { presignS3Url } from './sigv4';
-import { Workers } from './workers';
+import { presignS3Url } from './sigv4.js';
+import { Workers } from './workers.js';
 
 /** The longest an S3 presigned URL may last: seven days. */
 const MAX_PRESIGN_SECONDS = 604_800;

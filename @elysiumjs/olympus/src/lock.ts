@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Port } from './port';
+import { Port } from './port.js';
 
 /**
  * A held lock, as `acquire` answers it. Pass it back to `release` and `extend`.
@@ -112,7 +112,7 @@ export abstract class LockDriver {
 	}
 }
 
-declare module './port' {
+declare module './port.js' {
 	interface Ports {
 		lock: LockDriver;
 	}

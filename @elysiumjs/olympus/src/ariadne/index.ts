@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export { AriadneModule } from './ariadne.module';
-export { ARIADNE_OPTIONS, FlowEngine, type FlowHttpContext, type FlowOptions } from './engine';
+export { AriadneModule } from './ariadne.module.js';
+export { ARIADNE_OPTIONS, FlowEngine, type FlowHttpContext, type FlowOptions } from './engine.js';
 export {
 	FlowCompletedError,
 	FlowExpiredError,
@@ -24,7 +24,7 @@ export {
 	InvalidFlowError,
 	InvalidFlowRequestError,
 	MissingFlowStoreError
-} from './errors';
+} from './errors.js';
 export {
 	Flow,
 	type FlowAdvance,
@@ -34,15 +34,15 @@ export {
 	type FlowRefusal,
 	type FlowStepDescription,
 	type FlowStepOptions
-} from './flow';
+} from './flow.js';
 export {
 	type FlowAnswer,
 	FlowRouteTypes,
 	type FlowStart,
 	type FlowStatus,
 	type FlowStepReply
-} from './route-types';
-export { type FlowLease, FlowRules, type FlowSlot } from './rules';
+} from './route-types.js';
+export { type FlowLease, FlowRules, type FlowSlot } from './rules.js';
 export {
 	FLOW_KEY_HEADER,
 	FLOW_OWNER_HEADER,
@@ -56,5 +56,5 @@ export {
 	type FlowCommitResult,
 	type FlowRecord,
 	type FlowStore
-} from './store';
-export { MemoryFlowStore } from './stores/memory';
+} from './store.js';
+export { MemoryFlowStore } from './stores/memory.js';

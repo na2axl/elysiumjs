@@ -11,15 +11,15 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-import type { PortDriverName } from '../port';
-import type { LoggerConfig } from './types';
+import type { PortDriverName } from '../port.js';
+import type { LoggerConfig } from './types.js';
 
-import { Logger, LOGGER_SERVICE } from '../logger';
-import { Module } from '../module';
+import { Logger, LOGGER_SERVICE } from '../logger.js';
+import { Module } from '../module.js';
 
-import './services/json-console.logger';
+import './services/json-console.logger.js';
 
-import { DEFAULT_CONFIG } from './types';
+import { DEFAULT_CONFIG } from './types.js';
 
 /**
  * `pino` when `@elysiumjs/pino` is loaded, except on Cloudflare Workers, where pino's Node

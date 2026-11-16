@@ -12,17 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { CacheInterface } from './cache';
-import type { DatabaseCacheConfig, DatabaseDriver } from './interfaces';
+import type { CacheInterface } from './cache.js';
+import type { DatabaseCacheConfig, DatabaseDriver } from './interfaces.js';
 
-import { Application, Service, ServiceNotFoundError } from '../index';
-import { Cache } from './cache';
+import { Application, Service, ServiceNotFoundError } from '../index.js';
+import { Cache } from './cache.js';
 
 /**
  * Name of the global service running a callback in a database transaction, registered by driver
  * modules. Used by `@transactional` HTTP handlers; defined by `@elysiumjs/olympus`.
  */
-export { DATABASE_TRANSACTION_SERVICE } from '../index';
+export { DATABASE_TRANSACTION_SERVICE } from '../index.js';
 
 /**
  * Creates a cache storage instance tagged for database use.

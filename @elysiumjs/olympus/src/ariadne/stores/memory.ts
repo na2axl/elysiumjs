@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { FlowSlot } from '../rules';
+import type { FlowSlot } from '../rules.js';
 import type {
 	FlowAmend,
 	FlowClaim,
@@ -21,10 +21,10 @@ import type {
 	FlowCommitResult,
 	FlowRecord,
 	FlowStore
-} from '../store';
+} from '../store.js';
 
-import { FlowRules } from '../rules';
-import { FLOW_TOMBSTONE_SECONDS } from '../store';
+import { FlowRules } from '../rules.js';
+import { FLOW_TOMBSTONE_SECONDS } from '../store.js';
 
 type Entry = FlowSlot & {
 	/** When the entry expires, in milliseconds. */

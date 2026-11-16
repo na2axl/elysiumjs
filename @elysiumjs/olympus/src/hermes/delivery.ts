@@ -12,19 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ChannelContext, ChannelName, NotificationChannel } from './channel';
-import type { Notifiable } from './notifiable';
-import type { Notification } from './notification';
+import type { ChannelContext, ChannelName, NotificationChannel } from './channel.js';
+import type { Notifiable } from './notifiable.js';
+import type { Notification } from './notification.js';
 
-import { Lifecycle } from '../lifecycle';
-import { getLogger } from '../logger';
+import { Lifecycle } from '../lifecycle.js';
+import { getLogger } from '../logger.js';
 import {
 	ChannelRejected,
 	InvalidChannelMessageError,
 	MissingChannelMessageError,
 	UnknownChannelError
-} from './errors';
-import { channelRegistry, withInstance } from './registry';
+} from './errors.js';
+import { channelRegistry, withInstance } from './registry.js';
 
 /** Emitted before a channel sends a message. */
 export const HERMES_SENDING = 'elysium:hermes:sending';

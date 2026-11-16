@@ -16,8 +16,8 @@ import type * as Sentry from '@sentry/bun';
 
 import { Application, Env, MissingModuleConfigError, Module } from '@elysiumjs/olympus';
 
-import { SentryEnv } from './env';
-import { plugin } from './plugin';
+import { SentryEnv } from './env.js';
+import { plugin } from './plugin.js';
 
 /**
  * Configurable module that installs the Sentry plugin on the root app when serving.

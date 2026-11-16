@@ -12,19 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ChannelName } from './channel';
-import type { Notifiable } from './notifiable';
-import type { Notification } from './notification';
+import type { ChannelName } from './channel.js';
+import type { Notifiable } from './notifiable.js';
+import type { Notification } from './notification.js';
 
-import { Json } from '../json';
-import { getLogger } from '../logger';
-import { deliverChain } from './delivery';
+import { Json } from '../json.js';
+import { getLogger } from '../logger.js';
+import { deliverChain } from './delivery.js';
 import {
 	DuplicateNotificationTypeError,
 	QueuedNotificationDataError,
 	UnknownNotificationError
-} from './errors';
-import { notificationTypes, resolverRegistry, withInstance } from './registry';
+} from './errors.js';
+import { notificationTypes, resolverRegistry, withInstance } from './registry.js';
 
 /**
  * The recipient of a queued notification, as it was when it was queued.

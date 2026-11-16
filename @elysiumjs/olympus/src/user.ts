@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Application } from './app';
+import { Application } from './app.js';
 
 /**
  * The id of a user as guards leave it in `currentUser`: the user itself when it is a string or a

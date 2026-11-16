@@ -31,8 +31,8 @@ import {
 	ModuleRenameCommand,
 	RoutesCheckCommand,
 	RoutesGenerateCommand
-} from '../commands';
-import { CreateCommand } from '../create/create.command';
+} from '../commands/index.js';
+import { CreateCommand } from '../create/create.command.js';
 
 /**
  * The commands Styx runs itself: `create`, the code generators, `routes:check` and `routes:generate`.

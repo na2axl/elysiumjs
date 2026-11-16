@@ -16,7 +16,7 @@ import type { ServiceFactoryDefinition } from '@elysiumjs/olympus';
 
 import { Module, ServiceScope } from '@elysiumjs/olympus';
 
-import { Workers, WORKERS_CONTEXT_SERVICE, WORKERS_ENV_SERVICE } from './workers';
+import { Workers, WORKERS_CONTEXT_SERVICE, WORKERS_ENV_SERVICE } from './workers.js';
 
 /**
  * Configuration of the {@link WorkersModule}.

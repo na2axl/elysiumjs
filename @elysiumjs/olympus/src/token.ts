@@ -14,8 +14,8 @@
 
 import type { Class } from 'type-fest';
 
-import { Metadata } from './metadata';
-import { Symbols } from './utils';
+import { Metadata } from './metadata.js';
+import { Symbols } from './utils.js';
 
 /**
  * What identifies a service in the container: the name it is registered under, or its class.

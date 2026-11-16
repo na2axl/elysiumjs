@@ -13,9 +13,9 @@
 // limitations under the License.
 
 import type { AnyRelations, DrizzleConfig } from 'drizzle-orm';
-import type { DrizzleDatabaseCache } from './cache';
-import type { DrizzleConnection } from './database';
-import type { MigrationConnection } from './migration';
+import type { DrizzleDatabaseCache } from './cache.js';
+import type { DrizzleConnection } from './database.js';
+import type { MigrationConnection } from './migration.js';
 
 import { ElysiumError } from '@elysiumjs/olympus';
 

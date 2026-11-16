@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { OutboxRow } from './stores';
+import type { OutboxRow } from './stores.js';
 
-import { Background, Clock, Service } from '../index';
+import { Background, Clock, Service } from '../index.js';
 
-import { inOwnerModule } from './config';
-import { DuplicateEventConsumerError, UnknownEventConsumerError } from './errors';
-import { uuidv7 } from './ids';
-import { Inbox, Outbox, registerEffect } from './outbox';
+import { inOwnerModule } from './config.js';
+import { DuplicateEventConsumerError, UnknownEventConsumerError } from './errors.js';
+import { uuidv7 } from './ids.js';
+import { Inbox, Outbox, registerEffect } from './outbox.js';
 
 /**
  * The events of the application and their payloads. Extend it to type `Event.publish()` and

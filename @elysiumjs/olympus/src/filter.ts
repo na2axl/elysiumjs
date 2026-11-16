@@ -13,14 +13,14 @@
 // limitations under the License.
 
 import type { Class } from 'type-fest';
-import type { ModuleNode } from './module-graph';
+import type { ModuleNode } from './module-graph.js';
 
-import { Container } from './container';
-import { getLogger } from './logger';
-import { Metadata } from './metadata';
-import { ModuleContext } from './module-context';
-import { isProblemDetails, problemResponse } from './problem';
-import { Service } from './service';
+import { Container } from './container.js';
+import { getLogger } from './logger.js';
+import { Metadata } from './metadata.js';
+import { ModuleContext } from './module-context.js';
+import { isProblemDetails, problemResponse } from './problem.js';
+import { Service } from './service.js';
 
 const CATCH = Symbol('elysium:Catch');
 

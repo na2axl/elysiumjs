@@ -12,22 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { JobDispatchOptions } from '../heracles/index';
-import type { NotificationRun } from './queued';
+import type { JobDispatchOptions } from '../heracles/index.js';
+import type { NotificationRun } from './queued.js';
 
-import { Clock } from '../clock';
-import { ElysiumError } from '../errors';
-import { Heracles, Job, JobRegistry, Queue, QUEUES_SERVICE } from '../heracles/index';
-import { DATABASE_TRANSACTION_SERVICE } from '../index';
-import { UnitOfWork } from '../mnemosyne/unit-of-work';
-import { MOIRAI_INBOX_STORE, MOIRAI_OUTBOX_STORE } from '../moirai/config';
-import { job } from '../moirai/heracles';
-import { Inbox, Outbox } from '../moirai/outbox';
-import { Service } from '../service';
-import { HERMES_NOTIFICATION_JOB } from './config';
-import { QueuedNotificationsUnavailableError } from './errors';
-import { prepareRun, runQueuedNotification } from './queued';
-import { setNotificationQueue } from './registry';
+import { Clock } from '../clock.js';
+import { ElysiumError } from '../errors.js';
+import { Heracles, Job, JobRegistry, Queue, QUEUES_SERVICE } from '../heracles/index.js';
+import { DATABASE_TRANSACTION_SERVICE } from '../index.js';
+import { UnitOfWork } from '../mnemosyne/unit-of-work.js';
+import { MOIRAI_INBOX_STORE, MOIRAI_OUTBOX_STORE } from '../moirai/config.js';
+import { job } from '../moirai/heracles.js';
+import { Inbox, Outbox } from '../moirai/outbox.js';
+import { Service } from '../service.js';
+import { HERMES_NOTIFICATION_JOB } from './config.js';
+import { QueuedNotificationsUnavailableError } from './errors.js';
+import { prepareRun, runQueuedNotification } from './queued.js';
+import { setNotificationQueue } from './registry.js';
 
 /**
  * The job that delivers queued notifications, one per notifiable and channel entry; a fallback

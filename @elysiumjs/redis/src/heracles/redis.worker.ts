@@ -22,7 +22,7 @@ import type {
 	Worker,
 	WorkerQueueOptions
 } from '@elysiumjs/olympus/heracles';
-import type { RedisConnection } from '../index';
+import type { RedisConnection } from '../index.js';
 
 import { ModuleContext } from '@elysiumjs/olympus';
 import {
@@ -37,8 +37,8 @@ import {
 	WithId
 } from '@elysiumjs/olympus/heracles';
 
-import { Redis } from '../index';
-import { RedisTransport } from './redis.transport';
+import { Redis } from '../index.js';
+import { RedisTransport } from './redis.transport.js';
 
 /** The module that owns each job instance, so it runs in that module's context. */
 const jobOwners = new WeakMap<Job, ModuleNode>();

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { HephaestusConfig } from '../types';
+import type { HephaestusConfig } from '../types.js';
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';

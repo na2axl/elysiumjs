@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Environments } from './environments';
-import { ElysiumError } from './errors';
-import { currentEnvironment } from './utils';
+import { Environments } from './environments.js';
+import { ElysiumError } from './errors.js';
+import { currentEnvironment } from './utils.js';
 
 /**
  * Where the time comes from. The system clock is the default; an app may plug another one, such

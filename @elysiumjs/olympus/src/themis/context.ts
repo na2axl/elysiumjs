@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ThemisConfig } from './config';
+import type { ThemisConfig } from './config.js';
 
-import { Http, Service } from '../index';
+import { Http, Service } from '../index.js';
 
-import { THEMIS_CONFIG } from './config';
-import { MissingThemisConfigError } from './errors';
+import { THEMIS_CONFIG } from './config.js';
+import { MissingThemisConfigError } from './errors.js';
 
 /** The request context of the current request, shared by its middlewares and its handler. */
 export type HttpContext = {

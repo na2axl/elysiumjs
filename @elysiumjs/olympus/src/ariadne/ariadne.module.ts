@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { FlowOptions } from './engine';
+import type { FlowOptions } from './engine.js';
 
-import { Module } from '../index';
+import { Module } from '../index.js';
 
-import { ARIADNE_OPTIONS } from './engine';
-import { FlowRouteTypes } from './route-types';
+import { ARIADNE_OPTIONS } from './engine.js';
+import { FlowRouteTypes } from './route-types.js';
 
 /**
  * Configures where flows live. The flows themselves are `@Flow.controller()` classes, listed in

@@ -16,18 +16,18 @@ import type {
 	DomainError,
 	HttpControllerProps,
 	RequestHandlerDecoratorProps
-} from '../index';
+} from '../index.js';
 
-import { Http, Metadata, t } from '../index';
+import { Http, Metadata, t } from '../index.js';
 
-import { FlowEngine } from './engine';
-import { InvalidFlowError } from './errors';
+import { FlowEngine } from './engine.js';
+import { InvalidFlowError } from './errors.js';
 import {
 	FLOW_KEY_HEADER,
 	FLOW_OWNER_HEADER,
 	FLOW_STEP_HEADER,
 	FLOW_STEP_LEASE_SECONDS
-} from './store';
+} from './store.js';
 
 /** The owner token header, which only guest flows read. */
 const ownerHeader = {

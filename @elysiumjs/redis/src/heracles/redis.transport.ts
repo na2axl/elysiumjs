@@ -13,13 +13,13 @@
 // limitations under the License.
 
 import type { JobStatusInfo, Transport, TransportEvent } from '@elysiumjs/olympus/heracles';
-import type { RedisConnection } from '../index';
+import type { RedisConnection } from '../index.js';
 
 import { InteractsWithConsole, Service } from '@elysiumjs/olympus';
 import { JobStatus, TransportMode } from '@elysiumjs/olympus/heracles';
 import { uid } from 'radash';
 
-import { Redis } from '../index';
+import { Redis } from '../index.js';
 
 /**
  * Redis transport configuration options

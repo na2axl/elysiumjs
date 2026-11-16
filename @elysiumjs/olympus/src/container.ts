@@ -13,10 +13,10 @@
 // limitations under the License.
 
 import type { Class } from 'type-fest';
-import type { Environment } from './environments';
-import type { ModuleNode } from './module-graph';
-import type { ServiceDefinition, ServiceFactoryDefinition } from './service';
-import type { Injection, ServiceTag, ServiceToken } from './token';
+import type { Environment } from './environments.js';
+import type { ModuleNode } from './module-graph.js';
+import type { ServiceDefinition, ServiceFactoryDefinition } from './service.js';
+import type { Injection, ServiceTag, ServiceToken } from './token.js';
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 
@@ -31,13 +31,13 @@ import {
 	ServiceNotFoundError,
 	ServiceNotReadyError,
 	ServiceNotVisibleError
-} from './errors';
-import { getLogger } from './logger';
-import { Metadata } from './metadata';
-import { ModuleContext } from './module-context';
-import { ServiceScope } from './service';
-import { tokenLabel, tokenOf } from './token';
-import { Symbols } from './utils';
+} from './errors.js';
+import { getLogger } from './logger.js';
+import { Metadata } from './metadata.js';
+import { ModuleContext } from './module-context.js';
+import { ServiceScope } from './service.js';
+import { tokenLabel, tokenOf } from './token.js';
+import { Symbols } from './utils.js';
 
 /**
  * A service registered in the container.

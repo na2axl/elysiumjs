@@ -11,13 +11,13 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-import type { Ability, AbilityAction, SubjectInput, SubjectName } from './abilities';
+import type { Ability, AbilityAction, SubjectInput, SubjectName } from './abilities.js';
 
-import { Http } from '../http';
-import { Middleware } from '../middleware';
-import { ForbiddenError } from '../problem';
-import { Abilities } from './abilities';
-import { cerberusConfig } from './config';
+import { Http } from '../http.js';
+import { Middleware } from '../middleware.js';
+import { ForbiddenError } from '../problem.js';
+import { Abilities } from './abilities.js';
+import { cerberusConfig } from './config.js';
 
 const ABILITY = Symbol.for('elysium:cerberus:ability');
 

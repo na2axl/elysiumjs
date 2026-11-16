@@ -15,18 +15,18 @@
 import type { DatabaseCacheConfig, DatabaseDriver } from '@elysiumjs/olympus/mnemosyne';
 import type { AnyRelations, DrizzleConfig, EmptyRelations } from 'drizzle-orm';
 import type { PgAsyncDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core';
-import type { DrizzleDriver } from './driver';
+import type { DrizzleDriver } from './driver.js';
 
 import { ElysiumError } from '@elysiumjs/olympus';
 import { AbstractDatabase, getCurrentTenant, getTenancyConfig } from '@elysiumjs/olympus/mnemosyne';
 import { sql } from 'drizzle-orm';
 
-import { bunRequire } from './bun-require';
-import { DrizzleDatabaseCache } from './cache';
-import { MissingDriverError } from './driver';
-import { templateClientMigrations } from './migration-clients';
+import { bunRequire } from './bun-require.js';
+import { DrizzleDatabaseCache } from './cache.js';
+import { MissingDriverError } from './driver.js';
+import { templateClientMigrations } from './migration-clients.js';
 
-export { DEFAULT_CACHE_TTL, DrizzleDatabaseCache } from './cache';
+export { DEFAULT_CACHE_TTL, DrizzleDatabaseCache } from './cache.js';
 
 // ============================================================================
 // Types

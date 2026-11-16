@@ -18,13 +18,13 @@ import type {
 	HttpRouteTypes,
 	HttpRouteTypesContributor
 } from '@elysiumjs/olympus';
-import type { ControllerRoutes, ModuleRoutes } from './render';
+import type { ControllerRoutes, ModuleRoutes } from './render.js';
 
 import { basename, dirname, relative, resolve, sep } from 'node:path';
 
 import { Environments, Http, Service } from '@elysiumjs/olympus';
 
-import { CONTROLLER, quote } from './render';
+import { CONTROLLER, quote } from './render.js';
 
 /**
  * The result of reading the routes of an app.

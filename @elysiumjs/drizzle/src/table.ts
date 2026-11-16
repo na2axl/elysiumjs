@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import type { AnyPgColumnBuilder, PgTableWithColumns } from 'drizzle-orm/pg-core';
-import type { BuiltPgTable } from './built-table';
+import type { BuiltPgTable } from './built-table.js';
 
 import { pgTable as drizzlePgTable } from 'drizzle-orm/pg-core';
 

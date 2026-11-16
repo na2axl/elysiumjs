@@ -14,8 +14,8 @@
 
 import { Command, CommandArgumentType, Runtime } from '@elysiumjs/olympus';
 
-import { Redis } from '../../index';
-import { RedisWorker } from '../redis.worker';
+import { Redis } from '../../index.js';
+import { RedisWorker } from '../redis.worker.js';
 
 /**
  * Command used to start an Heracles worker.

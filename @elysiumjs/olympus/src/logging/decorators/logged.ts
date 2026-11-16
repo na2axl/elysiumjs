@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { LoggerInterface } from '../../logger';
-import type { LogLevel } from '../types';
+import type { LoggerInterface } from '../../logger.js';
+import type { LogLevel } from '../types.js';
 
-import { getLogger } from '../../logger';
+import { getLogger } from '../../logger.js';
 
 export interface LoggedOptions {
 	level?: LogLevel;

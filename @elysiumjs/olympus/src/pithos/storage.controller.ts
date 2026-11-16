@@ -13,15 +13,15 @@
 // limitations under the License.
 
 import type { Context } from 'elysia';
-import type { ServedSigning } from './signing';
-import type { StorageDriver } from './storage';
+import type { ServedSigning } from './signing.js';
+import type { StorageDriver } from './storage.js';
 
 import { t } from 'elysia';
 
-import { SignedUrl } from '../harpocrates/signed-url';
-import { Http } from '../http';
-import { View } from '../view';
-import { Storage } from './storage';
+import { SignedUrl } from '../harpocrates/signed-url.js';
+import { Http } from '../http.js';
+import { View } from '../view.js';
+import { Storage } from './storage.js';
 
 /** The disk of a request, and its signing options, or `null` when it does not serve URLs. */
 const servedDisk = (name: string): { disk: StorageDriver; signing: ServedSigning } | null => {

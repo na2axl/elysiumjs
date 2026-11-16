@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Job } from '../heracles/index';
-import { Files } from './files';
+import { Job } from '../heracles/index.js';
+import { Files } from './files.js';
 
 /**
  * The base of the job that prunes files: uploads never finished, whose staged object it deletes,

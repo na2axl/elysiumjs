@@ -19,14 +19,14 @@ import type {
 	PgSchema,
 	PgTable
 } from 'drizzle-orm/pg-core';
-import type { DrizzleConnection } from './database';
+import type { DrizzleConnection } from './database.js';
 
 import { getTenancyConfig, isValidTenantId, withTenant } from '@elysiumjs/olympus/mnemosyne';
 import { sql } from 'drizzle-orm';
 import { getTableConfig, pgPolicy, pgSchema, pgTable } from 'drizzle-orm/pg-core';
 
-import { assertTransactionTenant, bindTransactionTenant, Database } from './database';
-import { getTableBuilders } from './table';
+import { assertTransactionTenant, bindTransactionTenant, Database } from './database.js';
+import { getTableBuilders } from './table.js';
 
 // ============================================================================
 // Internal State

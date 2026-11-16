@@ -15,19 +15,19 @@
 import type { ElysiaOpenAPIConfig } from '@elysia/openapi';
 import type { AnyElysia, ErrorContext } from 'elysia';
 import type { TSchema } from 'typebox';
-import type { CommandClass } from './command';
-import type { Environment } from './environments';
-import type { FilterClass, FilterContext, FilterLevel } from './filter';
-import type { ElysiaApp, Route } from './http';
-import type { InterceptorClass } from './interceptor';
-import type { ConfiguredModule, ModuleClass } from './module';
-import type { ModuleGraph, ModuleNode } from './module-graph';
-import type { ProblemOptions } from './problem';
-import type { AppRateLimitOptions } from './rate-limit';
-import type { Runtime as RuntimePort, ServeHandle } from './runtime';
-import type { HttpOptions } from './security';
-import type { TestingApp, TestingAppOptions, TestingHttpApp, TestingOptions } from './testing';
-import type { ElysiaPlugin } from './utils';
+import type { CommandClass } from './command.js';
+import type { Environment } from './environments.js';
+import type { FilterClass, FilterContext, FilterLevel } from './filter.js';
+import type { ElysiaApp, Route } from './http.js';
+import type { InterceptorClass } from './interceptor.js';
+import type { ModuleGraph, ModuleNode } from './module-graph.js';
+import type { ConfiguredModule, ModuleClass } from './module.js';
+import type { ProblemOptions } from './problem.js';
+import type { AppRateLimitOptions } from './rate-limit.js';
+import type { Runtime as RuntimePort, ServeHandle } from './runtime.js';
+import type { HttpOptions } from './security.js';
+import type { TestingApp, TestingAppOptions, TestingHttpApp, TestingOptions } from './testing.js';
+import type { ElysiaPlugin } from './utils.js';
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 
@@ -35,28 +35,34 @@ import { openapi as openapiPlugin } from '@elysia/openapi';
 import { Elysia, ElysiaStatus } from 'elysia';
 import { first } from 'radash';
 
-import { getCommandName } from './command';
-import { mergeEnvironmentSchemas, validateEnvironment } from './config';
-import { ConsoleFormat, InteractsWithConsole } from './console';
-import { Container } from './container';
-import { awaitEnv, Env, initEnv } from './env';
-import { Environments } from './environments';
-import { ElysiumError, InvalidControllerError } from './errors';
-import { FILTER_LEVELS, routeFilterLevels, runFilters } from './filter';
-import { Kernel } from './kernel';
-import { Lifecycle } from './lifecycle';
-import { getLogger } from './logger';
-import { Metadata } from './metadata';
-import { applyMiddlewares, middlewareStops, runErrorMiddlewares } from './middleware';
-import { ModuleContext } from './module-context';
-import { buildModuleGraph } from './module-graph';
-import { DomainError, problemResponse, requestIdOf, toProblem, unwrapParseError } from './problem';
-import { Runtime } from './runtime';
-import { applyHttpSecurity } from './security';
-import { Service } from './service';
-import { createTestingApp, createTestingHttpApp } from './testing';
-import { deepMerge, Symbols } from './utils';
-import { Views } from './view';
+import { getCommandName } from './command.js';
+import { mergeEnvironmentSchemas, validateEnvironment } from './config.js';
+import { ConsoleFormat, InteractsWithConsole } from './console.js';
+import { Container } from './container.js';
+import { awaitEnv, Env, initEnv } from './env.js';
+import { Environments } from './environments.js';
+import { ElysiumError, InvalidControllerError } from './errors.js';
+import { FILTER_LEVELS, routeFilterLevels, runFilters } from './filter.js';
+import { Kernel } from './kernel.js';
+import { Lifecycle } from './lifecycle.js';
+import { getLogger } from './logger.js';
+import { Metadata } from './metadata.js';
+import { applyMiddlewares, middlewareStops, runErrorMiddlewares } from './middleware.js';
+import { ModuleContext } from './module-context.js';
+import { buildModuleGraph } from './module-graph.js';
+import {
+	DomainError,
+	problemResponse,
+	requestIdOf,
+	toProblem,
+	unwrapParseError
+} from './problem.js';
+import { Runtime } from './runtime.js';
+import { applyHttpSecurity } from './security.js';
+import { Service } from './service.js';
+import { createTestingApp, createTestingHttpApp } from './testing.js';
+import { deepMerge, Symbols } from './utils.js';
+import { Views } from './view.js';
 
 /**
  * An application plugin, consisting of a function that returns an Elysia instance.

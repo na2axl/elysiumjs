@@ -16,7 +16,7 @@ import type { LockAcquireOptions, LockHandle } from '@elysiumjs/olympus';
 
 import { ElysiumError, Lock, LockDriver } from '@elysiumjs/olympus';
 
-import { Workers } from './workers';
+import { Workers } from './workers.js';
 
 declare module '@elysiumjs/olympus' {
 	interface PortDrivers {

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import type { PromptObject } from 'prompts';
-import type { EnabledModule } from './code';
+import type { EnabledModule } from './code.js';
 
 import { existsSync } from 'node:fs';
 import { mkdir, readdir, rm } from 'node:fs/promises';
@@ -23,8 +23,8 @@ import { Command, CommandArgumentType, ConsoleFormat } from '@elysiumjs/olympus'
 import prompts from 'prompts';
 import { assign, objectify, pascal } from 'radash';
 
-import { listAssets, readAsset } from '../assets';
-import { fileName } from '../utils';
+import { listAssets, readAsset } from '../assets.js';
+import { fileName } from '../utils.js';
 import {
 	appPackages,
 	getAppCode,
@@ -35,8 +35,8 @@ import {
 	getWranglerConfig,
 	RUNTIMES,
 	versionFor
-} from './code';
-import { resolveProjectPath, validateModuleName, validateProjectName } from './names';
+} from './code.js';
+import { resolveProjectPath, validateModuleName, validateProjectName } from './names.js';
 
 /** The package managers `styx create` can install with. */
 export const PACKAGE_MANAGERS = ['bun', 'npm', 'pnpm'] as const;

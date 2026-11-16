@@ -12,19 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export { type RedisClientFactory, type RedisConnection } from './connection';
-export { type RedisConnectionProps, type RedisModuleConfig, Redis, RedisModule } from './redis';
-export { bunRedis } from './adapters/bun';
-export { type IoredisLike, ioredis } from './adapters/ioredis';
-export { upstash, type UpstashOptions } from './adapters/upstash';
-export { RedisFeatureNotSupportedError } from './errors';
-export { RedisRateLimitStore } from './rate-limit';
-export { type RedisLockOptions, RedisLock } from './lock';
-export { KeyvRedis } from './keyv-redis';
-export { HeraclesRedisModule } from './heracles/heracles-redis.module';
-export { HeraclesCleanCommand } from './heracles/commands/clean.command';
-export { HeraclesWorkCommand } from './heracles/commands/work.command';
-export { type RedisTransportOptions, RedisTransport } from './heracles/redis.transport';
-export { RedisWorker } from './heracles/redis.worker';
-export { RedisFlowStore } from './ariadne/flow-store';
-export { RedisSessionStore } from './themis/session-store';
+export { type RedisClientFactory, type RedisConnection } from './connection.js';
+export { type RedisConnectionProps, type RedisModuleConfig, Redis, RedisModule } from './redis.js';
+export { bunRedis } from './adapters/bun.js';
+export { type IoredisLike, ioredis } from './adapters/ioredis.js';
+export { upstash, type UpstashOptions } from './adapters/upstash.js';
+export { RedisFeatureNotSupportedError } from './errors.js';
+export { RedisRateLimitStore } from './rate-limit.js';
+export { type RedisLockOptions, RedisLock } from './lock.js';
+export { KeyvRedis } from './keyv-redis.js';
+export { HeraclesRedisModule } from './heracles/heracles-redis.module.js';
+export { HeraclesCleanCommand } from './heracles/commands/clean.command.js';
+export { HeraclesWorkCommand } from './heracles/commands/work.command.js';
+export { type RedisTransportOptions, RedisTransport } from './heracles/redis.transport.js';
+export { RedisWorker } from './heracles/redis.worker.js';
+export { RedisFlowStore } from './ariadne/flow-store.js';
+export { RedisSessionStore } from './themis/session-store.js';

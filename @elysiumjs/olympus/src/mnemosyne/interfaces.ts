@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { TSchema } from '../index';
-import type { RepositoryAdapter } from './repository';
+import type { TSchema } from '../index.js';
+import type { RepositoryAdapter } from './repository.js';
 
 // ============================================================================
 // Driver

@@ -18,7 +18,7 @@ import {
 	DomainError,
 	getLogger,
 	Service
-} from '../index';
+} from '../index.js';
 
 /** A callback run once the unit of work has committed or rolled back. */
 type Hook = () => unknown | Promise<unknown>;

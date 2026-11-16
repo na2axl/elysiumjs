@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { DrizzleConnection } from '../database';
-import type { DrizzleDriver, DrizzleDriverConfig } from '../driver';
+import type { DrizzleConnection } from '../database.js';
+import type { DrizzleDriver, DrizzleDriverConfig } from '../driver.js';
 
 import { Workers } from '@elysiumjs/workers';
 
-import { MissingMigrationsError } from '../driver';
+import { MissingMigrationsError } from '../driver.js';
 
 /**
  * A Hyperdrive binding, as Cloudflare Workers pass it.

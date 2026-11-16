@@ -21,7 +21,7 @@ import type {
 } from '@elysiumjs/olympus/mnemosyne';
 import type { SQL } from 'drizzle-orm';
 import type { PgColumn, PgTable, PgTableWithColumns } from 'drizzle-orm/pg-core';
-import type { DrizzleConnection } from './database';
+import type { DrizzleConnection } from './database.js';
 
 import {
 	getCurrentTenant,
@@ -32,9 +32,9 @@ import {
 import { and, eq, getTableColumns, inArray, or, sql } from 'drizzle-orm';
 import { getTableConfig } from 'drizzle-orm/pg-core';
 
-import { Database } from './database';
-import { compileQuery } from './query';
-import { DrizzleRLSTenancy } from './tenancy';
+import { Database } from './database.js';
+import { compileQuery } from './query.js';
+import { DrizzleRLSTenancy } from './tenancy.js';
 
 declare module '@elysiumjs/olympus/mnemosyne' {
 	interface RepositoryDrivers {

@@ -12,19 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export type { JobProps, JobClass, JobMetadata } from './job';
-export type { JobDispatchOptions, QueueOptions, JobDispatchId } from './queue';
+export type { JobProps, JobClass, JobMetadata } from './job.js';
+export type { JobDispatchOptions, QueueOptions, JobDispatchId } from './queue.js';
 export type {
 	JobStatusInfo,
 	Transport,
 	TransportClass,
 	TransportEvent,
 	TransportProcessMessage
-} from './transport';
-export type { QueuedJob, QueueState, Worker, WorkerInfo, WorkerQueueOptions } from './worker';
+} from './transport.js';
+export type { QueuedJob, QueueState, Worker, WorkerInfo, WorkerQueueOptions } from './worker.js';
 
-export { Cron, type CronSchedule, InvalidCronError } from './cron';
-export { HeraclesModule, type HeraclesModuleConfig } from './heracles.module';
+export { Cron, type CronSchedule, InvalidCronError } from './cron.js';
+export { HeraclesModule, type HeraclesModuleConfig } from './heracles.module.js';
 export {
 	DuplicateJobError,
 	HERACLES_CIPHER,
@@ -32,7 +32,7 @@ export {
 	JobRegistry,
 	type JobRegistryEntry,
 	QUEUES_SERVICE
-} from './registry';
+} from './registry.js';
 export {
 	type FanOutCase,
 	type JobSchedule,
@@ -45,13 +45,13 @@ export {
 	ScheduleRunner,
 	Scheduler,
 	schedulesOf
-} from './schedule';
-export { Heracles } from './heracles';
-export { Job, JobStatus, JobOverlapBehavior, WithId } from './job';
-export { getJobMetadata } from './utils';
-export { MissingJobCipherError, openJobArgs, sealJobArgs } from './encryption';
-export { Queue } from './queue';
-export { TransportMode } from './transport';
-export { MemoryTransport } from './transports/memory.transport';
-export { WorkerStatus } from './worker';
-export { BaseWorker } from './workers/base.worker';
+} from './schedule.js';
+export { Heracles } from './heracles.js';
+export { Job, JobStatus, JobOverlapBehavior, WithId } from './job.js';
+export { getJobMetadata } from './utils.js';
+export { MissingJobCipherError, openJobArgs, sealJobArgs } from './encryption.js';
+export { Queue } from './queue.js';
+export { TransportMode } from './transport.js';
+export { MemoryTransport } from './transports/memory.transport.js';
+export { WorkerStatus } from './worker.js';
+export { BaseWorker } from './workers/base.worker.js';

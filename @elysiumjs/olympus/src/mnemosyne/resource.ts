@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { TObject, TSchema } from '../index';
-import type { ModelClass } from './interfaces';
+import type { TObject, TSchema } from '../index.js';
+import type { ModelClass } from './interfaces.js';
 
 import { t } from 'elysia';
 
-import { Resource } from '../index';
+import { Resource } from '../index.js';
 
 /**
  * Options of {@link ModelResource}.

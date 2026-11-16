@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { RedisClientFactory, RedisConnection } from '../index';
+import type { RedisClientFactory, RedisConnection } from '../index.js';
 
 import { InteractsWithConsole } from '@elysiumjs/olympus';
 
-import { bunRedis, Redis } from '../index';
+import { bunRedis, Redis } from '../index.js';
 
 /**
  * Histogram for tracking distributions

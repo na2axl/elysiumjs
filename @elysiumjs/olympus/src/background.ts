@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ServiceProps } from './service';
+import type { ServiceProps } from './service.js';
 
-import { Service } from './service';
+import { Service } from './service.js';
 
 /**
  * A unit of background work: what runs outside a request, such as a job, an event handler or an

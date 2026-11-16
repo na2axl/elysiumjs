@@ -15,16 +15,16 @@
 import type { Elysia } from 'elysia';
 import type { Class } from 'type-fest';
 import type { TSchema } from 'typebox';
-import type { CommandClass } from './command';
-import type { Environment } from './environments';
-import type { FilterClass } from './filter';
-import type { Route } from './http';
-import type { InterceptorClass } from './interceptor';
-import type { ServiceDefinition } from './service';
+import type { CommandClass } from './command.js';
+import type { Environment } from './environments.js';
+import type { FilterClass } from './filter.js';
+import type { Route } from './http.js';
+import type { InterceptorClass } from './interceptor.js';
+import type { ServiceDefinition } from './service.js';
 
-import { InvalidModuleError, MissingModuleConfigError } from './errors';
-import { Metadata } from './metadata';
-import { deepMerge, Symbols } from './utils';
+import { InvalidModuleError, MissingModuleConfigError } from './errors.js';
+import { Metadata } from './metadata.js';
+import { deepMerge, Symbols } from './utils.js';
 
 /**
  * Type for a module class.

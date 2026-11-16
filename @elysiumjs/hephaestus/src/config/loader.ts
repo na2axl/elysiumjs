@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { HephaestusConfig } from '../types';
+import type { HephaestusConfig } from '../types.js';
 
 import { basename, join } from 'node:path';
 
-import { HephaestusConfigSchema } from '../types';
+import { HephaestusConfigSchema } from '../types.js';
 
 const CONFIG_FILENAMES = ['hephaestus.config.ts', 'hephaestus.config.js', 'hephaestus.config.json'];
 

@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ProblemValidationError } from '../index';
+import type { ProblemValidationError } from '../index.js';
 
-import { DomainError, ElysiumError, t, validationExtensions } from '../index';
+import { DomainError, ElysiumError, t, validationExtensions } from '../index.js';
 
 /**
  * Raised when an idempotent action is called without an idempotency key. Rendered as a 400

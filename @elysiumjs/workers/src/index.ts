@@ -17,13 +17,13 @@ export {
 	DuplicateQueueConsumerError,
 	NoWorkersHandlerError,
 	OutsideInvocationError
-} from './errors';
-export { type Invocation, runInvocation } from './invocation';
-export { KeyvWorkersKV, type KeyvWorkersKVOptions } from './kv-store';
-export { type WorkersModuleConfig, WorkersModule } from './module';
-export { WorkersRateLimitStore, type WorkersRateLimitStoreOptions } from './rate-limit';
-export { createRuntime, runtime, type WorkersRuntimeOptions } from './runtime';
-export * from './types';
+} from './errors.js';
+export { type Invocation, runInvocation } from './invocation.js';
+export { KeyvWorkersKV, type KeyvWorkersKVOptions } from './kv-store.js';
+export { type WorkersModuleConfig, WorkersModule } from './module.js';
+export { WorkersRateLimitStore, type WorkersRateLimitStoreOptions } from './rate-limit.js';
+export { createRuntime, runtime, type WorkersRuntimeOptions } from './runtime.js';
+export * from './types.js';
 export {
 	type R2BucketLike,
 	R2Disk,
@@ -31,40 +31,40 @@ export {
 	type R2ObjectBodyLike,
 	type R2ObjectLike,
 	type R2S3Options
-} from './storage';
-export { presignS3Url, type S3PresignInput } from './sigv4';
-export { createWorker } from './worker';
+} from './storage.js';
+export { presignS3Url, type S3PresignInput } from './sigv4.js';
+export { createWorker } from './worker.js';
 export {
 	type WorkersHandlerMeta,
 	Workers,
 	WORKERS_CONTEXT_SERVICE,
 	WORKERS_ENV_SERVICE
-} from './workers';
+} from './workers.js';
 export {
 	type DurableObjectLockOptions,
 	DurableObjectLock,
 	type LockObjectNamespace,
 	type LockObjectStub
-} from './lock';
+} from './lock.js';
 export {
 	type DeadJob,
 	type DeadLetterOptions,
 	isJobMessage,
 	runJobMessage
-} from './heracles/consumer';
+} from './heracles/consumer.js';
 export {
 	type HeraclesWorkersConfig,
 	HeraclesWorkersHandlers,
 	HeraclesWorkersModule
-} from './heracles/module';
+} from './heracles/module.js';
 export {
 	CloudflareQueueTransport,
 	type CloudflareQueueTransportOptions,
 	type WorkersQueueBinding
-} from './heracles/transport';
+} from './heracles/transport.js';
 export {
 	durableFlowStore,
 	type FlowStoreNamespace,
 	type FlowStoreStub
-} from './ariadne/flow-store';
-export { type KvNamespaceLike, KvSessionStore } from './themis/session-store';
+} from './ariadne/flow-store.js';
+export { type KvNamespaceLike, KvSessionStore } from './themis/session-store.js';

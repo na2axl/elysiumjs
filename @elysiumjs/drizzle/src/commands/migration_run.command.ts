@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { MigrationConnection, MigrationDatabase, MigrationRun } from '../migration';
+import type { MigrationConnection, MigrationDatabase, MigrationRun } from '../migration.js';
 
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -21,10 +21,10 @@ import { Command, CommandArgumentType, Service } from '@elysiumjs/olympus';
 import { isValidTenantId } from '@elysiumjs/olympus/mnemosyne';
 import { sql } from 'drizzle-orm';
 
-import { closeConnection, Database, getConnectionDriver } from '../database';
-import { Migration } from '../migration';
-import { getMigrationName, planMigrations } from '../migrations';
-import { getMigrationsPath } from './project';
+import { closeConnection, Database, getConnectionDriver } from '../database.js';
+import { Migration } from '../migration.js';
+import { getMigrationName, planMigrations } from '../migrations.js';
+import { getMigrationsPath } from './project.js';
 
 /**
  * Lists the `.sql` files under a folder, at any depth, as absolute paths.

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { ElysiumError } from '../index';
+import { ElysiumError } from '../index.js';
 
 /**
  * A secret: its value, or a function that reads it when it is needed, such as from a secrets

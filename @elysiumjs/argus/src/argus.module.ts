@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { TracingConfig } from './types';
+import type { TracingConfig } from './types.js';
 
 import { Module } from '@elysiumjs/olympus';
 
-import { argusPlugin } from './plugin';
-import { ArgusSDK } from './sdk';
+import { argusPlugin } from './plugin.js';
+import { ArgusSDK } from './sdk.js';
 
 /**
  * Configurable module that starts the {@link ArgusSDK} on init, installs the request-span

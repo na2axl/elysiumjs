@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { StoredEvent, StoredEventClass, StoredEventMeta } from './stored-event';
+import type { StoredEvent, StoredEventClass, StoredEventMeta } from './stored-event.js';
 
-import { inOwnerModule } from './config';
-import { handlerInstance } from './projection';
+import { inOwnerModule } from './config.js';
+import { handlerInstance } from './projection.js';
 
 /**
  * Options of {@link Reactor.on}.

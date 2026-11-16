@@ -12,18 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { MailAddress, MailMessage } from './messages';
-import type { Notifiable } from './notifiable';
+import type { MailAddress, MailMessage } from './messages.js';
+import type { Notifiable } from './notifiable.js';
 
-import { getLogger } from '../logger';
-import { Port } from '../port';
-import { Service } from '../service';
-import { HERMES_MAIL_TRANSPORT, HERMES_OPTIONS } from './config';
+import { getLogger } from '../logger.js';
+import { Port } from '../port.js';
+import { Service } from '../service.js';
+import { HERMES_MAIL_TRANSPORT, HERMES_OPTIONS } from './config.js';
 import {
 	HermesAssertionError,
 	HermesServiceMissingError,
 	MailViewUnsupportedError
-} from './errors';
+} from './errors.js';
 
 /**
  * A mail ready to send: its addresses, subject and bodies.
@@ -97,7 +97,7 @@ export interface MailRendererDriver {
 	render(message: MailMessage, context: MailRenderContext): RenderedMail | Promise<RenderedMail>;
 }
 
-declare module '../port' {
+declare module '../port.js' {
 	interface Ports {
 		'mail-transport': MailTransportDriver;
 		'mail-renderer': MailRendererDriver;

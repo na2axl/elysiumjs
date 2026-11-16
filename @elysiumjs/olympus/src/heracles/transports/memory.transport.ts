@@ -12,20 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Job } from '../job';
+import type { Job } from '../job.js';
 import type {
 	JobStatusInfo,
 	Transport,
 	TransportEvent,
 	TransportMode,
 	TransportProcessMessage
-} from '../transport';
+} from '../transport.js';
 
-import { ElysiumError, getLogger, ModuleContext } from '../../index';
-import { openJobArgs } from '../encryption';
-import { JobStatus, WithId } from '../job';
-import { Queue } from '../queue';
-import { JobRegistry } from '../registry';
+import { ElysiumError, getLogger, ModuleContext } from '../../index.js';
+import { openJobArgs } from '../encryption.js';
+import { JobStatus, WithId } from '../job.js';
+import { Queue } from '../queue.js';
+import { JobRegistry } from '../registry.js';
 
 /** A job the transport holds: waiting for its time, running, or done. */
 type Entry = {

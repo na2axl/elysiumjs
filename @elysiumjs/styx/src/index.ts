@@ -12,4 +12,4 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export { StyxModule } from './styx.module';
+export { StyxModule } from './styx.module.js';

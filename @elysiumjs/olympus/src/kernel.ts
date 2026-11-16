@@ -13,27 +13,27 @@
 // limitations under the License.
 
 import type { Class } from 'type-fest';
-import type { WiredListener } from './lifecycle-wiring';
-import type { Module } from './module';
-import type { ModuleGraph, ModuleNode } from './module-graph';
-import type { ServiceDefinition } from './service';
-import type { Injection, ServiceToken } from './token';
+import type { WiredListener } from './lifecycle-wiring.js';
+import type { ModuleGraph, ModuleNode } from './module-graph.js';
+import type { Module } from './module.js';
+import type { ServiceDefinition } from './service.js';
+import type { Injection, ServiceToken } from './token.js';
 
 import { isEqual } from 'radash';
 
-import { Container } from './container';
-import { Environments } from './environments';
-import { ConflictingModuleConfigError, ElysiumError } from './errors';
-import { LifecycleBus } from './lifecycle';
-import { wireLifecycleListeners } from './lifecycle-wiring';
-import { getLogger } from './logger';
-import { Metadata } from './metadata';
-import { getModuleProps } from './module';
-import { ModuleContext } from './module-context';
-import { selectConfig } from './module-graph';
-import { Service, ServiceScope } from './service';
-import { tokenOf } from './token';
-import { Symbols } from './utils';
+import { Container } from './container.js';
+import { Environments } from './environments.js';
+import { ConflictingModuleConfigError, ElysiumError } from './errors.js';
+import { wireLifecycleListeners } from './lifecycle-wiring.js';
+import { LifecycleBus } from './lifecycle.js';
+import { getLogger } from './logger.js';
+import { Metadata } from './metadata.js';
+import { ModuleContext } from './module-context.js';
+import { selectConfig } from './module-graph.js';
+import { getModuleProps } from './module.js';
+import { Service, ServiceScope } from './service.js';
+import { tokenOf } from './token.js';
+import { Symbols } from './utils.js';
 
 /** The global service name under which the kernel registers itself. */
 export const KERNEL_SERVICE = 'elysium.kernel';

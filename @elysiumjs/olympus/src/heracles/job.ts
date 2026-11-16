@@ -13,12 +13,12 @@
 // limitations under the License.
 
 import type { Class } from 'type-fest';
-import type { Environment } from '../index';
+import type { Environment } from '../index.js';
 
 import { assign, uid } from 'radash';
 
-import { Background, Environments, InteractsWithConsole, Metadata, Service } from '../index';
-import { getJobMetadata, Symbols } from './utils';
+import { Background, Environments, InteractsWithConsole, Metadata, Service } from '../index.js';
+import { getJobMetadata, Symbols } from './utils.js';
 
 /** The prefix of the service names of jobs. */
 const JOB_NAME_PREFIX = 'elysium.heracles.job.';

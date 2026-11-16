@@ -20,10 +20,10 @@ import type {
 	UserInfoResponse
 } from 'oauth4webapi';
 
-import { DomainError, getLogger } from '../index';
+import { DomainError, getLogger } from '../index.js';
 import * as oauth from 'oauth4webapi';
 
-import { Session } from './session';
+import { Session } from './session.js';
 
 /**
  * Raised when an OAuth callback does not check out: a wrong state, an error from the provider, or

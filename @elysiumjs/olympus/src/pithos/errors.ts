@@ -14,8 +14,8 @@
 
 import { t } from 'elysia';
 
-import { ElysiumError } from '../errors';
-import { DomainError } from '../problem';
+import { ElysiumError } from '../errors.js';
+import { DomainError } from '../problem.js';
 
 /**
  * No upload purpose has this name, or it does not take files of this owner: a 422 problem.

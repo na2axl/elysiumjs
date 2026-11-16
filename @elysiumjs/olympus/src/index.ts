@@ -14,22 +14,22 @@
 
 export { type Elysia, t } from 'elysia';
 export { type Static, type TObject, type TOptional, type TSchema, type TString } from 'typebox';
-export { type AppContext, type ElysiumPlugin, type ServerError, Application } from './app';
+export { type AppContext, type ElysiumPlugin, type ServerError, Application } from './app.js';
 export {
 	type CommandArgumentProps,
 	type CommandClass,
 	Command,
 	CommandArgumentType
-} from './command';
+} from './command.js';
 export {
 	ConsoleFormat,
 	type ConsoleTag,
 	type ConsoleTagStyle,
 	InteractsWithConsole
-} from './console';
-export { type AppEnv, type EnvName, type EnvValue, Env, EnvironmentNotReadyError } from './env';
-export { type BackgroundScope, type BackgroundWork, Background } from './background';
-export { type LifecycleEvent, type LifecycleHandler, Lifecycle } from './lifecycle';
+} from './console.js';
+export { type AppEnv, type EnvName, type EnvValue, Env, EnvironmentNotReadyError } from './env.js';
+export { type BackgroundScope, type BackgroundWork, Background } from './background.js';
+export { type LifecycleEvent, type LifecycleHandler, Lifecycle } from './lifecycle.js';
 export {
 	type LoggerInterface,
 	type LoggerOptions,
@@ -38,7 +38,7 @@ export {
 	getLogger,
 	Logger,
 	LOGGER_SERVICE
-} from './logger';
+} from './logger.js';
 export {
 	type Context,
 	type HttpBodyParser,
@@ -55,11 +55,11 @@ export {
 	DATABASE_TRANSACTION_SERVICE,
 	HttpControllerScope,
 	Http
-} from './http';
-export { Metadata } from './metadata';
-export { currentUserId, userIdOf } from './user';
-export { currentEnvironment } from './utils';
-export { Clock, ClockAdjustmentRefusedError, SystemClock } from './clock';
+} from './http.js';
+export { Metadata } from './metadata.js';
+export { currentUserId, userIdOf } from './user.js';
+export { currentEnvironment } from './utils.js';
+export { Clock, ClockAdjustmentRefusedError, SystemClock } from './clock.js';
 export {
 	type LockAcquireOptions,
 	type LockHandle,
@@ -67,7 +67,7 @@ export {
 	Lock,
 	LockDriver,
 	MemoryLock
-} from './lock';
+} from './lock.js';
 export {
 	type PortClass,
 	type PortDriver,
@@ -80,13 +80,13 @@ export {
 	DuplicatePortDriverError,
 	Port,
 	UnknownPortDriverError
-} from './port';
-export { AsyncResult, Failed, Passed, Result } from './result';
-export type { ClockSource } from './clock';
-export { Environments } from './environments';
-export type { Environment } from './environments';
-export { Middleware } from './middleware';
-export { RequestLoggerMiddleware } from './middlewares/request-logger.middleware';
+} from './port.js';
+export { AsyncResult, Failed, Passed, Result } from './result.js';
+export type { ClockSource } from './clock.js';
+export { Environments } from './environments.js';
+export type { Environment } from './environments.js';
+export { Middleware } from './middleware.js';
+export { RequestLoggerMiddleware } from './middlewares/request-logger.middleware.js';
 export {
 	CircularDependencyError,
 	ConflictingModuleConfigError,
@@ -109,25 +109,25 @@ export {
 	ServiceNotFoundError,
 	ServiceNotReadyError,
 	ServiceNotVisibleError
-} from './errors';
-export { needsDefaultAlias, runAll } from './connections';
-export { Kernel, KERNEL_SERVICE } from './kernel';
+} from './errors.js';
+export { needsDefaultAlias, runAll } from './connections.js';
+export { Kernel, KERNEL_SERVICE } from './kernel.js';
 export {
 	type ConfiguredModule,
 	type ModuleClass,
 	type ModuleCollections,
 	type ModuleProps,
 	Module
-} from './module';
-export { ModuleContext } from './module-context';
-export { type ModuleGraph, type ModuleNode } from './module-graph';
+} from './module.js';
+export { ModuleContext } from './module-context.js';
+export { type ModuleGraph, type ModuleNode } from './module-graph.js';
 export {
 	type TestingApp,
 	type TestingAppOptions,
 	type TestingHttpApp,
 	type TestingOptions,
 	resetContainer
-} from './testing';
+} from './testing.js';
 export {
 	type HttpTestClient,
 	type RequestHandler,
@@ -135,7 +135,7 @@ export {
 	createHttpClient,
 	TestRequest,
 	UnexpectedStatusError
-} from './http-client';
+} from './http-client.js';
 export {
 	type OutputLevel,
 	type ServeHandle,
@@ -143,7 +143,7 @@ export {
 	Runtime,
 	RuntimeNotConfiguredError,
 	RuntimeNotSupportedError
-} from './runtime';
+} from './runtime.js';
 export {
 	type Extension,
 	type ExtensionOptions,
@@ -152,8 +152,8 @@ export {
 	type ServiceFactoryDefinition,
 	ServiceScope,
 	Service
-} from './service';
-export { type ServiceTag } from './token';
+} from './service.js';
+export { type ServiceTag } from './token.js';
 export {
 	type WampRegistrationOptions,
 	type WampSubscriptionOptions,
@@ -166,8 +166,8 @@ export {
 	type WampModuleConfig,
 	Wamp,
 	WampModule
-} from './wamp';
-export { type WS, type WSError, Websocket } from './websocket';
+} from './wamp.js';
+export { type WS, type WSError, Websocket } from './websocket.js';
 
 /**
  * The type for the context of the application.
@@ -211,9 +211,9 @@ export {
 	ValidationFailedError,
 	validationErrors,
 	validationExtensions
-} from './problem';
-export { type ExceptionFilter, type FilterClass, type FilterContext, Catch } from './filter';
-export { type JsonForm, type ResponseSchemas, Resource } from './resource';
+} from './problem.js';
+export { type ExceptionFilter, type FilterClass, type FilterContext, Catch } from './filter.js';
+export { type JsonForm, type ResponseSchemas, Resource } from './resource.js';
 export {
 	pageResponseSchema,
 	PAGE_SCHEMA_KEYWORD,
@@ -229,7 +229,7 @@ export {
 	type ViewResponse,
 	type ViewResponseOf,
 	Views
-} from './view';
+} from './view.js';
 export {
 	type AppRateLimitOptions,
 	type RateLimitHit,
@@ -239,7 +239,7 @@ export {
 	MemoryRateLimitStore,
 	RateLimit,
 	TooManyRequestsError
-} from './rate-limit';
+} from './rate-limit.js';
 export {
 	type Interceptor,
 	type InterceptorClass,
@@ -248,7 +248,7 @@ export {
 	type TransformOptions,
 	TimingInterceptor,
 	TransformInterceptor
-} from './interceptor';
+} from './interceptor.js';
 export {
 	type EnvironmentIssue,
 	type SecretSchema,
@@ -257,7 +257,7 @@ export {
 	mergeEnvironmentSchemas,
 	Secret,
 	validateEnvironment
-} from './config';
+} from './config.js';
 export {
 	type CorsOptions,
 	type HttpOptions,
@@ -266,14 +266,14 @@ export {
 	DEFAULT_BODY_LIMIT,
 	InvalidCorsOptionsError,
 	PayloadTooLargeError
-} from './security';
-export { LoggerModule } from './logging/logger.module';
-export { RequestLogInterceptor } from './logging/interceptors/request-log.interceptor';
-export { JsonConsoleLogger } from './logging/services/json-console.logger';
-export { type HttpTransportOptions, HttpTransport } from './logging/transports/http.transport';
-export { type LoggedOptions, Logged } from './logging/decorators/logged';
-export { type LogFormat, type LoggerConfig, type TransportConfig } from './logging/types';
-export { Json } from './json';
+} from './security.js';
+export { LoggerModule } from './logging/logger.module.js';
+export { RequestLogInterceptor } from './logging/interceptors/request-log.interceptor.js';
+export { JsonConsoleLogger } from './logging/services/json-console.logger.js';
+export { type HttpTransportOptions, HttpTransport } from './logging/transports/http.transport.js';
+export { type LoggedOptions, Logged } from './logging/decorators/logged.js';
+export { type LogFormat, type LoggerConfig, type TransportConfig } from './logging/types.js';
+export { Json } from './json.js';
 export {
 	BigIntSerializer,
 	DateSerializer,
@@ -284,4 +284,4 @@ export {
 	SetSerializer,
 	type SerializerOptions,
 	UnknownSerializerError
-} from './serializer';
+} from './serializer.js';

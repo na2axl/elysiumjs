@@ -13,14 +13,14 @@
 // limitations under the License.
 
 import type { Application, Elysia, ModuleNode } from '@elysiumjs/olympus';
-import type { WorkersHandler, WorkersMessageBatch, WorkersQueueMessage } from './types';
-import type { WorkersHandlerMeta } from './workers';
+import type { WorkersHandler, WorkersMessageBatch, WorkersQueueMessage } from './types.js';
+import type { WorkersHandlerMeta } from './workers.js';
 
 import { getLogger, ModuleContext, Service } from '@elysiumjs/olympus';
 
-import { DuplicateQueueConsumerError, NoWorkersHandlerError } from './errors';
-import { runInvocation } from './invocation';
-import { Workers } from './workers';
+import { DuplicateQueueConsumerError, NoWorkersHandlerError } from './errors.js';
+import { runInvocation } from './invocation.js';
+import { Workers } from './workers.js';
 
 type Handler = WorkersHandlerMeta & { node: ModuleNode; cls: new (...args: any[]) => unknown };
 

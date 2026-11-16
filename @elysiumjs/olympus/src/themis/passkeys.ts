@@ -27,9 +27,9 @@ import {
 	verifyRegistrationResponse
 } from '@simplewebauthn/server';
 
-import { fromBase64Url, toBase64Url, utf8 } from '../harpocrates/crypto';
-import { DomainError } from '../index';
-import { Session } from './session';
+import { fromBase64Url, toBase64Url, utf8 } from '../harpocrates/crypto.js';
+import { DomainError } from '../index.js';
+import { Session } from './session.js';
 
 /**
  * A passkey the app keeps for a user.

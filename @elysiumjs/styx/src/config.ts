@@ -17,7 +17,7 @@ import { join } from 'node:path';
 import { ElysiumError } from '@elysiumjs/olympus';
 import { pascal } from 'radash';
 
-import { getProjectPath } from './utils';
+import { getProjectPath } from './utils.js';
 
 /**
  * Describes the Elysium project's configuration.

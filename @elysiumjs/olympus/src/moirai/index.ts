@@ -37,14 +37,14 @@ export {
 	Action,
 	Moirai,
 	Query
-} from './action';
+} from './action.js';
 export {
 	type AggregateClass,
 	type AggregateOptions,
 	type StateOf,
 	Aggregate,
 	AggregateScenario
-} from './aggregate';
+} from './aggregate.js';
 export {
 	isTransientError,
 	MOIRAI_ACTION_LOCK,
@@ -56,7 +56,7 @@ export {
 	MOIRAI_OPTIONS,
 	MOIRAI_OUTBOX_STORE,
 	type MoiraiOptions
-} from './config';
+} from './config.js';
 export {
 	CallForbiddenError,
 	ConcurrencyConflictError,
@@ -79,7 +79,7 @@ export {
 	UnknownEffectError,
 	UnknownStoredEventError,
 	UnregisteredStreamClassError
-} from './errors';
+} from './errors.js';
 export {
 	type EventCatalogue,
 	type EventHandlerOptions,
@@ -88,10 +88,10 @@ export {
 	type EventPayload,
 	Event,
 	MOIRAI_EVENT_EFFECT
-} from './event';
-export { requestHash } from './hash';
-export { uuidv7 } from './ids';
-export { MoiraiModule, type MoiraiModuleConfig, type MoiraiStores } from './moirai.module';
+} from './event.js';
+export { requestHash } from './hash.js';
+export { uuidv7 } from './ids.js';
+export { MoiraiModule, type MoiraiModuleConfig, type MoiraiStores } from './moirai.module.js';
 export {
 	type OutboxContext,
 	type RelayOptions,
@@ -101,7 +101,7 @@ export {
 	Inbox,
 	Outbox,
 	registerEffect
-} from './outbox';
+} from './outbox.js';
 export {
 	type EventReadFilter,
 	type EventStore,
@@ -120,15 +120,15 @@ export {
 	type OutboxStore,
 	type ProjectionStorage,
 	type StoredEventRecord
-} from './stores';
-export { ProjectionRebuildCommand } from './commands/projection-rebuild.command';
-export { type ProjectionOptions, Projection } from './projection';
-export { type ReactorOptions, Reactor } from './reactor';
+} from './stores.js';
+export { ProjectionRebuildCommand } from './commands/projection-rebuild.command.js';
+export { type ProjectionOptions, Projection } from './projection.js';
+export { type ReactorOptions, Reactor } from './reactor.js';
 export {
 	type DataOf,
 	type StoredEventClass,
 	type StoredEventMeta,
 	type StoredEventOptions,
 	StoredEvent
-} from './stored-event';
-export { type Acted, type ActOptions, type ActOutcome, Streams } from './streams';
+} from './stored-event.js';
+export { type Acted, type ActOptions, type ActOutcome, Streams } from './streams.js';

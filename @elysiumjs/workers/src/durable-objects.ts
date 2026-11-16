@@ -12,5 +12,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export { FlowStoreObject } from './ariadne/flow-store.object';
-export { LockObject } from './lock.object';
+export { FlowStoreObject } from './ariadne/flow-store.object.js';
+export { LockObject } from './lock.object.js';

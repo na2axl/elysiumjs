@@ -11,10 +11,10 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-import type { CerberusModuleConfig } from './config';
+import type { CerberusModuleConfig } from './config.js';
 
-import { Module } from '../module';
-import { CERBERUS_CONFIG, settingsOf } from './config';
+import { Module } from '../module.js';
+import { CERBERUS_CONFIG, settingsOf } from './config.js';
 
 /**
  * Gives cerberus the facts of actors, and where their abilities are cached. List the rules of

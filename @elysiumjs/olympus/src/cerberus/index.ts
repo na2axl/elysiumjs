@@ -22,14 +22,14 @@ export type {
 	PackedAbility,
 	SubjectInput,
 	SubjectName
-} from './abilities';
+} from './abilities.js';
 export {
 	Abilities,
 	detectSubjectType,
 	InvalidAbilityDomainError,
 	UnknownSubjectTypeError
-} from './abilities';
-export { AbilityMiddleware, Cerberus } from './cerberus';
-export { CerberusModule } from './cerberus.module';
-export type { CerberusModuleConfig, VersionedFacts } from './config';
-export { CERBERUS_CONFIG, CerberusUnavailableError, DEFAULT_ABILITY_TTL } from './config';
+} from './abilities.js';
+export { AbilityMiddleware, Cerberus } from './cerberus.js';
+export { CerberusModule } from './cerberus.module.js';
+export type { CerberusModuleConfig, VersionedFacts } from './config.js';
+export { CERBERUS_CONFIG, CerberusUnavailableError, DEFAULT_ABILITY_TTL } from './config.js';

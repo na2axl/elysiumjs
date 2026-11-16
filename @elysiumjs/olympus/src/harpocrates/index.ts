@@ -13,16 +13,16 @@
 // limitations under the License.
 
 // The port first: the driver files below register themselves on it.
-export { Password, PasswordHasher, type PasswordHasherDriver } from './password';
-export { Pbkdf2PasswordHasher } from './pbkdf2';
-export { type ScryptOptions, ScryptPasswordHasher } from './scrypt';
+export { Password, PasswordHasher, type PasswordHasherDriver } from './password.js';
+export { Pbkdf2PasswordHasher } from './pbkdf2.js';
+export { type ScryptOptions, ScryptPasswordHasher } from './scrypt.js';
 export {
 	AesGcmCipher,
 	type AesGcmCipherOptions,
 	Cipher,
 	type CipherDriver,
 	DecryptionFailedError
-} from './cipher';
+} from './cipher.js';
 export {
 	fromBase64Url,
 	hmac,
@@ -31,19 +31,19 @@ export {
 	sha256,
 	toBase64Url,
 	verifyHmac
-} from './crypto';
+} from './crypto.js';
 export {
 	InvalidTokenError,
 	Jwt,
 	type JwtKey,
 	type JwtSignOptions,
 	type JwtVerifyOptions
-} from './jwt';
+} from './jwt.js';
 export {
 	assertStrongSecret,
 	MIN_SECRET_BYTES,
 	resolveSecret,
 	type Secret,
 	WeakSecretError
-} from './secret';
-export { InvalidSignatureError, SignedUrl } from './signed-url';
+} from './secret.js';
+export { InvalidSignatureError, SignedUrl } from './signed-url.js';

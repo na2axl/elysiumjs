@@ -24,11 +24,11 @@ export type {
 	FilesSetting,
 	FileStatus,
 	FileStoreDriver
-} from './files';
-export type { MemoryDiskOptions } from './memory';
-export type { PithosModuleConfig } from './pithos.module';
-export type { ServedSigning } from './signing';
-export { joinUrl, signServedUrl } from './signing';
+} from './files.js';
+export type { MemoryDiskOptions } from './memory.js';
+export type { PithosModuleConfig } from './pithos.module.js';
+export type { ServedSigning } from './signing.js';
+export { joinUrl, signServedUrl } from './signing.js';
 export type {
 	ListOptions,
 	ListPage,
@@ -39,7 +39,7 @@ export type {
 	SignedUrlOptions,
 	StorageBody,
 	StoredObject
-} from './storage';
+} from './storage.js';
 
 export {
 	DuplicateUploadPurposeError,
@@ -54,7 +54,7 @@ export {
 	UploadTooLargeError,
 	UploadTooManyPendingError,
 	UploadTypeNotAllowedError
-} from './errors';
+} from './errors.js';
 export {
 	Files,
 	FileStore,
@@ -65,10 +65,10 @@ export {
 	PITHOS_FILE_REJECTED,
 	STAGING_PREFIX,
 	stagingKey
-} from './files';
-export { MemoryDisk } from './memory';
-export { PithosModule } from './pithos.module';
-export { StorageController, StoredObjectView } from './storage.controller';
+} from './files.js';
+export { MemoryDisk } from './memory.js';
+export { PithosModule } from './pithos.module.js';
+export { StorageController, StoredObjectView } from './storage.controller.js';
 export {
 	FINISH_UPLOAD_ERRORS,
 	type FinishUploadErrors,
@@ -78,7 +78,7 @@ export {
 	type UploadRequest,
 	Uploads,
 	type UploadTicket
-} from './uploads';
+} from './uploads.js';
 export {
 	assertKey,
 	DEFAULT_LIST_LIMIT,
@@ -94,4 +94,4 @@ export {
 	streamOf,
 	toBytes,
 	UnknownDiskError
-} from './storage';
+} from './storage.js';

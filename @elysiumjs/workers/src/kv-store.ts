@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { WorkersKVNamespace } from './types';
+import type { WorkersKVNamespace } from './types.js';
 
 import { getLogger } from '@elysiumjs/olympus';
 
-import { Workers } from './workers';
+import { Workers } from './workers.js';
 
 /**
  * Options of {@link KeyvWorkersKV}.

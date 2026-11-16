@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { FlowAdvance, FlowContext, FlowDescription, FlowRefusal, FlowStepRun } from './flow';
-import type { FlowRecord, FlowStore } from './store';
+import type { FlowAdvance, FlowContext, FlowDescription, FlowRefusal, FlowStepRun } from './flow.js';
+import type { FlowRecord, FlowStore } from './store.js';
 
-import { DomainError, Http, Result, Service, userIdOf } from '../index';
+import { DomainError, Http, Result, Service, userIdOf } from '../index.js';
 
 import {
 	FlowCompletedError,
@@ -27,8 +27,8 @@ import {
 	InvalidFlowError,
 	InvalidFlowRequestError,
 	MissingFlowStoreError
-} from './errors';
-import { FLOW_KEY_HEADER, FLOW_OWNER_HEADER, FLOW_STEP_HEADER } from './store';
+} from './errors.js';
+import { FLOW_KEY_HEADER, FLOW_OWNER_HEADER, FLOW_STEP_HEADER } from './store.js';
 
 /**
  * The Elysia context the flow routes read.

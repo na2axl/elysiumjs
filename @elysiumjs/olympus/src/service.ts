@@ -13,18 +13,18 @@
 // limitations under the License.
 
 import type { Class } from 'type-fest';
-import type { Environment } from './environments';
-import type { ModuleNode } from './module-graph';
-import type { Injection, ServiceTag, ServiceToken } from './token';
+import type { Environment } from './environments.js';
+import type { ModuleNode } from './module-graph.js';
+import type { Injection, ServiceTag, ServiceToken } from './token.js';
 
 import { isString } from 'radash';
 
-import { Container } from './container';
-import { Environments } from './environments';
-import { DuplicateExtensionError, ElysiumError, NotAnExtensionError } from './errors';
-import { Metadata } from './metadata';
-import { isServiceTag, serviceTag, tokenLabel, tokenOf } from './token';
-import { Symbols } from './utils';
+import { Container } from './container.js';
+import { Environments } from './environments.js';
+import { DuplicateExtensionError, ElysiumError, NotAnExtensionError } from './errors.js';
+import { Metadata } from './metadata.js';
+import { isServiceTag, serviceTag, tokenLabel, tokenOf } from './token.js';
+import { Symbols } from './utils.js';
 
 /**
  * The scope of a service.

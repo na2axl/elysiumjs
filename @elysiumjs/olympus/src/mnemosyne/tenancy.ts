@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Context } from '../index';
-import type { TenancyStrategy } from './interfaces';
+import type { Context } from '../index.js';
+import type { TenancyStrategy } from './interfaces.js';
 
-import { Application, Middleware, Service } from '../index';
+import { Application, Middleware, Service } from '../index.js';
 
 // ============================================================================
 // Types

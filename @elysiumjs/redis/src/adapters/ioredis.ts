@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { RedisClientFactory, RedisConnection } from '../connection';
+import type { RedisClientFactory, RedisConnection } from '../connection.js';
 
 /**
  * The parts of an ioredis client the adapter uses. An `ioredis` `Redis` instance fits it.

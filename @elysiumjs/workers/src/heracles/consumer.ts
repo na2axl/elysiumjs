@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import type { TransportProcessMessage } from '@elysiumjs/olympus/heracles';
-import type { WorkersQueueMessage } from '../index';
+import type { WorkersQueueMessage } from '../index.js';
 
 import { getLogger, ModuleContext, Service } from '@elysiumjs/olympus';
 import {
@@ -25,7 +25,7 @@ import {
 	WithId
 } from '@elysiumjs/olympus/heracles';
 
-import { Workers } from '../index';
+import { Workers } from '../index.js';
 
 /** Whether a queue message carries a Heracles job. */
 export const isJobMessage = (body: unknown): body is TransportProcessMessage =>

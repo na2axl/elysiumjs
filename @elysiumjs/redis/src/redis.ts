@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-import type { RedisClientFactory, RedisConnection } from './connection';
+import type { RedisClientFactory, RedisConnection } from './connection.js';
 
 import {
 	Module,
@@ -22,7 +22,7 @@ import {
 } from '@elysiumjs/olympus';
 import { omit } from 'radash';
 
-import { bunRedis } from './adapters/bun';
+import { bunRedis } from './adapters/bun.js';
 
 /**
  * Properties used to create a new redis connection.

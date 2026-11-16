@@ -13,9 +13,9 @@
 // limitations under the License.
 
 import type { RateLimitStore } from '@elysiumjs/olympus';
-import type { WorkersRateLimitBinding } from './types';
+import type { WorkersRateLimitBinding } from './types.js';
 
-import { Workers } from './workers';
+import { Workers } from './workers.js';
 
 /**
  * Options of {@link WorkersRateLimitStore}.

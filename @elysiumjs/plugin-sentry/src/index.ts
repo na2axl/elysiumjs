@@ -12,6 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export { SentryEnv } from './env';
-export { plugin } from './plugin';
-export { SentryModule } from './sentry.module';
+export { SentryEnv } from './env.js';
+export { plugin } from './plugin.js';
+export { SentryModule } from './sentry.module.js';

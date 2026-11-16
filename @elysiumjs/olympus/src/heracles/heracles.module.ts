@@ -12,14 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { CipherDriver } from '../harpocrates/cipher';
-import type { LockDriver, ServiceFactoryDefinition } from '../index';
-import type { QueueOptions } from './queue';
+import type { CipherDriver } from '../harpocrates/cipher.js';
+import type { LockDriver, ServiceFactoryDefinition } from '../index.js';
+import type { QueueOptions } from './queue.js';
 
-import { Module, runAll } from '../index';
-import { HeraclesCronsCommand, HeraclesListCommand, HeraclesScheduleCommand } from './commands';
-import { Queue } from './queue';
-import { HERACLES_CIPHER, HERACLES_LOCK, JobRegistry, QUEUES_SERVICE } from './registry';
+import { Module, runAll } from '../index.js';
+import {
+	HeraclesCronsCommand,
+	HeraclesListCommand,
+	HeraclesScheduleCommand
+} from './commands/index.js';
+import { Queue } from './queue.js';
+import { HERACLES_CIPHER, HERACLES_LOCK, JobRegistry, QUEUES_SERVICE } from './registry.js';
 
 /**
  * Configuration of the {@link HeraclesModule}.

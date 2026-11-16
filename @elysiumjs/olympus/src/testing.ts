@@ -13,19 +13,19 @@
 // limitations under the License.
 
 import type { Class } from 'type-fest';
-import type { Application } from './app';
-import type { Environment } from './environments';
-import type { HttpTestClient } from './http-client';
-import type { ConfiguredModule, ModuleClass } from './module';
-import type { ServiceToken } from './token';
+import type { Application } from './app.js';
+import type { Environment } from './environments.js';
+import type { HttpTestClient } from './http-client.js';
+import type { ConfiguredModule, ModuleClass } from './module.js';
+import type { ServiceToken } from './token.js';
 
-import { Container } from './container';
-import { ElysiumError } from './errors';
-import { createHttpClient } from './http-client';
-import { Kernel } from './kernel';
-import { ModuleContext } from './module-context';
-import { buildModuleGraph } from './module-graph';
-import { Service } from './service';
+import { Container } from './container.js';
+import { ElysiumError } from './errors.js';
+import { createHttpClient } from './http-client.js';
+import { Kernel } from './kernel.js';
+import { ModuleContext } from './module-context.js';
+import { buildModuleGraph } from './module-graph.js';
+import { Service } from './service.js';
 
 /**
  * Options of {@link Application.testing}.

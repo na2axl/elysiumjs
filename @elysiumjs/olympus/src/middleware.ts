@@ -14,19 +14,19 @@
 
 import type { AnyElysia } from 'elysia';
 import type { Class } from 'type-fest';
-import type { Context } from './http';
-import type { LoggerInterface } from './logger';
-import type { ModuleNode } from './module-graph';
+import type { Context } from './http.js';
+import type { LoggerInterface } from './logger.js';
+import type { ModuleNode } from './module-graph.js';
 
 import { ElysiaStatus } from 'elysia';
 
-import { Application } from './app';
-import { Container } from './container';
-import { getLogger } from './logger';
-import { Metadata } from './metadata';
-import { ModuleContext } from './module-context';
-import { Service } from './service';
-import { Symbols } from './utils';
+import { Application } from './app.js';
+import { Container } from './container.js';
+import { getLogger } from './logger.js';
+import { Metadata } from './metadata.js';
+import { ModuleContext } from './module-context.js';
+import { Service } from './service.js';
+import { Symbols } from './utils.js';
 
 /**
  * Execute a chain of middlewares, stopping on the first return or throw.

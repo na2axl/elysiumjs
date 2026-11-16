@@ -14,10 +14,10 @@
 
 import type { Runtime } from '@elysiumjs/olympus';
 
-import { peerAddress, serveNode } from './serve';
+import { peerAddress, serveNode } from './serve.js';
 
-export { type FetchHandler, peerAddress, serveNode } from './serve';
-export { LocalDisk } from './storage';
+export { type FetchHandler, peerAddress, serveNode } from './serve.js';
+export { LocalDisk } from './storage.js';
 
 const SIGNALS = ['SIGINT', 'SIGTERM'] as const;
 

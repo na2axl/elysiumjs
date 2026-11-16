@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Metadata } from './metadata';
-import { currentEnvironment } from './utils';
+import { Metadata } from './metadata.js';
+import { currentEnvironment } from './utils.js';
 
 const ENVIRONMENTS = Symbol.for('elysium:Environments');
 

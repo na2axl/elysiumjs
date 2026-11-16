@@ -13,13 +13,13 @@
 // limitations under the License.
 
 import type { Pool, PoolConfig } from 'pg';
-import type { DrizzleConnection } from '../database';
-import type { DrizzleDriver } from '../driver';
-import type { PgPool } from '../migration-clients';
+import type { DrizzleConnection } from '../database.js';
+import type { DrizzleDriver } from '../driver.js';
+import type { PgPool } from '../migration-clients.js';
 
 import { drizzle } from 'drizzle-orm/node-postgres';
 
-import { nodePostgresMigrations } from '../migration-clients';
+import { nodePostgresMigrations } from '../migration-clients.js';
 
 /**
  * Options of {@link nodePostgres}: a connection URL or pool options, or a pool.

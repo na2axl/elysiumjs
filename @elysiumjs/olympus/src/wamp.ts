@@ -13,22 +13,22 @@
 // limitations under the License.
 
 import type { Class } from 'type-fest';
-import type { ModuleNode } from './module-graph';
+import type { ModuleNode } from './module-graph.js';
 
 import { Elysia } from 'elysia';
 import { omit } from 'radash';
 import Wampy from 'wampy';
 
-import { needsDefaultAlias, runAll } from './connections';
-import { Container } from './container';
-import { ServiceNotFoundError } from './errors';
-import { Lifecycle } from './lifecycle';
-import { getLogger } from './logger';
-import { Metadata } from './metadata';
-import { Module } from './module';
-import { ModuleContext } from './module-context';
-import { Service } from './service';
-import { nextTick, Symbols } from './utils';
+import { needsDefaultAlias, runAll } from './connections.js';
+import { Container } from './container.js';
+import { ServiceNotFoundError } from './errors.js';
+import { Lifecycle } from './lifecycle.js';
+import { getLogger } from './logger.js';
+import { Metadata } from './metadata.js';
+import { ModuleContext } from './module-context.js';
+import { Module } from './module.js';
+import { Service } from './service.js';
+import { nextTick, Symbols } from './utils.js';
 
 /**
  * Options used to register a WAMP RPC for invocation.

@@ -15,9 +15,9 @@
 import { Command, CommandArgumentType } from '@elysiumjs/olympus';
 import prompts from 'prompts';
 
-import { parseProjectConfig } from '../config';
-import { createModule } from '../utils';
-import { BaseCommand } from './base.command';
+import { parseProjectConfig } from '../config.js';
+import { createModule } from '../utils.js';
+import { BaseCommand } from './base.command.js';
 
 /**
  * Command for renaming Elysium.js modules.

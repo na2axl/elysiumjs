@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Interceptor, InterceptorClass, InterceptorContext } from '../index';
-import type { CacheInterface } from './cache';
+import type { Interceptor, InterceptorClass, InterceptorContext } from '../index.js';
+import type { CacheInterface } from './cache.js';
 
-import { Cache } from './cache';
+import { Cache } from './cache.js';
 
 /**
  * Options of {@link CacheInterceptor.with}.

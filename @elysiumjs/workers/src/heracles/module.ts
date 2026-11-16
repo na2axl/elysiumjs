@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { WorkersQueueMessage, WorkersScheduledController } from '../index';
-import type { DeadJob } from './consumer';
+import type { WorkersQueueMessage, WorkersScheduledController } from '../index.js';
+import type { DeadJob } from './consumer.js';
 
 import { getLogger, Module, Service } from '@elysiumjs/olympus';
 import { HeraclesModule, Scheduler } from '@elysiumjs/olympus/heracles';
 
-import { Workers } from '../index';
-import { runJobMessage } from './consumer';
+import { Workers } from '../index.js';
+import { runJobMessage } from './consumer.js';
 
 /**
  * Configuration of the {@link HeraclesWorkersModule}.

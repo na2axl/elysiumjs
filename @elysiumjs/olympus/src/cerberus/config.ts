@@ -11,13 +11,13 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-import type { CacheInterface } from '../mnemosyne/cache';
-import type { Facts } from './abilities';
+import type { CacheInterface } from '../mnemosyne/cache.js';
+import type { Facts } from './abilities.js';
 
-import { ElysiumError } from '../errors';
-import { MEMORY_CACHE_SERVICE } from '../mnemosyne/cache';
-import { Service } from '../service';
-import { Auth } from '../themis/auth';
+import { ElysiumError } from '../errors.js';
+import { MEMORY_CACHE_SERVICE } from '../mnemosyne/cache.js';
+import { Service } from '../service.js';
+import { Auth } from '../themis/auth.js';
 
 /** The injection token of the resolved configuration of `CerberusModule`. */
 export const CERBERUS_CONFIG = 'elysium.cerberus.config';

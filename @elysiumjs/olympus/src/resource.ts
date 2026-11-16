@@ -16,7 +16,7 @@ import type { TSchema } from 'typebox';
 
 import { ElysiaStatus } from 'elysia';
 
-import { BadRequestError } from './problem';
+import { BadRequestError } from './problem.js';
 
 const HIDDEN = Symbol.for('elysium:Hidden');
 

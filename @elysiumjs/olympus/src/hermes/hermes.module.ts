@@ -12,20 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { MailRendererDriver, MailTransportDriver } from './mail';
-import type { MailAddress } from './messages';
-import type { NotificationStoreDriver } from './store';
+import type { MailRendererDriver, MailTransportDriver } from './mail.js';
+import type { MailAddress } from './messages.js';
+import type { NotificationStoreDriver } from './store.js';
 
-import { Module } from '../module';
+import { Module } from '../module.js';
 import {
 	HERMES_MAIL_RENDERER,
 	HERMES_MAIL_TRANSPORT,
 	HERMES_NOTIFICATION_STORE,
 	HERMES_OPTIONS
-} from './config';
-import { restoreNotificationFake } from './fake';
-import { MailRenderer, MailTransport, restoreMailFake } from './mail';
-import { NotificationStore } from './store';
+} from './config.js';
+import { restoreNotificationFake } from './fake.js';
+import { MailRenderer, MailTransport, restoreMailFake } from './mail.js';
+import { NotificationStore } from './store.js';
 
 type Option<T> = T | (() => T);
 

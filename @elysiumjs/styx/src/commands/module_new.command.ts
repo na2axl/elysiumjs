@@ -18,9 +18,9 @@ import { join } from 'node:path';
 import { Command, CommandArgumentType } from '@elysiumjs/olympus';
 import prompts from 'prompts';
 
-import { parseProjectConfig } from '../config';
-import { createModule, fileName, getProjectPath } from '../utils';
-import { BaseCommand } from './base.command';
+import { parseProjectConfig } from '../config.js';
+import { createModule, fileName, getProjectPath } from '../utils.js';
+import { BaseCommand } from './base.command.js';
 
 /**
  * Command for creating Elysium.js modules.

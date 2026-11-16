@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Command, CommandArgumentType, ConsoleFormat } from '../../index';
+import { Command, CommandArgumentType, ConsoleFormat } from '../../index.js';
 
-import { Projection } from '../projection';
+import { Projection } from '../projection.js';
 
 /**
  * Rebuilds the projections whose version changed, or the one named with `--name`.

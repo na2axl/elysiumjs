@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Secret } from '../harpocrates/secret';
+import type { Secret } from '../harpocrates/secret.js';
 
-import { hmac, randomBytes, safeEqual, sha256 } from '../harpocrates/crypto';
-import { resolveSecret } from '../harpocrates/secret';
-import { Clock } from '../index';
+import { hmac, randomBytes, safeEqual, sha256 } from '../harpocrates/crypto.js';
+import { resolveSecret } from '../harpocrates/secret.js';
+import { Clock } from '../index.js';
 
 const BASE32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 

@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { HttpContext } from './context';
+import type { HttpContext } from './context.js';
 
-import { decrypt, encrypt, hmac, randomToken, verifyHmac } from '../harpocrates/crypto';
-import { resolveSecret } from '../harpocrates/secret';
-import { Clock, currentEnvironment, getLogger, Middleware } from '../index';
-import { currentContext, readCookie, themisConfig, writeCookie } from './context';
-import { NoSessionError, SessionTooLargeError } from './errors';
+import { decrypt, encrypt, hmac, randomToken, verifyHmac } from '../harpocrates/crypto.js';
+import { resolveSecret } from '../harpocrates/secret.js';
+import { Clock, currentEnvironment, getLogger, Middleware } from '../index.js';
+import { currentContext, readCookie, themisConfig, writeCookie } from './context.js';
+import { NoSessionError, SessionTooLargeError } from './errors.js';
 
 /** The data of a session. */
 export type SessionData = Record<string, unknown>;
