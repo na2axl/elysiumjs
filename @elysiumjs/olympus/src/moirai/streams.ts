@@ -12,19 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ErrorOf, ValueOf } from './action';
-import type { Aggregate, AggregateClass } from './aggregate';
-import type { StoredEvent, StoredEventClass, StoredEventMeta } from './stored-event';
-import type { StoredEventRecord } from './stores';
+import type { ErrorOf, ValueOf } from './action.js';
+import type { Aggregate, AggregateClass } from './aggregate.js';
+import type { StoredEvent, StoredEventClass, StoredEventMeta } from './stored-event.js';
+import type { StoredEventRecord } from './stores.js';
 
-import { AsyncResult, Clock, DATABASE_TRANSACTION_SERVICE, Result, Service } from '../index';
-import { UnitOfWork } from '../mnemosyne/index';
-
-import { Aggregates } from './aggregate';
-import { eventStore, options } from './config';
-import { runProjections } from './projection';
-import { runReactors } from './reactor';
-import { StoredEvents } from './stored-event';
+import { AsyncResult, Clock, DATABASE_TRANSACTION_SERVICE, Result, Service } from '../index.js';
+import { UnitOfWork } from '../mnemosyne/index.js';
+import { Aggregates } from './aggregate.js';
+import { eventStore, options } from './config.js';
+import { runProjections } from './projection.js';
+import { runReactors } from './reactor.js';
+import { StoredEvents } from './stored-event.js';
 
 /**
  * How {@link Streams.act} records events.

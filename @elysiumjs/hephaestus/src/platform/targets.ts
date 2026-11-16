@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { PlatformTarget } from '../types';
+import type { PlatformTarget } from '../types.js';
 
 /**
  * Maps Hephaestus platform targets to Bun's `--target` flag values.

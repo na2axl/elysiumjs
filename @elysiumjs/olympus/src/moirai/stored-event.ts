@@ -16,12 +16,12 @@ import type { TSchema } from 'typebox';
 
 import Value from 'typebox/value';
 
-import { Environments } from '../index';
+import { Environments } from '../index.js';
 import {
 	DuplicateStreamNameError,
 	UnknownStoredEventError,
 	UnregisteredStreamClassError
-} from './errors';
+} from './errors.js';
 
 /**
  * The options of a stored event.

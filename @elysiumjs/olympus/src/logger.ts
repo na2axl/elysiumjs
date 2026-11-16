@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { JsonConsoleLogger } from './logging/services/json-console.logger';
+import type { JsonConsoleLogger } from './logging/services/json-console.logger.js';
 
-import { Container } from './container';
-import { Port } from './port';
+import { Container } from './container.js';
+import { Port } from './port.js';
 
 /**
  * Interface for structured application logging.
@@ -55,7 +55,7 @@ export type LoggerOptions = {
 	format?: 'json' | 'pretty' | 'logfmt';
 };
 
-declare module './port' {
+declare module './port.js' {
 	interface Ports {
 		logger: LoggerInterface;
 	}

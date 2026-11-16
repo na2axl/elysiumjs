@@ -12,19 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ModelClass, RepositoryInterface, RowKey } from './interfaces';
-import type { CursorPage, OffsetPage, Page, ParsedQuery } from './query';
-import type { RepositoryCacheOptions } from './repository-cache';
+import type { ModelClass, RepositoryInterface, RowKey } from './interfaces.js';
+import type { CursorPage, OffsetPage, Page, ParsedQuery } from './query.js';
+import type { RepositoryCacheOptions } from './repository-cache.js';
 
 import Emittery from 'emittery';
 
-import { ElysiumError, Json, ModuleContext, Service } from '../index';
-import { Metadata } from '../metadata';
-import { Symbols } from '../utils';
-import { Models } from './model';
-import { Listing } from './query';
-import { RepositoryCache } from './repository-cache';
-import { UnitOfWork } from './unit-of-work';
+import { ElysiumError, Json, ModuleContext, Service } from '../index.js';
+import { Metadata } from '../metadata.js';
+import { Symbols } from '../utils.js';
+import { Models } from './model.js';
+import { Listing } from './query.js';
+import { RepositoryCache } from './repository-cache.js';
+import { UnitOfWork } from './unit-of-work.js';
 
 /**
  * A row as the adapters see it: column values by property name.

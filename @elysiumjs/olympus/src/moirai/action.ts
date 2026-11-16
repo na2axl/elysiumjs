@@ -20,8 +20,8 @@ import type {
 	Passed,
 	ProblemClass,
 	ServiceDefinition
-} from '../index';
-import type { MoiraiStores } from './moirai.module';
+} from '../index.js';
+import type { MoiraiStores } from './moirai.module.js';
 
 import Value from 'typebox/value';
 
@@ -36,9 +36,9 @@ import {
 	Metadata,
 	Result,
 	Service
-} from '../index';
-import { UnitOfWork } from '../mnemosyne/index';
-import { actionLock, idempotencyStore, inOwnerModule, options } from './config';
+} from '../index.js';
+import { UnitOfWork } from '../mnemosyne/index.js';
+import { actionLock, idempotencyStore, inOwnerModule, options } from './config.js';
 import {
 	CallForbiddenError,
 	DuplicateActionNameError,
@@ -51,9 +51,9 @@ import {
 	QueuedInputError,
 	UndeclaredRefusalError,
 	UnknownActionError
-} from './errors';
-import { requestHash } from './hash';
-import { moduleStores } from './moirai.module';
+} from './errors.js';
+import { requestHash } from './hash.js';
+import { moduleStores } from './moirai.module.js';
 
 const ACTION = Symbol.for('elysium:moirai:action');
 const QUERY = Symbol.for('elysium:moirai:query');

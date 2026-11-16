@@ -21,25 +21,34 @@ export type {
 	SelectedFieldsOrdered,
 	TableConfig
 } from 'drizzle-orm/pg-core';
-export { pgTable, getTableBuilders } from './table';
+export { pgTable, getTableBuilders } from './table.js';
 
 // Re-exports
-export { rulesToDrizzle, UntranslatableRuleError } from './cerberus';
-export { Database, DEFAULT_CACHE_TTL, DrizzleDatabaseCache, TenantMismatchError } from './database';
-export type { DrizzleConnectionProps, DrizzleConnection, DrizzleQueryResultHKT } from './database';
+export { rulesToDrizzle, UntranslatableRuleError } from './cerberus.js';
+export {
+	Database,
+	DEFAULT_CACHE_TTL,
+	DrizzleDatabaseCache,
+	TenantMismatchError
+} from './database.js';
+export type {
+	DrizzleConnectionProps,
+	DrizzleConnection,
+	DrizzleQueryResultHKT
+} from './database.js';
 export {
 	type DrizzleDriver,
 	type DrizzleDriverConfig,
 	MissingDriverError,
 	MissingMigrationsError
-} from './driver';
+} from './driver.js';
 export {
 	DrizzleModel,
 	createSchemaFromDrizzle,
 	drizzleAdapter,
 	type DrizzleModelOptions
-} from './model';
-export { DrizzleModule, type DrizzleModuleConfig } from './drizzle.module';
+} from './model.js';
+export { DrizzleModule, type DrizzleModuleConfig } from './drizzle.module.js';
 export {
 	Migration,
 	type MigrationConnection,
@@ -47,13 +56,13 @@ export {
 	type MigrationHook,
 	type MigrationRun,
 	type MigrationStep
-} from './migration';
+} from './migration.js';
 export {
 	nodePostgresMigrations,
 	templateClientMigrations,
 	type PgPool,
 	type TemplateClient
-} from './migration-clients';
+} from './migration-clients.js';
 export {
 	applyTableMarkers,
 	DrizzleTable,
@@ -61,9 +70,9 @@ export {
 	type CreatedTable,
 	type PartitionColumn,
 	type TableMarker
-} from './table-markers';
-export { compileAfter, compileFilter, compileQuery } from './query';
-export { drizzleRepositoryAdapter } from './repository';
+} from './table-markers.js';
+export { compileAfter, compileFilter, compileQuery } from './query.js';
+export { drizzleRepositoryAdapter } from './repository.js';
 export {
 	DrizzleSchemaTenancy,
 	DrizzleRLSTenancy,
@@ -73,10 +82,10 @@ export {
 	withRLS,
 	getSessionTenant,
 	createRLSPolicy
-} from './tenancy';
-export { PgAdvisoryLock } from './lock';
-export { DrizzleNotificationStore, notificationsTable, type NotificationsTable } from './hermes';
-export { DrizzleFileStore, filesTable, type FilesTable } from './pithos';
+} from './tenancy.js';
+export { PgAdvisoryLock } from './lock.js';
+export { DrizzleNotificationStore, notificationsTable, type NotificationsTable } from './hermes.js';
+export { DrizzleFileStore, filesTable, type FilesTable } from './pithos.js';
 export {
 	DrizzleEventStore,
 	DrizzleIdempotencyStore,
@@ -88,4 +97,4 @@ export {
 	type MoiraiTables,
 	type MoiraiTablesOptions,
 	type StoreTable
-} from './moirai';
+} from './moirai.js';

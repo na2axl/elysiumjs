@@ -13,13 +13,13 @@
 // limitations under the License.
 
 import type { Options, PostgresType, Sql } from 'postgres';
-import type { DrizzleConnection } from '../database';
-import type { DrizzleDriver } from '../driver';
-import type { TemplateClient } from '../migration-clients';
+import type { DrizzleConnection } from '../database.js';
+import type { DrizzleDriver } from '../driver.js';
+import type { TemplateClient } from '../migration-clients.js';
 
 import { drizzle } from 'drizzle-orm/postgres-js';
 
-import { templateClientMigrations } from '../migration-clients';
+import { templateClientMigrations } from '../migration-clients.js';
 
 /**
  * Options of {@link postgresJs}: a connection URL or options, or a client.

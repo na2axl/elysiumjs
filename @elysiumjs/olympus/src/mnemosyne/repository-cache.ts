@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { CacheInterface } from './cache';
+import type { CacheInterface } from './cache.js';
 
-import { getLogger, Json, Service } from '../index';
-import { Cache } from './cache';
-import { getCurrentTenant, getTenancyConfig } from './tenancy';
+import { getLogger, Json, Service } from '../index.js';
+import { Cache } from './cache.js';
+import { getCurrentTenant, getTenancyConfig } from './tenancy.js';
 
 /** Name of the global service holding the default cache options of the repositories. */
 export const REPOSITORY_CACHE_SERVICE = 'mnemosyne.repositories.cache';

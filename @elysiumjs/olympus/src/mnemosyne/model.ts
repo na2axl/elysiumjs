@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { TSchema } from '../index';
-import type { ColumnMetadata, ModelAdapter, ModelClass } from './interfaces';
+import type { TSchema } from '../index.js';
+import type { ColumnMetadata, ModelAdapter, ModelClass } from './interfaces.js';
 
 import { t } from 'elysia';
 
-import { Application, ElysiumError, Serializer } from '../index';
-import { getCurrentTenant, getTenancyStrategy } from './tenancy';
+import { Application, ElysiumError, Serializer } from '../index.js';
+import { getCurrentTenant, getTenancyStrategy } from './tenancy.js';
 
 /** Marks the prototype of the model classes, so that their instances are told apart. */
 const MODEL = Symbol.for('elysium:mnemosyne:model');

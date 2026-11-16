@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { LockDriver } from '../../index';
+import type { LockDriver } from '../../index.js';
 
-import { Command, Runtime, Service } from '../../index';
-import { HERACLES_LOCK } from '../registry';
-import { ScheduleRunner } from '../schedule';
+import { Command, Runtime, Service } from '../../index.js';
+import { HERACLES_LOCK } from '../registry.js';
+import { ScheduleRunner } from '../schedule.js';
 
 /**
  * Runs the scheduler: dispatches the scheduled jobs at their times.

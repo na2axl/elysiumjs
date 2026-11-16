@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { DomainError, ElysiumError } from '../index';
+import { DomainError, ElysiumError } from '../index.js';
 
-export { UnauthenticatedError } from '../index';
+export { UnauthenticatedError } from '../index.js';
 
 /**
  * Raised when an unsafe request of a cookie session carries no valid CSRF token. Rendered as a 403

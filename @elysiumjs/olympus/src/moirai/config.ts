@@ -12,17 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { LockDriver } from '../index';
+import type { LockDriver } from '../index.js';
 import type {
 	EventStore,
 	IdempotencyStore,
 	InboxStore,
 	OutboxStore,
 	ProjectionStorage
-} from './stores';
+} from './stores.js';
 
-import { ModuleContext, Service } from '../index';
-import { MissingStoreError } from './errors';
+import { ModuleContext, Service } from '../index.js';
+import { MissingStoreError } from './errors.js';
 
 /** The service names of the moirai stores and options. */
 export const MOIRAI_IDEMPOTENCY_STORE = 'moirai.idempotency';
@@ -73,7 +73,7 @@ export type MoiraiOptions = {
 	 */
 	relayLease: number;
 	/** Called when an outbox row is dead, such as to raise an alert. */
-	onDead?: (row: import('./stores').OutboxRow, error: Error) => void;
+	onDead?: (row: import('./stores.js').OutboxRow, error: Error) => void;
 	/**
 	 * The metadata of every stored event, such as the current actor and correlation id. The
 	 * `metadata` given to `Streams.act()` is added to it.

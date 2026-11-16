@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ChannelContext, NotificationChannel } from '../channel';
-import type { Notifiable } from '../notifiable';
+import type { ChannelContext, NotificationChannel } from '../channel.js';
+import type { Notifiable } from '../notifiable.js';
 
-import { getLogger } from '../../logger';
-import { LogMessage } from '../messages';
-import { Notification } from '../notification';
+import { getLogger } from '../../logger.js';
+import { LogMessage } from '../messages.js';
+import { Notification } from '../notification.js';
 
 /**
  * Writes a `LogMessage` to the application log, with the type of the notification and the id of

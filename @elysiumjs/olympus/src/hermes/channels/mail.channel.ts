@@ -12,17 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ChannelContext, NotificationChannel } from '../channel';
-import type { MailReceipt, MailRendererDriver } from '../mail';
-import type { MailAddress } from '../messages';
-import type { Notifiable } from '../notifiable';
+import type { ChannelContext, NotificationChannel } from '../channel.js';
+import type { MailReceipt, MailRendererDriver } from '../mail.js';
+import type { MailAddress } from '../messages.js';
+import type { Notifiable } from '../notifiable.js';
 
-import { Service } from '../../service';
-import { HERMES_MAIL_RENDERER } from '../config';
-import { HermesServiceMissingError } from '../errors';
-import { Mail } from '../mail';
-import { MailMessage } from '../messages';
-import { Notification } from '../notification';
+import { Service } from '../../service.js';
+import { HERMES_MAIL_RENDERER } from '../config.js';
+import { HermesServiceMissingError } from '../errors.js';
+import { Mail } from '../mail.js';
+import { MailMessage } from '../messages.js';
+import { Notification } from '../notification.js';
 
 /** Whether a route is a mail address or a list of them. */
 const addressesOf = (route: unknown): MailAddress[] => {

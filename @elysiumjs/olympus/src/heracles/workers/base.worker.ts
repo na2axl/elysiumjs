@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Job } from '../job';
-import type { JobDispatchOptions } from '../queue';
-import type { Transport } from '../transport';
-import type { QueuedJob, QueueState, Worker, WorkerInfo, WorkerQueueOptions } from '../worker';
+import type { Job } from '../job.js';
+import type { JobDispatchOptions } from '../queue.js';
+import type { Transport } from '../transport.js';
+import type { QueuedJob, QueueState, Worker, WorkerInfo, WorkerQueueOptions } from '../worker.js';
 
-import { InteractsWithConsole, Runtime } from '../../index';
 import { sort, uid } from 'radash';
 
-import { JobStatus } from '../job';
-import { WorkerStatus } from '../worker';
+import { InteractsWithConsole, Runtime } from '../../index.js';
+import { JobStatus } from '../job.js';
+import { WorkerStatus } from '../worker.js';
 
 /**
  * Base class for workers that manages multiple job queues and processes them in parallel.

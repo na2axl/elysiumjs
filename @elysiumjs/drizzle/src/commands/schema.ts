@@ -26,7 +26,7 @@ import {
 	PgView
 } from 'drizzle-orm/pg-core';
 
-import { bunRequire } from '../bun-require';
+import { bunRequire } from '../bun-require.js';
 
 /**
  * A schema object found in a project file: the export that holds it, and the keys that lead to it

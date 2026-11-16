@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { FilesOptions, FilesSource, FileStoreDriver } from './files';
-import type { DiskSource, StorageDriver } from './storage';
+import type { FilesOptions, FilesSource, FileStoreDriver } from './files.js';
+import type { DiskSource, StorageDriver } from './storage.js';
 
-import { Module } from '../module';
-import { filesOptions, FileStore, PITHOS_FILES } from './files';
-import { PITHOS_DISKS, Storage } from './storage';
-import { StorageController } from './storage.controller';
+import { Module } from '../module.js';
+import { filesOptions, FileStore, PITHOS_FILES } from './files.js';
+import { StorageController } from './storage.controller.js';
+import { PITHOS_DISKS, Storage } from './storage.js';
 
-import './files';
-import './memory';
+import './files.js';
+import './memory.js';
 
 type Option<T> = T | (() => T);
 

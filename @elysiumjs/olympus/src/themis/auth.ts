@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { JwtVerifyOptions } from '../harpocrates/jwt';
-import type { ProblemClass } from '../index';
-import type { HttpContext } from './context';
+import type { JwtVerifyOptions } from '../harpocrates/jwt.js';
+import type { ProblemClass } from '../index.js';
+import type { HttpContext } from './context.js';
 
-import { Jwt } from '../harpocrates/jwt';
-import { Http, Metadata, Middleware, Service } from '../index';
-import { ApiKeys } from './api-keys';
-import { currentContext, themisConfig } from './context';
-import { UnauthenticatedError, UnknownGuardError } from './errors';
-import { loadSession, Session } from './session';
+import { Jwt } from '../harpocrates/jwt.js';
+import { Http, Metadata, Middleware, Service } from '../index.js';
+import { ApiKeys } from './api-keys.js';
+import { currentContext, themisConfig } from './context.js';
+import { UnauthenticatedError, UnknownGuardError } from './errors.js';
+import { loadSession, Session } from './session.js';
 
 /**
  * Finds the user of a request, or answers `undefined` when the request does not carry what the

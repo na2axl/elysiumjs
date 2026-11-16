@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import type { SQL } from 'drizzle-orm';
-import type { MigrationConnection, MigrationDatabase } from './migration';
+import type { MigrationConnection, MigrationDatabase } from './migration.js';
 
 import { PgDialect } from 'drizzle-orm/pg-core';
 

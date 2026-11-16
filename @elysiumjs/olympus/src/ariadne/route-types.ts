@@ -20,12 +20,11 @@ import type {
 	HttpRouteTypes,
 	HttpRouteTypesContributor,
 	Passed
-} from '../index';
-import type { FlowAdvance, FlowRefusal } from './flow';
+} from '../index.js';
+import type { FlowAdvance, FlowRefusal } from './flow.js';
 
-import { Environments, Http, Service } from '../index';
-
-import { Flow } from './flow';
+import { Environments, Http, Service } from '../index.js';
+import { Flow } from './flow.js';
 
 /**
  * What `POST /flows/{flow}` answers: the key of the new flow, the owner token of a guest flow,

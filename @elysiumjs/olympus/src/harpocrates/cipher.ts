@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Secret } from './secret';
+import type { Secret } from './secret.js';
 
-import { ElysiumError } from '../index';
-import { Port } from '../port';
-import { fromBase64Url, fromUtf8, randomBytes, toBase64Url, utf8 } from './crypto';
-import { resolveSecret } from './secret';
+import { ElysiumError } from '../index.js';
+import { Port } from '../port.js';
+import { fromBase64Url, fromUtf8, randomBytes, toBase64Url, utf8 } from './crypto.js';
+import { resolveSecret } from './secret.js';
 
 /**
  * Encrypts and decrypts strings: a driver of the {@link Cipher} port. A ciphertext names its
@@ -43,7 +43,7 @@ export interface CipherDriver {
 	decrypt(ciphertext: string, context?: string): Promise<string>;
 }
 
-declare module '../port' {
+declare module '../port.js' {
 	interface Ports {
 		cipher: CipherDriver;
 	}

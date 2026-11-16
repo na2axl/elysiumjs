@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Job, JobOverlapBehavior } from './job';
-import type { QueueOptions } from './queue';
+import type { Job, JobOverlapBehavior } from './job.js';
+import type { QueueOptions } from './queue.js';
 
 /**
  * Represents a job in the queue with its metadata.

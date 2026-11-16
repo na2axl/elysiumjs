@@ -26,7 +26,7 @@ import {
 	MakeValidatorCommand,
 	ModuleNewCommand,
 	ModuleRenameCommand
-} from './commands';
+} from './commands/index.js';
 
 /**
  * The development-only module holding the `make:*` and `module:*` scaffolding commands.

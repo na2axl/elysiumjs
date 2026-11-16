@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Command, CommandArgumentType, Runtime } from '../../index';
-import { JobRegistry } from '../registry';
-import { Scheduler } from '../schedule';
-import { parseJsonc } from '../utils';
+import { Command, CommandArgumentType, Runtime } from '../../index.js';
+import { JobRegistry } from '../registry.js';
+import { Scheduler } from '../schedule.js';
+import { parseJsonc } from '../utils.js';
 
 /** The parts of a wrangler configuration the check reads. */
 type WranglerConfig = {

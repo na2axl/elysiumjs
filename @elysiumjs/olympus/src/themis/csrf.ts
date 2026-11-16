@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ProblemClass } from '../index';
-import type { HttpContext } from './context';
+import type { ProblemClass } from '../index.js';
+import type { HttpContext } from './context.js';
 
-import { randomToken, safeEqual } from '../harpocrates/crypto';
-import { Middleware } from '../index';
-import { themisConfig } from './context';
-import { CsrfTokenMismatchError } from './errors';
-import { loadSession, Session } from './session';
+import { randomToken, safeEqual } from '../harpocrates/crypto.js';
+import { Middleware } from '../index.js';
+import { themisConfig } from './context.js';
+import { CsrfTokenMismatchError } from './errors.js';
+import { loadSession, Session } from './session.js';
 
 const TOKEN = '_csrf';
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);

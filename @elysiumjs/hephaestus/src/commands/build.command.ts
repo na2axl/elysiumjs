@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { WorkersBuildOptions, WorkersBuildResult } from '../builder/workers.builder';
-import type { PlatformTarget } from '../types';
+import type { WorkersBuildOptions, WorkersBuildResult } from '../builder/workers.builder.js';
+import type { PlatformTarget } from '../types.js';
 
 import { Command, CommandArgumentType } from '@elysiumjs/olympus';
 
-import { BinaryBuilder } from '../builder/binary.builder';
-import { NodeBuilder } from '../builder/node.builder';
-import { loadConfig } from '../config/loader';
+import { BinaryBuilder } from '../builder/binary.builder.js';
+import { NodeBuilder } from '../builder/node.builder.js';
+import { loadConfig } from '../config/loader.js';
 
 /**
  * Runs the Workers builder in a process of its own. The AOT plugin imports the entry to capture

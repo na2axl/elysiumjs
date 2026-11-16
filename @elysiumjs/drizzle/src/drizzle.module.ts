@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import type { TenancyConfig } from '@elysiumjs/olympus/mnemosyne';
-import type { DrizzleConnection, DrizzleConnectionProps } from './database';
+import type { DrizzleConnection, DrizzleConnectionProps } from './database.js';
 
 import { Module, needsDefaultAlias, runAll, Service } from '@elysiumjs/olympus';
 import {
@@ -25,10 +25,10 @@ import {
 	withUnitOfWork
 } from '@elysiumjs/olympus/mnemosyne';
 
-import { MigrationGenerateCommand } from './commands/migration_generate.command';
-import { MigrationRunCommand } from './commands/migration_run.command';
-import { closeConnection, Database } from './database';
-import { DrizzleRLSTenancy, DrizzleSchemaTenancy } from './tenancy';
+import { MigrationGenerateCommand } from './commands/migration_generate.command.js';
+import { MigrationRunCommand } from './commands/migration_run.command.js';
+import { closeConnection, Database } from './database.js';
+import { DrizzleRLSTenancy, DrizzleSchemaTenancy } from './tenancy.js';
 
 /**
  * Configuration of the {@link DrizzleModule}.

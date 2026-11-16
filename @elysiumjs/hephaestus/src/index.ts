@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export { HephaestusModule } from './hephaestus.module';
-export type { HephaestusConfig, PlatformTarget } from './types';
-export { HephaestusConfigSchema, PlatformTargetSchema } from './types';
+export { HephaestusModule } from './hephaestus.module.js';
+export type { HephaestusConfig, PlatformTarget } from './types.js';
+export { HephaestusConfigSchema, PlatformTargetSchema } from './types.js';
 
-export type { BuildResult, WorkersBuildOptions, WorkersBuildResult } from './builder';
-export { BinaryBuilder, NodeBuilder, WorkersBuilder } from './builder';
+export type { BuildResult, WorkersBuildOptions, WorkersBuildResult } from './builder/index.js';
+export { BinaryBuilder, NodeBuilder, WorkersBuilder } from './builder/index.js';
 
-export type { AssetManifest } from './assets';
-export { AssetEmbedder } from './assets';
+export type { AssetManifest } from './assets/index.js';
+export { AssetEmbedder } from './assets/index.js';
 
-export { DockerGenerator } from './commands/docker.generator';
-export { loadConfig } from './config';
-export { bunTarget, detectCurrentPlatform, getOutputName } from './platform';
+export { DockerGenerator } from './commands/docker.generator.js';
+export { loadConfig } from './config/index.js';
+export { bunTarget, detectCurrentPlatform, getOutputName } from './platform/index.js';

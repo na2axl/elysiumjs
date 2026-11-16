@@ -13,24 +13,24 @@
 // limitations under the License.
 
 import type { Class } from 'type-fest';
-import type { Environment } from './environments';
-import type { ConfiguredModule, ModuleClass, ModuleCollections, ModuleProps } from './module';
-import type { ServiceToken } from './token';
+import type { Environment } from './environments.js';
+import type { ConfiguredModule, ModuleClass, ModuleCollections, ModuleProps } from './module.js';
+import type { ServiceToken } from './token.js';
 
 import { isEqual } from 'radash';
 
-import { getCommandName } from './command';
-import { Environments } from './environments';
+import { getCommandName } from './command.js';
+import { Environments } from './environments.js';
 import {
 	ConflictingModuleConfigError,
 	DuplicateCommandError,
 	DuplicateModuleNameError,
 	ModuleCycleError
-} from './errors';
-import { Metadata } from './metadata';
-import { getModuleProps, isConfiguredModule } from './module';
-import { tokenOf } from './token';
-import { currentEnvironment, Symbols } from './utils';
+} from './errors.js';
+import { Metadata } from './metadata.js';
+import { getModuleProps, isConfiguredModule } from './module.js';
+import { tokenOf } from './token.js';
+import { currentEnvironment, Symbols } from './utils.js';
 
 /** The import site used for modules listed directly in the application. */
 const APP_SITE = '<app>';

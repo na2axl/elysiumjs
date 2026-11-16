@@ -16,11 +16,11 @@ import { relative, resolve } from 'node:path';
 
 import { Command, CommandArgumentType, ConsoleFormat } from '@elysiumjs/olympus';
 
-import { parseProjectConfig } from '../config';
-import { collectRoutes } from '../routes/collect';
-import { renderRoutes } from '../routes/render';
-import { getProjectPath, resolveAppEntry } from '../utils';
-import { BaseCommand } from './base.command';
+import { parseProjectConfig } from '../config.js';
+import { collectRoutes } from '../routes/collect.js';
+import { renderRoutes } from '../routes/render.js';
+import { getProjectPath, resolveAppEntry } from '../utils.js';
+import { BaseCommand } from './base.command.js';
 
 /**
  * Writes the route types of the app, for typed clients such as Eden: `treaty<AppRoutes>(url)`.

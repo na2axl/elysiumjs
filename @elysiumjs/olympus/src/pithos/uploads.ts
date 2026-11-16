@@ -12,17 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Result } from '../result';
-import type { FileMetadata, FileOwner, FileRecord } from './files';
+import type { Result } from '../result.js';
+import type { FileMetadata, FileOwner, FileRecord } from './files.js';
 
-import { Clock } from '../clock';
-import { Metadata } from '../metadata';
-import { ModuleContext } from '../module-context';
-import { uuidv7 } from '../moirai/ids';
-import { BadRequestError, ForbiddenError, NotFoundError } from '../problem';
-import { Result as R } from '../result';
-import { Service } from '../service';
-import { Symbols } from '../utils';
+import { Clock } from '../clock.js';
+import { Metadata } from '../metadata.js';
+import { ModuleContext } from '../module-context.js';
+import { uuidv7 } from '../moirai/ids.js';
+import { BadRequestError, ForbiddenError, NotFoundError } from '../problem.js';
+import { Result as R } from '../result.js';
+import { Service } from '../service.js';
+import { Symbols } from '../utils.js';
 import {
 	DuplicateUploadPurposeError,
 	MissingUploadPurposeServiceError,
@@ -34,7 +34,7 @@ import {
 	UploadTooLargeError,
 	UploadTooManyPendingError,
 	UploadTypeNotAllowedError
-} from './errors';
+} from './errors.js';
 import {
 	deleteQuietly,
 	emitFileEvent,
@@ -46,8 +46,8 @@ import {
 	STAGING_PREFIX,
 	stagingDisk,
 	stagingKey
-} from './files';
-import { assertKey, Storage } from './storage';
+} from './files.js';
+import { assertKey, Storage } from './storage.js';
 
 /** The kebab-case name of a purpose, which prefixes the keys of its files by default. */
 const NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;

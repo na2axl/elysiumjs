@@ -19,7 +19,7 @@ import type {
 	FlowCommit,
 	FlowCommitResult,
 	FlowRecord
-} from './store';
+} from './store.js';
 
 /**
  * A step reservation, as a store keeps it.

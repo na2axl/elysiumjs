@@ -14,9 +14,9 @@
 
 import { EventEmitter } from 'node:events';
 
-import { ElysiumError } from './errors';
-import { Metadata } from './metadata';
-import { Symbols } from './utils';
+import { ElysiumError } from './errors.js';
+import { Metadata } from './metadata.js';
+import { Symbols } from './utils.js';
 
 /**
  * Internal event bus used by the framework.

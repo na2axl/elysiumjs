@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Kernel, ModuleNode } from '../index';
-import type { Job, JobClass } from './job';
+import type { Kernel, ModuleNode } from '../index.js';
+import type { Job, JobClass } from './job.js';
 
-import { ElysiumError, KERNEL_SERVICE, Service } from '../index';
-import { getJobMetadata } from './utils';
+import { ElysiumError, KERNEL_SERVICE, Service } from '../index.js';
+import { getJobMetadata } from './utils.js';
 
 /**
  * Thrown when two modules declare jobs with the same name.

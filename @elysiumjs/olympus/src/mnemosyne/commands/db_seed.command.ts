@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Kernel } from '../../index';
+import type { Kernel } from '../../index.js';
 
-import { Command, CommandArgumentType, KERNEL_SERVICE, Runtime, Service } from '../../index';
-
-import { Seeder } from '../seeder';
+import { Command, CommandArgumentType, KERNEL_SERVICE, Runtime, Service } from '../../index.js';
+import { Seeder } from '../seeder.js';
 
 /**
  * Runs the seeders of the active modules, in order, each in its own transaction. The app boots

@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import './channels/inbox.channel';
-import './channels/mail.channel';
-import './channels/broadcast.channel';
-import './channels/log.channel';
+import './channels/inbox.channel.js';
+import './channels/mail.channel.js';
+import './channels/broadcast.channel.js';
+import './channels/log.channel.js';
 
 export type {
 	ChannelContext,
@@ -23,10 +23,10 @@ export type {
 	ChannelName,
 	NotificationChannel,
 	NotificationChannels
-} from './channel';
-export type { NotificationDelivery, NotificationEvent } from './delivery';
-export type { SentNotification } from './fake';
-export type { NotificationRun, QueuedRecipient } from './queued';
+} from './channel.js';
+export type { NotificationDelivery, NotificationEvent } from './delivery.js';
+export type { SentNotification } from './fake.js';
+export type { NotificationRun, QueuedRecipient } from './queued.js';
 export type {
 	MailEnvelope,
 	MailReceipt,
@@ -34,32 +34,32 @@ export type {
 	MailRendererDriver,
 	MailTransportDriver,
 	RenderedMail
-} from './mail';
-export type { MailAddress, MailMessageContent, MailPart } from './messages';
-export type { Notifiable, NotifiableResolver } from './notifiable';
-export type { NotificationOptions } from './registry';
+} from './mail.js';
+export type { MailAddress, MailMessageContent, MailPart } from './messages.js';
+export type { Notifiable, NotifiableResolver } from './notifiable.js';
+export type { NotificationOptions } from './registry.js';
 export type {
 	InboxOwner,
 	InboxPage,
 	InboxQuery,
 	NotificationStoreDriver,
 	StoredNotification
-} from './store';
-export type { HermesModuleConfig } from './hermes.module';
-export type { BroadcastEvent } from './channels/broadcast.channel';
+} from './store.js';
+export type { HermesModuleConfig } from './hermes.module.js';
+export type { BroadcastEvent } from './channels/broadcast.channel.js';
 
-export { BroadcastChannel, HERMES_BROADCAST } from './channels/broadcast.channel';
-export { InboxChannel } from './channels/inbox.channel';
-export { LogChannel } from './channels/log.channel';
-export { MailChannel } from './channels/mail.channel';
+export { BroadcastChannel, HERMES_BROADCAST } from './channels/broadcast.channel.js';
+export { InboxChannel } from './channels/inbox.channel.js';
+export { LogChannel } from './channels/log.channel.js';
+export { MailChannel } from './channels/mail.channel.js';
 export {
 	HERMES_MAIL_RENDERER,
 	HERMES_MAIL_TRANSPORT,
 	HERMES_NOTIFICATION_JOB,
 	HERMES_NOTIFICATION_STORE,
 	HERMES_OPTIONS
-} from './config';
-export { HERMES_FAILED, HERMES_SENDING, HERMES_SENT } from './delivery';
+} from './config.js';
+export { HERMES_FAILED, HERMES_SENDING, HERMES_SENT } from './delivery.js';
 export {
 	ChannelRejected,
 	DuplicateChannelError,
@@ -76,9 +76,9 @@ export {
 	UnknownChannelError,
 	UnknownNotificationError,
 	UnregisteredNotificationError
-} from './errors';
-export { NotificationFake } from './fake';
-export { HermesModule } from './hermes.module';
+} from './errors.js';
+export { NotificationFake } from './fake.js';
+export { HermesModule } from './hermes.module.js';
 export {
 	BasicMailRenderer,
 	LogMailTransport,
@@ -86,8 +86,8 @@ export {
 	MailFake,
 	MailRenderer,
 	MailTransport
-} from './mail';
-export { BroadcastMessage, InboxMessage, LogMessage, MailMessage } from './messages';
-export type { ChannelMethods } from './notification';
-export { AnonymousNotifiable, Notification } from './notification';
-export { DEFAULT_INBOX_LIMIT, MemoryNotificationStore, NotificationStore } from './store';
+} from './mail.js';
+export { BroadcastMessage, InboxMessage, LogMessage, MailMessage } from './messages.js';
+export type { ChannelMethods } from './notification.js';
+export { AnonymousNotifiable, Notification } from './notification.js';
+export { DEFAULT_INBOX_LIMIT, MemoryNotificationStore, NotificationStore } from './store.js';

@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ChannelContext, NotificationChannel } from '../channel';
-import type { Notifiable } from '../notifiable';
+import type { ChannelContext, NotificationChannel } from '../channel.js';
+import type { Notifiable } from '../notifiable.js';
 
-import { Lifecycle } from '../../lifecycle';
-import { BroadcastMessage } from '../messages';
-import { Notification } from '../notification';
+import { Lifecycle } from '../../lifecycle.js';
+import { BroadcastMessage } from '../messages.js';
+import { Notification } from '../notification.js';
 
 /** Emitted by the `broadcast` channel, for a WebSocket or a stream of the app to forward. */
 export const HERMES_BROADCAST = 'elysium:hermes:broadcast';

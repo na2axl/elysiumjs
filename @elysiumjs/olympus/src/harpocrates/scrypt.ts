@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { PasswordHasherDriver } from './password';
+import type { PasswordHasherDriver } from './password.js';
 
 import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
 
-import { PasswordHasher } from './password';
+import { PasswordHasher } from './password.js';
 
 /**
  * The scrypt parameters: the cost `N` (16384 by default), the block size `r` (8), the

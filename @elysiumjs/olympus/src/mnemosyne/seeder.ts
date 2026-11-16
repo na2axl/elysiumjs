@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Environment, ModuleGraph, ModuleNode } from '../index';
-import type { TransactionRunner } from './unit-of-work';
+import type { Environment, ModuleGraph, ModuleNode } from '../index.js';
+import type { TransactionRunner } from './unit-of-work.js';
 
 import {
 	DATABASE_TRANSACTION_SERVICE,
@@ -23,9 +23,9 @@ import {
 	Metadata,
 	ModuleContext,
 	Service
-} from '../index';
+} from '../index.js';
 
-declare module '../index' {
+declare module '../index.js' {
 	interface ModuleCollections {
 		/** The seeders provided by the module, run by `styx db:seed`. */
 		seeders?: SeederClass[];

@@ -13,9 +13,9 @@
 // limitations under the License.
 
 import type { Static, TObject, TProperties, TSchema } from 'typebox';
-import type { Secret, SecretSchema, UnmarkedSchema } from './config';
+import type { Secret, SecretSchema, UnmarkedSchema } from './config.js';
 
-import { ElysiumError } from './errors';
+import { ElysiumError } from './errors.js';
 
 /**
  * The validated environment variables of the application, by name. Empty in core: the app and

@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ModelClass } from './interfaces';
-import type { RepositoryAdapter, RepositoryTarget, Row, ScopeOf } from './repository';
+import type { ModelClass } from './interfaces.js';
+import type { RepositoryAdapter, RepositoryTarget, Row, ScopeOf } from './repository.js';
 
-import { Job } from '../heracles/job';
-import { MissingRepositoryAdapterError, RepositoryKeyError } from './repository';
-import { RepositoryCache } from './repository-cache';
+import { Job } from '../heracles/job.js';
+import { RepositoryCache } from './repository-cache.js';
+import { MissingRepositoryAdapterError, RepositoryKeyError } from './repository.js';
 
 /**
  * The base of the classes {@link Pruner} creates: a job that deletes the rows of its model that

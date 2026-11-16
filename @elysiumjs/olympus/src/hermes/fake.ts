@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ChannelEntry } from './channel';
-import type { Notifiable } from './notifiable';
-import type { Notification } from './notification';
+import type { ChannelEntry } from './channel.js';
+import type { Notifiable } from './notifiable.js';
+import type { Notification } from './notification.js';
 
-import { HermesAssertionError } from './errors';
+import { HermesAssertionError } from './errors.js';
 
 /**
  * A notification recorded by `Notification.fake()`.

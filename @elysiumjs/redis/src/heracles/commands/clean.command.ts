@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { RedisConnection } from '../../index';
+import type { RedisConnection } from '../../index.js';
 
 import { Command, CommandArgumentType, Runtime, Service } from '@elysiumjs/olympus';
 import { JobStatus } from '@elysiumjs/olympus/heracles';
 
-import { Redis } from '../../index';
+import { Redis } from '../../index.js';
 
 /**
  * Command used to clean a Redis stream.

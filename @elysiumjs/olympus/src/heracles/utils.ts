@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Job, JobClass, JobMetadata } from './job';
+import type { Job, JobClass, JobMetadata } from './job.js';
 
-import { Metadata } from '../index';
+import { Metadata } from '../index.js';
 
 export namespace Symbols {
 	/**

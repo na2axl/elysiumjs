@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { LoggerInterface } from '../../logger';
-import type { LoggerConfig, LogLevel } from '../types';
+import type { LoggerInterface } from '../../logger.js';
+import type { LoggerConfig, LogLevel } from '../types.js';
 
-import { InteractsWithConsole } from '../../console';
-import { Logger } from '../../logger';
-import { DEFAULT_CONFIG } from '../types';
+import { InteractsWithConsole } from '../../console.js';
+import { Logger } from '../../logger.js';
+import { DEFAULT_CONFIG } from '../types.js';
 
 const LEVELS: Record<LogLevel, number> = {
 	trace: 10,

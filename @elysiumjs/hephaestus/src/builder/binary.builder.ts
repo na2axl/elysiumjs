@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { HephaestusConfig, PlatformTarget } from '../types';
+import type { HephaestusConfig, PlatformTarget } from '../types.js';
 
 import { join } from 'node:path';
 
-import { bunTarget, detectCurrentPlatform, getOutputName } from '../platform';
+import { bunTarget, detectCurrentPlatform, getOutputName } from '../platform/index.js';
 
 /**
  * Result of a single binary compilation.

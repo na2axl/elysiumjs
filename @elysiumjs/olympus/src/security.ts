@@ -14,9 +14,9 @@
 
 import type { AnyElysia } from 'elysia';
 
-import { ElysiumError } from './errors';
-import { DomainError } from './problem';
-import { Runtime } from './runtime';
+import { ElysiumError } from './errors.js';
+import { DomainError } from './problem.js';
+import { Runtime } from './runtime.js';
 
 /**
  * Cross-origin resource sharing options.

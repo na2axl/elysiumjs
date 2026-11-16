@@ -12,21 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export * from './base.command';
+export * from './base.command.js';
 
-export * from './make_command.command';
-export * from './make_controller.command';
-export * from './make_job.command';
-export * from './make_middleware.command';
-export * from './make_model.command';
-export * from './make_repository.command';
-export * from './make_seeder.command';
-export * from './make_service.command';
-export * from './make_validator.command';
-export * from './make_view.command';
+export * from './make_command.command.js';
+export * from './make_controller.command.js';
+export * from './make_job.command.js';
+export * from './make_middleware.command.js';
+export * from './make_model.command.js';
+export * from './make_repository.command.js';
+export * from './make_seeder.command.js';
+export * from './make_service.command.js';
+export * from './make_validator.command.js';
+export * from './make_view.command.js';
 
-export * from './module_new.command';
-export * from './module_rename.command';
+export * from './module_new.command.js';
+export * from './module_rename.command.js';
 
-export * from './routes_check.command';
-export * from './routes_generate.command';
+export * from './routes_check.command.js';
+export * from './routes_generate.command.js';

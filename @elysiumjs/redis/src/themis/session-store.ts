@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import type { SessionData, SessionStore } from '@elysiumjs/olympus/themis';
-import type { RedisConnection } from '../connection';
+import type { RedisConnection } from '../connection.js';
 
 /**
  * Keeps sessions in Redis, under `session:<id>`, expiring with the session.

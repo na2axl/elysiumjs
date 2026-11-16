@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ThemisConfig } from './config';
+import type { ThemisConfig } from './config.js';
 
-import { assertStrongSecret } from '../harpocrates/secret';
-import { Module } from '../index';
-import { THEMIS_CONFIG } from './config';
+import { assertStrongSecret } from '../harpocrates/secret.js';
+import { Module } from '../index.js';
+import { THEMIS_CONFIG } from './config.js';
 
 /**
  * Configures Themis: the secret, the sessions and the guards of `@Auth()`.

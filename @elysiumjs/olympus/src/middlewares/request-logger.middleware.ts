@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Context } from '../http';
+import type { Context } from '../http.js';
 
-import { Middleware } from '../middleware';
+import { Middleware } from '../middleware.js';
 
 /**
  * Middleware that logs incoming HTTP requests and their completion time.

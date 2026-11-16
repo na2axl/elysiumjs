@@ -18,8 +18,8 @@ import { createCache } from 'cache-manager';
 import { Keyv } from 'keyv';
 import { alphabetical } from 'radash';
 
-import { Json, Service, ServiceNotFoundError } from '../index';
-import { StaleModelError } from './model';
+import { Json, Service, ServiceNotFoundError } from '../index.js';
+import { StaleModelError } from './model.js';
 
 /** Name of the global service backing `Cache.memory`. */
 export const MEMORY_CACHE_SERVICE = 'mnemosyne.cache.memory';

@@ -14,13 +14,13 @@
 
 import type { KeyvStoreAdapter } from 'cacheable';
 import type { KeyvEntry, StoredData } from 'keyv';
-import type { RedisConnection } from './index';
+import type { RedisConnection } from './index.js';
 
 import { EventEmitter } from 'node:events';
 
 import { Lifecycle, Service } from '@elysiumjs/olympus';
 
-import { Redis } from './index';
+import { Redis } from './index.js';
 
 /**
  * Keyv adapter for redis. This adapter is based on the Bun's Redis client.

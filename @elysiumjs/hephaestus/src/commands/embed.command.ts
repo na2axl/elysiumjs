@@ -16,8 +16,8 @@ import { join } from 'node:path';
 
 import { Command } from '@elysiumjs/olympus';
 
-import { AssetEmbedder } from '../assets/embedder';
-import { loadConfig } from '../config/loader';
+import { AssetEmbedder } from '../assets/embedder.js';
+import { loadConfig } from '../config/loader.js';
 
 /**
  * Command used to generate asset loader module from configured patterns.

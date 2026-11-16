@@ -12,18 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { LockDriver, ServiceDefinition } from '../index';
-import type { MoiraiOptions } from './config';
+import type { LockDriver, ServiceDefinition } from '../index.js';
+import type { MoiraiOptions } from './config.js';
 import type {
 	EventStore,
 	IdempotencyStore,
 	InboxStore,
 	OutboxStore,
 	ProjectionStorage
-} from './stores';
+} from './stores.js';
 
-import { Module } from '../index';
-import { ProjectionRebuildCommand } from './commands/projection-rebuild.command';
+import { Module } from '../index.js';
+import { ProjectionRebuildCommand } from './commands/projection-rebuild.command.js';
 import {
 	DEFAULT_OPTIONS,
 	MOIRAI_ACTION_LOCK,
@@ -34,7 +34,7 @@ import {
 	MOIRAI_OPTIONS,
 	MOIRAI_OUTBOX_STORE,
 	MOIRAI_PROJECTION_STORAGE
-} from './config';
+} from './config.js';
 
 type StoreOption<T> = T | (() => T);
 

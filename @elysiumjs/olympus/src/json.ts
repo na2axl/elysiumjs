@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Serializer, UnknownSerializerError } from './serializer';
+import { Serializer, UnknownSerializerError } from './serializer.js';
 
 /** The key that names the serializer of an encoded value. */
 const TYPE = '$type';

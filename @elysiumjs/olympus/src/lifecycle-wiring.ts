@@ -13,13 +13,13 @@
 // limitations under the License.
 
 import type { Class } from 'type-fest';
-import type { LifecycleEvent, LifecycleListenerMeta } from './lifecycle';
-import type { ModuleNode } from './module-graph';
+import type { LifecycleEvent, LifecycleListenerMeta } from './lifecycle.js';
+import type { ModuleNode } from './module-graph.js';
 
-import { Container } from './container';
-import { LifecycleListenerNotSupportedError } from './errors';
-import { getLifecycleListeners, LifecycleBus } from './lifecycle';
-import { ModuleContext } from './module-context';
+import { Container } from './container.js';
+import { LifecycleListenerNotSupportedError } from './errors.js';
+import { getLifecycleListeners, LifecycleBus } from './lifecycle.js';
+import { ModuleContext } from './module-context.js';
 
 /**
  * A listener the kernel added to the event bus.

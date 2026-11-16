@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { WorkersExecutionContext } from './types';
+import type { WorkersExecutionContext } from './types.js';
 
 import { Metadata, Service } from '@elysiumjs/olympus';
 
-import { BindingNotFoundError, OutsideInvocationError } from './errors';
-import { currentInvocation } from './invocation';
+import { BindingNotFoundError, OutsideInvocationError } from './errors.js';
+import { currentInvocation } from './invocation.js';
 
 /** Name of the request-scoped service holding the Worker's env. */
 export const WORKERS_ENV_SERVICE = 'workers.env';

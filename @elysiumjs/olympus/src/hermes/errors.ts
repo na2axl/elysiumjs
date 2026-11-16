@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { ElysiumError } from '../errors';
+import { ElysiumError } from '../errors.js';
 
 /**
  * Thrown by a channel when the provider refuses a message for good, such as an unknown number or

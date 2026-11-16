@@ -15,18 +15,18 @@
 import type { Context, ErrorContext } from 'elysia';
 import type { Class } from 'type-fest';
 import type { TSchema } from 'typebox';
-import type { Route } from './http';
-import type { ModuleNode } from './module-graph';
+import type { Route } from './http.js';
+import type { ModuleNode } from './module-graph.js';
 
 import { Elysia } from 'elysia';
 import { websocket } from 'elysia/websocket';
 
-import { Lifecycle } from './lifecycle';
-import { Metadata } from './metadata';
-import { applyMiddlewares } from './middleware';
-import { ModuleContext } from './module-context';
-import { Service } from './service';
-import { nextTick, Symbols } from './utils';
+import { Lifecycle } from './lifecycle.js';
+import { Metadata } from './metadata.js';
+import { applyMiddlewares } from './middleware.js';
+import { ModuleContext } from './module-context.js';
+import { Service } from './service.js';
+import { nextTick, Symbols } from './utils.js';
 
 /**
  * The options of the websocket server, shared by every runtime.

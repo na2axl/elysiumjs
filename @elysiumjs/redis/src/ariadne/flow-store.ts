@@ -21,7 +21,7 @@ import type {
 	FlowRecord,
 	FlowStore
 } from '@elysiumjs/olympus/ariadne';
-import type { RedisConnection } from '../connection';
+import type { RedisConnection } from '../connection.js';
 
 import { FLOW_TOMBSTONE_SECONDS } from '@elysiumjs/olympus/ariadne';
 

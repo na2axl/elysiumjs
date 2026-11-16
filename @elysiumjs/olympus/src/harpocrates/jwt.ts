@@ -13,13 +13,13 @@
 // limitations under the License.
 
 import type { CryptoKey, JWTPayload, KeyObject } from 'jose';
-import type { Secret } from './secret';
+import type { Secret } from './secret.js';
 
 import { jwtVerify, SignJWT } from 'jose';
 
-import { Clock, DomainError } from '../index';
-import { utf8 } from './crypto';
-import { resolveSecret } from './secret';
+import { Clock, DomainError } from '../index.js';
+import { utf8 } from './crypto.js';
+import { resolveSecret } from './secret.js';
 
 /**
  * The key of a token: a shared secret (HS256), or a key of an asymmetric algorithm such as EdDSA

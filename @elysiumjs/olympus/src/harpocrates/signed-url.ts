@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Secret } from './secret';
+import type { Secret } from './secret.js';
 
-import { Clock, DomainError } from '../index';
-import { hmac, verifyHmac } from './crypto';
-import { resolveSecret } from './secret';
+import { Clock, DomainError } from '../index.js';
+import { hmac, verifyHmac } from './crypto.js';
+import { resolveSecret } from './secret.js';
 
 /**
  * Raised when a signed URL was tampered with or has expired. Rendered as a 403 problem.

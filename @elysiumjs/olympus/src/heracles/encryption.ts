@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { CipherDriver } from '../harpocrates/cipher';
-import type { JobClass } from './job';
+import type { CipherDriver } from '../harpocrates/cipher.js';
+import type { JobClass } from './job.js';
 
-import { ElysiumError, Service } from '../index';
-import { HERACLES_CIPHER } from './registry';
-import { getJobMetadata } from './utils';
+import { ElysiumError, Service } from '../index.js';
+import { HERACLES_CIPHER } from './registry.js';
+import { getJobMetadata } from './utils.js';
 
 /**
  * Raised when an encrypted job is dispatched or run without a cipher in

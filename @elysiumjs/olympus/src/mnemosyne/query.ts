@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ProblemValidationError, TObject, TOptional, TSchema, TString } from '../index';
-import type { ModelClass } from './interfaces';
+import type { ProblemValidationError, TObject, TOptional, TSchema, TString } from '../index.js';
+import type { ModelClass } from './interfaces.js';
 
 import { t } from 'elysia';
 
-import { BadRequestError, PAGE_SCHEMA_KEYWORD, pageResponseSchema, Serializer } from '../index';
+import { BadRequestError, PAGE_SCHEMA_KEYWORD, pageResponseSchema, Serializer } from '../index.js';
 
 /**
  * A filter operator of the query DSL.

@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 import type { RateLimitStore } from '@elysiumjs/olympus';
-import type { RedisConnection } from './connection';
+import type { RedisConnection } from './connection.js';
 
-import { Redis } from './redis';
+import { Redis } from './redis.js';
 
 /**
  * Keeps rate limit counts in Redis, shared by every process of the app. A count is an `INCR`ed

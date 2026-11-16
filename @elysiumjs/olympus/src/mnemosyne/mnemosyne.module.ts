@@ -13,15 +13,15 @@
 // limitations under the License.
 
 import type { KeyvStoreAdapter } from 'keyv';
-import type { ServiceFactoryDefinition } from '../index';
-import type { RepositoryCacheOptions } from './repository-cache';
+import type { ServiceFactoryDefinition } from '../index.js';
+import type { RepositoryCacheOptions } from './repository-cache.js';
 
 import { KeyvCacheableMemory } from 'cacheable';
 
-import { Module } from '../index';
-import { cacheStoreService, makeCacheInterface, MEMORY_CACHE_SERVICE } from './cache';
-import { DbSeedCommand } from './commands/db_seed.command';
-import { REPOSITORY_CACHE_SERVICE } from './repository-cache';
+import { Module } from '../index.js';
+import { cacheStoreService, makeCacheInterface, MEMORY_CACHE_SERVICE } from './cache.js';
+import { DbSeedCommand } from './commands/db_seed.command.js';
+import { REPOSITORY_CACHE_SERVICE } from './repository-cache.js';
 
 /**
  * Configuration of the {@link MnemosyneModule}.

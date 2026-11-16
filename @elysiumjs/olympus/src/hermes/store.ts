@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Clock } from '../clock';
-import { Port } from '../port';
+import { Clock } from '../clock.js';
+import { Port } from '../port.js';
 
 /**
  * A notification kept by the `inbox` channel.
@@ -96,7 +96,7 @@ export interface NotificationStoreDriver {
 	delete(owner: InboxOwner, ids: readonly string[]): Promise<number>;
 }
 
-declare module '../port' {
+declare module '../port.js' {
 	interface Ports {
 		'notification-store': NotificationStoreDriver;
 	}

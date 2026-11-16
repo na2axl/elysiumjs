@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { PortDriverName } from '../port';
-import type { Pbkdf2PasswordHasher } from './pbkdf2';
-import type { ScryptPasswordHasher } from './scrypt';
+import type { PortDriverName } from '../port.js';
+import type { Pbkdf2PasswordHasher } from './pbkdf2.js';
+import type { ScryptPasswordHasher } from './scrypt.js';
 
-import { Port } from '../port';
+import { Port } from '../port.js';
 
 /**
  * Hashes and verifies passwords: a driver of the {@link PasswordHasher} port. A hash is a
@@ -33,7 +33,7 @@ export interface PasswordHasherDriver {
 	needsRehash(hash: string): boolean;
 }
 
-declare module '../port' {
+declare module '../port.js' {
 	interface Ports {
 		'password-hasher': PasswordHasherDriver;
 	}

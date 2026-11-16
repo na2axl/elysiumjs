@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Command, ConsoleFormat, InteractsWithConsole } from '../../index';
-
-import { JobRegistry } from '../registry';
+import { Command, ConsoleFormat, InteractsWithConsole } from '../../index.js';
+import { JobRegistry } from '../registry.js';
 
 /**
  * Command used to list all registered Heracles jobs.

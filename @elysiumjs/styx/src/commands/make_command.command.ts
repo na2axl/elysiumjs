@@ -19,10 +19,10 @@ import prompts from 'prompts';
 import { pascal } from 'radash';
 import formatter from 'string-template';
 
-import { readAsset } from '../assets';
-import { addToModuleHint, getModulePath, parseProjectConfig } from '../config';
-import { fileName } from '../utils';
-import { BaseCommand } from './base.command';
+import { readAsset } from '../assets.js';
+import { addToModuleHint, getModulePath, parseProjectConfig } from '../config.js';
+import { fileName } from '../utils.js';
+import { BaseCommand } from './base.command.js';
 
 /**
  * Maker class for creating Elysium.js commands.

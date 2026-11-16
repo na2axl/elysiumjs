@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { LockDriver } from '../index';
-import type { CronSchedule } from './cron';
-import type { JobClass } from './job';
+import type { LockDriver } from '../index.js';
+import type { CronSchedule } from './cron.js';
+import type { JobClass } from './job.js';
 
 import {
 	Background,
@@ -24,10 +24,10 @@ import {
 	Metadata,
 	ModuleContext,
 	Service
-} from '../index';
-import { Cron } from './cron';
-import { Heracles } from './heracles';
-import { JobRegistry } from './registry';
+} from '../index.js';
+import { Cron } from './cron.js';
+import { Heracles } from './heracles.js';
+import { JobRegistry } from './registry.js';
 
 const SCHEDULES = Symbol.for('elysium:heracles:Schedules');
 

@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { StoredEvent, StoredEventClass, StoredEventMeta } from './stored-event';
+import type { StoredEvent, StoredEventClass, StoredEventMeta } from './stored-event.js';
 
-import { Clock, DATABASE_TRANSACTION_SERVICE, Service } from '../index';
-import { UnitOfWork } from '../mnemosyne/index';
-import { eventStore, inOwnerModule, projectionStorage } from './config';
-import { DuplicateStreamNameError } from './errors';
-import { StoredEvents } from './stored-event';
+import { Clock, DATABASE_TRANSACTION_SERVICE, Service } from '../index.js';
+import { UnitOfWork } from '../mnemosyne/index.js';
+import { eventStore, inOwnerModule, projectionStorage } from './config.js';
+import { DuplicateStreamNameError } from './errors.js';
+import { StoredEvents } from './stored-event.js';
 
 /**
  * The options of a projection.

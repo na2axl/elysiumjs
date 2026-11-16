@@ -12,24 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { JobClass, JobDispatchOptions } from '../heracles/index';
-import type { QueuedRun } from './action';
-import type { OutboxEffect } from './stores';
+import type { JobClass, JobDispatchOptions } from '../heracles/index.js';
+import type { QueuedRun } from './action.js';
+import type { OutboxEffect } from './stores.js';
 
-import { Heracles, Job, JobRegistry, Queue, QUEUES_SERVICE, sealJobArgs } from '../heracles/index';
+import {
+	Heracles,
+	Job,
+	JobRegistry,
+	Queue,
+	QUEUES_SERVICE,
+	sealJobArgs
+} from '../heracles/index.js';
 import {
 	DATABASE_TRANSACTION_SERVICE,
 	ElysiumError,
 	getLogger,
 	ModuleContext,
 	Service
-} from '../index';
-import { UnitOfWork } from '../mnemosyne/index';
-import { runQueuedAction, setActionQueue } from './action';
-import { MOIRAI_ACTION_JOB, MOIRAI_OUTBOX_STORE } from './config';
-import { QueuedActionsUnavailableError } from './errors';
-import { uuidv7 } from './ids';
-import { Inbox, Outbox, registerEffect } from './outbox';
+} from '../index.js';
+import { UnitOfWork } from '../mnemosyne/index.js';
+import { runQueuedAction, setActionQueue } from './action.js';
+import { MOIRAI_ACTION_JOB, MOIRAI_OUTBOX_STORE } from './config.js';
+import { QueuedActionsUnavailableError } from './errors.js';
+import { uuidv7 } from './ids.js';
+import { Inbox, Outbox, registerEffect } from './outbox.js';
 
 /** The kind of the effects that dispatch a Heracles job. */
 export const HERACLES_JOB_EFFECT = 'heracles.job';

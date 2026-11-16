@@ -13,12 +13,12 @@
 // limitations under the License.
 
 import type { Elysia } from 'elysia';
-import type { Environment } from './environments';
-import type { ModuleNode } from './module-graph';
+import type { Environment } from './environments.js';
+import type { ModuleNode } from './module-graph.js';
 
 import { isObject } from 'radash';
 
-import { Runtime } from './runtime';
+import { Runtime } from './runtime.js';
 
 export namespace Symbols {
 	export const app = Symbol('elysium:Application');

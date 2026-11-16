@@ -18,7 +18,7 @@ import {
 	HephaestusBuildCommand,
 	HephaestusDockerCommand,
 	HephaestusEmbedCommand
-} from './commands';
+} from './commands/index.js';
 
 /**
  * Exposes the Hephaestus build tooling commands.

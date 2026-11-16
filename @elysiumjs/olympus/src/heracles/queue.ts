@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { LifecycleHandler } from '../index';
-import type { JobClass, JobOverlapBehavior } from './job';
-import type { JobStatusInfo, Transport, TransportClass, TransportEvent } from './transport';
+import type { LifecycleHandler } from '../index.js';
+import type { JobClass, JobOverlapBehavior } from './job.js';
+import type { JobStatusInfo, Transport, TransportClass, TransportEvent } from './transport.js';
 
 import { map, uid } from 'radash';
 
-import { InteractsWithConsole, Lifecycle } from '../index';
-import { sealJobArgs } from './encryption';
-import { Job, JobStatus } from './job';
-import { TransportMode } from './transport';
+import { InteractsWithConsole, Lifecycle } from '../index.js';
+import { sealJobArgs } from './encryption.js';
+import { Job, JobStatus } from './job.js';
+import { TransportMode } from './transport.js';
 
 /**
  * Options for dispatching a job to a queue.

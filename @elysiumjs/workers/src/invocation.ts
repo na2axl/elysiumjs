@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { WorkersExecutionContext } from './types';
+import type { WorkersExecutionContext } from './types.js';
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 

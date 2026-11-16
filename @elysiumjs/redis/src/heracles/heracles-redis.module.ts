@@ -14,8 +14,8 @@
 
 import { Module } from '@elysiumjs/olympus';
 
-import { HeraclesCleanCommand } from './commands/clean.command';
-import { HeraclesWorkCommand } from './commands/work.command';
+import { HeraclesCleanCommand } from './commands/clean.command.js';
+import { HeraclesWorkCommand } from './commands/work.command.js';
 
 /**
  * Provides the Heracles commands that run on Redis: `heracles:work` runs a worker that consumes

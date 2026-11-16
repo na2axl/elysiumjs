@@ -14,8 +14,8 @@
 
 import { t } from 'elysia';
 
-import { Metadata } from './metadata';
-import { DomainError } from './problem';
+import { Metadata } from './metadata.js';
+import { DomainError } from './problem.js';
 
 /**
  * What a store answers for a hit: the count of the key in its current window, or, for stores that

@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ChannelContext, NotificationChannel } from '../channel';
-import type { Notifiable } from '../notifiable';
+import type { ChannelContext, NotificationChannel } from '../channel.js';
+import type { Notifiable } from '../notifiable.js';
 
-import { Clock } from '../../clock';
-import { uuidv7 } from '../../moirai/ids';
-import { InboxMessage } from '../messages';
-import { Notification } from '../notification';
+import { Clock } from '../../clock.js';
+import { uuidv7 } from '../../moirai/ids.js';
+import { InboxMessage } from '../messages.js';
+import { Notification } from '../notification.js';
 
 /**
  * Keeps notifications in the notification store, for the inbox of the app. It reaches only

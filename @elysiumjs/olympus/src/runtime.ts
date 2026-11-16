@@ -14,7 +14,7 @@
 
 import type { AnyElysia } from 'elysia';
 
-import { ElysiumError } from './errors';
+import { ElysiumError } from './errors.js';
 
 /**
  * The process signals the application shuts down on.

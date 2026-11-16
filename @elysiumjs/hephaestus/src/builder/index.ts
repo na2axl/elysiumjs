@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export { type BuildResult, BinaryBuilder } from './binary.builder';
-export { type NodeBuildOptions, type NodeBuildResult, NodeBuilder } from './node.builder';
+export { type BuildResult, BinaryBuilder } from './binary.builder.js';
+export { type NodeBuildOptions, type NodeBuildResult, NodeBuilder } from './node.builder.js';
 export {
 	type WorkersBuildOptions,
 	type WorkersBuildResult,
 	WorkersBuilder
-} from './workers.builder';
+} from './workers.builder.js';

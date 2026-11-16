@@ -14,14 +14,14 @@
 
 import type { Class } from 'type-fest';
 import type { TSchema } from 'typebox';
-import type { ModuleNode } from './module-graph';
-import type { ProblemClass } from './problem';
+import type { ModuleNode } from './module-graph.js';
+import type { ProblemClass } from './problem.js';
 
-import { InterceptorNextCalledTwiceError } from './errors';
-import { Metadata } from './metadata';
-import { ModuleContext } from './module-context';
-import { Service, ServiceScope } from './service';
-import { Symbols } from './utils';
+import { InterceptorNextCalledTwiceError } from './errors.js';
+import { Metadata } from './metadata.js';
+import { ModuleContext } from './module-context.js';
+import { Service, ServiceScope } from './service.js';
+import { Symbols } from './utils.js';
 
 /**
  * The context an interceptor receives: the Elysia context of the request (`request`, `set`,

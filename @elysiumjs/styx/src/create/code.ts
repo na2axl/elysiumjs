@@ -14,7 +14,7 @@
 
 import { pascal } from 'radash';
 
-import { elysiumVersions } from './versions' with { type: 'macro' };
+import { elysiumVersions } from './versions.js' with { type: 'macro' };
 
 /** The ranges of the third-party tools features add, as in the root package.json of the monorepo. */
 const TOOL_VERSIONS: Record<string, string> = {

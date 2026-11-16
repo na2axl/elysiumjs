@@ -16,7 +16,7 @@ import type { JobStatusInfo, Transport, TransportEvent } from '@elysiumjs/olympu
 
 import { ElysiumError, getLogger } from '@elysiumjs/olympus';
 
-import { Workers } from '../index';
+import { Workers } from '../index.js';
 
 /**
  * A Cloudflare Queue producer binding.

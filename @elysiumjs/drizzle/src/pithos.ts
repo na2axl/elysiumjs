@@ -20,14 +20,14 @@ import type {
 	FileStatus,
 	FileStoreDriver
 } from '@elysiumjs/olympus/pithos';
-import type { BuiltPgTable } from './built-table';
-import type { DrizzleStoreOptions, StoreTable } from './moirai';
+import type { BuiltPgTable } from './built-table.js';
+import type { DrizzleStoreOptions, StoreTable } from './moirai.js';
 
 import { FileStore } from '@elysiumjs/olympus/pithos';
 import { and, asc, count, eq, gt, inArray, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
 import { bigint, index, jsonb, pgSchema, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
 
-import { Database } from './database';
+import { Database } from './database.js';
 
 declare module '@elysiumjs/olympus' {
 	interface PortDrivers {

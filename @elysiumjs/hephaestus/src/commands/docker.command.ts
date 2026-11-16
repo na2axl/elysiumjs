@@ -14,8 +14,8 @@
 
 import { Command, CommandArgumentType } from '@elysiumjs/olympus';
 
-import { loadConfig } from '../config/loader';
-import { DockerGenerator } from './docker.generator';
+import { loadConfig } from '../config/loader.js';
+import { DockerGenerator } from './docker.generator.js';
 
 /**
  * Command used to generate a Dockerfile for the compiled binary.

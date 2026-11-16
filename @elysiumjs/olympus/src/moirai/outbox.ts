@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ModuleNode } from '../index';
-import type { OutboxEffect, OutboxRow } from './stores';
+import type { ModuleNode } from '../index.js';
+import type { OutboxEffect, OutboxRow } from './stores.js';
 
 import {
 	Background,
@@ -22,15 +22,15 @@ import {
 	getLogger,
 	ModuleContext,
 	Service
-} from '../index';
-import { UnitOfWork } from '../mnemosyne/index';
-import { inboxStore, MOIRAI_OUTBOX_STORE, options, outboxStore } from './config';
+} from '../index.js';
+import { UnitOfWork } from '../mnemosyne/index.js';
+import { inboxStore, MOIRAI_OUTBOX_STORE, options, outboxStore } from './config.js';
 import {
 	MissingStoreError,
 	PayloadReplacementUnsupportedError,
 	UnknownEffectError
-} from './errors';
-import { uuidv7 } from './ids';
+} from './errors.js';
+import { uuidv7 } from './ids.js';
 
 /**
  * What an outbox handler gets besides the payload and the row.

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { Environment } from './environments';
-import type { ServiceToken } from './token';
+import type { Environment } from './environments.js';
+import type { ServiceToken } from './token.js';
 
 /**
  * Base class of every error thrown by the Elysium framework.

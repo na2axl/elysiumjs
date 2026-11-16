@@ -14,9 +14,9 @@
 
 import { Command } from '@elysiumjs/olympus';
 
-import { routesWithoutResponse } from '../routes/check';
-import { getProjectPath, resolveAppEntry } from '../utils';
-import { BaseCommand } from './base.command';
+import { routesWithoutResponse } from '../routes/check.js';
+import { getProjectPath, resolveAppEntry } from '../utils.js';
+import { BaseCommand } from './base.command.js';
 
 /**
  * Checks that every route of the app declares the schema of its success response.

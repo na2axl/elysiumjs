@@ -141,6 +141,9 @@ jobs:
       - name: Build
         run: bun run build
 
+      - name: Declarations resolve for consumers
+        run: bun run check:declarations
+
       - name: Services resolve in a minified build
         run: bun run --cwd @elysiumjs/olympus check:minified
 

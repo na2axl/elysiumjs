@@ -12,6 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export * from './build.command';
-export * from './embed.command';
-export * from './docker.command';
+export * from './build.command.js';
+export * from './embed.command.js';
+export * from './docker.command.js';

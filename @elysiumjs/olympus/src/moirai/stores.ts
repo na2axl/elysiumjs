@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { UnitOfWork } from '../mnemosyne/index';
-import { ConcurrencyConflictError, IdempotencyConflictError } from './errors';
+import { UnitOfWork } from '../mnemosyne/index.js';
+import { ConcurrencyConflictError, IdempotencyConflictError } from './errors.js';
 
 /**
  * What an idempotency store keeps of an action call: its response, replayed when the key comes

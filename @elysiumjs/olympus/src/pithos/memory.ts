@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { ServedSigning } from './signing';
+import type { ServedSigning } from './signing.js';
 import type {
 	ListOptions,
 	ListPage,
@@ -21,10 +21,10 @@ import type {
 	SignedUrlOptions,
 	StorageBody,
 	StoredObject
-} from './storage';
+} from './storage.js';
 
-import { Clock } from '../clock';
-import { joinUrl, signServedUrl } from './signing';
+import { Clock } from '../clock.js';
+import { joinUrl, signServedUrl } from './signing.js';
 import {
 	assertKey,
 	DiskCannotSignError,
@@ -35,9 +35,9 @@ import {
 	Storage,
 	StorageDriver,
 	toBytes
-} from './storage';
+} from './storage.js';
 
-declare module '../port' {
+declare module '../port.js' {
 	interface PortDrivers {
 		'storage:memory': typeof MemoryDisk;
 	}

@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export type { TracingConfig } from './types';
+export type { TracingConfig } from './types.js';
 
-export { ArgusSDK } from './sdk';
-export { Traced } from './decorators/traced';
-export { withTraceContext } from './correlation';
-export { argusPlugin } from './plugin';
-export { ArgusModule } from './argus.module';
+export { ArgusSDK } from './sdk.js';
+export { Traced } from './decorators/traced.js';
+export { withTraceContext } from './correlation.js';
+export { argusPlugin } from './plugin.js';
+export { ArgusModule } from './argus.module.js';

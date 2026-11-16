@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { randomToken, safeEqual, sha256 } from '../harpocrates/crypto';
+import { randomToken, safeEqual, sha256 } from '../harpocrates/crypto.js';
 
 export namespace ApiKeys {
 	/**

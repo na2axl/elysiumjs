@@ -17,18 +17,18 @@ import type {
 	ChannelName,
 	NotificationChannel,
 	NotificationChannels
-} from './channel';
-import type { NotificationDelivery } from './delivery';
-import type { NotificationFake } from './fake';
-import type { Notifiable, NotifiableResolver } from './notifiable';
-import type { Instantiable, NotificationOptions } from './registry';
-import type { NotificationStoreDriver } from './store';
+} from './channel.js';
+import type { NotificationDelivery } from './delivery.js';
+import type { NotificationFake } from './fake.js';
+import type { Notifiable, NotifiableResolver } from './notifiable.js';
+import type { Instantiable, NotificationOptions } from './registry.js';
+import type { NotificationStoreDriver } from './store.js';
 
-import { UnitOfWork } from '../mnemosyne/unit-of-work';
-import { uuidv7 } from '../moirai/ids';
-import { Service } from '../service';
-import { HERMES_NOTIFICATION_STORE } from './config';
-import { deliverChain } from './delivery';
+import { UnitOfWork } from '../mnemosyne/unit-of-work.js';
+import { uuidv7 } from '../moirai/ids.js';
+import { Service } from '../service.js';
+import { HERMES_NOTIFICATION_STORE } from './config.js';
+import { deliverChain } from './delivery.js';
 import {
 	DuplicateChannelError,
 	DuplicateNotificationTypeError,
@@ -38,16 +38,16 @@ import {
 	QueuedNotificationsUnavailableError,
 	UnknownChannelError,
 	UnregisteredNotificationError
-} from './errors';
-import { currentNotificationFake, startNotificationFake } from './fake';
-import { prepareRun } from './queued';
+} from './errors.js';
+import { currentNotificationFake, startNotificationFake } from './fake.js';
+import { prepareRun } from './queued.js';
 import {
 	channelRegistry,
 	getNotificationQueue,
 	notificationOptions,
 	notificationTypes,
 	resolverRegistry
-} from './registry';
+} from './registry.js';
 
 /** The channel names an entry list holds: each channel, and each channel of each chain. */
 type ChannelsIn<E> = E extends readonly (infer I)[]

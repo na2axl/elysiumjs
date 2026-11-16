@@ -21,7 +21,7 @@ import type { ModuleClass } from '@elysiumjs/olympus';
 import { existsSync, realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { route } from './cli/route';
+import { route } from './cli/route.js';
 
 /** Finds the project folder: the closest one holding `.elysiumrc`. */
 const findProject = (from: string): string | undefined => {
@@ -100,22 +100,22 @@ switch (decision.kind) {
 		process.exit(await proc.exited);
 	}
 	case 'cli': {
-		const { stubCloudflareModules } = await import('./cloudflare-stubs');
+		const { stubCloudflareModules } = await import('./cloudflare-stubs.js');
 		stubCloudflareModules();
-		const { runCli } = await import('./cli/app');
+		const { runCli } = await import('./cli/app.js');
 		await runCli(decision.argv, await loadTools(project, projectCli === self));
 		break;
 	}
 	case 'app': {
-		const { stubCloudflareModules } = await import('./cloudflare-stubs');
+		const { stubCloudflareModules } = await import('./cloudflare-stubs.js');
 		stubCloudflareModules();
-		const { resolveAppEntry } = await import('./utils');
+		const { resolveAppEntry } = await import('./utils.js');
 		const { Application, ElysiumError } = await import('@elysiumjs/olympus');
 		try {
 			let App = await resolveAppEntry(decision.project);
 			if (listsCommands(decision.argv)) {
 				// The listing and the help show Styx's commands beside the app's.
-				const { StyxCliModule } = await import('./cli/app');
+				const { StyxCliModule } = await import('./cli/app.js');
 				const modules = [StyxCliModule, ...(await loadTools(project, true))];
 				@Application.register({ modules })
 				class AppWithStyx extends App {}

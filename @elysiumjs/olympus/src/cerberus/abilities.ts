@@ -13,15 +13,15 @@
 // limitations under the License.
 import type { ExtractSubjectType, MongoAbility, MongoQuery } from '@casl/ability';
 import type { PackRule } from '@casl/ability/extra';
-import type { ServiceTag } from '../token';
+import type { ServiceTag } from '../token.js';
 
 import { AbilityBuilder, createMongoAbility, subject as tagSubject } from '@casl/ability';
 import { packRules, unpackRules } from '@casl/ability/extra';
 
-import { ElysiumError } from '../errors';
-import { getCurrentTenant } from '../mnemosyne/tenancy';
-import { Service } from '../service';
-import { CERBERUS_CONFIG, cerberusConfig } from './config';
+import { ElysiumError } from '../errors.js';
+import { getCurrentTenant } from '../mnemosyne/tenancy.js';
+import { Service } from '../service.js';
+import { CERBERUS_CONFIG, cerberusConfig } from './config.js';
 
 /**
  * What the rules know about an actor, such as its id and roles. It is empty until the app

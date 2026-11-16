@@ -16,7 +16,7 @@ import type { Static, TSchema } from 'typebox';
 
 import { t } from 'elysia';
 
-import { ElysiumError } from './errors';
+import { ElysiumError } from './errors.js';
 
 /** The JSON Schema keyword that marks the schema of a page, with its pagination. */
 export const PAGE_SCHEMA_KEYWORD = 'x-elysium-page';

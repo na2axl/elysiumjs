@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { ElysiumError } from './errors';
+import { ElysiumError } from './errors.js';
 
 /**
  * The driver type of every port, by port name. A package that makes a port adds it by

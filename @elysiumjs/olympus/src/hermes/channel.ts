@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { BroadcastMessage, InboxMessage, LogMessage, MailMessage } from './messages';
-import type { Notifiable } from './notifiable';
-import type { Notification } from './notification';
+import type { BroadcastMessage, InboxMessage, LogMessage, MailMessage } from './messages.js';
+import type { Notifiable } from './notifiable.js';
+import type { Notification } from './notification.js';
 
 /**
  * The message class each channel accepts, by channel name. A package or an app that adds a

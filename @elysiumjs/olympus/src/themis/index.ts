@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export { ApiKeys } from './api-keys';
+export { ApiKeys } from './api-keys.js';
 export {
 	apiKeyGuard,
 	Auth,
@@ -23,10 +23,10 @@ export {
 	type GuardClass,
 	jwtGuard,
 	sessionGuard
-} from './auth';
-export { THEMIS_CONFIG, type ThemisConfig } from './config';
-export { type CookieOptions, type HttpContext } from './context';
-export { Csrf, CsrfMiddleware } from './csrf';
+} from './auth.js';
+export { THEMIS_CONFIG, type ThemisConfig } from './config.js';
+export { type CookieOptions, type HttpContext } from './context.js';
+export { Csrf, CsrfMiddleware } from './csrf.js';
 export {
 	CsrfTokenMismatchError,
 	MissingThemisConfigError,
@@ -34,7 +34,7 @@ export {
 	SessionTooLargeError,
 	UnauthenticatedError,
 	UnknownGuardError
-} from './errors';
+} from './errors.js';
 export {
 	commitSession,
 	loadSession,
@@ -43,13 +43,13 @@ export {
 	type SessionData,
 	SessionMiddleware,
 	type SessionStore
-} from './session';
+} from './session.js';
 export {
 	OAuthCallbackError,
 	OAuthClient,
 	type OAuthClientOptions,
 	type OAuthResult
-} from './oauth';
+} from './oauth.js';
 export {
 	type PasskeyChallenge,
 	type PasskeyRecord,
@@ -57,6 +57,6 @@ export {
 	Passkeys,
 	type PasskeysOptions,
 	PasskeyVerificationError
-} from './passkeys';
-export { ThemisModule } from './themis.module';
-export { type BackupCodeOptions, BackupCodes, Totp, type TotpOptions } from './totp';
+} from './passkeys.js';
+export { ThemisModule } from './themis.module.js';
+export { type BackupCodeOptions, BackupCodes, Totp, type TotpOptions } from './totp.js';

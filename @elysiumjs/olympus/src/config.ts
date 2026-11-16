@@ -13,12 +13,12 @@
 // limitations under the License.
 
 import type { TObject, TOptional, TSchema, TString } from 'typebox';
-import type { ModuleGraph } from './module-graph';
+import type { ModuleGraph } from './module-graph.js';
 
 import { t } from 'elysia';
 import Value from 'typebox/value';
 
-import { ElysiumError } from './errors';
+import { ElysiumError } from './errors.js';
 
 const SECRET = Symbol.for('elysium:Secret');
 

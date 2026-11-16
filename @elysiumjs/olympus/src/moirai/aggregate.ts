@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { DomainError } from '../index';
-import type { StoredEventClass } from './stored-event';
+import type { DomainError } from '../index.js';
+import type { StoredEventClass } from './stored-event.js';
 
-import { DuplicateStreamNameError, UnregisteredStreamClassError } from './errors';
-import { deepFreeze, freezes, StoredEvent, StoredEvents } from './stored-event';
+import { DuplicateStreamNameError, UnregisteredStreamClassError } from './errors.js';
+import { deepFreeze, freezes, StoredEvent, StoredEvents } from './stored-event.js';
 
 /**
  * The options of an aggregate.
