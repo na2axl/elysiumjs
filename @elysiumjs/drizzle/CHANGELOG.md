@@ -1,5 +1,13 @@
 # @elysiumjs/drizzle
 
+## 0.2.2
+
+### Patch Changes
+
+- Updated dependencies [[`d9c7abe`](https://github.com/na2axl/elysiumjs/commit/d9c7abe5ebd3bed2cad9536e1d57cf87ac906f20)]:
+  - @elysiumjs/olympus@0.27.0
+  - @elysiumjs/workers@0.1.3
+
 ## 0.2.1
 
 ### Patch Changes
