@@ -19,7 +19,7 @@
     },
     "@elysiumjs/argus": {
       "name": "@elysiumjs/argus",
-      "version": "0.4.3",
+      "version": "0.4.4",
       "dependencies": {
         "@opentelemetry/api": "^1.10.0",
         "@opentelemetry/exporter-trace-otlp-http": "^0.300.0",
@@ -37,7 +37,7 @@
     },
     "@elysiumjs/bun": {
       "name": "@elysiumjs/bun",
-      "version": "0.1.3",
+      "version": "0.1.4",
       "devDependencies": {
         "@elysiumjs/olympus": "workspace:*",
         "elysia": "^2.0.0-rc.1",
@@ -48,7 +48,7 @@
     },
     "@elysiumjs/drizzle": {
       "name": "@elysiumjs/drizzle",
-      "version": "0.2.2",
+      "version": "0.3.0",
       "dependencies": {
         "@casl/ability": "^7.0.2",
         "drizzle-orm": "^1.0.0-rc.5",
@@ -78,7 +78,7 @@
     },
     "@elysiumjs/hephaestus": {
       "name": "@elysiumjs/hephaestus",
-      "version": "0.6.3",
+      "version": "0.6.4",
       "dependencies": {
         "zod": "^4.6.7",
       },
@@ -94,7 +94,7 @@
     },
     "@elysiumjs/node": {
       "name": "@elysiumjs/node",
-      "version": "0.1.3",
+      "version": "0.1.4",
       "devDependencies": {
         "@elysiumjs/olympus": "workspace:*",
         "elysia": "^2.0.0-rc.1",
@@ -105,7 +105,7 @@
     },
     "@elysiumjs/olympus": {
       "name": "@elysiumjs/olympus",
-      "version": "0.27.0",
+      "version": "0.28.0",
       "dependencies": {
         "@casl/ability": "^7.0.2",
         "@elysia/openapi": "^2.0.0-rc.0",
@@ -129,7 +129,7 @@
     },
     "@elysiumjs/pino": {
       "name": "@elysiumjs/pino",
-      "version": "0.1.3",
+      "version": "0.1.4",
       "dependencies": {
         "pino": "^10.4.0",
         "pino-pretty": "^13.2.0",
@@ -144,7 +144,7 @@
     },
     "@elysiumjs/plugin-sentry": {
       "name": "@elysiumjs/plugin-sentry",
-      "version": "0.5.3",
+      "version": "0.5.4",
       "dependencies": {
         "@elysia/opentelemetry": "^2.0.0-rc.0",
         "@sentry/bun": "^11.9.0",
@@ -158,7 +158,7 @@
     },
     "@elysiumjs/redis": {
       "name": "@elysiumjs/redis",
-      "version": "0.2.3",
+      "version": "0.3.0",
       "dependencies": {
         "cacheable": "^2.5.0",
         "keyv": "^5.6.0",
@@ -173,7 +173,7 @@
     },
     "@elysiumjs/styx": {
       "name": "@elysiumjs/styx",
-      "version": "0.17.3",
+      "version": "0.18.0",
       "bin": {
         "styx": "dist/cli.js",
       },
@@ -194,7 +194,7 @@
     },
     "@elysiumjs/workers": {
       "name": "@elysiumjs/workers",
-      "version": "0.1.3",
+      "version": "0.2.0",
       "devDependencies": {
         "@elysiumjs/olympus": "workspace:*",
         "elysia": "^2.0.0-rc.1",
@@ -223,7 +223,7 @@
     },
     "create-elysium": {
       "name": "create-elysium",
-      "version": "0.4.1",
+      "version": "0.4.2",
       "bin": {
         "create-elysium": "./index.js",
       },
@@ -1089,7 +1089,7 @@
 
     "miniflare": ["miniflare@5.20261104.0-beta", "", { "dependencies": { "@cspotcode/source-map-support": "0.8.1", "sharp": "0.35.5", "undici": "7.30.1", "workerd": "1.20261104.1", "ws": "8.21.0", "youch": "4.1.0-beta.10" } }, "sha512-pYZ2n85+FYUb7s0oIVcQxO63/+wgaknm+A/kQjctJqshvHPJs3UtnzaIZ7xrrHMOk8atD7yAfauf6G9VAv7Upg=="],
 
-    "minimatch": ["minimatch@11.0.8", "", { "dependencies": { "@isaacs/nonrecursive-glob-match": "^1.1.0", "brace-expansion": "^5.0.12" } }, "sha512-nFQuYSTVrGvysVBps5Ih+0BdnYFN/Cj3C816r6+p7yK+FHrVLGE4O4N9AFwykrlNlvM2HYt+Rad1Uiro6h88Ig=="],
+    "minimatch": ["minimatch@11.0.9", "", { "dependencies": { "@isaacs/nonrecursive-glob-match": "^1.1.0", "brace-expansion": "^5.0.12" } }, "sha512-KCFkfyjqerNlSstjlhIGNXIKZGA/6O4V4RlhZ+Dsr621SPPw0mzlypE9D9ZOoPiVefHID+j7/XuMMlqfD/F60Q=="],
 
     "minimist": ["minimist@1.2.8", "", {}, "sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA=="],
 

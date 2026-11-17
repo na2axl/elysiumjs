@@ -1,5 +1,12 @@
 # @elysiumjs/pino
 
+## 0.1.4
+
+### Patch Changes
+
+- Updated dependencies [[`7b3d398`](https://github.com/na2axl/elysiumjs/commit/7b3d398b9829b1f14e3ce73165caffa27c9007be), [`7b3d398`](https://github.com/na2axl/elysiumjs/commit/7b3d398b9829b1f14e3ce73165caffa27c9007be)]:
+  - @elysiumjs/olympus@0.28.0
+
 ## 0.1.3
 
 ### Patch Changes

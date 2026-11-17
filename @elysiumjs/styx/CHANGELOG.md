@@ -1,5 +1,17 @@
 # @elysiumjs/styx
 
+## 0.18.0
+
+### Minor Changes
+
+- [#131](https://github.com/na2axl/elysiumjs/pull/131) [`7b3d398`](https://github.com/na2axl/elysiumjs/commit/7b3d398b9829b1f14e3ce73165caffa27c9007be) Thanks [@na2axl](https://github.com/na2axl)! - Add `styx make:workflow`, which writes an Odysseus workflow to `workflows/<name>.workflow.ts` of a module, named `<module>.<name>`.
+
+### Patch Changes
+
+- Updated dependencies [[`7b3d398`](https://github.com/na2axl/elysiumjs/commit/7b3d398b9829b1f14e3ce73165caffa27c9007be), [`7b3d398`](https://github.com/na2axl/elysiumjs/commit/7b3d398b9829b1f14e3ce73165caffa27c9007be)]:
+  - @elysiumjs/olympus@0.28.0
+  - @elysiumjs/bun@0.1.4
+
 ## 0.17.3
 
 ### Patch Changes

@@ -1,5 +1,16 @@
 # @elysiumjs/redis
 
+## 0.3.0
+
+### Minor Changes
+
+- [#132](https://github.com/na2axl/elysiumjs/pull/132) [`4caa424`](https://github.com/na2axl/elysiumjs/commit/4caa424cbff49f4c52fb8309ea22f67a56238cf9) Thanks [@na2axl](https://github.com/na2axl)! - Add the `redis` workflow store of `@elysiumjs/olympus/odysseus`: `RedisWorkflowStore` keeps the instances of the `engine` driver in Redis, one Lua script per write, shared by any number of processes.
+
+### Patch Changes
+
+- Updated dependencies [[`7b3d398`](https://github.com/na2axl/elysiumjs/commit/7b3d398b9829b1f14e3ce73165caffa27c9007be), [`7b3d398`](https://github.com/na2axl/elysiumjs/commit/7b3d398b9829b1f14e3ce73165caffa27c9007be)]:
+  - @elysiumjs/olympus@0.28.0
+
 ## 0.2.3
 
 ### Patch Changes

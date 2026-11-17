@@ -1,5 +1,16 @@
 # @elysiumjs/workers
 
+## 0.2.0
+
+### Minor Changes
+
+- [#133](https://github.com/na2axl/elysiumjs/pull/133) [`4ade320`](https://github.com/na2axl/elysiumjs/commit/4ade32060f2376f2c725299a4bf6189ee56a864b) Thanks [@na2axl](https://github.com/na2axl)! - Add the `cloudflare` workflow driver of `@elysiumjs/olympus/odysseus`: `CloudflareWorkflowDriver` runs workflows on Cloudflare Workflows, through one shared binding (`WORKFLOWS`) or a binding per workflow (`driver: { binding }`), and `WorkflowRunner` (from `@elysiumjs/workers/durable-objects`) is the one Workflow class that runs them. `createWorker()` hands the application to the runner.
+
+### Patch Changes
+
+- Updated dependencies [[`7b3d398`](https://github.com/na2axl/elysiumjs/commit/7b3d398b9829b1f14e3ce73165caffa27c9007be), [`7b3d398`](https://github.com/na2axl/elysiumjs/commit/7b3d398b9829b1f14e3ce73165caffa27c9007be)]:
+  - @elysiumjs/olympus@0.28.0
+
 ## 0.1.3
 
 ### Patch Changes

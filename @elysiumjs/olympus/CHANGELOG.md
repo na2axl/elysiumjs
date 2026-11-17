@@ -1,5 +1,13 @@
 # @elysiumjs/olympus
 
+## 0.28.0
+
+### Minor Changes
+
+- [#131](https://github.com/na2axl/elysiumjs/pull/131) [`7b3d398`](https://github.com/na2axl/elysiumjs/commit/7b3d398b9829b1f14e3ce73165caffa27c9007be) Thanks [@na2axl](https://github.com/na2axl)! - Add `@elysiumjs/olympus/odysseus`, durable workflows. A workflow is a class registered with `@Workflow.register()` and listed in the `workflows` of a module; its `run()` is a series of steps (`step.do()`, `step.sleep()`, `step.sleepUntil()`, `step.waitFor()`) whose results are kept, so that it survives restarts, waits for events and timers, and retries failing steps. A step that returns a DomainError is not retried, and the error comes back with its class. `Odysseus.start()`, `startMany()`, `signal()`, `status()` and `terminate()` answer errors as values. The `workflow` port takes drivers: `engine` runs workflows in the process over the new `workflow-store` port, with a `memory` store, worker processes started with the `odysseus:work` command, leases between workers and `drain()` for tests.
+
+- [#131](https://github.com/na2axl/elysiumjs/pull/131) [`7b3d398`](https://github.com/na2axl/elysiumjs/commit/7b3d398b9829b1f14e3ce73165caffa27c9007be) Thanks [@na2axl](https://github.com/na2axl)! - Add `@Serializable({ name })`, which makes the instances of any class survive `Json`: they are written as their own fields and read back on the prototype of the class, without calling its constructor, and a DomainError is written as its problem and comes back with its class. A DomainError whose class is not serializable now survives `Json` as a plain DomainError with the same code and fields, and any other error as an `Error` with its name and message.
+
 ## 0.27.0
 
 ### Minor Changes
