@@ -37,7 +37,7 @@ export class OdysseusWorkCommand extends Command {
 		const driver = Service.get<WorkflowDriver>(ODYSSEUS_DRIVER);
 		if (!(driver instanceof EngineDriver)) {
 			throw new ElysiumError(
-				'Only the `engine` driver of OdysseusModule runs instances in a worker process.'
+				'Only the `engine` driver of OdysseusModule runs instances in workers.'
 			);
 		}
 		if (driver.store instanceof MemoryWorkflowStore) {
