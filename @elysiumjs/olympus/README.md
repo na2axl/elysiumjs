@@ -27,6 +27,7 @@ Add a runtime package too: `@elysiumjs/bun`, `@elysiumjs/node` or `@elysiumjs/wo
 | `@elysiumjs/olympus/hermes/heracles` | `NotificationJob`, which delivers queued notifications. List it in a module's `jobs`.                                                                                                                                   |
 | `@elysiumjs/olympus/pithos`          | Storage and files: disks (the `Storage` port and the `memory` disk), signed URLs, file records (the `FileStore` port), claims and deferred uploads.                                                                     |
 | `@elysiumjs/olympus/pithos/heracles` | `FilesPruner`, the base of the job that prunes files.                                                                                                                                                                   |
+| `@elysiumjs/olympus/odysseus`        | Durable workflows: steps kept across restarts, sleeps, events, retries, the `engine` driver and the `memory` store.                                                                                                     |
 
 Database drivers, stores and runtimes ship as separate packages, such as `@elysiumjs/drizzle` and `@elysiumjs/redis`.
 
@@ -1078,6 +1079,113 @@ class UpdatePost extends Action<Static<typeof UpdatePostInput>> {
 ```
 
 `Cerberus.ability()` answers the ability of the current actor, built once per request, and `Cerberus.check(action, subject)` whether it allows an action. `@elysiumjs/drizzle` turns the same rules into a SQL condition with `rulesToDrizzle()`, so a list answers only the rows the actor may act on.
+
+## Workflows
+
+A workflow is a series of steps that lives for minutes or months: it survives restarts, waits for events and timers without holding a worker, and tries a failing step again, each step running once. `@elysiumjs/olympus/odysseus` declares workflows; a driver runs them: `engine` runs them in the process over a store (on Bun, Node.js or Deno), and `cloudflare` from `@elysiumjs/workers` runs them on Cloudflare Workflows.
+
+```ts
+import type { WorkflowStep } from '@elysiumjs/olympus/odysseus';
+
+import { DomainError, Module, Service, t } from '@elysiumjs/olympus';
+import { Workflow, WorkflowEvent, WorkflowTimeoutError } from '@elysiumjs/olympus/odysseus';
+
+export class OutOfStock extends DomainError.for('OUT_OF_STOCK', 409) {}
+
+export const OrderPaid = WorkflowEvent.define('order-paid', t.Object({ amount: t.Integer() }));
+
+@Workflow.register({
+	name: 'orders.fulfil',
+	params: t.Object({ orderId: t.String(), sku: t.String() }),
+	errors: [OutOfStock]
+})
+export class FulfilOrder extends Workflow<{ orderId: string; sku: string }, { shipped: boolean }> {
+	constructor(
+		@Service.inject() private readonly inventory: Inventory,
+		@Service.inject() private readonly shipping: Shipping
+	) {
+		super();
+	}
+
+	public async run({ orderId, sku }: { orderId: string; sku: string }, step: WorkflowStep) {
+		// Returns { reservationId } or an OutOfStock error, which is not retried.
+		const reservation = await step.do('reserve', () => this.inventory.reserve(sku));
+		if (reservation instanceof OutOfStock) return { shipped: false };
+
+		const paid = await step.waitFor('payment', OrderPaid, { timeout: '3 days' });
+		if (paid instanceof WorkflowTimeoutError) {
+			await step.do('release', () => this.inventory.release(reservation.reservationId));
+			return { shipped: false };
+		}
+
+		await step.sleep('let the customer cancel', '1 hour');
+		await step.do('ship', { retries: { limit: 10, delay: '1 minute' } }, () =>
+			this.shipping.send(orderId)
+		);
+		return { shipped: true };
+	}
+}
+
+@Module.register({ workflows: [FulfilOrder], services: [Inventory, Shipping] })
+export class OrdersModule extends Module {}
+```
+
+`Odysseus` starts instances and talks to them. The id of an instance is unique in its workflow, so starting twice with the same id starts it once: take it from what the instance is about.
+
+```ts
+import { Odysseus } from '@elysiumjs/olympus/odysseus';
+
+await Odysseus.start(FulfilOrder, { orderId: '42', sku: 'mug' }, { id: 'order-42' });
+await Odysseus.signal(FulfilOrder, 'order-42', OrderPaid, { amount: 1500 }); // kept until the workflow waits for it
+const instance = await Odysseus.status(FulfilOrder, 'order-42'); // { status: 'waiting', ... }
+await Odysseus.terminate(FulfilOrder, 'order-42');
+```
+
+They answer errors as values: `WorkflowAlreadyStartedError`, `WorkflowNotFoundError`, `WorkflowFinishedError`, and `ValidationFailedError` for an invalid id, params or event payload. `Odysseus.startMany()` starts several instances in one call to the driver.
+
+How a workflow runs:
+
+- `run()` is replayed from the start each time the instance wakes. A finished step gives its kept result without running again, so code outside the steps must give the same answer on every replay: read the time, random values and anything that changes inside a step.
+- A step that throws is tried again by its retries (by default 5 retries from 10 seconds, doubled each time, set per step or per workflow), then `WorkflowStepFailedError` is thrown into `run()`: caught, the workflow goes on; uncaught, the instance ends `errored`. A step that returns a DomainError is not tried again: the error is its value. List the DomainError classes the workflow returns in `errors`, so that they come back with their class.
+- A step may run more than once when a process stops before its result is kept, so make its side effects idempotent, such as with an idempotency key.
+- Step values come back as JSON (a date as an ISO string), on the first run too. A step name used several times in one run, such as in a loop, names a new step each time.
+- `step.sleep()`, `step.sleepUntil()` and `step.waitFor()` wait up to 365 days. Event types and instance ids take letters, digits, `_` and `-`, the characters every driver accepts.
+
+### The engine driver
+
+```ts
+import { OdysseusModule, Workflows, WorkflowStore } from '@elysiumjs/olympus/odysseus';
+
+OdysseusModule.with({
+	driver: () =>
+		Workflows.for('engine', {
+			store: () => WorkflowStore.for('memory'),
+			concurrency: 10 // instances run at once by this process
+		})
+});
+```
+
+Each process with `work: true` (the default) runs a worker that polls the store (`pollInterval`, 1 second) and runs the due instances. A worker holds an instance under a lease (`lease`, 15 minutes, extended as steps finish), so that two processes never run it at once and another takes over from a process that died. Set `work: false` in a process that only starts instances and sends events. Finished instances are deleted after `retention` (7 days). The `memory` store keeps instances in the process; `@elysiumjs/drizzle` provides a PostgreSQL store and `@elysiumjs/redis` a Redis store. The engine does not run on Cloudflare Workers, which has no long-lived process: use the `cloudflare` driver there.
+
+### Workflows in tests
+
+With the `engine` driver, `work: false` and a frozen clock, `drain()` runs the due instances until each one finishes or waits, and `Clock.travel()` moves past sleeps, retry delays and wait timeouts:
+
+```ts
+const engine = Workflows.for('engine', { store: WorkflowStore.for('memory'), work: false });
+const app = await Application.testing({
+	modules: [OdysseusModule.with({ driver: engine }), OrdersModule],
+	boot: 'eager'
+});
+
+Clock.freeze('2026-01-01T00:00:00Z');
+await Odysseus.start(FulfilOrder, { orderId: '42', sku: 'mug' }, { id: 'order-42' });
+await engine.drain(); // waits for the payment
+await Odysseus.signal(FulfilOrder, 'order-42', OrderPaid, { amount: 1500 });
+await engine.drain(); // sleeps for an hour
+Clock.travel(3_600_000);
+await engine.drain(); // ships
+```
 
 ## Services
 

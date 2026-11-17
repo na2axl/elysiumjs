@@ -43,6 +43,7 @@ styx make:seeder --name CountriesSeeder
 styx make:service --name UserService
 styx make:validator --name CreateUser
 styx make:view --name Post
+styx make:workflow --name FulfilOrder
 styx module:new --name billing
 styx module:rename --module billing --name payments
 ```

@@ -30,7 +30,7 @@ const importPattern = /^import \{([^}]+)\} from '(@elysiumjs\/[^']+)';$/gm;
 
 describe('stub imports', () => {
 	it('has stubs to check', async () => {
-		expect((await readdir(stubsDir)).filter((f) => f.endsWith('.stub'))).toHaveLength(14);
+		expect((await readdir(stubsDir)).filter((f) => f.endsWith('.stub'))).toHaveLength(15);
 	});
 
 	for (const file of [
@@ -47,6 +47,7 @@ describe('stub imports', () => {
 		'validator.validate',
 		'view',
 		'wamp.controller',
+		'workflow',
 		'ws.controller'
 	]) {
 		it(`${file}.stub imports only names its package exports`, async () => {

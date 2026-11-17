@@ -168,7 +168,15 @@ export const ELYSIUM_PROBLEM_CODES = {
 	/** 422: the uploaded file is not what was declared; start again (pithos). */
 	UPLOAD_REJECTED: 'UPLOAD_REJECTED',
 	/** 422: the file is not stored and ready for this use (pithos). */
-	FILE_NOT_READY: 'FILE_NOT_READY'
+	FILE_NOT_READY: 'FILE_NOT_READY',
+	/** 404: no workflow instance has this id (odysseus). */
+	WORKFLOW_NOT_FOUND: 'WORKFLOW_NOT_FOUND',
+	/** 409: a workflow instance with this id exists already (odysseus). */
+	WORKFLOW_ALREADY_STARTED: 'WORKFLOW_ALREADY_STARTED',
+	/** 409: the workflow instance is finished and takes no more events (odysseus). */
+	WORKFLOW_FINISHED: 'WORKFLOW_FINISHED',
+	/** 504: a workflow waited for an event that did not come in time (odysseus). */
+	WORKFLOW_TIMEOUT: 'WORKFLOW_TIMEOUT'
 } as const;
 
 /**

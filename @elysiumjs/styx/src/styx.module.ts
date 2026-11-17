@@ -24,6 +24,7 @@ import {
 	MakeSeederCommand,
 	MakeServiceCommand,
 	MakeValidatorCommand,
+	MakeWorkflowCommand,
 	ModuleNewCommand,
 	ModuleRenameCommand
 } from './commands/index.js';
@@ -42,6 +43,7 @@ import {
 		MakeModelCommand,
 		MakeRepositoryCommand,
 		MakeSeederCommand,
+		MakeWorkflowCommand,
 		MakeServiceCommand,
 		MakeValidatorCommand,
 		ModuleNewCommand,
