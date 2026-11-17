@@ -15,7 +15,6 @@
 import type {
 	ClaimedInstance,
 	InstanceSettlement,
-	StoredError,
 	StoredEvent,
 	StoredInstance,
 	StoredStep,
@@ -57,7 +56,7 @@ const instanceColumns = () => ({
 	params: jsonb('params'),
 	status: text('status').$type<WorkflowStatus>().notNull(),
 	output: jsonb('output'),
-	error: jsonb('error').$type<StoredError>(),
+	error: jsonb('error'),
 	wakeAt: at('wake_at'),
 	leaseOwner: text('lease_owner'),
 	leaseUntil: at('lease_until'),
