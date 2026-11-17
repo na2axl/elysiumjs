@@ -30,14 +30,14 @@ import { ElysiumError } from '@elysiumjs/olympus';
 import {
 	assertRetries,
 	assertStepName,
-	decodeValue,
 	DEFAULT_RETRIES,
 	DEFAULT_STEP_TIMEOUT,
 	DEFAULT_WAIT_TIMEOUT,
 	doArguments,
-	encodeValue,
 	InvalidWorkflowStepError,
+	keepValue,
 	MAX_WAIT_MS,
+	restoreValue,
 	toMilliseconds,
 	UnregisteredWorkflowError,
 	waitMilliseconds,
@@ -83,7 +83,10 @@ const MIN_WAIT_MS = 1000;
 type Unkept = { '~unkept': string };
 
 const isUnkept = (value: unknown): value is Unkept =>
-	typeof value === 'object' && value !== null && '~unkept' in value;
+	typeof value === 'object' &&
+	value !== null &&
+	Object.keys(value).length === 1 &&
+	typeof (value as Unkept)['~unkept'] === 'string';
 
 /** Runs a function in the async context of the caller, whatever context Cloudflare calls it in. */
 const inContext = (): (<T>(fn: () => T) => T) =>
@@ -93,8 +96,8 @@ const messageOf = (error: unknown): string =>
 	error instanceof Error ? error.message : String(error);
 
 /**
- * The steps of the port, over the steps of Cloudflare Workflows: values cross as JSON, a
- * DomainError returned by a step keeps its class, a step that fails for good throws
+ * The steps of the port, over the steps of Cloudflare Workflows: values are kept with `Json`, so
+ * a serializable DomainError returned by a step keeps its class, a step that fails for good throws
  * `WorkflowStepFailedError`, and a wait that times out gives `WorkflowTimeoutError`.
  * @param step The steps Cloudflare gives `run()`.
  * @param definition The definition of the workflow.
@@ -103,7 +106,7 @@ export const adaptSteps = (
 	step: CloudflareStepLike,
 	definition: WorkflowDefinition
 ): WorkflowStep => {
-	const decode = (value: unknown) => decodeValue(value, definition.known);
+	const decode = (value: unknown) => restoreValue(value);
 	return {
 		do: async <T>(
 			name: string,
@@ -138,7 +141,7 @@ export const adaptSteps = (
 							throw error;
 						}
 						try {
-							return encodeValue(value);
+							return keepValue(value);
 						} catch (error) {
 							return { '~unkept': `returned a value that cannot be kept: ${messageOf(error)}` };
 						}
@@ -219,7 +222,7 @@ export const runWorkflow = (
 		if (!definition) throw new UnregisteredWorkflowError(payload.workflow);
 		const scope = {};
 		try {
-			return encodeValue(
+			return keepValue(
 				await host.run(payload.workflow, payload.params, adaptSteps(step, definition), scope)
 			);
 		} finally {

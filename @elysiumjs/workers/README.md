@@ -316,7 +316,7 @@ class Payout extends Workflow<PayoutParams, PayoutResult> {}
 
 Each workflow either shares the binding or has one of its own: two workflows naming the same binding, or a workflow naming the shared one, stop the application at start with `WorkflowBindingConflictError`.
 
-Steps are steps of Cloudflare Workflows, with the same names, retries and timeouts, so the dashboard shows them. Values cross as JSON; a DomainError returned by a step keeps its class; a step that fails on every attempt throws `WorkflowStepFailedError` into `run()`, and a step whose value is not JSON fails at once, without a retry; a wait that times out gives `WorkflowTimeoutError`. The work of a step runs in the async context of `run()`, so bindings and request-scoped services work inside it. The `signal` given to a step aborts when the step's timeout passes; Cloudflare cannot stop the work itself, so make long work listen to it. `Odysseus.start()` and `startMany()` create instances in batches of 100, and an id in use is answered as `WorkflowAlreadyStartedError`. When Cloudflare refuses a batch, as on a rate limit, `WorkflowCreateError` tells in `started` which instances of the earlier batches were created.
+Steps are steps of Cloudflare Workflows, with the same names, retries and timeouts, so the dashboard shows them. Values are kept with `Json`, as with the `engine` driver, so a `@Serializable()` DomainError returned by a step keeps its class; a step that fails on every attempt throws `WorkflowStepFailedError` into `run()`, and a step whose value `Json` cannot keep fails at once, without a retry; a wait that times out gives `WorkflowTimeoutError`. The work of a step runs in the async context of `run()`, so bindings and request-scoped services work inside it. The `signal` given to a step aborts when the step's timeout passes; Cloudflare cannot stop the work itself, so make long work listen to it. `Odysseus.start()` and `startMany()` create instances in batches of 100, and an id in use is answered as `WorkflowAlreadyStartedError`. When Cloudflare refuses a batch, as on a rate limit, `WorkflowCreateError` tells in `started` which instances of the earlier batches were created.
 
 Where Cloudflare Workflows differ from the `engine` driver:
 
@@ -325,7 +325,7 @@ Where Cloudflare Workflows differ from the `engine` driver:
 - Cloudflare keeps finished instances for a limited time only: after that, `status()` answers `WorkflowNotFoundError` and the id can be used again.
 - `paused` is reached only from Cloudflare's own tools, and a signal to a paused instance may be refused.
 - An instance that sleeps or waits is evicted and replayed later: its request scope ends without `onDestroy` hooks, and each replay gets a new one.
-- A DomainError thrown (not returned) by `run()` reaches `status()` as a plain error, with its name and message only.
+- What `run()` throws reaches `status()` as an `Error` with its name and message only, even a serializable DomainError.
 - Instances can only be started with `Odysseus.start()`: `WorkflowRunner` refuses instances created from the dashboard or the REST API with `WorkflowPayloadError`.
 - There is no `drain()` or `Clock.travel()`: test workflows with the `engine` driver, and the Cloudflare side with `@cloudflare/vitest-pool-workers`.
 

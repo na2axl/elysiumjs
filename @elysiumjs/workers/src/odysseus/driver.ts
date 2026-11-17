@@ -23,7 +23,7 @@ import type {
 import type { WorkflowBindingLike, WorkflowInstanceLike, WorkflowRunnerPayload } from './types.js';
 
 import { ElysiumError } from '@elysiumjs/olympus';
-import { FINISHED_STATUSES, Workflows } from '@elysiumjs/olympus/odysseus';
+import { FINISHED_STATUSES, keepError, Workflows } from '@elysiumjs/olympus/odysseus';
 
 import { Workers } from '../workers.js';
 
@@ -223,7 +223,14 @@ export class CloudflareWorkflowDriver implements WorkflowDriver {
 			...(state.status === 'complete' && state.output !== undefined
 				? { output: state.output }
 				: {}),
-			...(state.error ? { error: { name: state.error.name, message: state.error.message } } : {})
+			// Cloudflare keeps the name and message of what `run()` threw.
+			...(state.error
+				? {
+						error: keepError(
+							Object.assign(new Error(state.error.message), { name: state.error.name })
+						)
+					}
+				: {})
 		};
 	}
 

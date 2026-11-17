@@ -21,7 +21,7 @@ import type {
 	WorkflowRunnerPayload
 } from '../src';
 
-import { Application, DomainError, Module, t } from '@elysiumjs/olympus';
+import { Application, DomainError, Module, Serializable, t } from '@elysiumjs/olympus';
 import {
 	Odysseus,
 	OdysseusModule,
@@ -153,6 +153,7 @@ const fakeWorkflows = () => {
 
 const ctx: WorkersExecutionContext = { waitUntil: () => {}, passThroughOnException: () => {} };
 
+@Serializable({ name: 'shop.declined' })
 class Declined extends DomainError.for('PAYMENT_DECLINED', 402) {}
 
 const Paid = WorkflowEvent.define('paid', t.Object({ amount: t.Integer() }));
@@ -236,7 +237,7 @@ describe('cloudflare workflow driver', () => {
 		await shared.run(env, id);
 		expect(await inWorker(() => Odysseus.status(Order, 'o-1'))).toMatchObject({
 			status: 'completed',
-			output: { sku: 'mug', amount: 1500, at: '2026-01-01T00:00:00.000Z' }
+			output: { sku: 'mug', amount: 1500, at: new Date('2026-01-01T00:00:00Z') }
 		});
 		expect(shared.configs[0]).toEqual({
 			name: 'charge',
@@ -382,7 +383,7 @@ describe('cloudflare workflow driver', () => {
 	});
 
 	describe('steps', () => {
-		const definition = { known: [] } as never;
+		const definition = {} as never;
 		const fake = (overrides: Partial<CloudflareStepLike> = {}) => {
 			const calls: { kind: string; args: unknown[] }[] = [];
 			const step: CloudflareStepLike = {
@@ -414,7 +415,7 @@ describe('cloudflare workflow driver', () => {
 			const error = await step
 				.do('big', { retries: { limit: 3, delay: 0 } }, () => {
 					runs += 1;
-					return { n: 1n } as never;
+					return { later: () => 1 } as never;
 				})
 				.catch((e) => e);
 			expect(runs).toBe(1);
