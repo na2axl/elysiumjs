@@ -1,6 +1,6 @@
 # @elysiumjs/redis
 
-Redis for [Elysium.js](https://github.com/na2axl/elysiumjs): connections, a lock driver, a cache store, rate limits, a Heracles transport with its worker, and flow and session stores.
+Redis for [Elysium.js](https://github.com/na2axl/elysiumjs): connections, a lock driver, a cache store, rate limits, a Heracles transport with its worker, flow and session stores, and a workflow store.
 
 ## Installation
 
@@ -118,6 +118,25 @@ ThemisModule.with({
 ```
 
 Each session is a JSON value under `{prefix}{id}` (`session:` by default), which expires with the session.
+
+## Workflows
+
+`RedisWorkflowStore` (the `redis` driver of `WorkflowStore`) keeps the instances of the `engine` driver of `@elysiumjs/olympus/odysseus`, on any connection that runs `EVAL`, Upstash included:
+
+```ts
+import { OdysseusModule, Workflows, WorkflowStore } from '@elysiumjs/olympus/odysseus';
+
+import '@elysiumjs/redis';
+
+OdysseusModule.with({
+	driver: () =>
+		Workflows.for('engine', {
+			store: () => WorkflowStore.for('redis', { connection: 'workflows', prefix: 'odysseus:' })
+		})
+});
+```
+
+Each write is one Lua script, so any number of processes can share the server. Keys start with `prefix` (`odysseus:` by default); on Redis Cluster, the prefix **must** hold a hash tag, such as `{odysseus}:`: the scripts touch several keys at once, and fail when those keys live on different slots. Instances last as long as their workflows, days or months, so make the server persist its data (append-only file) and keep it from evicting keys. A purge deletes finished instances in batches of `purgeBatch` (1000 by default), one script per batch, until none is left.
 
 ## License
 

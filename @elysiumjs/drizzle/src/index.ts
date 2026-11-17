@@ -98,3 +98,9 @@ export {
 	type MoiraiTablesOptions,
 	type StoreTable
 } from './moirai.js';
+export {
+	DrizzleWorkflowStore,
+	type DrizzleWorkflowStoreOptions,
+	workflowTables,
+	type WorkflowTables
+} from './odysseus.js';

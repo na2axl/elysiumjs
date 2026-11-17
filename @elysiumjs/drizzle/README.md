@@ -1,6 +1,6 @@
 # @elysiumjs/drizzle
 
-The Drizzle ORM backend of [Elysium.js](https://github.com/na2axl/elysiumjs): database connections and drivers for `@elysiumjs/olympus/mnemosyne` (`/bun-sql`, `/postgres-js`, `/node-postgres` and `/hyperdrive` subpaths), models, repositories, queries, migrations and tenancy, the Postgres stores of `@elysiumjs/olympus/moirai`, and the `postgres` driver of the `Lock` port.
+The Drizzle ORM backend of [Elysium.js](https://github.com/na2axl/elysiumjs): database connections and drivers for `@elysiumjs/olympus/mnemosyne` (`/bun-sql`, `/postgres-js`, `/node-postgres` and `/hyperdrive` subpaths), models, repositories, queries, migrations and tenancy, the Postgres stores of `@elysiumjs/olympus/moirai`, the workflow store of `@elysiumjs/olympus/odysseus`, and the `postgres` driver of the `Lock` port.
 
 ## Installation
 
@@ -217,6 +217,24 @@ HermesModule.with({ store: () => NotificationStore.for('drizzle', { table: notif
 ```
 
 The table keeps one row per delivery id, and has an index on the notifiable and the id, which pages use, and a partial index on unread notifications. The `metadata` of a file is a `jsonb` column, `{}` by default. Any table with the same columns works, given as `table`, with an optional `connection`.
+
+## Workflow store
+
+`workflowTables()` builds the tables of the workflow store of `@elysiumjs/olympus/odysseus` (`workflow_instances`, `workflow_steps` and `workflow_events`), and `DrizzleWorkflowStore` (the `drizzle` driver of `WorkflowStore`) keeps the instances of the `engine` driver in them:
+
+```ts
+import { workflowTables } from '@elysiumjs/drizzle';
+import { OdysseusModule, Workflows, WorkflowStore } from '@elysiumjs/olympus/odysseus';
+
+export const workflows = workflowTables(); // or workflowTables('jobs')
+
+OdysseusModule.with({
+	driver: () =>
+		Workflows.for('engine', { store: () => WorkflowStore.for('drizzle', { tables: workflows }) })
+});
+```
+
+Every write is one statement or one transaction, and a claim takes an instance with one conditional update, so any number of processes can share the tables. Instances have a partial index on their wake time while they run, and one on their end time once finished, for the purge. Any tables with the same columns work, given as `tables`, with an optional `connection` and `purgeBatch` (how many finished instances one purge deletes, 1000 by default).
 
 ## File store
 
