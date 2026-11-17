@@ -15,6 +15,7 @@
 import type { WorkflowDriver } from './driver.js';
 
 import { Module, Service } from '../index.js';
+import { OdysseusWorkCommand } from './commands/index.js';
 import { ODYSSEUS_DRIVER, WorkflowRegistry } from './workflow.js';
 
 import './engine/engine.js';
@@ -31,7 +32,8 @@ export type OdysseusModuleConfig = {
 
 /**
  * Runs the workflows that the modules list in their `workflows`, with a driver: `engine` (in the
- * process, over a store) or `cloudflare` (Cloudflare Workflows, from `@elysiumjs/workers`).
+ * process, over a store) or `cloudflare` (Cloudflare Workflows, from `@elysiumjs/workers`). With
+ * the `engine` driver, the `odysseus:work` command starts a worker process.
  * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
@@ -47,6 +49,7 @@ export type OdysseusModuleConfig = {
  * ```
  */
 @Module.register<OdysseusModuleConfig>({
+	commands: [OdysseusWorkCommand],
 	services: (config) => {
 		let built: WorkflowDriver | undefined;
 		return [

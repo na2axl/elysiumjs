@@ -25,6 +25,7 @@ export type { WorkflowDuration } from './duration.js';
 export { toMilliseconds } from './duration.js';
 export type { EngineDriverOptions } from './engine/engine.js';
 export { EngineDriver } from './engine/engine.js';
+export { OdysseusWorkCommand } from './commands/index.js';
 export { StepTimeoutError } from './engine/replay.js';
 export type {
 	ClaimedInstance,
@@ -76,7 +77,10 @@ export {
 	DEFAULT_WAIT_TIMEOUT,
 	MAX_WAIT_MS,
 	assertRetries,
-	retryDelay
+	assertStepName,
+	doArguments,
+	retryDelay,
+	waitMilliseconds
 } from './step.js';
 export type {
 	WorkflowClass,

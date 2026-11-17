@@ -38,6 +38,7 @@ import {
 	Odysseus,
 	OdysseusModule,
 	OdysseusNotConfiguredError,
+	OdysseusWorkCommand,
 	UnregisteredWorkflowError,
 	Workflow,
 	WorkflowAlreadyStartedError,
@@ -276,13 +277,16 @@ describe('odysseus', () => {
 	let engine: EngineDriver;
 	let store: MemoryWorkflowStore;
 
+	let working: Promise<void> | undefined;
+
 	const boot = async (options: { work?: boolean } = {}) => {
 		store = new MemoryWorkflowStore();
-		engine = Workflows.for('engine', { store, work: options.work ?? false }) as EngineDriver;
+		engine = Workflows.for('engine', { store }) as EngineDriver;
 		app = await Application.testing({
 			modules: [OdysseusModule.with({ driver: engine }), OrdersModule],
 			boot: 'eager'
 		});
+		working = options.work ? engine.work() : undefined;
 	};
 
 	beforeEach(() => {
@@ -293,6 +297,8 @@ describe('odysseus', () => {
 
 	afterEach(async () => {
 		await app?.shutdown();
+		await working;
+		working = undefined;
 		app = undefined;
 		Clock.reset();
 		Runtime.use(testRuntime);
@@ -464,6 +470,59 @@ describe('odysseus', () => {
 			await new Promise((resolve) => setTimeout(resolve, 10));
 		}
 		expect(await Odysseus.status(Shapes, 'auto')).toMatchObject({ status: 'completed' });
+	});
+
+	it('runs instances only in a process that works', async () => {
+		await boot();
+		await Odysseus.start(Shapes, {}, { id: 'idle' });
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		expect(await Odysseus.status(Shapes, 'idle')).toMatchObject({ status: 'queued' });
+		const stopped = engine.work();
+		expect(() => engine.work()).toThrow('already runs instances');
+		for (let i = 0; i < 50; i++) {
+			const status = (await Odysseus.status(Shapes, 'idle')) as { status: string };
+			if (status.status === 'completed') break;
+			await new Promise((resolve) => setTimeout(resolve, 10));
+		}
+		expect(await Odysseus.status(Shapes, 'idle')).toMatchObject({ status: 'completed' });
+		let settled = false;
+		void stopped.then(() => (settled = true));
+		await app!.shutdown();
+		app = undefined;
+		await stopped;
+		expect(settled).toBe(true);
+	});
+
+	it('starts a worker process with odysseus:work, over a shared store only', async () => {
+		await boot();
+		const command = new OdysseusWorkCommand();
+		expect(command.run()).rejects.toThrow('`memory` workflow store lives in one process');
+		await app!.shutdown();
+
+		const memory = new MemoryWorkflowStore();
+		// A store that is not the memory store, as a PostgreSQL or Redis store would be.
+		const shared = new Proxy({} as MemoryWorkflowStore, {
+			get: (_, key) => {
+				const value = memory[key as keyof MemoryWorkflowStore];
+				return typeof value === 'function' ? value.bind(memory) : value;
+			}
+		});
+		engine = Workflows.for('engine', { store: shared }) as EngineDriver;
+		app = await Application.testing({
+			modules: [OdysseusModule.with({ driver: engine }), OrdersModule],
+			boot: 'eager'
+		});
+		const running = command.run();
+		await Odysseus.start(Shapes, {}, { id: 'worker' });
+		for (let i = 0; i < 50; i++) {
+			const status = (await Odysseus.status(Shapes, 'worker')) as { status: string };
+			if (status.status === 'completed') break;
+			await new Promise((resolve) => setTimeout(resolve, 10));
+		}
+		expect(await Odysseus.status(Shapes, 'worker')).toMatchObject({ status: 'completed' });
+		await app.shutdown();
+		app = undefined;
+		await running;
 	});
 
 	it('lets one worker at a time run an instance', async () => {
