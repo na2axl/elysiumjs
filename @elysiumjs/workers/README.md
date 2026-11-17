@@ -1,6 +1,6 @@
 # @elysiumjs/workers
 
-The Cloudflare Workers backend of [Elysium.js](https://github.com/na2axl/elysiumjs): the runtime and the Worker entry, bindings, queue and cron handlers, Heracles jobs on Cloudflare Queues, KV caches and sessions, rate limits, and flows and locks in Durable Objects.
+The Cloudflare Workers backend of [Elysium.js](https://github.com/na2axl/elysiumjs): the runtime and the Worker entry, bindings, queue and cron handlers, Heracles jobs on Cloudflare Queues, KV caches and sessions, rate limits, flows and locks in Durable Objects, and workflows on Cloudflare Workflows.
 
 | Port or store                  | Export                                              |
 | ------------------------------ | --------------------------------------------------- |
@@ -11,8 +11,9 @@ The Cloudflare Workers backend of [Elysium.js](https://github.com/na2axl/elysium
 | Flow store (ariadne)           | `durableFlowStore()`, `FlowStoreObject`             |
 | Session store (themis)         | `KvSessionStore`                                    |
 | `Lock` driver `durable-object` | `DurableObjectLock`, `LockObject`                   |
+| Workflow driver `cloudflare`   | `CloudflareWorkflowDriver`, `WorkflowRunner`        |
 
-Durable Object classes come from the `@elysiumjs/workers/durable-objects` subpath, which imports `cloudflare:workers`; everything else comes from the root export, which runs anywhere, so tests can import it under Bun or Node.js.
+Durable Object classes and `WorkflowRunner` come from the `@elysiumjs/workers/durable-objects` subpath, which imports `cloudflare:workers`; everything else comes from the root export, which runs anywhere, so tests can import it under Bun or Node.js.
 
 ## Installation
 
@@ -275,6 +276,58 @@ ThemisModule.with({
 ```
 
 KV is eventually consistent: a session saved in one location can take a few seconds to be seen in another. KV refuses expirations under 60 seconds, so a shorter session lives 60 seconds in KV.
+
+## Workflows on Cloudflare Workflows
+
+The `cloudflare` driver of `@elysiumjs/olympus/odysseus` runs workflows on Cloudflare Workflows. One class, `WorkflowRunner`, runs every workflow of the application: export it from the Worker entry built with `createWorker()`, and declare one Workflow binding for it, `WORKFLOWS` by default:
+
+```ts
+// worker.ts
+export { WorkflowRunner } from '@elysiumjs/workers/durable-objects';
+```
+
+```jsonc
+// wrangler.jsonc
+{
+	"workflows": [
+		{ "name": "my-app-workflows", "binding": "WORKFLOWS", "class_name": "WorkflowRunner" }
+	]
+}
+```
+
+```ts
+import { OdysseusModule, Workflows } from '@elysiumjs/olympus/odysseus';
+
+import '@elysiumjs/workers';
+
+OdysseusModule.with({ driver: () => Workflows.for('cloudflare') }); // or { binding: 'JOBS' }
+```
+
+Instances on the shared binding have ids made of a hash of the workflow name and the id given to `Odysseus.start()`, so that two workflows can use the same id. A workflow that needs its own limits or its own view in the dashboard takes a binding of its own, with the same class, and its instances keep the ids as given:
+
+```ts
+@Workflow.register({ name: 'billing.payout', driver: { binding: 'PAYOUTS' } })
+class Payout extends Workflow<PayoutParams, PayoutResult> {}
+```
+
+```jsonc
+{ "name": "my-app-payouts", "binding": "PAYOUTS", "class_name": "WorkflowRunner" }
+```
+
+Each workflow either shares the binding or has one of its own: two workflows naming the same binding, or a workflow naming the shared one, stop the application at start with `WorkflowBindingConflictError`.
+
+Steps are steps of Cloudflare Workflows, with the same names, retries and timeouts, so the dashboard shows them. Values are kept with `Json`, as with the `engine` driver, so a `@Serializable()` DomainError returned by a step keeps its class; a step that fails on every attempt throws `WorkflowStepFailedError` into `run()`, and a step whose value `Json` cannot keep fails at once, without a retry; a wait that times out gives `WorkflowTimeoutError`. The work of a step runs in the async context of `run()`, so bindings and request-scoped services work inside it. The `signal` given to a step aborts when the step's timeout passes; Cloudflare cannot stop the work itself, so make long work listen to it. `Odysseus.start()` and `startMany()` create instances in batches of 100, and an id in use is answered as `WorkflowAlreadyStartedError`. When Cloudflare refuses a batch, as on a rate limit, `WorkflowCreateError` tells in `started` which instances of the earlier batches were created.
+
+Where Cloudflare Workflows differ from the `engine` driver:
+
+- A step result, an event payload and the params of an instance hold at most 1 MiB, and an instance runs at most 1,024 steps (10,000 on paid plans). A step that breaks a limit throws Cloudflare's error into `run()`, not `WorkflowStepFailedError`.
+- Keep step timeouts at 30 minutes or less, and use `waitFor()` for longer waits. Waits last 1 second at the least.
+- Cloudflare keeps finished instances for a limited time only: after that, `status()` answers `WorkflowNotFoundError` and the id can be used again.
+- `paused` is reached only from Cloudflare's own tools, and a signal to a paused instance may be refused.
+- An instance that sleeps or waits is evicted and replayed later: its request scope ends without `onDestroy` hooks, and each replay gets a new one.
+- What `run()` throws reaches `status()` as an `Error` with its name and message only, even a serializable DomainError.
+- Instances can only be started with `Odysseus.start()`: `WorkflowRunner` refuses instances created from the dashboard or the REST API with `WorkflowPayloadError`.
+- There is no `drain()` or `Clock.travel()`: test workflows with the `engine` driver, and the Cloudflare side with `@cloudflare/vitest-pool-workers`.
 
 ## Compiling ahead of time
 

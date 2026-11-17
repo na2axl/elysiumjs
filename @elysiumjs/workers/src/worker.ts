@@ -20,6 +20,7 @@ import { getLogger, ModuleContext, Service } from '@elysiumjs/olympus';
 
 import { DuplicateQueueConsumerError, NoWorkersHandlerError } from './errors.js';
 import { runInvocation } from './invocation.js';
+import { useWorkflowApplication } from './odysseus/runner.js';
 import { Workers } from './workers.js';
 
 type Handler = WorkersHandlerMeta & { node: ModuleNode; cls: new (...args: any[]) => unknown };
@@ -222,6 +223,7 @@ export const createWorker = async <Env = Record<string, unknown>>(
 	app: Application
 ): Promise<WorkersHandler<Env> & { readonly app: Elysia<any> }> => {
 	const elysia = await app.build();
+	useWorkflowApplication(app);
 	const handlers = collectHandlers(app);
 	assertOneConsumerPerQueue(handlers);
 

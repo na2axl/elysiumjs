@@ -14,3 +14,4 @@
 
 export { FlowStoreObject } from './ariadne/flow-store.object.js';
 export { LockObject } from './lock.object.js';
+export { WorkflowRunner } from './odysseus/runner.object.js';
