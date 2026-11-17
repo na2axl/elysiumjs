@@ -28,7 +28,7 @@ import type { BuiltPgTable } from './built-table.js';
 import type { StoreTable } from './moirai.js';
 
 import { CLAIMABLE, FINISHED_STATUSES, WorkflowStore } from '@elysiumjs/olympus/odysseus';
-import { and, asc, eq, inArray, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, asc, eq, getTableColumns, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import {
 	index,
 	integer,
@@ -150,7 +150,35 @@ export type DrizzleWorkflowStoreOptions = {
 	purgeBatch?: number;
 };
 
-type InstanceRow = WorkflowTables['instances']['$inferSelect'];
+type InstanceRow = Omit<WorkflowTables['instances']['$inferSelect'], 'params' | 'output'> & {
+	params: [unknown] | null;
+	output: [unknown] | null;
+};
+
+/**
+ * A JSON value to write: JSON `null` for `null`, SQL `NULL` for no value, so that both come back
+ * as they were written.
+ */
+const jsonValue = (value: unknown) =>
+	value === undefined ? null : sql`(${JSON.stringify(value)}::text)::jsonb`;
+
+/**
+ * A JSON column to read, wrapped in an array: `[value]` when it holds a value, JSON `null`
+ * included, and `null` when it holds none.
+ */
+const kept = (column: unknown) =>
+	sql<
+		[unknown] | null
+	>`case when ${column} is null then null else jsonb_build_array(${column}) end`;
+
+/** A value read with {@link kept}. */
+const unwrap = (value: [unknown] | null): unknown => (value === null ? undefined : value[0]);
+
+/** The statuses an instance may be claimed in, inlined so that the partial index applies. */
+const CLAIMABLE_SQL = sql.raw(`(${CLAIMABLE.map((status) => `'${status}'`).join(', ')})`);
+
+/** The statuses of a finished instance, inlined so that the partial index applies. */
+const FINISHED_SQL = sql.raw(`(${FINISHED_STATUSES.map((status) => `'${status}'`).join(', ')})`);
 
 /** The time of a store, as a date of a row. */
 const dateOf = (ms: number): Date => new Date(ms);
@@ -162,9 +190,9 @@ const msOf = (date: Date | null): number | null => (date === null ? null : date.
 const instanceOf = (row: InstanceRow): StoredInstance => ({
 	workflow: row.workflow,
 	id: row.id,
-	params: row.params ?? undefined,
+	params: unwrap(row.params),
 	status: row.status,
-	...(row.output === null ? {} : { output: row.output }),
+	...(row.output === null ? {} : { output: unwrap(row.output) }),
 	error: row.error ?? null,
 	wakeAt: msOf(row.wakeAt),
 	createdAt: row.createdAt.getTime(),
@@ -199,8 +227,20 @@ export class DrizzleWorkflowStore implements WorkflowStoreDriver {
 		return this.options.tables as unknown as WorkflowTables;
 	}
 
+	/** The connection, joining the transaction of the caller: for starts, events and stops. */
 	private get db() {
 		return Database.getConnection(this.options.connection);
+	}
+
+	/** The connection outside any transaction of the caller: for the writes of the worker. */
+	private get worker() {
+		return Database.getBaseConnection(this.options.connection);
+	}
+
+	/** The columns of an instance, with its JSON values read with {@link kept}. */
+	private get fields() {
+		const t = this.tables.instances;
+		return { ...getTableColumns(t), params: kept(t.params), output: kept(t.output) };
 	}
 
 	/** The row of an instance. */
@@ -227,7 +267,7 @@ export class DrizzleWorkflowStore implements WorkflowStoreDriver {
 	private dueAt(now: number): SQL {
 		const t = this.tables.instances;
 		return and(
-			inArray(t.status, [...CLAIMABLE]),
+			sql`${t.status} in ${CLAIMABLE_SQL}`,
 			lte(t.wakeAt, dateOf(now)),
 			or(isNull(t.leaseUntil), lte(t.leaseUntil, dateOf(now)))
 		)!;
@@ -240,7 +280,7 @@ export class DrizzleWorkflowStore implements WorkflowStoreDriver {
 			.values({
 				workflow: instance.workflow,
 				id: instance.id,
-				params: instance.params ?? null,
+				params: jsonValue(instance.params),
 				status: instance.status,
 				wakeAt: instance.wakeAt === null ? null : dateOf(instance.wakeAt),
 				createdAt: dateOf(instance.createdAt),
@@ -253,7 +293,7 @@ export class DrizzleWorkflowStore implements WorkflowStoreDriver {
 
 	public async get(workflow: string, id: string): Promise<StoredInstance | null> {
 		const [row] = await this.db
-			.select()
+			.select(this.fields)
 			.from(this.tables.instances)
 			.where(this.instance(workflow, id));
 		return row ? instanceOf(row) : null;
@@ -266,7 +306,7 @@ export class DrizzleWorkflowStore implements WorkflowStoreDriver {
 	): Promise<{ workflow: string; id: string }[]> {
 		if (workflows.length === 0) return [];
 		const t = this.tables.instances;
-		return this.db
+		return this.worker
 			.select({ workflow: t.workflow, id: t.id })
 			.from(t)
 			.where(and(inArray(t.workflow, [...workflows]), this.dueAt(now)))
@@ -281,7 +321,7 @@ export class DrizzleWorkflowStore implements WorkflowStoreDriver {
 		now: number
 	): Promise<ClaimedInstance | null> {
 		const { instances, steps, events } = this.tables;
-		return this.db.transaction(async (tx) => {
+		return this.worker.transaction(async (tx) => {
 			const [row] = await tx
 				.update(instances)
 				.set({
@@ -291,26 +331,34 @@ export class DrizzleWorkflowStore implements WorkflowStoreDriver {
 					updatedAt: dateOf(now)
 				})
 				.where(and(this.instance(workflow, id), this.dueAt(now)))
-				.returning();
+				.returning(this.fields);
 			if (!row) return null;
-			const kept = await tx
+			const keptSteps = await tx
 				.select({ key: steps.key, step: steps.step })
 				.from(steps)
 				.where(this.of(steps, workflow, id));
 			const sent = await tx
-				.select({ seq: events.seq, type: events.type, payload: events.payload, at: events.at })
+				.select({
+					seq: events.seq,
+					type: events.type,
+					payload: kept(events.payload),
+					at: events.at
+				})
 				.from(events)
 				.where(this.of(events, workflow, id))
 				.orderBy(asc(events.seq));
 			return {
 				instance: instanceOf(row),
-				steps: Object.fromEntries(kept.map(({ key, step }) => [key, step])),
-				events: sent.map((event): StoredEvent => ({
-					seq: event.seq,
-					type: event.type,
-					payload: event.payload ?? undefined,
-					at: event.at.getTime()
-				})),
+				steps: Object.fromEntries(keptSteps.map(({ key, step }) => [key, step])),
+				events: sent.map((event): StoredEvent => {
+					const payload = unwrap(event.payload);
+					return {
+						seq: event.seq,
+						type: event.type,
+						...(payload === undefined ? {} : { payload }),
+						at: event.at.getTime()
+					} as StoredEvent;
+				}),
 				lastSeq: row.seq
 			};
 		});
@@ -318,7 +366,7 @@ export class DrizzleWorkflowStore implements WorkflowStoreDriver {
 
 	public async extend(workflow: string, id: string, lease: WorkflowLease): Promise<boolean> {
 		const t = this.tables.instances;
-		const extended = await this.db
+		const extended = await this.worker
 			.update(t)
 			.set({ leaseUntil: dateOf(lease.until) })
 			.where(this.held(workflow, id, lease.owner))
@@ -335,7 +383,7 @@ export class DrizzleWorkflowStore implements WorkflowStoreDriver {
 		takes?: number
 	): Promise<boolean> {
 		const { instances, steps, events } = this.tables;
-		return this.db.transaction(async (tx) => {
+		return this.worker.transaction(async (tx) => {
 			// Locks the row of the instance for the transaction, while the lease is checked.
 			const [held] = await tx
 				.select({ id: instances.id })
@@ -363,7 +411,7 @@ export class DrizzleWorkflowStore implements WorkflowStoreDriver {
 	): Promise<boolean> {
 		const t = this.tables.instances;
 		const wakeAt = settlement.wakeAt === null ? null : dateOf(settlement.wakeAt);
-		const settled = await this.db
+		const settled = await this.worker
 			.update(t)
 			.set({
 				status: settlement.status,
@@ -372,7 +420,7 @@ export class DrizzleWorkflowStore implements WorkflowStoreDriver {
 					settlement.status === 'waiting'
 						? sql`case when ${t.seq} > ${settlement.seenSeq} then ${dateOf(now)}::timestamptz else ${wakeAt}::timestamptz end`
 						: wakeAt,
-				output: settlement.output ?? null,
+				output: jsonValue(settlement.output),
 				error: settlement.error ?? null,
 				leaseOwner: null,
 				leaseUntil: null,
@@ -399,12 +447,7 @@ export class DrizzleWorkflowStore implements WorkflowStoreDriver {
 					wakeAt: sql`least(coalesce(${instances.wakeAt}, ${dateOf(now)}::timestamptz), ${dateOf(now)}::timestamptz)`,
 					updatedAt: dateOf(now)
 				})
-				.where(
-					and(
-						this.instance(workflow, id),
-						sql`${instances.status} not in ('completed', 'errored', 'terminated')`
-					)
-				)
+				.where(and(this.instance(workflow, id), sql`${instances.status} not in ${FINISHED_SQL}`))
 				.returning({ seq: instances.seq });
 			if (!row) {
 				const [found] = await tx
@@ -415,7 +458,7 @@ export class DrizzleWorkflowStore implements WorkflowStoreDriver {
 			}
 			await tx
 				.insert(events)
-				.values({ workflow, id, seq: row.seq, type, payload: payload ?? null, at: dateOf(now) });
+				.values({ workflow, id, seq: row.seq, type, payload: jsonValue(payload), at: dateOf(now) });
 			return 'sent';
 		});
 	}
@@ -431,42 +474,41 @@ export class DrizzleWorkflowStore implements WorkflowStoreDriver {
 				leaseUntil: null,
 				updatedAt: dateOf(now)
 			})
-			.where(
-				and(
-					this.instance(workflow, id),
-					sql`${t.status} not in ('completed', 'errored', 'terminated')`
-				)
-			)
+			.where(and(this.instance(workflow, id), sql`${t.status} not in ${FINISHED_SQL}`))
 			.returning({ id: t.id });
 		return stopped.length > 0;
 	}
 
 	public async purge(before: number): Promise<number> {
 		const { instances, steps, events } = this.tables;
-		const old = await this.db
-			.select({ workflow: instances.workflow, id: instances.id })
-			.from(instances)
-			.where(
-				and(
-					inArray(instances.status, [...FINISHED_STATUSES]),
-					lte(instances.updatedAt, dateOf(before - 1))
-				)
-			)
-			.limit(this.options.purgeBatch ?? 1000);
-		if (old.length === 0) return 0;
-		const pairs = (table: { workflow: unknown; id: unknown }) =>
+		const batch = this.options.purgeBatch ?? 1000;
+		const pairs = (
+			table: { workflow: unknown; id: unknown },
+			keys: { workflow: string; id: string }[]
+		) =>
 			sql`(${table.workflow}, ${table.id}) in (${sql.join(
-				old.map(({ workflow, id }) => sql`(${workflow}, ${id})`),
+				keys.map(({ workflow, id }) => sql`(${workflow}, ${id})`),
 				sql`, `
 			)})`;
-		return this.db.transaction(async (tx) => {
-			await tx.delete(steps).where(pairs(steps));
-			await tx.delete(events).where(pairs(events));
-			const removed = await tx
-				.delete(instances)
-				.where(pairs(instances))
-				.returning({ id: instances.id });
-			return removed.length;
-		});
+		let total = 0;
+		for (;;) {
+			// The instances are deleted first, by a statement that checks again that each one is still
+			// finished and old, so that a new instance created under a purged id is never deleted.
+			const removed = await this.worker.transaction(async (tx) => {
+				const keys = await tx
+					.delete(instances)
+					.where(
+						sql`(${instances.workflow}, ${instances.id}) in (select ${instances.workflow}, ${instances.id} from ${instances} where ${instances.status} in ${FINISHED_SQL} and ${instances.updatedAt} < ${dateOf(before)}::timestamptz limit ${batch} for update skip locked)`
+					)
+					.returning({ workflow: instances.workflow, id: instances.id });
+				if (keys.length > 0) {
+					await tx.delete(steps).where(pairs(steps, keys));
+					await tx.delete(events).where(pairs(events, keys));
+				}
+				return keys.length;
+			});
+			total += removed;
+			if (removed < batch) return total;
+		}
 	}
 }

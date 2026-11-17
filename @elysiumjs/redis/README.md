@@ -136,7 +136,7 @@ OdysseusModule.with({
 });
 ```
 
-Each write is one Lua script, so any number of processes can share the server. Keys start with `prefix` (`odysseus:` by default); on Redis Cluster, give it a hash tag, such as `{odysseus}:`, so that every key lives on one slot. Instances last as long as their workflows, days or months, so make the server persist its data (append-only file) and keep it from evicting keys. `purgeBatch` sets how many finished instances one purge deletes (1000 by default).
+Each write is one Lua script, so any number of processes can share the server. Keys start with `prefix` (`odysseus:` by default); on Redis Cluster, the prefix **must** hold a hash tag, such as `{odysseus}:`: the scripts touch several keys at once, and fail when those keys live on different slots. Instances last as long as their workflows, days or months, so make the server persist its data (append-only file) and keep it from evicting keys. A purge deletes finished instances in batches of `purgeBatch` (1000 by default), one script per batch, until none is left.
 
 ## License
 

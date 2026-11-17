@@ -244,6 +244,83 @@ export const workflowStoreContract = (
 			expect(await store.due(T0 + 5000, 10, ['orders'])).toEqual([]);
 		});
 
+		it('keeps null apart from no value', async () => {
+			const store = await make();
+			await store.create(queued('orders', 'a', null));
+			await store.claim('orders', 'a', { owner: 'w1', until: T0 + 1000 }, T0);
+			await store.addEvent('orders', 'a', 'empty', undefined, T0 + 1);
+			await store.addEvent('orders', 'a', 'nothing', null, T0 + 2);
+			await store.saveStep('orders', 'a', 'w1', 'none', { kind: 'done', value: null });
+			await store.saveStep('orders', 'a', 'w1', '__proto__', { kind: 'done', value: 1 });
+			await store.settle(
+				'orders',
+				'a',
+				'w1',
+				{ status: 'waiting', wakeAt: T0, seenSeq: 0 },
+				T0 + 3
+			);
+			const next = await store.claim('orders', 'a', { owner: 'w2', until: T0 + 2000 }, T0 + 3);
+			expect(next?.instance.params).toBeNull();
+			expect(Object.prototype.hasOwnProperty.call(next?.steps, '__proto__')).toBe(true);
+			expect(next?.steps['__proto__']).toEqual({ kind: 'done', value: 1 });
+			expect(next?.steps.none).toEqual({ kind: 'done', value: null });
+			expect(next?.events[0]).toEqual({ seq: 1, type: 'empty', at: T0 + 1 });
+			expect(next?.events[1]).toEqual({ seq: 2, type: 'nothing', payload: null, at: T0 + 2 });
+			await store.settle(
+				'orders',
+				'a',
+				'w2',
+				{ status: 'completed', wakeAt: null, output: null, seenSeq: 2 },
+				T0 + 4
+			);
+			expect((await store.get('orders', 'a'))?.output).toBeNull();
+			await store.create(queued('orders', 'b'));
+			await store.claim('orders', 'b', { owner: 'w1', until: T0 + 1000 }, T0);
+			await store.settle(
+				'orders',
+				'b',
+				'w1',
+				{ status: 'completed', wakeAt: null, seenSeq: 0 },
+				T0
+			);
+			expect(await store.get('orders', 'b')).not.toHaveProperty('output');
+		});
+
+		it('hands many events back in order', async () => {
+			const store = await make();
+			await store.create(queued('orders', 'a'));
+			for (let n = 1; n <= 12; n++) await store.addEvent('orders', 'a', 'tick', { n }, T0 + n);
+			const claimed = await store.claim('orders', 'a', { owner: 'w1', until: T0 + 1000 }, T0 + 20);
+			expect(claimed?.events.map((event) => event.seq)).toEqual([
+				1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
+			]);
+			expect(claimed?.lastSeq).toBe(12);
+		});
+
+		it('refuses the writes of a lease that ended', async () => {
+			const store = await make();
+			await store.create(queued('orders', 'a'));
+			await store.claim('orders', 'a', { owner: 'w1', until: T0 + 1000 }, T0);
+			await store.claim('orders', 'a', { owner: 'w2', until: T0 + 5000 }, T0 + 1000);
+			const waiting = { status: 'waiting', wakeAt: T0 + 9000, seenSeq: 0 } as const;
+			expect(await store.settle('orders', 'a', 'w1', waiting, T0 + 1001)).toBe(false);
+			expect(await store.get('orders', 'a')).toMatchObject({ status: 'running' });
+
+			await store.terminate('orders', 'a', T0 + 1002);
+			expect(await store.settle('orders', 'a', 'w2', waiting, T0 + 1003)).toBe(false);
+			expect(await store.extend('orders', 'a', { owner: 'w2', until: T0 + 9000 })).toBe(false);
+			expect(await store.get('orders', 'a')).toMatchObject({ status: 'terminated', wakeAt: null });
+		});
+
+		it('does not make a held instance due when an event comes', async () => {
+			const store = await make();
+			await store.create(queued('orders', 'a'));
+			await store.claim('orders', 'a', { owner: 'w1', until: T0 + 1000 }, T0);
+			await store.addEvent('orders', 'a', 'paid', {}, T0 + 10);
+			expect(await store.due(T0 + 10, 10, ['orders'])).toEqual([]);
+			expect(await store.due(T0 + 1000, 10, ['orders'])).toEqual([{ workflow: 'orders', id: 'a' }]);
+		});
+
 		it('purges the instances that finished before a time', async () => {
 			const store = await make();
 			for (const id of ['old', 'recent', 'live']) {
