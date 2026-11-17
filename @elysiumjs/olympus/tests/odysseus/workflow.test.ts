@@ -15,6 +15,8 @@
 import type { TestingApp } from '../../src/index';
 import type { WorkflowStep } from '../../src/odysseus/index';
 
+import { AsyncLocalStorage } from 'node:async_hooks';
+
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import {
@@ -207,6 +209,18 @@ class Gap extends Workflow<Record<string, never>, void> {
 
 let destroyed = 0;
 
+/** Stands for a context of the caller, such as an open transaction. */
+const callerContext = new AsyncLocalStorage<string>();
+const seen: (string | undefined)[] = [];
+
+/** Records the caller context its step sees. */
+@Workflow.register({ name: 'context' })
+class Context extends Workflow<Record<string, never>, void> {
+	public async run(_: Record<string, never>, step: WorkflowStep): Promise<void> {
+		await step.do('look', () => void seen.push(callerContext.getStore()));
+	}
+}
+
 @Service.register({ scope: ServiceScope.REQUEST })
 class Basket {
 	public onDestroy(): void {
@@ -252,7 +266,7 @@ class Odd extends Workflow<{ bad: 'none' | 'duration' | 'date' }, string> {
 }
 
 @Module.register({
-	workflows: [FulfilOrder, Flaky, Shapes, Deadline, Branches, Saga, Gap, Scoped, Odd],
+	workflows: [FulfilOrder, Flaky, Shapes, Deadline, Branches, Saga, Gap, Scoped, Odd, Context],
 	services: [Inventory, Basket]
 })
 class OrdersModule extends Module {}
@@ -632,6 +646,22 @@ describe('odysseus', () => {
 		await engine.drain();
 		expect(await store.get('elsewhere', 'x')).toMatchObject({ status: 'queued' });
 		expect(await store.due(now, 10, ['elsewhere'])).toEqual([{ workflow: 'elsewhere', id: 'x' }]);
+	});
+
+	it('runs instances outside the context of the code that started them', async () => {
+		await boot({ work: true });
+		seen.length = 0;
+		await callerContext.run('transaction', async () => {
+			await Odysseus.start(Context, {}, { id: 'worker' });
+		});
+		for (let i = 0; i < 50 && seen.length === 0; i++) {
+			await new Promise((resolve) => setTimeout(resolve, 5));
+		}
+		await callerContext.run('transaction', async () => {
+			await Odysseus.start(Context, {}, { id: 'drained' });
+			await engine.drain();
+		});
+		expect(seen).toEqual([undefined, undefined]);
 	});
 
 	it('checks retries and event types', () => {
