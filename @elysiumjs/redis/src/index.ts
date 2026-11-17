@@ -28,3 +28,4 @@ export { type RedisTransportOptions, RedisTransport } from './heracles/redis.tra
 export { RedisWorker } from './heracles/redis.worker.js';
 export { RedisFlowStore } from './ariadne/flow-store.js';
 export { RedisSessionStore } from './themis/session-store.js';
+export { RedisWorkflowStore, type RedisWorkflowStoreOptions } from './odysseus/workflow-store.js';
