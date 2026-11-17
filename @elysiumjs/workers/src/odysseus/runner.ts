@@ -24,24 +24,38 @@ import type {
 import type { WorkersExecutionContext } from '../types.js';
 import type { CloudflareStepLike, WorkflowRunnerPayload } from './types.js';
 
+import { AsyncLocalStorage } from 'node:async_hooks';
+
 import { ElysiumError } from '@elysiumjs/olympus';
 import {
 	assertRetries,
+	assertStepName,
 	decodeValue,
 	DEFAULT_RETRIES,
 	DEFAULT_STEP_TIMEOUT,
 	DEFAULT_WAIT_TIMEOUT,
+	doArguments,
 	encodeValue,
 	InvalidWorkflowStepError,
 	MAX_WAIT_MS,
 	toMilliseconds,
 	UnregisteredWorkflowError,
+	waitMilliseconds,
 	WorkflowRegistry,
 	WorkflowStepFailedError,
 	WorkflowTimeoutError
 } from '@elysiumjs/olympus/odysseus';
 
 import { runInvocation } from '../invocation.js';
+
+/** Thrown when an instance of the runner was not created by the `cloudflare` driver. */
+export class WorkflowPayloadError extends ElysiumError {
+	constructor() {
+		super(
+			'This Workflow instance was not started by Odysseus: start instances with Odysseus.start(), not from the dashboard or the REST API.'
+		);
+	}
+}
 
 /** Thrown when a workflow runs in an isolate whose Worker entry was not built with `createWorker()`. */
 export class WorkflowApplicationMissingError extends ElysiumError {
@@ -62,16 +76,21 @@ export const useWorkflowApplication = (app: Application): void => {
 	application = app;
 };
 
-/** A signal that never aborts: Cloudflare stops a step that runs past its timeout itself. */
-const quiet = (): AbortSignal => new AbortController().signal;
+/** The shortest wait Cloudflare takes. */
+const MIN_WAIT_MS = 1000;
 
-/** The milliseconds of a sleep or a wait, checked against the longest one. */
-const waitMs = (duration: WorkflowDuration, what: string): number => {
-	const ms = toMilliseconds(duration);
-	if (ms > MAX_WAIT_MS)
-		throw new InvalidWorkflowStepError(`${what} cannot be longer than 365 days.`);
-	return ms;
-};
+/** What a step answers when its value cannot be kept: the step fails without a retry. */
+type Unkept = { '~unkept': string };
+
+const isUnkept = (value: unknown): value is Unkept =>
+	typeof value === 'object' && value !== null && '~unkept' in value;
+
+/** Runs a function in the async context of the caller, whatever context Cloudflare calls it in. */
+const inContext = (): (<T>(fn: () => T) => T) =>
+	(AsyncLocalStorage as { snapshot?: () => <T>(fn: () => T) => T }).snapshot?.() ?? ((fn) => fn());
+
+const messageOf = (error: unknown): string =>
+	error instanceof Error ? error.message : String(error);
 
 /**
  * The steps of the port, over the steps of Cloudflare Workflows: values cross as JSON, a
@@ -91,11 +110,8 @@ export const adaptSteps = (
 			second: StepOptions | ((context: StepContext) => T | Promise<T>),
 			third?: (context: StepContext) => T | Promise<T>
 		) => {
-			const options = typeof second === 'function' ? {} : second;
-			const work = typeof second === 'function' ? second : third;
-			if (typeof work !== 'function') {
-				throw new InvalidWorkflowStepError('step.do() needs the work of the step as a function.');
-			}
+			assertStepName(name);
+			const { options, work } = doArguments(second, third);
 			const retries = options.retries ?? definition.retries ?? DEFAULT_RETRIES;
 			assertRetries(retries);
 			const config = {
@@ -106,38 +122,73 @@ export const adaptSteps = (
 				},
 				timeout: toMilliseconds(options.timeout ?? definition.timeout ?? DEFAULT_STEP_TIMEOUT)
 			};
+			const run = inContext();
+			// What the last attempt of this run did, to tell a failure of the work from one of Cloudflare.
+			let last: { attempt: number; error?: unknown } | undefined;
 			let encoded: unknown;
 			try {
-				encoded = await step.do(name, config, async ({ attempt }) =>
-					encodeValue(await work({ attempt, signal: quiet() }))
+				encoded = await step.do(name, config, ({ attempt }) =>
+					run(async () => {
+						last = { attempt };
+						let value: unknown;
+						try {
+							value = await work({ attempt, signal: AbortSignal.timeout(config.timeout) });
+						} catch (error) {
+							last = { attempt, error };
+							throw error;
+						}
+						try {
+							return encodeValue(value);
+						} catch (error) {
+							return { '~unkept': `returned a value that cannot be kept: ${messageOf(error)}` };
+						}
+					})
 				);
 			} catch (error) {
+				// A failure the work threw, live or kept by Cloudflare, ends the step; any other one,
+				// such as a limit of Cloudflare, is not a failure of the step and goes on as it is.
+				if (last && !('error' in last)) throw error;
 				throw new WorkflowStepFailedError(
 					name,
-					retries.limit + 1,
-					error instanceof Error ? error.message : String(error)
+					last?.attempt ?? retries.limit + 1,
+					messageOf(last && 'error' in last ? last.error : error)
 				);
+			}
+			if (isUnkept(encoded)) {
+				throw new WorkflowStepFailedError(name, last?.attempt ?? 1, encoded['~unkept']);
 			}
 			return decode(encoded) as T;
 		},
-		sleep: async (name: string, duration: WorkflowDuration) =>
-			step.sleep(name, waitMs(duration, 'A sleep')),
+		sleep: async (name: string, duration: WorkflowDuration) => {
+			assertStepName(name);
+			return step.sleep(name, waitMilliseconds(duration, 'A sleep'));
+		},
 		sleepUntil: async (name: string, until: Date | number | string) => {
+			assertStepName(name);
 			const at = new Date(until).getTime();
 			if (Number.isNaN(at)) {
 				throw new InvalidWorkflowStepError(`The time step "${name}" sleeps until is not a date.`);
 			}
+			if (at - Date.now() > MAX_WAIT_MS) {
+				throw new InvalidWorkflowStepError('A sleep cannot be longer than 365 days.');
+			}
 			return step.sleepUntil(name, at);
 		},
 		waitFor: async (name: string, event: { type: string }, options: WaitForOptions = {}) => {
-			const timeout = waitMs(options.timeout ?? DEFAULT_WAIT_TIMEOUT, 'A wait');
+			assertStepName(name);
+			// Cloudflare waits 1 second at the least.
+			const timeout = Math.max(
+				waitMilliseconds(options.timeout ?? DEFAULT_WAIT_TIMEOUT, 'A wait'),
+				MIN_WAIT_MS
+			);
+			let received: { payload: unknown };
 			try {
-				const received = await step.waitForEvent(name, { type: event.type, timeout });
-				return decode(received.payload);
+				received = await step.waitForEvent(name, { type: event.type, timeout });
 			} catch {
 				// Cloudflare throws when the wait times out; the port gives the timeout as a value.
 				return new WorkflowTimeoutError(name, event.type);
 			}
+			return decode(received.payload);
 		}
 	} as WorkflowStep;
 };
@@ -159,6 +210,9 @@ export const runWorkflow = (
 ): Promise<unknown> =>
 	runInvocation({ env, ctx }, async () => {
 		if (!application) throw new WorkflowApplicationMissingError();
+		if (typeof payload !== 'object' || payload === null || typeof payload.workflow !== 'string') {
+			throw new WorkflowPayloadError();
+		}
 		await application.boot();
 		const host = WorkflowRegistry.host;
 		const definition = host.definition(payload.workflow);

@@ -76,7 +76,10 @@ export {
 	DEFAULT_WAIT_TIMEOUT,
 	MAX_WAIT_MS,
 	assertRetries,
-	retryDelay
+	assertStepName,
+	doArguments,
+	retryDelay,
+	waitMilliseconds
 } from './step.js';
 export type {
 	WorkflowClass,

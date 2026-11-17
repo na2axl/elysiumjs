@@ -46,10 +46,27 @@ declare module '@elysiumjs/olympus' {
 	}
 }
 
-/** Thrown when Cloudflare refuses to create instances for another reason than an id in use. */
+/**
+ * Thrown when Cloudflare refuses to create instances for another reason than an id in use, such
+ * as a rate limit. The instances of the batches sent before it are created: `started` tells, for
+ * each request, whether its instance started.
+ */
 export class WorkflowCreateError extends ElysiumError {
-	constructor(workflow: string, reasons: string[]) {
+	constructor(
+		workflow: string,
+		reasons: string[],
+		public readonly started: readonly boolean[]
+	) {
 		super(`Cloudflare Workflows could not start instances of "${workflow}": ${reasons.join('; ')}`);
+	}
+}
+
+/** Thrown when two workflows would share the ids of one binding. */
+export class WorkflowBindingConflictError extends ElysiumError {
+	constructor(first: string, second: string, binding: string) {
+		super(
+			`The workflows "${first}" and "${second}" would share the instance ids of the Cloudflare binding "${binding}": give each workflow a binding of its own, or rename one of them.`
+		);
 	}
 }
 
@@ -90,7 +107,7 @@ const statusOf = (status: string): WorkflowStatus => {
 
 /** Whether an error of `get()` says that the instance does not exist. */
 const isMissing = (error: unknown): boolean =>
-	/not[ _-]?found|does ?n[o']t exist|no such instance|invalid/i.test(
+	/not[ _-]?found|does ?n[o']t exist|no such instance/i.test(
 		error instanceof Error ? error.message : String(error)
 	);
 
@@ -120,6 +137,21 @@ export class CloudflareWorkflowDriver implements WorkflowDriver {
 
 	public open(host: WorkflowHost): void {
 		this.#host = host;
+		// A shared binding tells workflows apart by the hash of their names; a binding of its own
+		// holds the ids of one workflow only, so no other workflow may use it.
+		const shared = this.options.binding ?? 'WORKFLOWS';
+		const keys = new Map<string, string>();
+		const bindings = new Map<string, string>();
+		for (const workflow of host.workflows()) {
+			const own = this.#ownBinding(workflow);
+			const binding = own ?? shared;
+			const key = own === undefined ? `${shared}#${hashOf(workflow)}` : own;
+			const other =
+				keys.get(key) ?? (own !== undefined ? bindings.get(own) : bindings.get(`own:${shared}`));
+			if (other !== undefined) throw new WorkflowBindingConflictError(other, workflow, binding);
+			keys.set(key, workflow);
+			bindings.set(own === undefined ? binding : `own:${own}`, workflow);
+		}
 	}
 
 	public async start(requests: readonly WorkflowStartRequest[]): Promise<boolean[]> {
@@ -137,14 +169,15 @@ export class CloudflareWorkflowDriver implements WorkflowDriver {
 					const payload: WorkflowRunnerPayload = { workflow, params };
 					return { id: this.instanceId(workflow, id), params: payload };
 				});
-				const result = await Workers.binding<WorkflowBindingLike>(binding).createBatch({
-					instances
-				});
-				if (Array.isArray(result)) {
-					// The array form of older runtimes answers the created instances only.
-					const created = new Set(result.map((instance) => instance.id));
-					chunk.forEach((index, i) => (started[index] = created.has(instances[i]!.id)));
-					continue;
+				let result: Awaited<ReturnType<WorkflowBindingLike['createBatch']>>;
+				try {
+					result = await Workers.binding<WorkflowBindingLike>(binding).createBatch({ instances });
+				} catch (error) {
+					throw new WorkflowCreateError(
+						requests[chunk[0]!]!.workflow,
+						[error instanceof Error ? error.message : String(error)],
+						started
+					);
 				}
 				const failed = new Set<number>();
 				const reasons: string[] = [];
@@ -153,10 +186,10 @@ export class CloudflareWorkflowDriver implements WorkflowDriver {
 					if (!ID_IN_USE.has(error.code))
 						reasons.push(`${error.id ?? error.index}: ${error.message}`);
 				}
-				if (reasons.length > 0) {
-					throw new WorkflowCreateError(requests[chunk[0]!]!.workflow, reasons);
-				}
 				chunk.forEach((index, i) => (started[index] = !failed.has(i)));
+				if (reasons.length > 0) {
+					throw new WorkflowCreateError(requests[chunk[0]!]!.workflow, reasons, started);
+				}
 			}
 		}
 		return started;
@@ -170,12 +203,13 @@ export class CloudflareWorkflowDriver implements WorkflowDriver {
 	): Promise<WorkflowSignalOutcome> {
 		const instance = await this.#instance(workflow, id);
 		if (!instance) return 'missing';
+		if (await this.#finished(instance)) return 'finished';
 		try {
 			await instance.sendEvent({ type, payload });
 			return 'sent';
 		} catch (error) {
-			const { status } = await instance.status();
-			if (FINISHED_STATUSES.includes(statusOf(status))) return 'finished';
+			// The instance may have ended between the two calls.
+			if (await this.#finished(instance).catch(() => false)) return 'finished';
 			throw error;
 		}
 	}
@@ -186,7 +220,9 @@ export class CloudflareWorkflowDriver implements WorkflowDriver {
 		const state = await instance.status();
 		return {
 			status: statusOf(state.status),
-			...(state.output === undefined || state.output === null ? {} : { output: state.output }),
+			...(state.status === 'complete' && state.output !== undefined
+				? { output: state.output }
+				: {}),
 			...(state.error ? { error: { name: state.error.name, message: state.error.message } } : {})
 		};
 	}
@@ -194,14 +230,18 @@ export class CloudflareWorkflowDriver implements WorkflowDriver {
 	public async terminate(workflow: string, id: string): Promise<boolean> {
 		const instance = await this.#instance(workflow, id);
 		if (!instance) return false;
-		if (FINISHED_STATUSES.includes(statusOf((await instance.status()).status))) return false;
+		if (await this.#finished(instance)) return false;
 		try {
 			await instance.terminate();
 			return true;
 		} catch (error) {
-			if (FINISHED_STATUSES.includes(statusOf((await instance.status()).status))) return false;
+			if (await this.#finished(instance).catch(() => false)) return false;
 			throw error;
 		}
+	}
+
+	async #finished(instance: WorkflowInstanceLike): Promise<boolean> {
+		return FINISHED_STATUSES.includes(statusOf((await instance.status()).status));
 	}
 
 	/**

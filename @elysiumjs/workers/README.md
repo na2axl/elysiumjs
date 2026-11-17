@@ -314,7 +314,20 @@ class Payout extends Workflow<PayoutParams, PayoutResult> {}
 { "name": "my-app-payouts", "binding": "PAYOUTS", "class_name": "WorkflowRunner" }
 ```
 
-Steps are steps of Cloudflare Workflows, with the same names, retries and timeouts, so the dashboard shows them. Values cross as JSON; a DomainError returned by a step keeps its class; a step that fails on every attempt throws `WorkflowStepFailedError` into `run()`; a wait that times out gives `WorkflowTimeoutError`. The `signal` given to a step never aborts: Cloudflare stops a step that runs past its timeout itself. `Odysseus.start()` and `startMany()` create instances in batches of 100, and an id in use is answered as `WorkflowAlreadyStartedError`.
+Each workflow either shares the binding or has one of its own: two workflows naming the same binding, or a workflow naming the shared one, stop the application at start with `WorkflowBindingConflictError`.
+
+Steps are steps of Cloudflare Workflows, with the same names, retries and timeouts, so the dashboard shows them. Values cross as JSON; a DomainError returned by a step keeps its class; a step that fails on every attempt throws `WorkflowStepFailedError` into `run()`, and a step whose value is not JSON fails at once, without a retry; a wait that times out gives `WorkflowTimeoutError`. The work of a step runs in the async context of `run()`, so bindings and request-scoped services work inside it. The `signal` given to a step aborts when the step's timeout passes; Cloudflare cannot stop the work itself, so make long work listen to it. `Odysseus.start()` and `startMany()` create instances in batches of 100, and an id in use is answered as `WorkflowAlreadyStartedError`. When Cloudflare refuses a batch, as on a rate limit, `WorkflowCreateError` tells in `started` which instances of the earlier batches were created.
+
+Where Cloudflare Workflows differ from the `engine` driver:
+
+- A step result, an event payload and the params of an instance hold at most 1 MiB, and an instance runs at most 1,024 steps (10,000 on paid plans). A step that breaks a limit throws Cloudflare's error into `run()`, not `WorkflowStepFailedError`.
+- Keep step timeouts at 30 minutes or less, and use `waitFor()` for longer waits. Waits last 1 second at the least.
+- Cloudflare keeps finished instances for a limited time only: after that, `status()` answers `WorkflowNotFoundError` and the id can be used again.
+- `paused` is reached only from Cloudflare's own tools, and a signal to a paused instance may be refused.
+- An instance that sleeps or waits is evicted and replayed later: its request scope ends without `onDestroy` hooks, and each replay gets a new one.
+- A DomainError thrown (not returned) by `run()` reaches `status()` as a plain error, with its name and message only.
+- Instances can only be started with `Odysseus.start()`: `WorkflowRunner` refuses instances created from the dashboard or the REST API with `WorkflowPayloadError`.
+- There is no `drain()` or `Clock.travel()`: test workflows with the `engine` driver, and the Cloudflare side with `@cloudflare/vitest-pool-workers`.
 
 ## Compiling ahead of time
 

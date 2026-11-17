@@ -37,12 +37,15 @@ import {
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 
 import {
+	adaptSteps,
 	CloudflareWorkflowDriver,
 	runInvocation,
 	runWorkflow,
 	useWorkflowApplication,
 	WorkflowApplicationMissingError,
-	WorkflowCreateError
+	WorkflowBindingConflictError,
+	WorkflowCreateError,
+	WorkflowPayloadError
 } from '../src';
 
 type FakeInstance = {
@@ -329,5 +332,135 @@ describe('cloudflare workflow driver', () => {
 		expect(
 			runWorkflow(env, ctx, { workflow: 'shop.order', params: {} }, {} as CloudflareStepLike)
 		).rejects.toThrow(WorkflowApplicationMissingError);
+	});
+
+	it('refuses a payload the driver did not create', async () => {
+		expect(runWorkflow(env, ctx, null as never, {} as CloudflareStepLike)).rejects.toThrow(
+			WorkflowPayloadError
+		);
+		expect(runWorkflow(env, ctx, {} as never, {} as CloudflareStepLike)).rejects.toThrow(
+			WorkflowPayloadError
+		);
+	});
+
+	it('refuses workflows that would share the ids of a binding', () => {
+		const host = (props: Record<string, Record<string, unknown> | undefined>) =>
+			({
+				workflows: () => Object.keys(props),
+				definition: (name: string) => ({ driver: props[name] })
+			}) as never;
+		const driver = new CloudflareWorkflowDriver();
+		expect(() => driver.open(host({ a: { binding: 'PAY' }, b: { binding: 'PAY' } }))).toThrow(
+			WorkflowBindingConflictError
+		);
+		expect(() => driver.open(host({ a: undefined, b: { binding: 'WORKFLOWS' } }))).toThrow(
+			WorkflowBindingConflictError
+		);
+		expect(() => driver.open(host({ a: { binding: 'WORKFLOWS' }, b: undefined }))).toThrow(
+			WorkflowBindingConflictError
+		);
+		expect(() =>
+			driver.open(host({ a: undefined, b: undefined, c: { binding: 'PAY' } }))
+		).not.toThrow();
+	});
+
+	it('tells which instances started when Cloudflare refuses a later batch', async () => {
+		let calls = 0;
+		const real = shared.binding.createBatch;
+		shared.binding.createBatch = async (options) => {
+			calls += 1;
+			if (calls === 2) throw new Error('rate limited');
+			return real(options);
+		};
+		const requests = Array.from({ length: 150 }, (_, i) => ({
+			params: { sku: `s${i}` },
+			id: `b-${i}`
+		}));
+		const error = await inWorker(() => Odysseus.startMany(Order, requests)).catch((e) => e);
+		expect(error).toBeInstanceOf(WorkflowCreateError);
+		expect((error as WorkflowCreateError).started.filter(Boolean).length).toBe(100);
+	});
+
+	describe('steps', () => {
+		const definition = { known: [] } as never;
+		const fake = (overrides: Partial<CloudflareStepLike> = {}) => {
+			const calls: { kind: string; args: unknown[] }[] = [];
+			const step: CloudflareStepLike = {
+				do: async (_name, config, callback) => {
+					let last: unknown;
+					for (let attempt = 1; attempt <= (config.retries?.limit ?? 5) + 1; attempt++) {
+						try {
+							return await callback({ attempt });
+						} catch (error) {
+							last = error;
+						}
+					}
+					throw last;
+				},
+				sleep: async (...args) => void calls.push({ kind: 'sleep', args }),
+				sleepUntil: async (...args) => void calls.push({ kind: 'sleepUntil', args }),
+				waitForEvent: async (...args) => {
+					calls.push({ kind: 'wait', args });
+					throw new Error('timed out');
+				},
+				...overrides
+			};
+			return { step: adaptSteps(step, definition), calls };
+		};
+
+		it('fails a step whose value cannot be kept, without a retry', async () => {
+			const { step } = fake();
+			let runs = 0;
+			const error = await step
+				.do('big', { retries: { limit: 3, delay: 0 } }, () => {
+					runs += 1;
+					return { n: 1n } as never;
+				})
+				.catch((e) => e);
+			expect(runs).toBe(1);
+			expect(error).toBeInstanceOf(WorkflowStepFailedError);
+			expect((error as WorkflowStepFailedError).attempts).toBe(1);
+		});
+
+		it('counts the attempts the work made, and lets other failures through', async () => {
+			const { step } = fake({
+				do: async (_name, _config, callback) => {
+					try {
+						return await callback({ attempt: 1 });
+					} catch {
+						return callback({ attempt: 2 });
+					}
+				}
+			});
+			const error = await step
+				.do('call', { retries: { limit: 5, delay: 0 } }, () => {
+					throw new Error('down');
+				})
+				.catch((e) => e);
+			expect((error as WorkflowStepFailedError).attempts).toBe(2);
+
+			const limit = new Error('step output is too large');
+			const { step: over } = fake({
+				do: async (_name, _config, callback) => {
+					await callback({ attempt: 1 });
+					throw limit;
+				}
+			});
+			expect(await over.do('big', () => 'x').catch((e) => e)).toBe(limit);
+		});
+
+		it('checks names, sleeps and waits as the engine does', async () => {
+			const { step, calls } = fake();
+			expect(step.do('', () => 1)).rejects.toThrow('1 to 256 characters');
+			expect(step.sleep('x'.repeat(300), '1 second')).rejects.toThrow('1 to 256 characters');
+			expect(step.sleepUntil('far', Date.now() + 400 * 86_400_000)).rejects.toThrow('365 days');
+			expect(await step.waitFor('quick', Paid, { timeout: 10 })).toBeInstanceOf(
+				WorkflowTimeoutError
+			);
+			expect(calls.at(-1)).toEqual({
+				kind: 'wait',
+				args: ['quick', { type: 'paid', timeout: 1000 }]
+			});
+		});
 	});
 });

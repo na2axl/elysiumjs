@@ -18,13 +18,10 @@
  * @author Axel Nana <ax.lnana@outlook.com>
  */
 export interface WorkflowBindingLike {
-	createBatch(options: { instances: { id: string; params?: unknown }[] }): Promise<
-		| {
-				created: { id: string }[];
-				errors: { index: number; id?: string; code: number; message: string }[];
-		  }
-		| { id: string }[]
-	>;
+	createBatch(options: { instances: { id: string; params?: unknown }[] }): Promise<{
+		created: { id: string }[];
+		errors: { index: number; id?: string; code: number; message: string }[];
+	}>;
 	get(id: string): Promise<WorkflowInstanceLike>;
 }
 
