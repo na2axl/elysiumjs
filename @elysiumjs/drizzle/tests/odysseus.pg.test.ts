@@ -132,8 +132,7 @@ describe.skipIf(!url)('DrizzleWorkflowStore on PostgreSQL', () => {
 		);
 		Clock.freeze('2026-11-01T00:00:00Z');
 		const engine = Workflows.for('engine', {
-			store: new DrizzleWorkflowStore({ tables }),
-			work: false
+			store: new DrizzleWorkflowStore({ tables })
 		}) as EngineDriver;
 		const app = await Application.testing({
 			modules: [OdysseusModule.with({ driver: engine }), OrdersModule],

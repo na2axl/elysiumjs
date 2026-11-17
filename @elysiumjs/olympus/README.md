@@ -1161,20 +1161,29 @@ import { OdysseusModule, Workflows, WorkflowStore } from '@elysiumjs/olympus/ody
 OdysseusModule.with({
 	driver: () =>
 		Workflows.for('engine', {
-			store: () => WorkflowStore.for('memory'),
-			concurrency: 10 // instances run at once by this process
+			store: () => WorkflowStore.for('drizzle', { connection: 'default' }),
+			concurrency: 10 // instances run at once by each worker
 		})
 });
 ```
 
-Each process with `work: true` (the default) runs a worker that polls the store (`pollInterval`, 1 second) and runs the due instances. A worker holds an instance under a lease (`lease`, 15 minutes, extended while the run lasts), so that two processes never run it at once and another takes over from a process that died. Once an instance is terminated or taken over, its run stops at its next step. A process only runs the workflows it registers, and leaves the others in a shared store alone. Runs never join the context of the code that started them: a start or a signal made inside a database transaction reaches the workers once it commits, and steps open transactions of their own. Set `work: false` in a process that only starts instances and sends events. Finished instances are deleted after `retention` (7 days). The `memory` store keeps instances in the process; `@elysiumjs/drizzle` provides a PostgreSQL store and `@elysiumjs/redis` a Redis store. The engine does not run on Cloudflare Workers, which has no long-lived process: use the `cloudflare` driver there.
+Every process of the application starts instances and sends events; worker processes run them. Start one with the `odysseus:work` command, as many as you need, with the same configuration as the HTTP server:
+
+```sh
+bun run src/index.ts serve          # starts instances and sends events
+bun run src/index.ts odysseus:work  # runs them, until the process stops
+```
+
+Workers share the instances through the store, so `odysseus:work` needs a store every process reaches: `@elysiumjs/drizzle` provides a PostgreSQL store and `@elysiumjs/redis` a Redis store. The `memory` store keeps instances inside one process, for tests and scripts, and the command refuses it. To run instances inside the HTTP server process instead, call `work()` on the driver once the application has started.
+
+A worker polls the store (`pollInterval`, 1 second) and runs the due instances, `concurrency` at once. A worker holds an instance under a lease (`lease`, 15 minutes, extended while the run lasts), so that two processes never run it at once and another takes over from a process that died. Once an instance is terminated or taken over, its run stops at its next step. A process only runs the workflows it registers, and leaves the others in a shared store alone. Runs never join the context of the code that started them: a start or a signal made inside a database transaction reaches the workers once it commits, and steps open transactions of their own. A process that does not work leaves instances queued until a worker takes them. Finished instances are deleted after `retention` (7 days). The engine does not run on Cloudflare Workers, which has no long-lived process: use the `cloudflare` driver there.
 
 ### Workflows in tests
 
-With the `engine` driver, `work: false` and a frozen clock, `drain()` runs the due instances until each one finishes or waits, and `Clock.travel()` moves past sleeps, retry delays and wait timeouts:
+Tests need no worker: with the `engine` driver, the `memory` store and a frozen clock, `drain()` runs the due instances until each one finishes or waits, and `Clock.travel()` moves past sleeps, retry delays and wait timeouts:
 
 ```ts
-const engine = Workflows.for('engine', { store: WorkflowStore.for('memory'), work: false });
+const engine = Workflows.for('engine', { store: WorkflowStore.for('memory') });
 const app = await Application.testing({
 	modules: [OdysseusModule.with({ driver: engine }), OrdersModule],
 	boot: 'eager'

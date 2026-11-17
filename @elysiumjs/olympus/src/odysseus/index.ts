@@ -25,6 +25,7 @@ export type { WorkflowDuration } from './duration.js';
 export { toMilliseconds } from './duration.js';
 export type { EngineDriverOptions } from './engine/engine.js';
 export { EngineDriver } from './engine/engine.js';
+export { OdysseusWorkCommand } from './commands/index.js';
 export { StepTimeoutError } from './engine/replay.js';
 export type {
 	ClaimedInstance,
