@@ -13,7 +13,6 @@
 // limitations under the License.
 
 import type { WorkflowStatus } from '../driver.js';
-import type { StoredError } from '../serialize.js';
 
 import { Port } from '../../port.js';
 import { FINISHED_STATUSES } from '../driver.js';
@@ -31,7 +30,7 @@ export type StoredInstance = {
 	readonly status: WorkflowStatus;
 	/** The value `run()` returned, encoded. */
 	readonly output?: unknown;
-	readonly error?: StoredError | null;
+	readonly error?: unknown;
 	/** When a worker should run it next, or `null` when nothing will wake it. */
 	readonly wakeAt: number | null;
 	readonly createdAt: number;
@@ -95,7 +94,7 @@ export type InstanceSettlement = {
 	readonly status: 'waiting' | 'completed' | 'errored';
 	readonly wakeAt: number | null;
 	readonly output?: unknown;
-	readonly error?: StoredError;
+	readonly error?: unknown;
 	/** The last event the run saw: a later one wakes the instance at once. */
 	readonly seenSeq: number;
 };

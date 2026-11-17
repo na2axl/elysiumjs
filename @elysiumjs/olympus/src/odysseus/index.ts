@@ -54,15 +54,6 @@ export type { WorkflowEventPayload } from './event.js';
 export { WorkflowEvent } from './event.js';
 export type { OdysseusModuleConfig } from './odysseus.module.js';
 export { OdysseusModule } from './odysseus.module.js';
-export type { StoredError, StoredProblem } from './serialize.js';
-export {
-	decodeValue,
-	encodeValue,
-	jsonCopy,
-	reviveProblem,
-	storeError,
-	storeProblem
-} from './serialize.js';
 export type {
 	StepBackoff,
 	StepContext,
@@ -92,4 +83,12 @@ export type {
 	WorkflowRef,
 	WorkflowStartOptions
 } from './workflow.js';
-export { Odysseus, ODYSSEUS_DRIVER, Workflow, WorkflowRegistry } from './workflow.js';
+export {
+	keepError,
+	keepValue,
+	Odysseus,
+	ODYSSEUS_DRIVER,
+	restoreValue,
+	Workflow,
+	WorkflowRegistry
+} from './workflow.js';

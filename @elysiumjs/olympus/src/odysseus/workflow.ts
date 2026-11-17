@@ -16,7 +16,6 @@ import type { Kernel, ModuleNode, ProblemClass, Static, TSchema } from '../index
 import type { WorkflowDriver, WorkflowHost, WorkflowStatus } from './driver.js';
 import type { WorkflowDuration } from './duration.js';
 import type { WorkflowEvent, WorkflowEventPayload } from './event.js';
-import type { StoredError } from './serialize.js';
 import type { StepRetries, WorkflowStep } from './step.js';
 
 import Value from 'typebox/value';
@@ -24,9 +23,11 @@ import Value from 'typebox/value';
 import { Container } from '../container.js';
 import {
 	ElysiumError,
+	Json,
 	KERNEL_SERVICE,
 	Metadata,
 	ModuleContext,
+	Serializable,
 	Service,
 	ValidationFailedError
 } from '../index.js';
@@ -37,11 +38,9 @@ import {
 	UnregisteredWorkflowError,
 	WorkflowAlreadyStartedError,
 	WorkflowFinishedError,
-	WorkflowNotFoundError,
-	WorkflowTimeoutError
+	WorkflowNotFoundError
 } from './errors.js';
 import { WorkflowEvent as Events } from './event.js';
-import { decodeValue, jsonCopy } from './serialize.js';
 import { assertRetries } from './step.js';
 
 declare module '../index.js' {
@@ -69,9 +68,9 @@ export type WorkflowProps<P extends TSchema = TSchema> = {
 	/** The schema of the params, checked when an instance starts. */
 	readonly params?: P;
 	/**
-	 * The DomainError classes its steps and `run()` return, so that a kept error comes back with
-	 * its class on replay and in `Odysseus.status()`. Other errors come back as a plain DomainError
-	 * with the same code. {@link WorkflowTimeoutError} is always known.
+	 * The DomainError classes its steps and `run()` return. Each must be declared with
+	 * `@Serializable()`, so that a kept error comes back with its class on replay and in
+	 * `Odysseus.status()`.
 	 */
 	readonly errors?: readonly ProblemClass[];
 	/** The retries of its steps, unless a step sets its own. */
@@ -91,8 +90,6 @@ export type WorkflowProps<P extends TSchema = TSchema> = {
  */
 export type WorkflowDefinition = WorkflowProps & {
 	readonly cls: WorkflowClass;
-	/** The DomainError classes its kept errors come back as. */
-	readonly known: readonly ProblemClass[];
 };
 
 /**
@@ -122,8 +119,12 @@ export type WorkflowInstance<O = unknown> = WorkflowRef & {
 	readonly status: WorkflowStatus;
 	/** The value `run()` returned, once `completed`. A DomainError comes back with its class. */
 	readonly output?: O;
-	/** What `run()` threw, once `errored`. */
-	readonly error?: StoredError;
+	/**
+	 * What `run()` threw, once `errored`: a serializable DomainError with its class, another
+	 * DomainError as a plain one with its code, any other error as an `Error` with its name and
+	 * message.
+	 */
+	readonly error?: Error;
 	readonly createdAt?: Date;
 	readonly updatedAt?: Date;
 };
@@ -203,6 +204,14 @@ export abstract class Workflow<P = unknown, O = unknown> {
 			);
 		}
 		if (props.retries) assertRetries(props.retries);
+		for (const error of props.errors ?? []) {
+			if (!Serializable.has(error)) {
+				throw new InvalidWorkflowError(
+					props.name,
+					`lists ${error.name} in its errors, which is not declared with @Serializable()`
+				);
+			}
+		}
 		return <C extends WorkflowClass<Static<S>>>(target: C): C => {
 			Metadata.define(WORKFLOW, props, target);
 			return target;
@@ -296,7 +305,16 @@ export namespace Odysseus {
 		const checked = Events.check(event, payload);
 		if (!checked.ok)
 			return new ValidationFailedError(checked.errors, 'The event payload is invalid.');
-		const outcome = await driver().signal(defined.name, id, event.type, jsonCopy(checked.payload));
+		let kept: unknown;
+		try {
+			kept = keepValue(checked.payload);
+		} catch (error) {
+			return new ValidationFailedError(
+				[{ pointer: '/payload', message: (error as Error).message }],
+				'The event payload is invalid.'
+			);
+		}
+		const outcome = await driver().signal(defined.name, id, event.type, kept);
 		if (outcome === 'missing') return new WorkflowNotFoundError(defined.name, id);
 		if (outcome === 'finished') return new WorkflowFinishedError(defined.name, id);
 	}
@@ -320,8 +338,10 @@ export namespace Odysseus {
 			status: state.status,
 			...(state.output === undefined
 				? {}
-				: { output: decodeValue(state.output, defined.known) as WorkflowOutput<C> }),
-			...(state.error ? { error: state.error } : {}),
+				: { output: restoreValue<WorkflowOutput<C>>(state.output) }),
+			...(state.error === undefined || state.error === null
+				? {}
+				: { error: restoreValue<Error>(state.error) }),
 			...(state.createdAt ? { createdAt: state.createdAt } : {}),
 			...(state.updatedAt ? { updatedAt: state.updatedAt } : {})
 		};
@@ -399,7 +419,6 @@ export namespace WorkflowRegistry {
 			found.set(props.name, {
 				...props,
 				cls,
-				known: [WorkflowTimeoutError, ...(props.errors ?? [])],
 				module
 			});
 		}
@@ -429,13 +448,74 @@ export namespace WorkflowRegistry {
 			return ModuleContext.run(entry.module, () =>
 				Container.runInRequestScope(async () => {
 					const instance = Service.make(entry.cls as unknown as new () => Workflow) as Workflow;
-					return instance.run(params, step);
+					return instance.run(restoreValue(params), step);
 				}, scope)
 			);
 		},
 		release: (scope) => Container.disposeRequestScope(scope)
 	};
 }
+
+/** Whether a value is a plain object: made by `{}` or with a null prototype. */
+const isPlainObject = (value: unknown): value is Record<string, unknown> => {
+	if (typeof value !== 'object' || value === null) return false;
+	const prototype = Object.getPrototypeOf(value);
+	return prototype === Object.prototype || prototype === null;
+};
+
+/** A value without the `undefined` members of its plain objects, which JSON drops too. */
+const withoutUndefined = (value: unknown): unknown => {
+	if (Array.isArray(value)) return value.map(withoutUndefined);
+	if (!isPlainObject(value)) return value;
+	return Object.fromEntries(
+		Object.entries(value)
+			.filter(([, item]) => item !== undefined)
+			.map(([key, item]) => [key, withoutUndefined(item)])
+	);
+};
+
+/**
+ * Writes a value a workflow keeps, such as a step result, with `Json.encode()`: dates, bigints,
+ * maps, sets, byte arrays and the instances of `@Serializable()` classes come back as they were.
+ * `undefined` is kept as no value, and dropped from plain objects as JSON drops it.
+ * @param value The value.
+ * @throws {TypeError} When `Json` cannot keep the value, such as a function or the instance of a
+ * class that is not serializable.
+ */
+export const keepValue = (value: unknown): unknown => {
+	if (value === undefined) return undefined;
+	const cleaned = withoutUndefined(value);
+	if (!Json.survives(cleaned)) {
+		throw new TypeError(
+			'Json cannot keep it: return JSON values, dates, bigints, maps, sets, byte arrays or instances of @Serializable() classes.'
+		);
+	}
+	return Json.encode(cleaned);
+};
+
+/**
+ * Writes what a run threw with `Json.encode()`: a DomainError keeps its problem, and its class
+ * when it is serializable; another error keeps its name and message.
+ * @param error What the run threw.
+ */
+export const keepError = (error: unknown): unknown => {
+	const thrown = error instanceof Error ? error : new Error(String(error));
+	try {
+		return keepValue(thrown);
+	} catch {
+		// A DomainError whose extensions Json cannot keep.
+		const plain = new Error(thrown.message);
+		plain.name = thrown.name;
+		return keepValue(plain);
+	}
+};
+
+/**
+ * Reads back a value written with {@link keepValue}.
+ * @param kept The kept value.
+ */
+export const restoreValue = <T = unknown>(kept: unknown): T =>
+	(kept === undefined ? undefined : Json.decode(kept)) as T;
 
 /** The driver of `OdysseusModule`. */
 const driver = (): WorkflowDriver => {
@@ -465,10 +545,20 @@ const checkStart = (
 			'The workflow instance id is invalid.'
 		);
 	}
-	if (!definition.params) return jsonCopy(params);
-	const value = Value.Default(definition.params, structuredClone(params));
-	const errors = [...Value.Errors(definition.params, value)];
-	if (errors.length === 0) return jsonCopy(value);
+	const value = definition.params
+		? Value.Default(definition.params, structuredClone(params))
+		: params;
+	const errors = definition.params ? [...Value.Errors(definition.params, value)] : [];
+	if (errors.length === 0) {
+		try {
+			return keepValue(value);
+		} catch (error) {
+			return new ValidationFailedError(
+				[{ pointer: '/params', message: (error as Error).message }],
+				'The workflow params are invalid.'
+			);
+		}
+	}
 	return new ValidationFailedError(
 		errors.map((error) => ({
 			pointer: `/params${(error as { instancePath?: string }).instancePath ?? ''}`,
