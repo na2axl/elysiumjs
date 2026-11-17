@@ -26,7 +26,6 @@ import {
 	WorkflowStepFailedError,
 	WorkflowTimeoutError
 } from '../errors.js';
-import { decodeValue, encodeValue } from '../serialize.js';
 import {
 	assertRetries,
 	assertStepName,
@@ -38,6 +37,7 @@ import {
 	retryDelay,
 	waitMilliseconds
 } from '../step.js';
+import { keepValue, restoreValue } from '../workflow.js';
 
 /** Thrown into an attempt that ran past its timeout. */
 export class StepTimeoutError extends ElysiumError {
@@ -231,7 +231,7 @@ export class Replay {
 
 	/** A kept value, given back. */
 	#decode(value: unknown): unknown {
-		return decodeValue(value, this.definition.known);
+		return restoreValue(value);
 	}
 
 	async #do<T>(
@@ -264,7 +264,7 @@ export class Replay {
 			);
 			if (this.lost) throw new Halt();
 			try {
-				encoded = encodeValue(value);
+				encoded = keepValue(value);
 			} catch (error) {
 				const reason = `returned a value that cannot be kept: ${messageOf(error)}`;
 				await this.#save(key, { kind: 'failed', attempts: attempt, reason });
@@ -325,7 +325,8 @@ export class Replay {
 		const index = this.#events.findIndex((candidate) => candidate.type === event.type);
 		if (index !== -1) {
 			const taken = this.#events[index]!;
-			const encoded = encodeValue(taken.payload);
+			// Payloads are kept with `keepValue()` when they are sent.
+			const encoded = taken.payload;
 			await this.#save(key, { kind: 'done', value: encoded }, taken.seq);
 			this.#events.splice(this.#events.indexOf(taken), 1);
 			return { value: this.#decode(encoded) };
@@ -334,7 +335,7 @@ export class Replay {
 		const now = Clock.epochMs();
 		const until = kept?.kind === 'wait' ? kept.until : now + ms;
 		if (until <= now) {
-			const encoded = encodeValue(new WorkflowTimeoutError(name, event.type));
+			const encoded = keepValue(new WorkflowTimeoutError(name, event.type));
 			await this.#save(key, { kind: 'done', value: encoded });
 			return { value: this.#decode(encoded) };
 		}

@@ -14,6 +14,8 @@
 
 import { Serializer, UnknownSerializerError } from './serializer.js';
 
+import './serializable.js';
+
 /** The key that names the serializer of an encoded value. */
 const TYPE = '$type';
 

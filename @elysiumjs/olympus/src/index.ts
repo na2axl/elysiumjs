@@ -275,6 +275,12 @@ export { type LoggedOptions, Logged } from './logging/decorators/logged.js';
 export { type LogFormat, type LoggerConfig, type TransportConfig } from './logging/types.js';
 export { Json } from './json.js';
 export {
+	ErrorSerializer,
+	ProblemSerializer,
+	Serializable,
+	type SerializableOptions
+} from './serializable.js';
+export {
 	BigIntSerializer,
 	DateSerializer,
 	DuplicateSerializerError,
