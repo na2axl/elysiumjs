@@ -41,11 +41,6 @@ import { Replay } from './replay.js';
 export type EngineDriverOptions = {
 	/** Where instances are kept: a store, or a function that builds it when the module starts. */
 	readonly store: WorkflowStoreDriver | (() => WorkflowStoreDriver);
-	/**
-	 * Whether this process runs instances. Defaults to `true`. Set `false` in processes that only
-	 * start instances and send events, such as an HTTP server next to dedicated workers.
-	 */
-	readonly work?: boolean;
 	/** How many instances this process runs at once. Defaults to 10. */
 	readonly concurrency?: number;
 	/** How often the worker looks for due instances. Defaults to 1 second. */
@@ -80,13 +75,13 @@ const PURGE_EVERY_MS = 3_600_000;
 const MAX_DRAIN_ROUNDS = 10_000;
 
 /**
- * Runs workflows in the process, over a {@link WorkflowStore}: on Bun, Node.js or Deno, in an
- * HTTP server or a worker process of its own. A worker in each process that sets `work` (the
- * default) runs the due instances; leases keep two processes from running the same instance, and
- * let another process take over from one that died.
+ * Runs workflows over a {@link WorkflowStore}, on Bun, Node.js or Deno. Any process starts
+ * instances and sends events; worker processes, started with the `odysseus:work` command, run
+ * them. Leases keep two workers from running the same instance, and let another take over from
+ * one that died. Tests run instances with {@link EngineDriver.drain}.
  *
- * Starting an instance or sending it an event runs it at once in the same process; other
- * processes see it at their next poll.
+ * In a worker, starting an instance or sending it an event runs it at once; other workers see it
+ * at their next poll.
  * @author Axel Nana <ax.lnana@outlook.com>
  * @example
  * ```ts
@@ -110,6 +105,7 @@ export class EngineDriver implements WorkflowDriver {
 	#ticking: Promise<void> | undefined;
 	#again = false;
 	#lastPurge = 0;
+	#stopped: (() => void) | undefined;
 
 	constructor(options: EngineDriverOptions) {
 		this.#options = options;
@@ -132,10 +128,25 @@ export class EngineDriver implements WorkflowDriver {
 			);
 		}
 		this.#host = host;
-		if (this.#options.work !== false) {
-			this.#working = true;
-			this.#schedule(0);
+	}
+
+	/**
+	 * Runs the due instances in this process until the driver closes: what the `odysseus:work`
+	 * command does. Call it from the process itself to run instances next to an HTTP server.
+	 * @returns A promise that settles once the driver closed and its last runs ended.
+	 * @throws {ElysiumError} When the driver was not opened by `OdysseusModule`.
+	 */
+	public work(): Promise<void> {
+		if (!this.#host) {
+			throw new ElysiumError('The engine driver is not open: start OdysseusModule first.');
 		}
+		if (this.#working) {
+			throw new ElysiumError('The engine driver already runs instances in this process.');
+		}
+		this.#working = true;
+		const stopped = new Promise<void>((resolve) => (this.#stopped = resolve));
+		this.#schedule(0);
+		return stopped;
 	}
 
 	public async close(): Promise<void> {
@@ -146,6 +157,8 @@ export class EngineDriver implements WorkflowDriver {
 			await this.#ticking;
 			await Promise.allSettled([...this.#active.values()]);
 		}
+		this.#stopped?.();
+		this.#stopped = undefined;
 	}
 
 	public async start(requests: readonly WorkflowStartRequest[]): Promise<boolean[]> {
