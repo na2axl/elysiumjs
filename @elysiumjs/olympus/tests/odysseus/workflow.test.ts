@@ -24,12 +24,14 @@ import {
 	Module,
 	Runtime,
 	Service,
+	ServiceScope,
 	t,
 	ValidationFailedError
 } from '../../src/index';
 import {
 	EngineDriver,
 	InvalidWorkflowError,
+	InvalidWorkflowStepError,
 	MemoryWorkflowStore,
 	Odysseus,
 	OdysseusModule,
@@ -135,7 +137,124 @@ class Shapes extends Workflow<Record<string, never>, unknown> {
 	}
 }
 
-@Module.register({ workflows: [FulfilOrder, Flaky, Shapes], services: [Inventory] })
+const Go = WorkflowEvent.define('go', t.Object({}));
+
+/** Waits for an event against a deadline, then does one step. */
+@Workflow.register({ name: 'deadline' })
+class Deadline extends Workflow<Record<string, never>, string> {
+	public async run(_: Record<string, never>, step: WorkflowStep): Promise<string> {
+		const winner = await Promise.race([
+			step.waitFor('go', Go, { timeout: '10 days' }).then(() => 'event'),
+			step.sleep('deadline', '2 days').then(() => 'deadline')
+		]);
+		await step.do('after', () => hit('after'));
+		return winner;
+	}
+}
+
+/** Sleeps beside a step that fails for good, and returns beside a sleep it never awaits. */
+@Workflow.register({ name: 'branches' })
+class Branches extends Workflow<{ fail: boolean }, number> {
+	public async run(params: { fail: boolean }, step: WorkflowStep): Promise<number> {
+		if (params.fail) {
+			await Promise.all([
+				step.sleep('cool', '30 days'),
+				step.do('charge', { retries: { limit: 0, delay: 0 } }, () => {
+					throw new Error('declined');
+				})
+			]);
+		}
+		void step.sleep('forgotten', '2 days');
+		return step.do('value', () => 1);
+	}
+}
+
+let gate: { promise: Promise<void>; open: () => void };
+const newGate = () => {
+	let open!: () => void;
+	const promise = new Promise<void>((resolve) => (open = resolve));
+	gate = { promise, open };
+};
+
+/** A saga whose first step waits on a gate. */
+@Workflow.register({ name: 'saga' })
+class Saga extends Workflow<Record<string, never>, void> {
+	public async run(_: Record<string, never>, step: WorkflowStep): Promise<void> {
+		try {
+			await step.do('charge', async () => {
+				hit('charge');
+				await gate.promise;
+			});
+		} catch {
+			await step.do('refund', () => hit('refund'));
+		}
+		await step.do('next', () => hit('next'));
+	}
+}
+
+/** A branch with a gap that is not a step, beside a wait. */
+@Workflow.register({ name: 'gap' })
+class Gap extends Workflow<Record<string, never>, void> {
+	public async run(_: Record<string, never>, step: WorkflowStep): Promise<void> {
+		const branch = (async () => {
+			await step.do('b', () => hit('b'));
+			await new Promise((resolve) => setTimeout(resolve, 5));
+			await step.do('c', () => hit('c'));
+		})();
+		await Promise.all([step.waitFor('go', Go), branch]);
+	}
+}
+
+let destroyed = 0;
+
+@Service.register({ scope: ServiceScope.REQUEST })
+class Basket {
+	public onDestroy(): void {
+		destroyed += 1;
+	}
+}
+
+/** Uses a request-scoped service and sleeps. */
+@Workflow.register({ name: 'scoped' })
+class Scoped extends Workflow<Record<string, never>, number> {
+	constructor(@Service.inject(Basket) private readonly basket: Basket) {
+		super();
+	}
+
+	public async run(_: Record<string, never>, step: WorkflowStep): Promise<number> {
+		void this.basket;
+		await step.sleep('nap', '1 day');
+		return 1;
+	}
+}
+
+/** One step with a long timeout, and bad sleeps. */
+@Workflow.register({ name: 'odd' })
+class Odd extends Workflow<{ bad: 'none' | 'duration' | 'date' }, string> {
+	public async run(params: { bad: 'none' | 'duration' | 'date' }, step: WorkflowStep) {
+		if (params.bad === 'duration') {
+			let thrown = false;
+			const sleeping = step.sleep('bad', '400 days').catch(() => (thrown = true));
+			await sleeping;
+			return thrown ? 'rejected' : 'slept';
+		}
+		if (params.bad === 'date') {
+			return step.sleepUntil('bad', 'not a date').then(
+				() => 'slept',
+				(error) => (error instanceof InvalidWorkflowStepError ? 'invalid' : 'other')
+			);
+		}
+		return step.do('long', { timeout: '30 days' }, async () => {
+			await new Promise((resolve) => setTimeout(resolve, 20));
+			return 'done';
+		});
+	}
+}
+
+@Module.register({
+	workflows: [FulfilOrder, Flaky, Shapes, Deadline, Branches, Saga, Gap, Scoped, Odd],
+	services: [Inventory, Basket]
+})
 class OrdersModule extends Module {}
 
 describe('odysseus', () => {
@@ -378,8 +497,148 @@ describe('odysseus', () => {
 		Runtime.use({ ...testRuntime, name: 'workers' });
 		const driver = Workflows.for('engine', { store: WorkflowStore.for('memory') });
 		expect(
-			driver.open!({ run: async () => undefined, definition: () => undefined })
+			driver.open!({
+				run: async () => undefined,
+				release: async () => undefined,
+				definition: () => undefined,
+				workflows: () => []
+			})
 		).rejects.toThrow(WorkflowDriverUnavailableError);
+	});
+
+	it('lets run() win over a suspended branch: an event beats a deadline', async () => {
+		await boot();
+		await Odysseus.start(Deadline, {}, { id: 'race' });
+		await engine.drain();
+		expect(await Odysseus.status(Deadline, 'race')).toMatchObject({ status: 'waiting' });
+		await Odysseus.signal(Deadline, 'race', Go, {});
+		await engine.drain();
+		expect(await Odysseus.status(Deadline, 'race')).toMatchObject({
+			status: 'completed',
+			output: 'event'
+		});
+		expect(calls.after).toBe(1);
+	});
+
+	it('errors or completes at once whatever its suspended branches', async () => {
+		await boot();
+		await Odysseus.start(Branches, { fail: true }, { id: 'fail' });
+		await Odysseus.start(Branches, { fail: false }, { id: 'ok' });
+		await engine.drain();
+		expect(await Odysseus.status(Branches, 'fail')).toMatchObject({ status: 'errored' });
+		expect(await Odysseus.status(Branches, 'ok')).toMatchObject({
+			status: 'completed',
+			output: 1
+		});
+	});
+
+	it('runs no more steps once the instance is terminated during a step', async () => {
+		await boot();
+		newGate();
+		await Odysseus.start(Saga, {}, { id: 'saga' });
+		const draining = engine.drain();
+		await new Promise((resolve) => setTimeout(resolve, 5));
+		expect(calls.charge).toBe(1);
+		await Odysseus.terminate(Saga, 'saga');
+		gate.open();
+		await draining;
+		await new Promise((resolve) => setTimeout(resolve, 5));
+		expect(calls.refund).toBeUndefined();
+		expect(calls.next).toBeUndefined();
+		expect(await Odysseus.status(Saga, 'saga')).toMatchObject({ status: 'terminated' });
+	});
+
+	it('stops a run when another worker takes the instance over', async () => {
+		await boot();
+		newGate();
+		await Odysseus.start(Saga, {}, { id: 'taken' });
+		const draining = engine.drain();
+		await new Promise((resolve) => setTimeout(resolve, 5));
+		// The lease ends and another worker claims the instance.
+		Clock.travel(16 * 60_000);
+		const now = Clock.epochMs();
+		expect(
+			await store.claim('saga', 'taken', { owner: 'other', until: now + 60_000 }, now)
+		).not.toBeNull();
+		gate.open();
+		await draining;
+		expect(calls.refund).toBeUndefined();
+		expect(calls.next).toBeUndefined();
+		expect(await store.saveStep('saga', 'taken', 'other', 'x', { kind: 'done', value: 1 })).toBe(
+			true
+		);
+	});
+
+	it('runs no step of a branch left behind once the run is settled', async () => {
+		await boot();
+		await Odysseus.start(Gap, {}, { id: 'gap' });
+		await engine.drain();
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		expect(calls).toEqual({ b: 1 });
+		await Odysseus.signal(Gap, 'gap', Go, {});
+		await engine.drain();
+		expect(calls).toEqual({ b: 1, c: 1 });
+		expect(await Odysseus.status(Gap, 'gap')).toMatchObject({ status: 'completed' });
+	});
+
+	it('wakes an instance at once for an event sent while it runs', async () => {
+		await boot();
+		newGate();
+		await Odysseus.start(Deadline, {}, { id: 'early' });
+		const draining = engine.drain();
+		await Odysseus.signal(Deadline, 'early', Go, {});
+		await draining;
+		expect(await Odysseus.status(Deadline, 'early')).toMatchObject({ status: 'completed' });
+	});
+
+	it('ends the request scope of a run that suspends', async () => {
+		await boot();
+		destroyed = 0;
+		await Odysseus.start(Scoped, {}, { id: 'scope' });
+		await engine.drain();
+		expect(destroyed).toBe(1);
+		Clock.travel(DAY);
+		await engine.drain();
+		expect(destroyed).toBe(2);
+		expect(await Odysseus.status(Scoped, 'scope')).toMatchObject({ status: 'completed' });
+	});
+
+	it('takes step timeouts longer than a timer, and rejects bad sleeps as promises', async () => {
+		await boot();
+		await Odysseus.start(Odd, { bad: 'none' }, { id: 'long' });
+		await Odysseus.start(Odd, { bad: 'duration' }, { id: 'duration' });
+		await Odysseus.start(Odd, { bad: 'date' }, { id: 'date' });
+		await engine.drain();
+		expect(await Odysseus.status(Odd, 'long')).toMatchObject({ output: 'done' });
+		expect(await Odysseus.status(Odd, 'duration')).toMatchObject({ output: 'rejected' });
+		expect(await Odysseus.status(Odd, 'date')).toMatchObject({ output: 'invalid' });
+	});
+
+	it('leaves instances of workflows it does not run alone, and drains only when open', async () => {
+		expect(
+			(Workflows.for('engine', { store: new MemoryWorkflowStore() }) as EngineDriver).drain()
+		).rejects.toThrow('not open');
+		await boot();
+		const now = Clock.epochMs();
+		await store.create({
+			workflow: 'elsewhere',
+			id: 'x',
+			params: {},
+			status: 'queued',
+			wakeAt: now,
+			createdAt: now,
+			updatedAt: now
+		});
+		await engine.drain();
+		expect(await store.get('elsewhere', 'x')).toMatchObject({ status: 'queued' });
+		expect(await store.due(now, 10, ['elsewhere'])).toEqual([{ workflow: 'elsewhere', id: 'x' }]);
+	});
+
+	it('checks retries and event types', () => {
+		expect(() =>
+			Workflow.register({ name: 'bad-retries', retries: { limit: Number.NaN, delay: 1 } })
+		).toThrow(InvalidWorkflowStepError);
+		expect(() => WorkflowEvent.define('-dash', t.Object({}))).toThrow(InvalidWorkflowError);
 	});
 
 	it('names the missing module', () => {

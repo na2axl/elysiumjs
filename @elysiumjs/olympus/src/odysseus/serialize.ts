@@ -35,7 +35,12 @@ export type StoredProblem = {
  * An error a run threw, as a store keeps it.
  * @author Axel Nana <ax.lnana@outlook.com>
  */
-export type StoredError = { readonly name: string; readonly message: string };
+export type StoredError = {
+	readonly name: string;
+	readonly message: string;
+	/** The error, when it was a DomainError. */
+	readonly problem?: StoredProblem;
+};
 
 /**
  * A copy of a value as it comes back from a store: JSON. Steps answer this copy on their first run
@@ -93,9 +98,11 @@ export const reviveProblem = (
 
 /** Keeps an error a run threw. */
 export const storeError = (error: unknown): StoredError =>
-	error instanceof Error
-		? { name: error.name, message: error.message }
-		: { name: 'Error', message: String(error) };
+	error instanceof DomainError
+		? { name: error.name, message: error.message, problem: storeProblem(error) }
+		: error instanceof Error
+			? { name: error.name, message: error.message }
+			: { name: 'Error', message: String(error) };
 
 /** Whether a value is a kept DomainError. */
 export const isStoredProblem = (value: unknown): value is StoredProblem =>
@@ -108,8 +115,9 @@ export const isStoredProblem = (value: unknown): value is StoredProblem =>
 const PROBLEM = '~problem';
 
 /**
- * Encodes the value of a step or of `run()` for a store: a DomainError is kept with its code, so
- * that it comes back with its class; any other value is copied as JSON.
+ * Encodes the value of a step or of `run()` for a store: a DomainError returned as the value is
+ * kept with its code, so that it comes back with its class; any other value is copied as JSON,
+ * DomainErrors nested in it included (they come back as plain objects).
  * @param value The value.
  */
 export const encodeValue = (value: unknown): unknown =>

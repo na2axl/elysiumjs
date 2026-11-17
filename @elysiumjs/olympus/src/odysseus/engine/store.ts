@@ -16,6 +16,7 @@ import type { WorkflowStatus } from '../driver.js';
 import type { StoredError } from '../serialize.js';
 
 import { Port } from '../../port.js';
+import { FINISHED_STATUSES } from '../driver.js';
 
 /**
  * An instance, as a store keeps it. Times are milliseconds since the epoch.
@@ -117,11 +118,19 @@ export interface WorkflowStoreDriver {
 
 	/**
 	 * The instances due at `now`, oldest wake first: `queued`, `waiting` or `running`, whose wake
-	 * time has come and that no live lease holds.
+	 * time has come and that no live lease holds. A store that sorts by one score, such as a
+	 * Redis sorted set, can keep `lease.until` as the score while a lease holds the instance.
 	 * @param now The time.
 	 * @param limit How many at most.
+	 * @param workflows The workflows to look at: those the process runs, so that a process that
+	 * does not know a workflow (another application on the same store, or a process from before
+	 * a deploy) leaves its instances alone.
 	 */
-	due(now: number, limit: number): Promise<{ workflow: string; id: string }[]>;
+	due(
+		now: number,
+		limit: number,
+		workflows: readonly string[]
+	): Promise<{ workflow: string; id: string }[]>;
 
 	/**
 	 * Takes an instance to run it, when it is due and no live lease holds it: marks it `running`
@@ -135,11 +144,14 @@ export interface WorkflowStoreDriver {
 		now: number
 	): Promise<ClaimedInstance | null>;
 
-	/** Gives a held instance more time. */
+	/** Gives a held instance more time. Answers `false` when `lease.owner` no longer holds it. */
 	extend(workflow: string, id: string, lease: WorkflowLease): Promise<boolean>;
 
 	/**
-	 * Keeps the result of a step, and takes the event of `seq` when given.
+	 * Keeps the result of a step, and takes the event of `seq` when given. Answers `false`,
+	 * changing nothing, when `owner` no longer holds the instance.
+	 * @param owner The owner of the lease: one per claim, so that it fences a run that lost its
+	 * lease from the runs after it.
 	 * @param key The key of the step.
 	 */
 	saveStep(
@@ -202,9 +214,6 @@ export class WorkflowStore extends Port('workflow-store') {}
 /** The statuses whose instances may be claimed. */
 export const CLAIMABLE: readonly WorkflowStatus[] = ['queued', 'waiting', 'running'];
 
-/** The statuses of a finished instance. */
-export const FINISHED: readonly WorkflowStatus[] = ['completed', 'errored', 'terminated'];
-
 type Row = {
 	instance: StoredInstance;
 	lease: WorkflowLease | null;
@@ -242,9 +251,13 @@ export class MemoryWorkflowStore implements WorkflowStoreDriver {
 		return row ? copy(row.instance) : null;
 	}
 
-	public async due(now: number, limit: number): Promise<{ workflow: string; id: string }[]> {
+	public async due(
+		now: number,
+		limit: number,
+		workflows: readonly string[]
+	): Promise<{ workflow: string; id: string }[]> {
 		return [...this.#rows.values()]
-			.filter((row) => isDue(row, now))
+			.filter((row) => workflows.includes(row.instance.workflow) && isDue(row, now))
 			.sort((a, b) => (a.instance.wakeAt ?? 0) - (b.instance.wakeAt ?? 0))
 			.slice(0, limit)
 			.map(({ instance }) => ({ workflow: instance.workflow, id: instance.id }));
@@ -321,7 +334,7 @@ export class MemoryWorkflowStore implements WorkflowStoreDriver {
 	): Promise<'sent' | 'missing' | 'finished'> {
 		const row = this.#rows.get(keyOf(workflow, id));
 		if (!row) return 'missing';
-		if (FINISHED.includes(row.instance.status)) return 'finished';
+		if (FINISHED_STATUSES.includes(row.instance.status)) return 'finished';
 		row.seq += 1;
 		row.events.push(copy({ seq: row.seq, type, payload, at: now }));
 		const wakeAt = row.instance.wakeAt;
@@ -335,7 +348,7 @@ export class MemoryWorkflowStore implements WorkflowStoreDriver {
 
 	public async terminate(workflow: string, id: string, now: number): Promise<boolean> {
 		const row = this.#rows.get(keyOf(workflow, id));
-		if (!row || FINISHED.includes(row.instance.status)) return false;
+		if (!row || FINISHED_STATUSES.includes(row.instance.status)) return false;
 		row.lease = null;
 		row.instance = { ...row.instance, status: 'terminated', wakeAt: null, updatedAt: now };
 		return true;
@@ -344,7 +357,7 @@ export class MemoryWorkflowStore implements WorkflowStoreDriver {
 	public async purge(before: number): Promise<number> {
 		let purged = 0;
 		for (const [key, row] of this.#rows) {
-			if (FINISHED.includes(row.instance.status) && row.instance.updatedAt < before) {
+			if (FINISHED_STATUSES.includes(row.instance.status) && row.instance.updatedAt < before) {
 				this.#rows.delete(key);
 				purged += 1;
 			}

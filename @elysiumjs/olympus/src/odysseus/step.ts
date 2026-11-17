@@ -173,6 +173,17 @@ export const assertStepName = (name: string): void => {
 	}
 };
 
+/** Checks the retries of a step or a workflow. */
+export const assertRetries = (retries: StepRetries): void => {
+	if (!Number.isInteger(retries.limit) || retries.limit < 0) {
+		throw new InvalidWorkflowStepError('The retry limit must be a whole number, 0 or more.');
+	}
+	const delay = toMilliseconds(retries.delay);
+	if (!Number.isFinite(delay) || delay < 0) {
+		throw new InvalidWorkflowStepError('The retry delay must be a duration of 0 or more.');
+	}
+};
+
 /** Reads the arguments of `step.do()`. */
 export const doArguments = <T>(
 	second: StepOptions | ((context: StepContext) => T | Promise<T>),

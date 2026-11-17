@@ -25,7 +25,7 @@ export type { WorkflowDuration } from './duration.js';
 export { toMilliseconds } from './duration.js';
 export type { EngineDriverOptions } from './engine/engine.js';
 export { EngineDriver } from './engine/engine.js';
-export { LeaseLostError, Replay, StepTimeoutError } from './engine/replay.js';
+export { StepTimeoutError } from './engine/replay.js';
 export type {
 	ClaimedInstance,
 	InstanceSettlement,
@@ -35,7 +35,7 @@ export type {
 	WorkflowLease,
 	WorkflowStoreDriver
 } from './engine/store.js';
-export { CLAIMABLE, FINISHED, MemoryWorkflowStore, WorkflowStore } from './engine/store.js';
+export { CLAIMABLE, MemoryWorkflowStore, WorkflowStore } from './engine/store.js';
 export {
 	DuplicateWorkflowError,
 	InvalidWorkflowError,
@@ -75,6 +75,7 @@ export {
 	DEFAULT_STEP_TIMEOUT,
 	DEFAULT_WAIT_TIMEOUT,
 	MAX_WAIT_MS,
+	assertRetries,
 	retryDelay
 } from './step.js';
 export type {

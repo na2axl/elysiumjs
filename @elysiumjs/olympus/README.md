@@ -1148,8 +1148,10 @@ How a workflow runs:
 - `run()` is replayed from the start each time the instance wakes. A finished step gives its kept result without running again, so code outside the steps must give the same answer on every replay: read the time, random values and anything that changes inside a step.
 - A step that throws is tried again by its retries (by default 5 retries from 10 seconds, doubled each time, set per step or per workflow), then `WorkflowStepFailedError` is thrown into `run()`: caught, the workflow goes on; uncaught, the instance ends `errored`. A step that returns a DomainError is not tried again: the error is its value. List the DomainError classes the workflow returns in `errors`, so that they come back with their class.
 - A step may run more than once when a process stops before its result is kept, so make its side effects idempotent, such as with an idempotency key.
-- Step values come back as JSON (a date as an ISO string), on the first run too. A step name used several times in one run, such as in a loop, names a new step each time.
-- `step.sleep()`, `step.sleepUntil()` and `step.waitFor()` wait up to 365 days. Event types and instance ids take letters, digits, `_` and `-`, the characters every driver accepts.
+- Step values come back as JSON (a date as an ISO string), on the first run too. A DomainError returned as a step's value keeps its class; one nested in an object comes back as a plain object. A step name used several times in one run, such as in a loop, names a new step each time, in the order the steps are called: give steps in parallel branches distinct names.
+- Steps may run in parallel (`Promise.all`, `Promise.race`). The run goes on as long as a branch can; once every branch left is waiting, the instance sleeps until the earliest of them. When `run()` returns or throws, the instance ends, whatever is still waiting.
+- `step.sleep()`, `step.sleepUntil()` and `step.waitFor()` wait up to 365 days. Event types and instance ids take letters, digits, `_` and `-`, not starting with `-`: the characters every driver accepts.
+- A step receives `{ attempt, signal }`; the signal aborts when the attempt runs past its timeout (10 minutes by default), and with the engine driver also when the instance is terminated or taken over.
 
 ### The engine driver
 
@@ -1165,7 +1167,7 @@ OdysseusModule.with({
 });
 ```
 
-Each process with `work: true` (the default) runs a worker that polls the store (`pollInterval`, 1 second) and runs the due instances. A worker holds an instance under a lease (`lease`, 15 minutes, extended as steps finish), so that two processes never run it at once and another takes over from a process that died. Set `work: false` in a process that only starts instances and sends events. Finished instances are deleted after `retention` (7 days). The `memory` store keeps instances in the process; `@elysiumjs/drizzle` provides a PostgreSQL store and `@elysiumjs/redis` a Redis store. The engine does not run on Cloudflare Workers, which has no long-lived process: use the `cloudflare` driver there.
+Each process with `work: true` (the default) runs a worker that polls the store (`pollInterval`, 1 second) and runs the due instances. A worker holds an instance under a lease (`lease`, 15 minutes, extended while the run lasts), so that two processes never run it at once and another takes over from a process that died. Once an instance is terminated or taken over, its run stops at its next step. A process only runs the workflows it registers, and leaves the others in a shared store alone. Set `work: false` in a process that only starts instances and sends events. Finished instances are deleted after `retention` (7 days). The `memory` store keeps instances in the process; `@elysiumjs/drizzle` provides a PostgreSQL store and `@elysiumjs/redis` a Redis store. The engine does not run on Cloudflare Workers, which has no long-lived process: use the `cloudflare` driver there.
 
 ### Workflows in tests
 

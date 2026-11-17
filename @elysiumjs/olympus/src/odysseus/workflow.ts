@@ -21,6 +21,7 @@ import type { StepRetries, WorkflowStep } from './step.js';
 
 import Value from 'typebox/value';
 
+import { Container } from '../container.js';
 import {
 	ElysiumError,
 	KERNEL_SERVICE,
@@ -41,6 +42,7 @@ import {
 } from './errors.js';
 import { WorkflowEvent as Events } from './event.js';
 import { decodeValue, jsonCopy } from './serialize.js';
+import { assertRetries } from './step.js';
 
 declare module '../index.js' {
 	interface ModuleCollections {
@@ -200,6 +202,7 @@ export abstract class Workflow<P = unknown, O = unknown> {
 				'needs a name of 1 to 64 lowercase letters, digits, ".", "_" or "-"'
 			);
 		}
+		if (props.retries) assertRetries(props.retries);
 		return <C extends WorkflowClass<Static<S>>>(target: C): C => {
 			Metadata.define(WORKFLOW, props, target);
 			return target;
@@ -419,16 +422,18 @@ export namespace WorkflowRegistry {
 	/** The host that runs the registered workflows, for the drivers. */
 	export const host: WorkflowHost = {
 		definition: (workflow) => registry.get(workflow),
-		run: (workflow, params, step) => {
+		workflows: () => [...registry.keys()],
+		run: (workflow, params, step, scope) => {
 			const entry = registry.get(workflow);
 			if (!entry) return Promise.reject(new UnregisteredWorkflowError(workflow));
 			return ModuleContext.run(entry.module, () =>
-				Service.runInRequestScope(async () => {
+				Container.runInRequestScope(async () => {
 					const instance = Service.make(entry.cls as unknown as new () => Workflow) as Workflow;
 					return instance.run(params, step);
-				})
+				}, scope)
 			);
-		}
+		},
+		release: (scope) => Container.disposeRequestScope(scope)
 	};
 }
 

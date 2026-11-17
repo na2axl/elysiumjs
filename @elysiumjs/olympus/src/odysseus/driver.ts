@@ -77,15 +77,24 @@ export type WorkflowSignalOutcome = 'sent' | 'missing' | 'finished';
  */
 export interface WorkflowHost {
 	/**
-	 * Runs `run()` of a workflow in its module, in a request scope of its own.
+	 * Runs `run()` of a workflow in its module, in the request scope of `scope`. A run that
+	 * suspends never settles, so the driver ends the scope with {@link release} once it is done
+	 * with the run.
 	 * @param workflow The name of the workflow.
 	 * @param params The params of the instance.
 	 * @param step The steps.
+	 * @param scope The object the request scope of the run belongs to.
 	 */
-	run(workflow: string, params: unknown, step: WorkflowStep): Promise<unknown>;
+	run(workflow: string, params: unknown, step: WorkflowStep, scope: object): Promise<unknown>;
+
+	/** Ends the request scope of a run, calling `onDestroy` on its request-scoped services. */
+	release(scope: object): Promise<void>;
 
 	/** The definition of a registered workflow, or `undefined`. */
 	definition(workflow: string): WorkflowDefinition | undefined;
+
+	/** The names of the registered workflows. */
+	workflows(): string[];
 }
 
 /**

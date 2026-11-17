@@ -58,10 +58,10 @@ export namespace WorkflowEvent {
 		type: T,
 		schema: S
 	): WorkflowEvent<T, S> => {
-		if (!/^[A-Za-z0-9_-]+$/.test(type) || type.length > MAX_TYPE_LENGTH) {
+		if (!/^[A-Za-z0-9_][A-Za-z0-9_-]*$/.test(type) || type.length > MAX_TYPE_LENGTH) {
 			throw new InvalidWorkflowError(
 				type,
-				`has an event type that is not 1 to ${MAX_TYPE_LENGTH} letters, digits, "_" or "-"`
+				`has an event type that is not 1 to ${MAX_TYPE_LENGTH} letters, digits, "_" or "-", not starting with "-"`
 			);
 		}
 		return { '~workflowEvent': true, type, schema };
