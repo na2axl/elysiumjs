@@ -22,6 +22,13 @@ declare module 'cloudflare:workers' {
 		alarm?(): void | Promise<void>;
 	}
 
+	export abstract class WorkflowEntrypoint<Env = unknown, Params = unknown> {
+		protected ctx: unknown;
+		protected env: Env;
+		constructor(ctx: unknown, env: Env);
+		run(event: { payload: Params }, step: unknown): Promise<unknown>;
+	}
+
 	export interface DurableObjectStateLike {
 		storage: {
 			get<T = unknown>(key: string): Promise<T | undefined>;

@@ -1,6 +1,6 @@
 # @elysiumjs/workers
 
-The Cloudflare Workers backend of [Elysium.js](https://github.com/na2axl/elysiumjs): the runtime and the Worker entry, bindings, queue and cron handlers, Heracles jobs on Cloudflare Queues, KV caches and sessions, rate limits, and flows and locks in Durable Objects.
+The Cloudflare Workers backend of [Elysium.js](https://github.com/na2axl/elysiumjs): the runtime and the Worker entry, bindings, queue and cron handlers, Heracles jobs on Cloudflare Queues, KV caches and sessions, rate limits, flows and locks in Durable Objects, and workflows on Cloudflare Workflows.
 
 | Port or store                  | Export                                              |
 | ------------------------------ | --------------------------------------------------- |
@@ -11,8 +11,9 @@ The Cloudflare Workers backend of [Elysium.js](https://github.com/na2axl/elysium
 | Flow store (ariadne)           | `durableFlowStore()`, `FlowStoreObject`             |
 | Session store (themis)         | `KvSessionStore`                                    |
 | `Lock` driver `durable-object` | `DurableObjectLock`, `LockObject`                   |
+| Workflow driver `cloudflare`   | `CloudflareWorkflowDriver`, `WorkflowRunner`        |
 
-Durable Object classes come from the `@elysiumjs/workers/durable-objects` subpath, which imports `cloudflare:workers`; everything else comes from the root export, which runs anywhere, so tests can import it under Bun or Node.js.
+Durable Object classes and `WorkflowRunner` come from the `@elysiumjs/workers/durable-objects` subpath, which imports `cloudflare:workers`; everything else comes from the root export, which runs anywhere, so tests can import it under Bun or Node.js.
 
 ## Installation
 
@@ -275,6 +276,45 @@ ThemisModule.with({
 ```
 
 KV is eventually consistent: a session saved in one location can take a few seconds to be seen in another. KV refuses expirations under 60 seconds, so a shorter session lives 60 seconds in KV.
+
+## Workflows on Cloudflare Workflows
+
+The `cloudflare` driver of `@elysiumjs/olympus/odysseus` runs workflows on Cloudflare Workflows. One class, `WorkflowRunner`, runs every workflow of the application: export it from the Worker entry built with `createWorker()`, and declare one Workflow binding for it, `WORKFLOWS` by default:
+
+```ts
+// worker.ts
+export { WorkflowRunner } from '@elysiumjs/workers/durable-objects';
+```
+
+```jsonc
+// wrangler.jsonc
+{
+	"workflows": [
+		{ "name": "my-app-workflows", "binding": "WORKFLOWS", "class_name": "WorkflowRunner" }
+	]
+}
+```
+
+```ts
+import { OdysseusModule, Workflows } from '@elysiumjs/olympus/odysseus';
+
+import '@elysiumjs/workers';
+
+OdysseusModule.with({ driver: () => Workflows.for('cloudflare') }); // or { binding: 'JOBS' }
+```
+
+Instances on the shared binding have ids made of a hash of the workflow name and the id given to `Odysseus.start()`, so that two workflows can use the same id. A workflow that needs its own limits or its own view in the dashboard takes a binding of its own, with the same class, and its instances keep the ids as given:
+
+```ts
+@Workflow.register({ name: 'billing.payout', driver: { binding: 'PAYOUTS' } })
+class Payout extends Workflow<PayoutParams, PayoutResult> {}
+```
+
+```jsonc
+{ "name": "my-app-payouts", "binding": "PAYOUTS", "class_name": "WorkflowRunner" }
+```
+
+Steps are steps of Cloudflare Workflows, with the same names, retries and timeouts, so the dashboard shows them. Values cross as JSON; a DomainError returned by a step keeps its class; a step that fails on every attempt throws `WorkflowStepFailedError` into `run()`; a wait that times out gives `WorkflowTimeoutError`. The `signal` given to a step never aborts: Cloudflare stops a step that runs past its timeout itself. `Odysseus.start()` and `startMany()` create instances in batches of 100, and an id in use is answered as `WorkflowAlreadyStartedError`.
 
 ## Compiling ahead of time
 

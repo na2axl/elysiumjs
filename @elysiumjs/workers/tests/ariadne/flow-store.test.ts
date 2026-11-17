@@ -41,6 +41,12 @@ mock.module('cloudflare:workers', () => ({
 			protected ctx: unknown,
 			protected env: unknown
 		) {}
+	},
+	WorkflowEntrypoint: class {
+		constructor(
+			protected ctx: unknown,
+			protected env: unknown
+		) {}
 	}
 }));
 

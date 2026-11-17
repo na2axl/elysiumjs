@@ -68,3 +68,21 @@ export {
 	type FlowStoreStub
 } from './ariadne/flow-store.js';
 export { type KvNamespaceLike, KvSessionStore } from './themis/session-store.js';
+export {
+	CloudflareWorkflowDriver,
+	type CloudflareWorkflowDriverOptions,
+	WorkflowCreateError
+} from './odysseus/driver.js';
+export {
+	adaptSteps,
+	runWorkflow,
+	useWorkflowApplication,
+	WorkflowApplicationMissingError
+} from './odysseus/runner.js';
+export type {
+	CloudflareStepConfig,
+	CloudflareStepLike,
+	WorkflowBindingLike,
+	WorkflowInstanceLike,
+	WorkflowRunnerPayload
+} from './odysseus/types.js';
