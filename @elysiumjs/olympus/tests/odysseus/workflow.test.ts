@@ -25,6 +25,7 @@ import {
 	DomainError,
 	Module,
 	Runtime,
+	Serializable,
 	Service,
 	ServiceScope,
 	t,
@@ -55,6 +56,7 @@ import { testRuntime } from '../core/test-runtime';
 
 const DAY = 86_400_000;
 
+@Serializable({ name: 'test.out-of-stock' })
 class OutOfStock extends DomainError.for('OUT_OF_STOCK', 409) {
 	constructor(sku: string) {
 		super(`${sku} is out of stock.`, { extensions: { sku } });
@@ -125,10 +127,23 @@ class Flaky extends Workflow<{ catchIt: boolean }, string> {
 	}
 }
 
+@Serializable({ name: 'test.price' })
+class Price {
+	constructor(
+		readonly amount: bigint,
+		readonly currency: string
+	) {}
+}
+
 @Workflow.register({ name: 'shapes' })
 class Shapes extends Workflow<Record<string, never>, unknown> {
 	public async run(_: Record<string, never>, step: WorkflowStep) {
-		const date = await step.do('date', () => ({ at: new Date('2026-01-01T00:00:00Z') }));
+		const date = await step.do('date', () => ({
+			at: new Date('2026-01-01T00:00:00Z'),
+			price: new Price(1500n, 'XAF'),
+			note: undefined
+		}));
+		if (date.at instanceof Date && date.price instanceof Price) hit('typed');
 		const items: number[] = [];
 		for (let i = 0; i < 3; i++) items.push(await step.do('item', () => (hit('item'), i * 10)));
 		const both = await Promise.all([
@@ -404,15 +419,33 @@ describe('odysseus', () => {
 		});
 	});
 
-	it('answers JSON copies, numbers repeated step names, and runs parallel steps', async () => {
+	it('keeps values with Json, numbers repeated step names, and runs parallel steps', async () => {
 		await boot();
 		await Odysseus.start(Shapes, {}, { id: 's-1' });
 		await engine.drain();
-		expect(await Odysseus.status(Shapes, 's-1')).toMatchObject({
+		const status = (await Odysseus.status(Shapes, 's-1')) as {
+			output: { date: { at: Date; price: Price } };
+		};
+		expect(status).toMatchObject({
 			status: 'completed',
-			output: { date: { at: '2026-01-01T00:00:00.000Z' }, items: [0, 10, 20], both: ['L', 'R'] }
+			output: {
+				date: { at: new Date('2026-01-01T00:00:00Z') },
+				items: [0, 10, 20],
+				both: ['L', 'R']
+			}
 		});
-		expect(calls).toEqual({ item: 3, left: 1, right: 1 });
+		expect(status.output.date).not.toHaveProperty('note');
+		expect(status.output.date.price).toBeInstanceOf(Price);
+		expect(status.output.date.price.amount).toBe(1500n);
+		// The first run sees the kept copies too.
+		expect(calls).toEqual({ typed: 1, item: 3, left: 1, right: 1 });
+	});
+
+	it('refuses errors that are not serializable', () => {
+		class Plain extends DomainError.for('PLAIN', 400) {}
+		expect(() => Workflow.register({ name: 'plain', errors: [Plain] })).toThrow(
+			'lists Plain in its errors, which is not declared with @Serializable()'
+		);
 	});
 
 	it('starts an id once and checks ids and params', async () => {

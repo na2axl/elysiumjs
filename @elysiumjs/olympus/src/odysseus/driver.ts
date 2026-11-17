@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { StoredError } from './serialize.js';
 import type { WorkflowStep } from './step.js';
 import type { WorkflowDefinition } from './workflow.js';
 
@@ -46,7 +45,7 @@ export type WorkflowStartRequest = {
 	readonly workflow: string;
 	/** The id of the instance, unique in its workflow. */
 	readonly id: string;
-	/** The params `run()` is given, as JSON. */
+	/** The params `run()` is given, written with `Json.encode()`. */
 	readonly params: unknown;
 };
 
@@ -56,10 +55,10 @@ export type WorkflowStartRequest = {
  */
 export type WorkflowDriverState = {
 	readonly status: WorkflowStatus;
-	/** The value `run()` returned, encoded (see `encodeValue`). */
+	/** The value `run()` returned, written with `Json.encode()`. */
 	readonly output?: unknown;
-	/** What `run()` threw. */
-	readonly error?: StoredError;
+	/** What `run()` threw, written with `Json.encode()`. */
+	readonly error?: unknown;
 	readonly createdAt?: Date;
 	readonly updatedAt?: Date;
 };

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { DomainError, ElysiumError } from '../index.js';
+import { DomainError, ElysiumError, Serializable } from '../index.js';
 
 /**
  * Raised when a workflow is declared wrong: no name, a name already taken, or no `run` method.
@@ -102,6 +102,7 @@ export class WorkflowStepFailedError extends ElysiumError {
  * No workflow instance has this id: a 404 problem.
  * @author Axel Nana <ax.lnana@outlook.com>
  */
+@Serializable({ name: 'odysseus.workflow-not-found' })
 export class WorkflowNotFoundError extends DomainError.for('WORKFLOW_NOT_FOUND', 404) {
 	constructor(workflow: string, id: string) {
 		super(`No instance of the workflow "${workflow}" has the id "${id}".`, {
@@ -115,6 +116,7 @@ export class WorkflowNotFoundError extends DomainError.for('WORKFLOW_NOT_FOUND',
  * id starts it once.
  * @author Axel Nana <ax.lnana@outlook.com>
  */
+@Serializable({ name: 'odysseus.workflow-already-started' })
 export class WorkflowAlreadyStartedError extends DomainError.for('WORKFLOW_ALREADY_STARTED', 409) {
 	constructor(workflow: string, id: string) {
 		super(`An instance of the workflow "${workflow}" has the id "${id}" already.`, {
@@ -127,6 +129,7 @@ export class WorkflowAlreadyStartedError extends DomainError.for('WORKFLOW_ALREA
  * The workflow instance is finished and takes no more events: a 409 problem.
  * @author Axel Nana <ax.lnana@outlook.com>
  */
+@Serializable({ name: 'odysseus.workflow-finished' })
 export class WorkflowFinishedError extends DomainError.for('WORKFLOW_FINISHED', 409) {
 	constructor(workflow: string, id: string) {
 		super(`The instance "${id}" of the workflow "${workflow}" is finished.`, {
@@ -140,6 +143,7 @@ export class WorkflowFinishedError extends DomainError.for('WORKFLOW_FINISHED', 
  * value, never thrown.
  * @author Axel Nana <ax.lnana@outlook.com>
  */
+@Serializable({ name: 'odysseus.workflow-timeout' })
 export class WorkflowTimeoutError extends DomainError.for('WORKFLOW_TIMEOUT', 504) {
 	constructor(step: string, event: string) {
 		super(`The step "${step}" waited for "${event}" and it did not come in time.`, {

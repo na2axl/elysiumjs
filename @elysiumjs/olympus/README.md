@@ -361,6 +361,34 @@ export class MoneySerializer extends Serializer<Money, { amount: string; currenc
 
 `Json.encode()` and `Json.decode()` do the same on values, for a transport that serializes on its own. `Json.survives()` accepts only `null`, booleans, finite numbers, strings, values a serializer supports, and arrays and plain objects of those.
 
+A class whose state lives in its fields needs no serializer of its own: declare it with `@Serializable({ name })`. Its instances are written as their own fields, written with `Json` again, and read back on the prototype of the class, without calling its constructor:
+
+```ts
+import { DomainError, Json, Serializable } from '@elysiumjs/olympus';
+
+@Serializable({ name: 'money' })
+export class Money {
+	constructor(
+		readonly amount: bigint,
+		readonly currency: string
+	) {}
+}
+
+@Serializable({ name: 'payment-declined' })
+export class PaymentDeclined extends DomainError.for('PAYMENT_DECLINED', 402) {}
+
+const back = Json.parse(
+	Json.stringify({ price: new Money(1500n, 'XAF'), error: new PaymentDeclined('Card refused.') })
+);
+back.price instanceof Money; // true, and its amount is a bigint
+back.error instanceof PaymentDeclined; // true, with its code, detail and extensions
+```
+
+- The name is written with each instance, as for a serializer: keep it unique and stable. Class names cannot serve, since bundlers rename classes.
+- A DomainError is written as its problem: code, status, detail, title, errors, extensions and retry delay.
+- Only instances of the class itself match: a subclass needs a name of its own.
+- A DomainError whose class is not serializable reads back as a plain DomainError with the same code and fields, and another error as an `Error` with its name and message.
+
 ## Ports
 
 A port is an extension point whose drivers register by name. `Port(name)` makes one, `@X.driver(name)` registers a class, and `X.for(name, options)` builds the driver. The names and the options are typed by declaration merging, so a typo fails to compile.
@@ -1087,9 +1115,10 @@ A workflow is a series of steps that lives for minutes or months: it survives re
 ```ts
 import type { WorkflowStep } from '@elysiumjs/olympus/odysseus';
 
-import { DomainError, Module, Service, t } from '@elysiumjs/olympus';
+import { DomainError, Module, Serializable, Service, t } from '@elysiumjs/olympus';
 import { Workflow, WorkflowEvent, WorkflowTimeoutError } from '@elysiumjs/olympus/odysseus';
 
+@Serializable({ name: 'orders.out-of-stock' })
 export class OutOfStock extends DomainError.for('OUT_OF_STOCK', 409) {}
 
 export const OrderPaid = WorkflowEvent.define('order-paid', t.Object({ amount: t.Integer() }));
@@ -1146,9 +1175,9 @@ They answer errors as values: `WorkflowAlreadyStartedError`, `WorkflowNotFoundEr
 How a workflow runs:
 
 - `run()` is replayed from the start each time the instance wakes. A finished step gives its kept result without running again, so code outside the steps must give the same answer on every replay: read the time, random values and anything that changes inside a step.
-- A step that throws is tried again by its retries (by default 5 retries from 10 seconds, doubled each time, set per step or per workflow), then `WorkflowStepFailedError` is thrown into `run()`: caught, the workflow goes on; uncaught, the instance ends `errored`. A step that returns a DomainError is not tried again: the error is its value. List the DomainError classes the workflow returns in `errors`, so that they come back with their class.
+- A step that throws is tried again by its retries (by default 5 retries from 10 seconds, doubled each time, set per step or per workflow), then `WorkflowStepFailedError` is thrown into `run()`: caught, the workflow goes on; uncaught, the instance ends `errored`. A step that returns a DomainError is not tried again: the error is its value. List the DomainError classes the workflow returns in `errors`, each declared with `@Serializable()` (a class that is not throws when the workflow is registered), so that they come back with their class.
 - A step may run more than once when a process stops before its result is kept, so make its side effects idempotent, such as with an idempotency key.
-- Step values come back as JSON (a date as an ISO string), on the first run too. A DomainError returned as a step's value keeps its class; one nested in an object comes back as a plain object. A step name used several times in one run, such as in a loop, names a new step each time, in the order the steps are called: give steps in parallel branches distinct names.
+- Step values, params, event payloads and outputs are kept with `Json`, so dates, bigints, maps, sets, byte arrays and the instances of `@Serializable()` classes come back as they were, at any depth; `undefined` members of plain objects are dropped, as JSON drops them. A step answers the kept copy on the first run too, so that it sees the same values on replay. A step value `Json` cannot keep, such as a function or a class instance without a serializer, fails the step without a retry; params or a payload it cannot keep are answered with `ValidationFailedError`. `Odysseus.status()` gives what `run()` threw as an error, with its class when it is a serializable DomainError. A step name used several times in one run, such as in a loop, names a new step each time, in the order the steps are called: give steps in parallel branches distinct names.
 - Steps may run in parallel (`Promise.all`, `Promise.race`). The run goes on as long as a branch can; once every branch left is waiting, the instance sleeps until the earliest of them. When `run()` returns or throws, the instance ends, whatever is still waiting.
 - `step.sleep()`, `step.sleepUntil()` and `step.waitFor()` wait up to 365 days. Event types and instance ids take letters, digits, `_` and `-`, not starting with `-`: the characters every driver accepts.
 - A step receives `{ attempt, signal }`; the signal aborts when the attempt runs past its timeout (10 minutes by default), and with the engine driver also when the instance is terminated or taken over.

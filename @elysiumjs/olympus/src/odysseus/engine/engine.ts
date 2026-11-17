@@ -31,7 +31,7 @@ import { Runtime } from '../../runtime.js';
 import { Workflows } from '../driver.js';
 import { toMilliseconds } from '../duration.js';
 import { WorkflowDriverUnavailableError } from '../errors.js';
-import { encodeValue, storeError } from '../serialize.js';
+import { keepError, keepValue } from '../workflow.js';
 import { Replay } from './replay.js';
 
 /**
@@ -350,7 +350,7 @@ export class EngineDriver implements WorkflowDriver {
 			let failure: unknown;
 			if (settled?.kind === 'done') {
 				try {
-					output = encodeValue(settled.value);
+					output = keepValue(settled.value);
 				} catch (error) {
 					failure = new ElysiumError(
 						`The workflow returned a value that cannot be kept: ${error instanceof Error ? error.message : String(error)}`
@@ -368,7 +368,7 @@ export class EngineDriver implements WorkflowDriver {
 						: {
 								status: 'errored',
 								wakeAt: null,
-								error: storeError(settled.kind === 'error' ? settled.error : failure),
+								error: keepError(settled.kind === 'error' ? settled.error : failure),
 								seenSeq: replay.seenSeq
 							},
 				Clock.epochMs()
