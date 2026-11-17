@@ -17,7 +17,7 @@
 	"scripts": {
 		"format": "prettier --write \"./src/**/*.ts\"",
 		"clean": "rimraf dist",
-		"build:js": "bun build ./src/index.ts ./src/heracles/index.ts ./src/mnemosyne/index.ts ./src/moirai/index.ts ./src/ariadne/index.ts ./src/themis/index.ts ./src/cerberus/index.ts ./src/moirai/heracles.ts ./src/harpocrates/index.ts ./src/hermes/index.ts ./src/hermes/heracles.ts ./src/pithos/index.ts ./src/pithos/heracles.ts --outdir ./dist --target node --packages external --splitting --root ./src --minify-syntax --minify-whitespace",
+		"build:js": "bun build ./src/index.ts ./src/heracles/index.ts ./src/mnemosyne/index.ts ./src/moirai/index.ts ./src/ariadne/index.ts ./src/themis/index.ts ./src/cerberus/index.ts ./src/moirai/heracles.ts ./src/harpocrates/index.ts ./src/hermes/index.ts ./src/hermes/heracles.ts ./src/pithos/index.ts ./src/pithos/heracles.ts ./src/odysseus/index.ts --outdir ./dist --target node --packages external --splitting --root ./src --minify-syntax --minify-whitespace",
 		"build:ts": "tsc",
 		"build": "bun run clean && bun run build:js && bun run build:ts",
 		"typecheck": "tsc --noEmit && tsc -p tsconfig.types.json",
@@ -89,6 +89,10 @@
 		"./pithos/heracles": {
 			"types": "./dist/pithos/heracles.d.ts",
 			"import": "./dist/pithos/heracles.js"
+		},
+		"./odysseus": {
+			"types": "./dist/odysseus/index.d.ts",
+			"import": "./dist/odysseus/index.js"
 		}
 	},
 	"files": [

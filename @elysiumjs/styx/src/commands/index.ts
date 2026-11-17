@@ -21,6 +21,7 @@ export * from './make_middleware.command.js';
 export * from './make_model.command.js';
 export * from './make_repository.command.js';
 export * from './make_seeder.command.js';
+export * from './make_workflow.command.js';
 export * from './make_service.command.js';
 export * from './make_validator.command.js';
 export * from './make_view.command.js';

@@ -1,0 +1,100 @@
+// Copyright (c) 2026-present Axel Nana <ax.lnana@outlook.com>. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+import type { PromptObject } from 'prompts';
+
+import { Command, CommandArgumentType } from '@elysiumjs/olympus';
+import prompts from 'prompts';
+import formatter from 'string-template';
+
+import { readAsset } from '../assets.js';
+import { addToModuleHint, getModulePath, parseProjectConfig } from '../config.js';
+import { fileName } from '../utils.js';
+import { BaseCommand } from './base.command.js';
+
+/**
+ * Maker class for creating Odysseus workflows.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+@Command.register()
+export class MakeWorkflowCommand extends BaseCommand {
+	public static readonly command: string = 'make:workflow';
+	public static readonly description: string = 'Creates a new workflow.';
+
+	@Command.arg({
+		description: 'The name of the workflow to create',
+		type: CommandArgumentType.STRING
+	})
+	private name?: string;
+
+	@Command.arg({
+		description: 'The module where the workflow will be created',
+		type: CommandArgumentType.STRING
+	})
+	private module?: string;
+
+	public async run(): Promise<void> {
+		const config = await parseProjectConfig();
+		const items: PromptObject[] = [
+			{
+				type: () => (this.module || config.mono ? null : 'select'),
+				name: 'module',
+				message: 'Module:',
+				choices: () =>
+					Object.keys(config.modules ?? {}).map((moduleName) => ({
+						title: moduleName,
+						value: moduleName
+					}))
+			},
+			{
+				type: () => (this.name ? null : 'text'),
+				name: 'name',
+				message: 'Workflow Name:',
+				initial: 'FulfilOrderWorkflow',
+				validate: (value: string) => (value.length < 1 ? 'Workflow name cannot be empty' : true)
+			}
+		];
+
+		const answers = await prompts(items, {
+			onCancel: () => {
+				this.error('Operation cancelled.');
+				process.exit(0);
+			}
+		});
+
+		return this.build({
+			module: this.module ?? answers.module,
+			name: this.name ?? answers.name
+		});
+	}
+
+	private async build(answers: { module?: string; name?: string }): Promise<void> {
+		if (!answers.name) {
+			this.error('Operation cancelled.');
+			return;
+		}
+
+		const name = answers.name.endsWith('Workflow') ? answers.name : `${answers.name}Workflow`;
+		const base = fileName(name.replace(/Workflow$/, ''));
+		const workflow = answers.module ? `${fileName(answers.module)}.${base}` : base;
+		const stub = formatter(await readAsset('stubs/workflow.stub'), { name, workflow });
+		const path = answers.module ? await getModulePath(answers.module) : './src';
+
+		const file = Bun.file(`${path}/workflows/${base}.workflow.ts`);
+		await file.write(stub);
+
+		this.success(`Workflow ${this.bold(file.name!)} created successfully.`);
+		this.info(await addToModuleHint('workflows', name, answers.module));
+	}
+}

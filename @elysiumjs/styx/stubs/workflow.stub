@@ -1,0 +1,12 @@
+import type { WorkflowStep } from '@elysiumjs/olympus/odysseus';
+
+import { Workflow } from '@elysiumjs/olympus/odysseus';
+
+type Params = { id: string };
+
+@Workflow.register({ name: '{workflow}' })
+export class {name} extends Workflow<Params, void> {
+	public async run(params: Params, step: WorkflowStep): Promise<void> {
+		await step.do('first step', () => params.id);
+	}
+}

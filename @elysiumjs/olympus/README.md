@@ -27,6 +27,7 @@ Add a runtime package too: `@elysiumjs/bun`, `@elysiumjs/node` or `@elysiumjs/wo
 | `@elysiumjs/olympus/hermes/heracles` | `NotificationJob`, which delivers queued notifications. List it in a module's `jobs`.                                                                                                                                   |
 | `@elysiumjs/olympus/pithos`          | Storage and files: disks (the `Storage` port and the `memory` disk), signed URLs, file records (the `FileStore` port), claims and deferred uploads.                                                                     |
 | `@elysiumjs/olympus/pithos/heracles` | `FilesPruner`, the base of the job that prunes files.                                                                                                                                                                   |
+| `@elysiumjs/olympus/odysseus`        | Durable workflows: steps kept across restarts, sleeps, events, retries, the `engine` driver and the `memory` store.                                                                                                     |
 
 Database drivers, stores and runtimes ship as separate packages, such as `@elysiumjs/drizzle` and `@elysiumjs/redis`.
 
@@ -359,6 +360,34 @@ export class MoneySerializer extends Serializer<Money, { amount: string; currenc
 - Registering two classes under one name throws `DuplicateSerializerError`. Reading a value whose serializer is not registered throws `UnknownSerializerError`: only registered serializers rebuild values, so stored JSON cannot create other classes. Import the serializers in every process that reads the values, such as the workers of a queue.
 
 `Json.encode()` and `Json.decode()` do the same on values, for a transport that serializes on its own. `Json.survives()` accepts only `null`, booleans, finite numbers, strings, values a serializer supports, and arrays and plain objects of those.
+
+A class whose state lives in its fields needs no serializer of its own: declare it with `@Serializable({ name })`. Its instances are written as their own fields, written with `Json` again, and read back on the prototype of the class, without calling its constructor:
+
+```ts
+import { DomainError, Json, Serializable } from '@elysiumjs/olympus';
+
+@Serializable({ name: 'money' })
+export class Money {
+	constructor(
+		readonly amount: bigint,
+		readonly currency: string
+	) {}
+}
+
+@Serializable({ name: 'payment-declined' })
+export class PaymentDeclined extends DomainError.for('PAYMENT_DECLINED', 402) {}
+
+const back = Json.parse(
+	Json.stringify({ price: new Money(1500n, 'XAF'), error: new PaymentDeclined('Card refused.') })
+);
+back.price instanceof Money; // true, and its amount is a bigint
+back.error instanceof PaymentDeclined; // true, with its code, detail and extensions
+```
+
+- The name is written with each instance, as for a serializer: keep it unique and stable. Class names cannot serve, since bundlers rename classes.
+- A DomainError is written as its problem: code, status, detail, title, errors, extensions and retry delay.
+- Only instances of the class itself match: a subclass needs a name of its own.
+- A DomainError whose class is not serializable reads back as a plain DomainError with the same code and fields, and another error as an `Error` with its name and message.
 
 ## Ports
 
@@ -1078,6 +1107,125 @@ class UpdatePost extends Action<Static<typeof UpdatePostInput>> {
 ```
 
 `Cerberus.ability()` answers the ability of the current actor, built once per request, and `Cerberus.check(action, subject)` whether it allows an action. `@elysiumjs/drizzle` turns the same rules into a SQL condition with `rulesToDrizzle()`, so a list answers only the rows the actor may act on.
+
+## Workflows
+
+A workflow is a series of steps that lives for minutes or months: it survives restarts, waits for events and timers without holding a worker, and tries a failing step again, each step running once. `@elysiumjs/olympus/odysseus` declares workflows; a driver runs them: `engine` runs them in the process over a store (on Bun, Node.js or Deno), and `cloudflare` from `@elysiumjs/workers` runs them on Cloudflare Workflows.
+
+```ts
+import type { WorkflowStep } from '@elysiumjs/olympus/odysseus';
+
+import { DomainError, Module, Serializable, Service, t } from '@elysiumjs/olympus';
+import { Workflow, WorkflowEvent, WorkflowTimeoutError } from '@elysiumjs/olympus/odysseus';
+
+@Serializable({ name: 'orders.out-of-stock' })
+export class OutOfStock extends DomainError.for('OUT_OF_STOCK', 409) {}
+
+export const OrderPaid = WorkflowEvent.define('order-paid', t.Object({ amount: t.Integer() }));
+
+@Workflow.register({
+	name: 'orders.fulfil',
+	params: t.Object({ orderId: t.String(), sku: t.String() }),
+	errors: [OutOfStock]
+})
+export class FulfilOrder extends Workflow<{ orderId: string; sku: string }, { shipped: boolean }> {
+	constructor(
+		@Service.inject() private readonly inventory: Inventory,
+		@Service.inject() private readonly shipping: Shipping
+	) {
+		super();
+	}
+
+	public async run({ orderId, sku }: { orderId: string; sku: string }, step: WorkflowStep) {
+		// Returns { reservationId } or an OutOfStock error, which is not retried.
+		const reservation = await step.do('reserve', () => this.inventory.reserve(sku));
+		if (reservation instanceof OutOfStock) return { shipped: false };
+
+		const paid = await step.waitFor('payment', OrderPaid, { timeout: '3 days' });
+		if (paid instanceof WorkflowTimeoutError) {
+			await step.do('release', () => this.inventory.release(reservation.reservationId));
+			return { shipped: false };
+		}
+
+		await step.sleep('let the customer cancel', '1 hour');
+		await step.do('ship', { retries: { limit: 10, delay: '1 minute' } }, () =>
+			this.shipping.send(orderId)
+		);
+		return { shipped: true };
+	}
+}
+
+@Module.register({ workflows: [FulfilOrder], services: [Inventory, Shipping] })
+export class OrdersModule extends Module {}
+```
+
+`Odysseus` starts instances and talks to them. The id of an instance is unique in its workflow, so starting twice with the same id starts it once: take it from what the instance is about.
+
+```ts
+import { Odysseus } from '@elysiumjs/olympus/odysseus';
+
+await Odysseus.start(FulfilOrder, { orderId: '42', sku: 'mug' }, { id: 'order-42' });
+await Odysseus.signal(FulfilOrder, 'order-42', OrderPaid, { amount: 1500 }); // kept until the workflow waits for it
+const instance = await Odysseus.status(FulfilOrder, 'order-42'); // { status: 'waiting', ... }
+await Odysseus.terminate(FulfilOrder, 'order-42');
+```
+
+They answer errors as values: `WorkflowAlreadyStartedError`, `WorkflowNotFoundError`, `WorkflowFinishedError`, and `ValidationFailedError` for an invalid id, params or event payload. `Odysseus.startMany()` starts several instances in one call to the driver.
+
+How a workflow runs:
+
+- `run()` is replayed from the start each time the instance wakes. A finished step gives its kept result without running again, so code outside the steps must give the same answer on every replay: read the time, random values and anything that changes inside a step.
+- A step that throws is tried again by its retries (by default 5 retries from 10 seconds, doubled each time, set per step or per workflow), then `WorkflowStepFailedError` is thrown into `run()`: caught, the workflow goes on; uncaught, the instance ends `errored`. A step that returns a DomainError is not tried again: the error is its value. List the DomainError classes the workflow returns in `errors`, each declared with `@Serializable()` (a class that is not throws when the workflow is registered), so that they come back with their class.
+- A step may run more than once when a process stops before its result is kept, so make its side effects idempotent, such as with an idempotency key.
+- Step values, params, event payloads and outputs are kept with `Json`, so dates, bigints, maps, sets, byte arrays and the instances of `@Serializable()` classes come back as they were, at any depth; `undefined` members of plain objects are dropped, as JSON drops them. A step answers the kept copy on the first run too, so that it sees the same values on replay. A step value `Json` cannot keep, such as a function or a class instance without a serializer, fails the step without a retry; params or a payload it cannot keep are answered with `ValidationFailedError`. `Odysseus.status()` gives what `run()` threw as an error, with its class when it is a serializable DomainError. A step name used several times in one run, such as in a loop, names a new step each time, in the order the steps are called: give steps in parallel branches distinct names.
+- Steps may run in parallel (`Promise.all`, `Promise.race`). The run goes on as long as a branch can; once every branch left is waiting, the instance sleeps until the earliest of them. When `run()` returns or throws, the instance ends, whatever is still waiting.
+- `step.sleep()`, `step.sleepUntil()` and `step.waitFor()` wait up to 365 days. Event types and instance ids take letters, digits, `_` and `-`, not starting with `-`: the characters every driver accepts.
+- A step receives `{ attempt, signal }`; the signal aborts when the attempt runs past its timeout (10 minutes by default), and with the engine driver also when the instance is terminated or taken over.
+
+### The engine driver
+
+```ts
+import { OdysseusModule, Workflows, WorkflowStore } from '@elysiumjs/olympus/odysseus';
+
+OdysseusModule.with({
+	driver: () =>
+		Workflows.for('engine', {
+			store: () => WorkflowStore.for('drizzle', { connection: 'default' }),
+			concurrency: 10 // instances run at once by each worker
+		})
+});
+```
+
+Every process of the application starts instances and sends events; worker processes run them. Start one with the `odysseus:work` command, as many as you need, with the same configuration as the HTTP server:
+
+```sh
+bun run src/index.ts serve          # starts instances and sends events
+bun run src/index.ts odysseus:work  # runs them, until the process stops
+```
+
+Workers share the instances through the store, so `odysseus:work` needs a store every process reaches: `@elysiumjs/drizzle` provides a PostgreSQL store and `@elysiumjs/redis` a Redis store. The `memory` store keeps instances inside one process, for tests and scripts, and the command refuses it. To run instances inside the HTTP server process instead, call `work()` on the driver once the application has started.
+
+A worker polls the store (`pollInterval`, 1 second) and runs the due instances, `concurrency` at once. A worker holds an instance under a lease (`lease`, 15 minutes, extended while the run lasts), so that two processes never run it at once and another takes over from a process that died. Once an instance is terminated or taken over, its run stops at its next step. A process only runs the workflows it registers, and leaves the others in a shared store alone. Runs never join the context of the code that started them: a start or a signal made inside a database transaction reaches the workers once it commits, and steps open transactions of their own. A process that does not work leaves instances queued until a worker takes them. Finished instances are deleted after `retention` (7 days). The engine does not run on Cloudflare Workers, which has no long-lived process: use the `cloudflare` driver there.
+
+### Workflows in tests
+
+Tests need no worker: with the `engine` driver, the `memory` store and a frozen clock, `drain()` runs the due instances until each one finishes or waits, and `Clock.travel()` moves past sleeps, retry delays and wait timeouts:
+
+```ts
+const engine = Workflows.for('engine', { store: WorkflowStore.for('memory') });
+const app = await Application.testing({
+	modules: [OdysseusModule.with({ driver: engine }), OrdersModule],
+	boot: 'eager'
+});
+
+Clock.freeze('2026-01-01T00:00:00Z');
+await Odysseus.start(FulfilOrder, { orderId: '42', sku: 'mug' }, { id: 'order-42' });
+await engine.drain(); // waits for the payment
+await Odysseus.signal(FulfilOrder, 'order-42', OrderPaid, { amount: 1500 });
+await engine.drain(); // sleeps for an hour
+Clock.travel(3_600_000);
+await engine.drain(); // ships
+```
 
 ## Services
 
