@@ -180,4 +180,39 @@ describe.skipIf(!url)('DrizzleWorkflowStore on PostgreSQL', () => {
 		);
 		expect(claims.filter(Boolean).length).toBe(1);
 	});
+
+	it('purges in batches until none is left', async () => {
+		await db.execute(
+			sql`truncate test_odysseus.workflow_instances, test_odysseus.workflow_steps, test_odysseus.workflow_events`
+		);
+		const store = new DrizzleWorkflowStore({ tables, purgeBatch: 2 });
+		const now = Date.parse('2026-11-01T00:00:00Z');
+		for (const [id, at] of [
+			['a', 1],
+			['b', 1],
+			['c', 1],
+			['d', 1],
+			['e', 1],
+			['late', 100]
+		] as const) {
+			await store.create({
+				workflow: 'w',
+				id,
+				params: null,
+				status: 'queued',
+				wakeAt: now,
+				createdAt: now,
+				updatedAt: now
+			});
+			await store.claim('w', id, { owner: 'o', until: now + 1000 }, now);
+			await store.saveStep('w', id, 'o', 's', { kind: 'done', value: 1 });
+			await store.settle('w', id, 'o', { status: 'completed', wakeAt: null, seenSeq: 0 }, now + at);
+		}
+		expect(await store.purge(now + 50)).toBe(5);
+		expect(await store.get('w', 'late')).not.toBeNull();
+		const [{ count }] = (await db.execute(
+			sql`select count(*)::int as count from test_odysseus.workflow_steps`
+		)) as unknown as [{ count: number }];
+		expect(count).toBe(1);
+	});
 });

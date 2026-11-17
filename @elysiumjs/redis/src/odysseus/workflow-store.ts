@@ -69,9 +69,11 @@ return 1`;
 /** KEYS: instance, due, steps, events. ARGV: id, owner, until, now. */
 const CLAIM = `
 local h = redis.call('HMGET', KEYS[1], 'status', 'wake', 'owner', 'until')
-if not h[1] then return false end
+if not h[1] or (h[1] ~= 'queued' and h[1] ~= 'waiting' and h[1] ~= 'running') then
+	redis.call('ZREM', KEYS[2], ARGV[1])
+	return false
+end
 local now = tonumber(ARGV[4])
-if h[1] ~= 'queued' and h[1] ~= 'waiting' and h[1] ~= 'running' then return false end
 if h[2] == '' or tonumber(h[2]) > now then return false end
 if h[3] ~= '' and tonumber(h[4]) > now then return false end
 redis.call('HSET', KEYS[1], 'status', 'running', 'owner', ARGV[2], 'until', ARGV[3], 'updated', ARGV[4])
@@ -146,10 +148,12 @@ return #members`;
 /** A reply of `HGETALL`, as a record, whether the client answers a flat list, an object or a map. */
 const recordOf = (reply: unknown): Record<string, string> => {
 	if (reply === null || reply === undefined) return {};
+	// `Object.fromEntries` defines every key as its own, `__proto__` included.
 	if (Array.isArray(reply)) {
-		const record: Record<string, string> = {};
-		for (let i = 0; i + 1 < reply.length; i += 2) record[String(reply[i])] = String(reply[i + 1]);
-		return record;
+		const entries: [string, string][] = [];
+		for (let i = 0; i + 1 < reply.length; i += 2)
+			entries.push([String(reply[i]), String(reply[i + 1])]);
+		return Object.fromEntries(entries);
 	}
 	if (reply instanceof Map) {
 		return Object.fromEntries([...reply].map(([key, value]) => [String(key), String(value)]));
@@ -287,7 +291,12 @@ export class RedisWorkflowStore implements WorkflowStoreDriver {
 		const events = Object.entries(recordOf(reply[2]))
 			.map(([seq, value]): StoredEvent => {
 				const event = JSON.parse(value) as Omit<StoredEvent, 'seq'>;
-				return { seq: Number(seq), type: event.type, payload: event.payload, at: event.at };
+				return {
+					seq: Number(seq),
+					type: event.type,
+					payload: event.payload,
+					at: event.at
+				};
 			})
 			.sort((a, b) => a.seq - b.seq);
 		return {
@@ -360,7 +369,7 @@ export class RedisWorkflowStore implements WorkflowStoreDriver {
 		const outcome = await this.#eval(
 			ADD_EVENT,
 			[this.#instance(workflow, id), this.#events(workflow, id), this.#due(workflow)],
-			[id, JSON.stringify({ type, payload: payload ?? null, at: now }), String(now)]
+			[id, JSON.stringify({ type, payload, at: now }), String(now)]
 		);
 		return String(outcome) as 'sent' | 'missing' | 'finished';
 	}
@@ -375,12 +384,19 @@ export class RedisWorkflowStore implements WorkflowStoreDriver {
 	}
 
 	public async purge(before: number): Promise<number> {
-		const purged = await this.#eval(
-			PURGE,
-			[this.#finished()],
-			[this.#options.prefix, String(before), String(this.#options.purgeBatch)]
-		);
-		return Number(purged);
+		const batch = this.#options.purgeBatch;
+		let total = 0;
+		for (;;) {
+			const purged = Number(
+				await this.#eval(
+					PURGE,
+					[this.#finished()],
+					[this.#options.prefix, String(before), String(batch)]
+				)
+			);
+			total += purged;
+			if (purged < batch) return total;
+		}
 	}
 
 	// Workflow names and instance ids hold no ":", so `<workflow>:<id>` names one instance.

@@ -43,7 +43,9 @@ describe.skipIf(!url)('RedisWorkflowStore on a Redis server', () => {
 		);
 	});
 
-	afterAll(() => {
+	afterAll(async () => {
+		const keys = (await client.send('KEYS', ['test:odysseus:*'])) as string[];
+		if (keys.length > 0) await client.send('DEL', keys);
 		getConnection.mockRestore();
 		client.close();
 	});
@@ -74,5 +76,40 @@ describe.skipIf(!url)('RedisWorkflowStore on a Redis server', () => {
 		const won = claims.filter(Boolean);
 		expect(won.length).toBe(1);
 		expect(won[0]!.instance.params).toEqual({ big: 1793491200000, pi: 3.141592653589793 });
+	});
+
+	const now = Date.parse('2026-11-01T00:00:00Z');
+	const finish = async (store: RedisWorkflowStore, id: string, at: number) => {
+		await store.create({
+			workflow: 'w',
+			id,
+			params: null,
+			status: 'queued',
+			wakeAt: now,
+			createdAt: now,
+			updatedAt: now
+		});
+		await store.claim('w', id, { owner: 'o', until: now + 1000 }, now);
+		await store.settle('w', id, 'o', { status: 'completed', wakeAt: null, seenSeq: 0 }, at);
+	};
+
+	it('purges in batches until none is left', async () => {
+		const store = new RedisWorkflowStore({
+			prefix: `test:odysseus:${crypto.randomUUID()}:`,
+			purgeBatch: 2
+		});
+		for (const id of ['a', 'b', 'c', 'd', 'e']) await finish(store, id, now + 1);
+		await finish(store, 'late', now + 100);
+		expect(await store.purge(now + 50)).toBe(5);
+		expect(await store.get('w', 'late')).not.toBeNull();
+	});
+
+	it('drops a due entry whose instance is gone', async () => {
+		const prefix = `test:odysseus:${crypto.randomUUID()}:`;
+		const store = new RedisWorkflowStore({ prefix });
+		await client.send('ZADD', [`${prefix}due:w`, String(now), 'ghost']);
+		expect(await store.due(now, 10, ['w'])).toEqual([{ workflow: 'w', id: 'ghost' }]);
+		expect(await store.claim('w', 'ghost', { owner: 'o', until: now + 1000 }, now)).toBeNull();
+		expect(await store.due(now, 10, ['w'])).toEqual([]);
 	});
 });

@@ -22,6 +22,8 @@ import type {
 import type { WorkflowDuration } from '../duration.js';
 import type { WorkflowStoreDriver } from './store.js';
 
+import { AsyncLocalStorage } from 'node:async_hooks';
+
 import { Clock } from '../../clock.js';
 import { ElysiumError } from '../../errors.js';
 import { getLogger } from '../../logger.js';
@@ -62,6 +64,14 @@ declare module '../../port.js' {
 		'workflow:engine': typeof EngineDriver;
 	}
 }
+
+/**
+ * Runs a function outside the async context of its caller: the worker and the runs it starts
+ * never join the transaction, request scope or module of the code that started or signalled an
+ * instance. Taken when the module loads, before any request.
+ */
+const detached: <T>(fn: () => T) => T =
+	(AsyncLocalStorage as { snapshot?: () => <T>(fn: () => T) => T }).snapshot?.() ?? ((fn) => fn());
 
 /** How often finished instances are purged. */
 const PURGE_EVERY_MS = 3_600_000;
@@ -231,7 +241,7 @@ export class EngineDriver implements WorkflowDriver {
 			if (delay > 0) return;
 			clearTimeout(this.#timer);
 		}
-		this.#timer = setTimeout(() => {
+		const tick = () => {
 			this.#timer = undefined;
 			this.#ticking = this.#tick().finally(() => {
 				this.#ticking = undefined;
@@ -239,7 +249,8 @@ export class EngineDriver implements WorkflowDriver {
 				this.#again = false;
 				this.#schedule(again ? 0 : toMilliseconds(this.#options.pollInterval ?? 1_000));
 			});
-		}, delay);
+		};
+		this.#timer = detached(() => setTimeout(tick, delay));
 	}
 
 	/** Runs the due instances that fit, and purges old ones from time to time. */
@@ -272,7 +283,7 @@ export class EngineDriver implements WorkflowDriver {
 		const key = `${workflow}\u0000${id}`;
 		const running = this.#active.get(key);
 		if (running) return running;
-		const run = this.#execute(workflow, id)
+		const run = detached(() => this.#execute(workflow, id))
 			.catch((error) =>
 				getLogger().error('A workflow instance could not run', { workflow, id, error })
 			)
