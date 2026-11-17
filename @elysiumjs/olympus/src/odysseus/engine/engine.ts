@@ -141,7 +141,7 @@ export class EngineDriver implements WorkflowDriver {
 			throw new ElysiumError('The engine driver is not open: start OdysseusModule first.');
 		}
 		if (this.#working) {
-			throw new ElysiumError('The engine driver already runs instances in this process.');
+			throw new ElysiumError('The engine driver already runs instances here.');
 		}
 		this.#working = true;
 		const stopped = new Promise<void>((resolve) => (this.#stopped = resolve));
