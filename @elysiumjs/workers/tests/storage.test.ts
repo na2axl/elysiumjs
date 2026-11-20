@@ -286,8 +286,13 @@ describe('R2Disk uploads in parts', () => {
 		);
 		expect(url.searchParams.get('uploadId')).toBe(uploadId);
 
-		const second = await multipart.putPart('movie/2', uploadId, 2, new TextEncoder().encode('def'));
-		const first = await multipart.putPart('movie/2', uploadId, 1, new TextEncoder().encode('abc'));
+		const second = await multipart.putPart!(
+			'movie/2',
+			uploadId,
+			2,
+			new TextEncoder().encode('def')
+		);
+		const first = await multipart.putPart!('movie/2', uploadId, 1, new TextEncoder().encode('abc'));
 		expect(second.etag).not.toContain('"');
 		const listed = await multipart.listParts('movie/2', uploadId);
 		expect(listed).toEqual([first, second]);
@@ -301,11 +306,23 @@ describe('R2Disk uploads in parts', () => {
 		expect([...bucket.objects.keys()]).toEqual(['movie/2']);
 		expect(await multipart.listParts('movie/2', uploadId)).toBeNull();
 		await expect(
-			multipart.putPart('movie/2', uploadId, 1, new Uint8Array(1))
+			multipart.putPart!('movie/2', uploadId, 1, new Uint8Array(1))
 		).rejects.toBeInstanceOf(MultipartUploadNotFoundError);
 
+		const failing = await multipart.create('movie/4');
+		const broken = bucket.resumeMultipartUpload('movie/4', failing);
+		bucket.resumeMultipartUpload = () => ({
+			...broken,
+			complete: async () => {
+				throw new Error('completeMultipartUpload: the network does not exist');
+			}
+		});
+		await expect(multipart.complete('movie/4', failing, [])).rejects.toThrow('network');
+		delete (bucket as Partial<FakeBucket>).resumeMultipartUpload;
+		await multipart.abort('movie/4', failing);
+
 		const dropped = await multipart.create('movie/3');
-		await multipart.putPart('movie/3', dropped, 1, new Uint8Array(4));
+		await multipart.putPart!('movie/3', dropped, 1, new Uint8Array(4));
 		await multipart.abort('movie/3', dropped);
 		await multipart.abort('movie/3', dropped);
 		expect(bucket.uploads.has(dropped)).toBe(false);

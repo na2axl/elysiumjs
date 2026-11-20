@@ -32,6 +32,7 @@ import {
 	MIN_PART_BYTES,
 	MultipartOnPublicDiskError,
 	MultipartPartsMismatchError,
+	MultipartUploadNotFoundError,
 	partCountOf,
 	partSizeOf,
 	PITHOS_FILE_EXPIRED,
@@ -128,6 +129,22 @@ class TinyPartsUpload extends MovieUpload {
 	}
 }
 
+@Upload.purpose('single-movie')
+class SingleMovieUpload extends Upload {
+	public override get disk() {
+		return 'vault';
+	}
+
+	public get types() {
+		return ['video/mp4'];
+	}
+
+	public get maxBytes() {
+		return MiB;
+	}
+}
+
+void SingleMovieUpload;
 void PublicMovieUpload;
 void TinyPartsUpload;
 
@@ -186,6 +203,8 @@ describe('Uploads in parts', () => {
 		return ticket;
 	};
 
+	const uploadIdOf = async (id: string) => (await Files.find(id))!.multipart!.uploadId;
+
 	const put = async (url: string, body: Uint8Array) => {
 		const parsed = new URL(url);
 		return testing!.http
@@ -215,9 +234,11 @@ describe('Uploads in parts', () => {
 			key: `movie/${ticket.file.id}`,
 			metadata: { declaredSeconds: 90 }
 		});
-		expect(ticket.file.multipart?.uploadId).toBeString();
+		// The disk's upload id stays on the server.
+		expect(ticket.file.multipart).toBeUndefined();
+		expect(await uploadIdOf(ticket.file.id)).toBeString();
+		expect((await Files.find(ticket.file.id))?.multipart?.partBytes).toBe(5 * MiB);
 		expect(ticket.expiresAt.getTime() - ticket.file.createdAt.getTime()).toBe(600_000);
-		expect((await Files.find(ticket.file.id))?.multipart).toEqual(ticket.file.multipart);
 	});
 
 	it('answers the refusal of admit() as it is', async () => {
@@ -332,9 +353,11 @@ describe('Uploads in parts', () => {
 		const size = 5 * MiB + 1;
 		const ticket = await open(size);
 		await send(ticket, video(size), [1, 2]);
-		const { uploadId } = ticket.file.multipart!;
+		const uploadId = await uploadIdOf(ticket.file.id);
 		const parts = await vault.multipart.listParts(ticket.file.key, uploadId);
 		await vault.multipart.complete(ticket.file.key, uploadId, parts!);
+		const progress = (await Uploads.listParts(ticket.file.id)).orThrow();
+		expect(progress).toMatchObject({ joined: true, parts: [] });
 		const file = (await Uploads.finish(ticket.file.id)).orThrow();
 		expect(file.status).toBe('ready');
 	});
@@ -342,7 +365,7 @@ describe('Uploads in parts', () => {
 	it('refuses an upload the disk no longer has', async () => {
 		await boot();
 		const ticket = await open(5 * MiB + 1);
-		await vault.multipart.abort(ticket.file.key, ticket.file.multipart!.uploadId);
+		await vault.multipart.abort(ticket.file.key, await uploadIdOf(ticket.file.id));
 		expect((await Uploads.finish(ticket.file.id)).error).toBeInstanceOf(UploadRejectedError);
 	});
 
@@ -376,22 +399,79 @@ describe('Uploads in parts', () => {
 		);
 		const aborted = (await Uploads.abort(given.file.id, { user: 'alice' })).orThrow();
 		expect(aborted.status).toBe('expired');
-		const { key, multipart } = given.file;
-		expect(await vault.multipart.listParts(key, multipart!.uploadId)).toBeNull();
+		const givenId = (await Files.find(given.file.id))!.multipart!.uploadId;
+		expect(await vault.multipart.listParts(given.file.key, givenId)).toBeNull();
 		expect((await Uploads.abort(given.file.id)).error).toBeInstanceOf(UploadNotPendingError);
 		expect((await Uploads.finish(given.file.id)).error).toBeInstanceOf(UploadNotPendingError);
 
 		const left = await open(5 * MiB + 1);
+		const leftId = await uploadIdOf(left.file.id);
 		Clock.travel(601_000);
 		expect(await Files.prune()).toBe(1);
 		expect((await Files.find(left.file.id))?.status).toBe('expired');
-		expect(
-			await vault.multipart.listParts(left.file.key, left.file.multipart!.uploadId)
-		).toBeNull();
+		expect(await vault.multipart.listParts(left.file.key, leftId)).toBeNull();
 		expect(events.map((event) => [event.event, event.file.id])).toEqual([
 			[PITHOS_FILE_EXPIRED, given.file.id],
 			[PITHOS_FILE_EXPIRED, left.file.id]
 		]);
+	});
+
+	it('aborts the upload of a file refused before its parts are joined', async () => {
+		await boot();
+		const size = 5 * MiB + 1;
+		const ticket = await open(size);
+		const uploadId = await uploadIdOf(ticket.file.id);
+		await vault.multipart.putPart!(ticket.file.key, uploadId, 1, new Uint8Array(5 * MiB));
+		await vault.multipart.putPart!(ticket.file.key, uploadId, 2, new Uint8Array(2));
+		const refused = await Uploads.finish(ticket.file.id);
+		expect((refused.error as UploadRejectedError).reason).toContain('part 2');
+		expect(await vault.multipart.listParts(ticket.file.key, uploadId)).toBeNull();
+		expect(await vault.exists(ticket.file.key)).toBe(false);
+	});
+
+	it('refuses after a retry an upload the disk dropped while joining it', async () => {
+		await boot();
+		const size = 5 * MiB + 1;
+		const ticket = await open(size);
+		await send(ticket, video(size), [1, 2]);
+		const uploadId = await uploadIdOf(ticket.file.id);
+		const real = vault.multipart;
+		Object.defineProperty(vault, 'multipart', {
+			get: (): MultipartStorage => ({
+				...real,
+				complete: async (key) => {
+					await real.abort(key, uploadId);
+					throw new MultipartUploadNotFoundError(uploadId);
+				}
+			})
+		});
+		expect((await Uploads.finish(ticket.file.id)).error).toBeInstanceOf(UploadMissingError);
+		expect((await Uploads.finish(ticket.file.id)).error).toBeInstanceOf(UploadRejectedError);
+	});
+
+	it('answers parts, aborts and finishes of uploads that are not in progress', async () => {
+		await boot();
+		const ticket = await open(5 * MiB + 1);
+		for (const call of [
+			Uploads.listParts(ticket.file.id, { user: 'bob' }),
+			Uploads.signParts(ticket.file.id, [1], { user: 'bob' }),
+			Uploads.abort(ticket.file.id, { user: 'bob' })
+		]) {
+			expect((await call).error).toBeInstanceOf(NotFoundError);
+		}
+		expect((await Uploads.listParts('nope')).error).toBeInstanceOf(NotFoundError);
+		const single = (
+			await Uploads.open({
+				purpose: 'single-movie',
+				contentType: 'video/mp4',
+				size: 10,
+				owner: alice
+			})
+		).orThrow();
+		expect(single.mode).toBe('single');
+		expect((await Uploads.listParts(single.file.id)).error).toBeInstanceOf(NotFoundError);
+		Clock.travel(601_000);
+		expect((await Uploads.listParts(ticket.file.id)).error).toBeInstanceOf(UploadExpiredError);
 	});
 
 	it('refuses a purpose in parts on a public disk or with parts too small', async () => {

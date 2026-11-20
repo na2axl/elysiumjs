@@ -123,7 +123,7 @@ export class StorageController {
 			// A part of a multipart upload: its number and upload are signed with the URL.
 			const multipart = checked.disk.multipart;
 			const part = Number(checked.url.searchParams.get('partNumber'));
-			if (!multipart || !Number.isInteger(part) || part < 1) {
+			if (!multipart?.putPart || !Number.isInteger(part) || part < 1) {
 				return new Response(null, { status: 404 });
 			}
 			try {

@@ -198,15 +198,14 @@ const unquote = (etag: string): string => etag.replace(/&quot;|"/g, '');
 const tag = (xml: string, name: string): string | undefined =>
 	new RegExp(`<${name}>([^<]*)</${name}>`).exec(xml)?.[1];
 
-/** A failure of the binding about a part or an upload, as an error of pithos. */
+/**
+ * A failure of the binding about a part or an upload, as an error of pithos: R2's `NoSuchUpload`
+ * (10024) and `InvalidPart` (10025) codes only; anything else is thrown as it is.
+ */
 const multipartError = (error: unknown, uploadId: string): unknown => {
 	const message = error instanceof Error ? error.message : String(error);
-	if (/NoSuchUpload|10024|does not exist/i.test(message)) {
-		return new MultipartUploadNotFoundError(uploadId);
-	}
-	if (/InvalidPart|10025|EntityTooSmall|10011|etag/i.test(message)) {
-		return new MultipartPartsMismatchError(uploadId);
-	}
+	if (/\bNoSuchUpload\b|\(10024\)/.test(message)) return new MultipartUploadNotFoundError(uploadId);
+	if (/\bInvalidPart\b|\(10025\)/.test(message)) return new MultipartPartsMismatchError(uploadId);
 	return error;
 };
 
@@ -462,11 +461,9 @@ export class R2Disk extends StorageDriver {
 			url.searchParams.set('max-parts', '1000');
 			if (marker) url.searchParams.set('part-number-marker', marker);
 			const response = await fetch(await this.#presign(s3, 'GET', url.toString(), 60, {}));
-			if (response.status === 404) {
-				await response.body?.cancel();
-				return null;
-			}
 			const xml = await response.text();
+			// Only a missing upload: a missing bucket or a wrong endpoint also answers 404.
+			if (response.status === 404 && tag(xml, 'Code') === 'NoSuchUpload') return null;
 			if (!response.ok) {
 				throw new Error(`R2 ListParts failed with ${response.status}: ${tag(xml, 'Code') ?? xml}`);
 			}

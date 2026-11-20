@@ -155,10 +155,11 @@ export interface MultipartStorage {
 	/** A URL that uploads one part (1 to 10,000) of exactly `contentLength` bytes. */
 	signPart(key: string, uploadId: string, part: number, options: SignPartOptions): Promise<string>;
 	/**
-	 * Writes one part, for a disk whose part URLs `PithosModule` serves.
+	 * Writes one part, for a disk whose part URLs `PithosModule` serves; a disk whose part URLs go
+	 * straight to its storage leaves it out.
 	 * @throws {MultipartUploadNotFoundError} When the upload is not in progress.
 	 */
-	putPart(key: string, uploadId: string, part: number, body: Uint8Array): Promise<UploadedPart>;
+	putPart?(key: string, uploadId: string, part: number, body: Uint8Array): Promise<UploadedPart>;
 	/** The parts uploaded so far, by number, or `null` when the upload is not in progress. */
 	listParts(key: string, uploadId: string): Promise<readonly UploadedPart[] | null>;
 	/**

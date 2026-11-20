@@ -16,6 +16,7 @@ import type { DomainError } from '../problem.js';
 import type { Result } from '../result.js';
 import type { FileMetadata, FileOwner, FileRecord } from './files.js';
 import type { UploadedPart } from './storage.js';
+import type { StorageDriver } from './storage.js';
 
 import { Clock } from '../clock.js';
 import { Metadata } from '../metadata.js';
@@ -324,6 +325,11 @@ export type UploadProgress = {
 	readonly partBytes: number;
 	readonly partCount: number;
 	readonly parts: readonly UploadedPart[];
+	/**
+	 * Whether the parts were already joined by a finish that stopped before the file was ready:
+	 * `parts` is then empty, and the client finishes again instead of sending parts.
+	 */
+	readonly joined: boolean;
 	readonly expiresAt: Date;
 };
 
@@ -525,7 +531,7 @@ export namespace Uploads {
 				}
 				return R.pass({
 					mode: 'multipart' as const,
-					file,
+					file: withoutUpload(file),
 					partBytes: multipart.partBytes,
 					partCount: partCountOf(request.size, multipart.partBytes),
 					expiresAt
@@ -624,13 +630,13 @@ export namespace Uploads {
 		const found = await pendingUpload(id, call);
 		if (!found.check()) return found;
 		const { file, multipart } = found.result;
-		const parts =
-			(await Storage.disk(file.disk).multipart!.listParts(file.key, multipart.uploadId)) ?? [];
+		const listed = await Storage.disk(file.disk).multipart!.listParts(file.key, multipart.uploadId);
 		return R.pass({
-			file,
+			file: withoutUpload(file),
 			partBytes: multipart.partBytes,
 			partCount: partCountOf(file.size, multipart.partBytes),
-			parts,
+			parts: listed ?? [],
+			joined: listed === null,
 			expiresAt: file.expiresAt!
 		});
 	};
@@ -779,14 +785,21 @@ export namespace Uploads {
 		const multipart = file.multipart!;
 		const disk = Storage.disk(file.disk);
 		const back = () => store.transition(file.id, { status: ['finishing'] }, { status: 'pending' });
+		// Before the parts are joined, the upload is aborted; after, the joined object is deleted.
+		let joined = false;
 		const refuse = (reason: string) =>
-			refuseFile(file, reason, () => deleteQuietly(file.disk, file.key));
+			refuseFile(file, reason, () =>
+				joined
+					? deleteQuietly(file.disk, file.key)
+					: abortQuietly(file.disk, file.key, multipart.uploadId)
+			);
 
 		let metadata: FileMetadata = file.metadata;
 		let contentType = file.contentType;
 		try {
 			const listed = await disk.multipart!.listParts(file.key, multipart.uploadId);
 			if (listed === null) {
+				joined = true;
 				const object = await disk.head(file.key);
 				if (!object) return refuse('the upload is no longer on the disk');
 			} else {
@@ -806,6 +819,7 @@ export namespace Uploads {
 				}
 				try {
 					await disk.multipart!.complete(file.key, multipart.uploadId, ordered);
+					joined = true;
 				} catch (error) {
 					// A part sent again between the listing and now: list and finish again.
 					if (
@@ -931,26 +945,37 @@ export namespace Uploads {
 
 /** Checks that a purpose can upload in parts to its disk; throws on a wrong configuration. */
 const checkMultipart = (name: string, purpose: Upload<any>, diskName: string): void => {
+	const { partBytes } = purpose.multipart!;
+	if (!Number.isInteger(partBytes) || partBytes < MIN_PART_BYTES) {
+		throw new UploadPartSizeError(name, `parts must be at least ${MIN_PART_BYTES} bytes`);
+	}
+	if (partCountOf(purpose.maxBytes, partBytes) > MAX_PARTS) {
+		throw new UploadPartSizeError(
+			name,
+			`a file of ${purpose.maxBytes} bytes would have more than ${MAX_PARTS} parts`
+		);
+	}
 	const disk = Storage.disk(diskName);
 	if (!disk.multipart) throw new DiskCannotMultipartError(diskName);
-	try {
-		disk.url(`${name}/check`);
-	} catch (error) {
-		if (!(error instanceof DiskNotPublicError)) throw error;
-		const { partBytes } = purpose.multipart!;
-		if (!Number.isInteger(partBytes) || partBytes < MIN_PART_BYTES) {
-			throw new UploadPartSizeError(name, `parts must be at least ${MIN_PART_BYTES} bytes`);
-		}
-		if (partCountOf(purpose.maxBytes, partBytes) > MAX_PARTS) {
-			throw new UploadPartSizeError(
-				name,
-				`a file of ${purpose.maxBytes} bytes would have more than ${MAX_PARTS} parts`
-			);
-		}
-		return;
-	}
-	throw new MultipartOnPublicDiskError(name, diskName);
+	if (isPublic(disk)) throw new MultipartOnPublicDiskError(name, diskName);
 };
+
+/** Whether a disk serves its objects at public URLs: `url()` answers instead of throwing. */
+const isPublic = (disk: StorageDriver): boolean => {
+	try {
+		disk.url('public-check');
+		return true;
+	} catch (error) {
+		if (error instanceof DiskNotPublicError) return false;
+		throw error;
+	}
+};
+
+/**
+ * A file without the disk's multipart upload id, which stays on the server: what tickets and
+ * progress carry.
+ */
+const withoutUpload = ({ multipart: _multipart, ...file }: FileRecord): FileRecord => file;
 
 const after = (from: Date, seconds: number): Date => new Date(from.getTime() + seconds * 1000);
 

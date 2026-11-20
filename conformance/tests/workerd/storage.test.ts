@@ -83,8 +83,8 @@ describe('r2 (workerd) uploads in parts', () => {
 		// R2 needs every part but the last to be at least 5 MiB, and all of the same size.
 		const first = new Uint8Array(5 * MiB).fill(1);
 		const last = new TextEncoder().encode('tail');
-		const two = await multipart.putPart(key, uploadId, 2, last);
-		const one = await multipart.putPart(key, uploadId, 1, first);
+		const two = await multipart.putPart!(key, uploadId, 2, last);
+		const one = await multipart.putPart!(key, uploadId, 1, first);
 		const listed = await multipart.listParts(key, uploadId);
 		expect(listed).toEqual([one, two]);
 
@@ -105,10 +105,10 @@ describe('r2 (workerd) uploads in parts', () => {
 		const multipart = disk.multipart!;
 		const key = `multipart/${crypto.randomUUID()}`;
 		const uploadId = await multipart.create(key);
-		await multipart.putPart(key, uploadId, 1, new Uint8Array(16));
+		await multipart.putPart!(key, uploadId, 1, new Uint8Array(16));
 		await multipart.abort(key, uploadId);
 		await multipart.abort(key, uploadId);
 		expect(await multipart.listParts(key, uploadId)).toBeNull();
-		await expect(multipart.putPart(key, uploadId, 1, new Uint8Array(1))).rejects.toThrow();
+		await expect(multipart.putPart!(key, uploadId, 1, new Uint8Array(1))).rejects.toThrow();
 	});
 });
