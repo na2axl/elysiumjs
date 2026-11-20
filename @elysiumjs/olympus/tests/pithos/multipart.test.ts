@@ -362,6 +362,19 @@ describe('Uploads in parts', () => {
 		expect(file.status).toBe('ready');
 	});
 
+	it('drops the object of parts already joined when an upload is given up', async () => {
+		await boot();
+		const size = 5 * MiB + 1;
+		const ticket = await open(size);
+		await send(ticket, video(size), [1, 2]);
+		const uploadId = await uploadIdOf(ticket.file.id);
+		const parts = await vault.multipart.listParts(ticket.file.key, uploadId);
+		await vault.multipart.complete(ticket.file.key, uploadId, parts!);
+		expect(await vault.head(ticket.file.key)).not.toBeNull();
+		expect((await Uploads.abort(ticket.file.id)).orThrow().status).toBe('expired');
+		expect(await vault.head(ticket.file.key)).toBeNull();
+	});
+
 	it('refuses an upload the disk no longer has', async () => {
 		await boot();
 		const ticket = await open(5 * MiB + 1);

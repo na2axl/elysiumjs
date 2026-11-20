@@ -642,7 +642,8 @@ export namespace Uploads {
 	};
 
 	/**
-	 * Gives up an upload that is `pending`: the file expires, and the parts sent are dropped.
+	 * Gives up an upload that is `pending`: the file expires, and the parts sent are dropped, along
+	 * with an object they were already joined into.
 	 * `user`, when given, must be who started the upload.
 	 */
 	export const abort = async (
@@ -662,6 +663,8 @@ export namespace Uploads {
 		if (!expired) return R.fail(new UploadNotPendingError());
 		if (file.multipart) {
 			await abortQuietly(file.disk, file.key, file.multipart.uploadId);
+			// Parts joined by a finish that did not take (it stopped half way) sit at the key.
+			await deleteQuietly(file.disk, file.key);
 		} else {
 			await deleteQuietly(stagingDisk(file.disk), stagingKey(file.id));
 		}
