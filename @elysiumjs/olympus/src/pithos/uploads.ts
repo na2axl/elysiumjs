@@ -15,8 +15,7 @@
 import type { DomainError } from '../problem.js';
 import type { Result } from '../result.js';
 import type { FileMetadata, FileOwner, FileRecord } from './files.js';
-import type { UploadedPart } from './storage.js';
-import type { StorageDriver } from './storage.js';
+import type { StorageDriver, UploadedPart } from './storage.js';
 
 import { Clock } from '../clock.js';
 import { Metadata } from '../metadata.js';
@@ -326,8 +325,9 @@ export type UploadProgress = {
 	readonly partCount: number;
 	readonly parts: readonly UploadedPart[];
 	/**
-	 * Whether the parts were already joined by a finish that stopped before the file was ready:
-	 * `parts` is then empty, and the client finishes again instead of sending parts.
+	 * Whether the disk no longer holds the upload: most often a finish joined the parts and stopped
+	 * before the file was ready. `parts` is then empty, and the client finishes again instead of
+	 * sending parts; an upload dropped from the disk is then refused.
 	 */
 	readonly joined: boolean;
 	readonly expiresAt: Date;
