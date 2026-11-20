@@ -1,5 +1,12 @@
 # @elysiumjs/argus
 
+## 0.4.5
+
+### Patch Changes
+
+- Updated dependencies [[`83468be`](https://github.com/na2axl/elysiumjs/commit/83468bebf825cad730a5e0b12f68d6226bafca30)]:
+  - @elysiumjs/olympus@0.29.0
+
 ## 0.4.4
 
 ### Patch Changes
