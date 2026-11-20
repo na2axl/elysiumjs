@@ -14,22 +14,28 @@
 
 import type { ServedSigning } from './signing.js';
 import type {
+	GetOptions,
 	ListOptions,
 	ListPage,
+	MultipartStorage,
 	ObjectInfo,
 	PutOptions,
 	SignedUrlOptions,
+	SignPartOptions,
 	StorageBody,
-	StoredObject
+	StoredObject,
+	UploadedPart
 } from './storage.js';
 
 import { Clock } from '../clock.js';
-import { joinUrl, signServedUrl } from './signing.js';
+import { joinUrl, signServedPartUrl, signServedUrl } from './signing.js';
 import {
 	assertKey,
 	DiskCannotSignError,
 	DiskNotPublicError,
 	listLimit,
+	MultipartPartsMismatchError,
+	MultipartUploadNotFoundError,
 	ObjectNotFoundError,
 	objectOf,
 	Storage,
@@ -61,6 +67,15 @@ export type MemoryDiskOptions = {
 @Storage.driver('memory')
 export class MemoryDisk extends StorageDriver {
 	readonly #objects = new Map<string, { info: ObjectInfo; bytes: Uint8Array }>();
+	readonly #uploads = new Map<
+		string,
+		{
+			key: string;
+			options: PutOptions;
+			parts: Map<number, { part: UploadedPart; bytes: Uint8Array }>;
+		}
+	>();
+	#uploadCount = 0;
 
 	constructor(private readonly options: MemoryDiskOptions = {}) {
 		super();
@@ -81,9 +96,14 @@ export class MemoryDisk extends StorageDriver {
 		return info;
 	}
 
-	public async get(key: string): Promise<StoredObject | null> {
+	public async get(key: string, options: GetOptions = {}): Promise<StoredObject | null> {
 		const entry = this.#objects.get(assertKey(key));
-		return entry ? objectOf(entry.info, entry.bytes.slice()) : null;
+		if (!entry) return null;
+		const { range } = options;
+		const bytes = range
+			? entry.bytes.slice(range.offset, range.offset + range.length)
+			: entry.bytes.slice();
+		return objectOf(entry.info, bytes);
 	}
 
 	public async head(key: string): Promise<ObjectInfo | null> {
@@ -126,5 +146,66 @@ export class MemoryDisk extends StorageDriver {
 	public async signedUrl(key: string, options: SignedUrlOptions): Promise<string> {
 		if (!this.options.signing) throw new DiskCannotSignError('memory');
 		return signServedUrl(this.options.signing, assertKey(key), options);
+	}
+
+	/** Multipart uploads held in memory; their part URLs are served by `PithosModule`. */
+	public override get multipart(): MultipartStorage {
+		const uploads = this.#uploads;
+		const upload = (key: string, uploadId: string) => {
+			const found = uploads.get(uploadId);
+			if (!found || found.key !== key) throw new MultipartUploadNotFoundError(uploadId);
+			return found;
+		};
+		return {
+			create: async (key: string, options: PutOptions = {}) => {
+				this.#uploadCount += 1;
+				const uploadId = `memory-${Clock.epochMs()}-${this.#uploadCount}`;
+				uploads.set(uploadId, { key: assertKey(key), options, parts: new Map() });
+				return uploadId;
+			},
+			signPart: async (key: string, uploadId: string, part: number, options: SignPartOptions) => {
+				if (!this.options.signing) throw new DiskCannotSignError('memory');
+				return signServedPartUrl(this.options.signing, assertKey(key), uploadId, part, options);
+			},
+			putPart: async (key: string, uploadId: string, number: number, body: Uint8Array) => {
+				const found = upload(key, uploadId);
+				const part = {
+					number,
+					size: body.byteLength,
+					etag: `${Clock.epochMs()}-${number}-${(this.#uploadCount += 1)}`
+				};
+				found.parts.set(number, { part, bytes: body.slice() });
+				return part;
+			},
+			listParts: async (key: string, uploadId: string) => {
+				const found = uploads.get(uploadId);
+				if (!found || found.key !== key) return null;
+				return [...found.parts.values()]
+					.map((entry) => entry.part)
+					.sort((a, b) => a.number - b.number);
+			},
+			complete: async (key: string, uploadId: string, parts: readonly UploadedPart[]) => {
+				const found = upload(key, uploadId);
+				const chunks = parts.map((given) => {
+					const held = found.parts.get(given.number);
+					if (!held || held.part.etag !== given.etag) {
+						throw new MultipartPartsMismatchError(uploadId);
+					}
+					return held.bytes;
+				});
+				const bytes = new Uint8Array(chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0));
+				let offset = 0;
+				for (const chunk of chunks) {
+					bytes.set(chunk, offset);
+					offset += chunk.byteLength;
+				}
+				uploads.delete(uploadId);
+				return this.put(key, bytes, found.options);
+			},
+			abort: async (key: string, uploadId: string) => {
+				const found = uploads.get(uploadId);
+				if (found && found.key === key) uploads.delete(uploadId);
+			}
+		};
 	}
 }

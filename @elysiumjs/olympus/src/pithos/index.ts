@@ -17,6 +17,7 @@ export type {
 	FileEvent,
 	FileExpectation,
 	FileMetadata,
+	FileMultipart,
 	FileOwner,
 	FilePatch,
 	FileRecord,
@@ -28,17 +29,21 @@ export type {
 export type { MemoryDiskOptions } from './memory.js';
 export type { PithosModuleConfig } from './pithos.module.js';
 export type { ServedSigning } from './signing.js';
-export { joinUrl, signServedUrl } from './signing.js';
+export { joinUrl, signServedPartUrl, signServedUrl } from './signing.js';
 export type {
+	GetOptions,
 	ListOptions,
 	ListPage,
 	LocalDiskDriver,
 	LocalDiskOptions,
+	MultipartStorage,
 	ObjectInfo,
 	PutOptions,
 	SignedUrlOptions,
+	SignPartOptions,
 	StorageBody,
-	StoredObject
+	StoredObject,
+	UploadedPart
 } from './storage.js';
 
 export {
@@ -46,9 +51,12 @@ export {
 	FileNotReadyError,
 	FilesUnavailableError,
 	MissingUploadPurposeServiceError,
+	MultipartOnPublicDiskError,
 	UploadExpiredError,
 	UploadMissingError,
 	UploadNotPendingError,
+	UploadPartInvalidError,
+	UploadPartSizeError,
 	UploadPurposeUnknownError,
 	UploadRejectedError,
 	UploadTooLargeError,
@@ -60,7 +68,10 @@ export {
 	FileStore,
 	meets,
 	MemoryFileStore,
+	partCountOf,
+	partSizeOf,
 	PITHOS_FILE_DELETED,
+	PITHOS_FILE_EXPIRED,
 	PITHOS_FILE_READY,
 	PITHOS_FILE_REJECTED,
 	STAGING_PREFIX,
@@ -70,11 +81,19 @@ export { MemoryDisk } from './memory.js';
 export { PithosModule } from './pithos.module.js';
 export { StorageController, StoredObjectView } from './storage.controller.js';
 export {
+	ABORT_UPLOAD_ERRORS,
+	type AbortUploadErrors,
 	FINISH_UPLOAD_ERRORS,
 	type FinishUploadErrors,
+	type MultipartTicket,
 	OPEN_UPLOAD_ERRORS,
 	type OpenUploadErrors,
+	type SignedPart,
+	type SignedParts,
 	Upload,
+	UPLOAD_PARTS_ERRORS,
+	type UploadPartsErrors,
+	type UploadProgress,
 	type UploadRequest,
 	Uploads,
 	type UploadTicket
@@ -82,10 +101,16 @@ export {
 export {
 	assertKey,
 	DEFAULT_LIST_LIMIT,
+	DiskCannotMultipartError,
 	DiskCannotSignError,
 	DiskNotPublicError,
 	InvalidObjectKeyError,
+	headOf,
 	listLimit,
+	MAX_PARTS,
+	MIN_PART_BYTES,
+	MultipartPartsMismatchError,
+	MultipartUploadNotFoundError,
 	ObjectNotFoundError,
 	objectOf,
 	PITHOS_DISKS,

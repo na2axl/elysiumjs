@@ -21,7 +21,7 @@ import { t } from 'elysia';
 import { SignedUrl } from '../harpocrates/signed-url.js';
 import { Http } from '../http.js';
 import { View } from '../view.js';
-import { Storage } from './storage.js';
+import { MultipartUploadNotFoundError, Storage } from './storage.js';
 
 /** The disk of a request, and its signing options, or `null` when it does not serve URLs. */
 const servedDisk = (name: string): { disk: StorageDriver; signing: ServedSigning } | null => {
@@ -70,7 +70,7 @@ export class StoredObjectView extends View(t.Uint8Array()) {
 
 /**
  * Serves the signed URLs of disks that cannot serve them themselves, such as `memory` and
- * `local`: `GET` downloads the object, and `PUT` uploads it. Give such a disk
+ * `local`: `GET` downloads the object, and `PUT` uploads it, or one part of a multipart upload. Give such a disk
  * `signing: { url, secret }`, where `url` is this route followed by the name of the disk, such as
  * `https://api.example.com/storage/uploads`. `PithosModule` lists this controller.
  * @author Axel Nana <ax.lnana@outlook.com>
@@ -117,6 +117,24 @@ export class StorageController {
 		const body = await ctx.request.arrayBuffer();
 		if (length !== null && body.byteLength !== Number(length)) {
 			return new Response(null, { status: 403 });
+		}
+		const uploadId = checked.url.searchParams.get('uploadId');
+		if (uploadId !== null) {
+			// A part of a multipart upload: its number and upload are signed with the URL.
+			const multipart = checked.disk.multipart;
+			const part = Number(checked.url.searchParams.get('partNumber'));
+			if (!multipart?.putPart || !Number.isInteger(part) || part < 1) {
+				return new Response(null, { status: 404 });
+			}
+			try {
+				const uploaded = await multipart.putPart(checked.key, uploadId, part, new Uint8Array(body));
+				return new Response(null, { status: 204, headers: { etag: `"${uploaded.etag}"` } });
+			} catch (error) {
+				if (error instanceof MultipartUploadNotFoundError) {
+					return new Response(null, { status: 404 });
+				}
+				throw error;
+			}
 		}
 		await checked.disk.put(checked.key, body, { contentType: declared });
 		return new Response(null, { status: 204 });

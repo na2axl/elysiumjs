@@ -107,6 +107,19 @@ export class UploadRejectedError extends DomainError.for('UPLOAD_REJECTED', 422)
 }
 
 /**
+ * A part number outside the parts of a multipart upload: a 400 problem with how many parts the
+ * upload has.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export class UploadPartInvalidError extends DomainError.for('UPLOAD_PART_INVALID', 400, {
+	extensions: { partCount: t.Integer() }
+}) {
+	constructor(partCount: number) {
+		super(`This upload has parts 1 to ${partCount}.`, { extensions: { partCount } });
+	}
+}
+
+/**
  * The file is not stored and ready for this use: a 422 problem. Upload it again.
  * @author Axel Nana <ax.lnana@outlook.com>
  */
@@ -143,5 +156,29 @@ export class DuplicateUploadPurposeError extends ElysiumError {
 export class MissingUploadPurposeServiceError extends ElysiumError {
 	constructor(name: string) {
 		super(`The upload purpose ${name} is a service: list it in the services of a module.`);
+	}
+}
+
+/**
+ * Thrown for an upload purpose that uploads in parts to a public disk: a part upload writes the
+ * file's own key before it is checked, so the disk must not serve it.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export class MultipartOnPublicDiskError extends ElysiumError {
+	constructor(purpose: string, disk: string) {
+		super(
+			`The upload purpose "${purpose}" uploads in parts, so its disk must be private, not the public ${disk} disk.`
+		);
+	}
+}
+
+/**
+ * Thrown for an upload purpose whose part size the disk cannot take: under 5 MiB, or so small that
+ * a file of the largest size has more than 10,000 parts.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export class UploadPartSizeError extends ElysiumError {
+	constructor(purpose: string, detail: string) {
+		super(`The part size of the upload purpose "${purpose}" is not valid: ${detail}.`);
 	}
 }
