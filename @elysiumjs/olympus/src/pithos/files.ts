@@ -80,7 +80,26 @@ export type FileRecord = {
 	readonly rejection: string | null;
 	/** What its purpose tells about it, such as the length of a video. */
 	readonly metadata: FileMetadata;
+	/**
+	 * The disk's multipart upload of a file uploaded in parts, kept until the file is ready;
+	 * `null` (or absent) for a file uploaded in one request.
+	 */
+	readonly multipart?: FileMultipart | null;
 };
+
+/**
+ * The multipart upload of a file: the disk's upload id, and the size of every part but the last.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export type FileMultipart = { readonly uploadId: string; readonly partBytes: number };
+
+/** How many parts a file of `size` bytes has, in parts of `partBytes`. */
+export const partCountOf = (size: number, partBytes: number): number =>
+	Math.max(1, Math.ceil(size / partBytes));
+
+/** The size of part `number` (from 1) of a file of `size` bytes, in parts of `partBytes`. */
+export const partSizeOf = (size: number, partBytes: number, number: number): number =>
+	number < partCountOf(size, partBytes) ? partBytes : size - partBytes * (number - 1);
 
 /**
  * The fields a transition may change.
@@ -97,6 +116,8 @@ export type FilePatch = Partial<
 		| 'deletedAt'
 		| 'rejection'
 		| 'metadata'
+		| 'multipart'
+		| 'contentType'
 	>
 >;
 
@@ -289,6 +310,12 @@ export const PITHOS_FILE_READY = 'elysium:pithos:ready';
 /** Emitted when an uploaded file is refused. */
 export const PITHOS_FILE_REJECTED = 'elysium:pithos:rejected';
 
+/**
+ * Emitted when an upload ends without a file: given up with `Uploads.abort()`, or never finished
+ * and pruned.
+ */
+export const PITHOS_FILE_EXPIRED = 'elysium:pithos:expired';
+
 /** Emitted once a file is deleted, by `Files.remove()` or by pruning. */
 export const PITHOS_FILE_DELETED = 'elysium:pithos:deleted';
 
@@ -316,6 +343,19 @@ export const deleteQuietly = async (disk: string, key: string): Promise<void> =>
 		await Storage.disk(disk).delete(key);
 	} catch (error) {
 		getLogger().error('A file object could not be deleted', {
+			disk,
+			key,
+			error: error instanceof Error ? error.message : String(error)
+		});
+	}
+};
+
+/** Aborts a multipart upload, logging a failure instead of failing the request or the job. */
+export const abortQuietly = async (disk: string, key: string, uploadId: string): Promise<void> => {
+	try {
+		await Storage.disk(disk).multipart?.abort(key, uploadId);
+	} catch (error) {
+		getLogger().error('A multipart upload could not be aborted', {
 			disk,
 			key,
 			error: error instanceof Error ? error.message : String(error)
@@ -458,8 +498,8 @@ export namespace Files {
 	};
 
 	/**
-	 * Deletes up to `limit` files whose time is over: uploads never finished (their staged object,
-	 * and their object should a finish have stopped half way) and ready files nothing claims (their
+	 * Deletes up to `limit` files whose time is over: uploads never finished (their staged object or
+	 * multipart upload, and their object should a finish have stopped half way) and ready files nothing claims (their
 	 * object). A file claimed in the meantime is kept. Then deletes the staged objects whose upload
 	 * URL has expired, such as one sent again through the URL after the upload finished. Answers how
 	 * many files were pruned.
@@ -479,9 +519,13 @@ export namespace Files {
 			);
 			if (!done) continue;
 			pruned += 1;
-			if (expired) await deleteQuietly(stagingDisk(file.disk), stagingKey(file.id));
+			if (expired && file.multipart) {
+				await abortQuietly(file.disk, file.key, file.multipart.uploadId);
+			} else if (expired) {
+				await deleteQuietly(stagingDisk(file.disk), stagingKey(file.id));
+			}
 			await deleteQuietly(file.disk, file.key);
-			if (!expired) emitFileEvent(PITHOS_FILE_DELETED, done);
+			emitFileEvent(expired ? PITHOS_FILE_EXPIRED : PITHOS_FILE_DELETED, done);
 		}
 		if (pruned < limit) await sweepStaging(after(now, -options.uploadTtl), limit);
 		return pruned;

@@ -107,6 +107,76 @@ export type SignedUrlOptions = {
 	readonly contentLength?: number;
 };
 
+/**
+ * How an object is read.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export type GetOptions = {
+	/**
+	 * Only `length` bytes from `offset`, such as the head of a large file. The object's `size` stays
+	 * the size of the whole object. A disk that cannot read a range answers the whole content.
+	 */
+	readonly range?: { readonly offset: number; readonly length: number };
+};
+
+/**
+ * A part of a multipart upload that the disk holds.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export type UploadedPart = {
+	/** Its number, from 1. */
+	readonly number: number;
+	/** Its size, in bytes. */
+	readonly size: number;
+	/** The tag the disk gave it, without quotes. */
+	readonly etag: string;
+};
+
+/**
+ * What signing a part takes.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export type SignPartOptions = {
+	/** The size, in bytes, the part must have. */
+	readonly contentLength: number;
+	/** How long the URL works, in seconds. */
+	readonly expiresIn: number;
+};
+
+/**
+ * How a disk uploads a large object in parts: the client sends each part to its own signed URL,
+ * in any order and again if it fails, then the server joins them. Parts other than the last
+ * must all have the same size, of at least 5 MiB on S3-compatible disks.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export interface MultipartStorage {
+	/** Starts a multipart upload of `key`, and answers its upload id. */
+	create(key: string, options?: PutOptions): Promise<string>;
+	/** A URL that uploads one part (1 to 10,000) of exactly `contentLength` bytes. */
+	signPart(key: string, uploadId: string, part: number, options: SignPartOptions): Promise<string>;
+	/**
+	 * Writes one part, for a disk whose part URLs `PithosModule` serves.
+	 * @throws {MultipartUploadNotFoundError} When the upload is not in progress.
+	 */
+	putPart(key: string, uploadId: string, part: number, body: Uint8Array): Promise<UploadedPart>;
+	/** The parts uploaded so far, by number, or `null` when the upload is not in progress. */
+	listParts(key: string, uploadId: string): Promise<readonly UploadedPart[] | null>;
+	/**
+	 * Joins the parts into the object `key`, and ends the upload.
+	 * @throws {MultipartUploadNotFoundError} When the upload is not in progress.
+	 * @throws {MultipartPartsMismatchError} When a part is missing or no longer has its etag.
+	 */
+	complete(key: string, uploadId: string, parts: readonly UploadedPart[]): Promise<ObjectInfo>;
+	/** Ends the upload and drops its parts; does nothing when it is not in progress. */
+	abort(key: string, uploadId: string): Promise<void>;
+}
+
+/** The most parts a multipart upload may have. */
+export const MAX_PARTS = 10_000;
+
+/** The smallest size of a part other than the last, on S3-compatible disks: 5 MiB. */
+export const MIN_PART_BYTES = 5 * 1024 * 1024;
+
 /** The default size of a listing page. */
 export const DEFAULT_LIST_LIMIT = 1000;
 
@@ -133,6 +203,37 @@ export class DiskCannotSignError extends ElysiumError {
 		super(
 			`The ${disk} disk cannot sign URLs: give it signing options, and serve them with PithosModule.`
 		);
+	}
+}
+
+/**
+ * Thrown when a multipart upload is asked of a disk that has none.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export class DiskCannotMultipartError extends ElysiumError {
+	constructor(disk: string) {
+		super(`The ${disk} disk cannot upload in parts: give it a driver with multipart support.`);
+	}
+}
+
+/**
+ * Thrown by a disk for a multipart upload that is not in progress: never started, completed or
+ * aborted.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export class MultipartUploadNotFoundError extends ElysiumError {
+	constructor(public readonly uploadId: string) {
+		super(`No multipart upload "${uploadId}" is in progress.`);
+	}
+}
+
+/**
+ * Thrown by `complete()` when a part is missing or was sent again since it was listed.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export class MultipartPartsMismatchError extends ElysiumError {
+	constructor(public readonly uploadId: string) {
+		super(`The parts of the multipart upload "${uploadId}" are not the ones given.`);
 	}
 }
 
@@ -183,6 +284,31 @@ export const toBytes = async (body: StorageBody): Promise<Uint8Array> => {
 	return new Uint8Array(await new Response(body).arrayBuffer());
 };
 
+/**
+ * Reads the first `length` bytes of a stream at most, and cancels the rest, so a large object is
+ * never held in memory.
+ */
+export const headOf = async (
+	body: ReadableStream<Uint8Array>,
+	length: number
+): Promise<Uint8Array> => {
+	const head = new Uint8Array(length);
+	let read = 0;
+	const reader = body.getReader();
+	try {
+		while (read < length) {
+			const { done, value } = await reader.read();
+			if (done) break;
+			const take = Math.min(value.byteLength, length - read);
+			head.set(value.subarray(0, take), read);
+			read += take;
+		}
+	} finally {
+		await reader.cancel().catch(() => undefined);
+	}
+	return head.slice(0, read);
+};
+
 /** A stream of bytes. */
 export const streamOf = (bytes: Uint8Array): ReadableStream<Uint8Array> =>
 	new ReadableStream({
@@ -211,8 +337,8 @@ export abstract class StorageDriver {
 	/** Writes an object, and answers what the disk knows about it. */
 	public abstract put(key: string, body: StorageBody, options?: PutOptions): Promise<ObjectInfo>;
 
-	/** Reads an object, or `null` when there is none. */
-	public abstract get(key: string): Promise<StoredObject | null>;
+	/** Reads an object, or a range of it, or `null` when there is none. */
+	public abstract get(key: string, options?: GetOptions): Promise<StoredObject | null>;
 
 	/** What the disk knows about an object, or `null` when there is none. */
 	public abstract head(key: string): Promise<ObjectInfo | null>;
@@ -240,6 +366,11 @@ export abstract class StorageDriver {
 	 * @throws {DiskCannotSignError} When the disk cannot sign URLs.
 	 */
 	public abstract signedUrl(key: string, options: SignedUrlOptions): Promise<string>;
+
+	/** How the disk uploads large objects in parts; `undefined` when it cannot. */
+	public get multipart(): MultipartStorage | undefined {
+		return undefined;
+	}
 
 	/** Whether an object exists. */
 	public async exists(key: string): Promise<boolean> {

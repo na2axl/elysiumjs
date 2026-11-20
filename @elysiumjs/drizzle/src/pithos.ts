@@ -15,6 +15,7 @@
 import type {
 	FileCondition,
 	FileMetadata,
+	FileMultipart,
 	FilePatch,
 	FileRecord,
 	FileStatus,
@@ -56,7 +57,9 @@ const fileColumns = () => ({
 	expiresAt: at('expires_at'),
 	deletedAt: at('deleted_at'),
 	rejection: text('rejection'),
-	metadata: jsonb('metadata').$type<FileMetadata>().notNull().default({})
+	metadata: jsonb('metadata').$type<FileMetadata>().notNull().default({}),
+	/** The disk's multipart upload of a file uploaded in parts, until it is ready. */
+	multipart: jsonb('multipart').$type<FileMultipart>()
 });
 
 /**

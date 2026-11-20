@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import type { Secret } from '../harpocrates/secret.js';
-import type { SignedUrlOptions } from './storage.js';
+import type { SignedUrlOptions, SignPartOptions } from './storage.js';
 
 import { SignedUrl } from '../harpocrates/signed-url.js';
 
@@ -48,5 +48,23 @@ export const signServedUrl = (
 	if (options.contentLength !== undefined) {
 		url.searchParams.set('contentLength', String(options.contentLength));
 	}
+	return SignedUrl.sign(url, { secret: signing.secret, expiresIn: options.expiresIn });
+};
+
+/**
+ * Signs a URL of the disk's route in `PithosModule` that uploads one part of a multipart upload.
+ */
+export const signServedPartUrl = (
+	signing: ServedSigning,
+	key: string,
+	uploadId: string,
+	part: number,
+	options: SignPartOptions
+): Promise<string> => {
+	const url = new URL(joinUrl(signing.url, key));
+	url.searchParams.set('method', 'PUT');
+	url.searchParams.set('uploadId', uploadId);
+	url.searchParams.set('partNumber', String(part));
+	url.searchParams.set('contentLength', String(options.contentLength));
 	return SignedUrl.sign(url, { secret: signing.secret, expiresIn: options.expiresIn });
 };

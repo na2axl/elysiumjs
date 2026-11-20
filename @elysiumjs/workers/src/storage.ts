@@ -14,23 +14,31 @@
 
 import type { Secret } from '@elysiumjs/olympus/harpocrates';
 import type {
+	GetOptions,
 	ListOptions,
 	ListPage,
+	MultipartStorage,
 	ObjectInfo,
 	PutOptions,
 	ServedSigning,
 	SignedUrlOptions,
+	SignPartOptions,
 	StorageBody,
-	StoredObject
+	StoredObject,
+	UploadedPart
 } from '@elysiumjs/olympus/pithos';
 
 import {
 	assertKey,
+	DiskCannotMultipartError,
 	DiskCannotSignError,
 	DiskNotPublicError,
 	joinUrl,
 	listLimit,
+	MultipartPartsMismatchError,
+	MultipartUploadNotFoundError,
 	ObjectNotFoundError,
+	signServedPartUrl,
 	signServedUrl,
 	Storage,
 	StorageDriver,
@@ -73,6 +81,21 @@ export type R2ObjectBodyLike = R2ObjectLike & {
 };
 
 /**
+ * A multipart upload of an R2 bucket binding.
+ * @author Axel Nana <ax.lnana@outlook.com>
+ */
+export type R2MultipartUploadLike = {
+	readonly key: string;
+	readonly uploadId: string;
+	uploadPart(
+		partNumber: number,
+		value: ArrayBuffer | ArrayBufferView | string | Blob | ReadableStream
+	): Promise<{ partNumber: number; etag: string }>;
+	abort(): Promise<void>;
+	complete(parts: { partNumber: number; etag: string }[]): Promise<R2ObjectLike>;
+};
+
+/**
  * The slice of an R2 bucket binding that {@link R2Disk} uses.
  * @author Axel Nana <ax.lnana@outlook.com>
  */
@@ -85,7 +108,10 @@ export interface R2BucketLike {
 			customMetadata?: Record<string, string>;
 		}
 	): Promise<R2ObjectLike | null>;
-	get(key: string): Promise<R2ObjectBodyLike | null>;
+	get(
+		key: string,
+		options?: { range?: { offset: number; length: number } }
+	): Promise<R2ObjectBodyLike | null>;
 	head(key: string): Promise<R2ObjectLike | null>;
 	delete(keys: string | string[]): Promise<void>;
 	list(options?: {
@@ -94,6 +120,16 @@ export interface R2BucketLike {
 		limit?: number;
 		include?: ('httpMetadata' | 'customMetadata')[];
 	}): Promise<{ objects: R2ObjectLike[]; truncated: boolean; cursor?: string }>;
+	/** Starts a multipart upload; needed for uploads in parts. */
+	createMultipartUpload?(
+		key: string,
+		options?: {
+			httpMetadata?: { contentType?: string; cacheControl?: string };
+			customMetadata?: Record<string, string>;
+		}
+	): Promise<R2MultipartUploadLike>;
+	/** Resumes a multipart upload by id; needed for uploads in parts. */
+	resumeMultipartUpload?(key: string, uploadId: string): R2MultipartUploadLike;
 }
 
 /**
@@ -140,6 +176,39 @@ export type R2S3Options = {
 
 const read = async (secret: Secret): Promise<string> =>
 	typeof secret === 'function' ? await secret() : secret;
+
+/**
+ * Where a disk whose part URLs `PithosModule` serves keeps a receipt of each part, since an R2
+ * binding cannot list the parts of an upload.
+ */
+const RECEIPTS = '.multipart/';
+
+const receiptsOf = (uploadId: string): string => `${RECEIPTS}${encodeURIComponent(uploadId)}/`;
+
+/** The name of a part receipt, padded so that receipts list in part order. */
+const receiptKey = (uploadId: string, part: number): string =>
+	`${receiptsOf(uploadId)}${String(part).padStart(5, '0')}`;
+
+/** The receipt that tells an upload is in progress, even before any part. */
+const anchorKey = (uploadId: string): string => `${receiptsOf(uploadId)}upload`;
+
+const unquote = (etag: string): string => etag.replace(/&quot;|"/g, '');
+
+/** The text of the first `<name>` element of an XML fragment. */
+const tag = (xml: string, name: string): string | undefined =>
+	new RegExp(`<${name}>([^<]*)</${name}>`).exec(xml)?.[1];
+
+/** A failure of the binding about a part or an upload, as an error of pithos. */
+const multipartError = (error: unknown, uploadId: string): unknown => {
+	const message = error instanceof Error ? error.message : String(error);
+	if (/NoSuchUpload|10024|does not exist/i.test(message)) {
+		return new MultipartUploadNotFoundError(uploadId);
+	}
+	if (/InvalidPart|10025|EntityTooSmall|10011|etag/i.test(message)) {
+		return new MultipartPartsMismatchError(uploadId);
+	}
+	return error;
+};
 
 /** What a disk knows about an object, from what R2 answers. */
 const infoOf = (object: R2ObjectLike): ObjectInfo => ({
@@ -203,8 +272,11 @@ export class R2Disk extends StorageDriver {
 		return infoOf(object!);
 	}
 
-	public async get(key: string): Promise<StoredObject | null> {
-		const object = await this.#bucket().get(assertKey(key));
+	public async get(key: string, options: GetOptions = {}): Promise<StoredObject | null> {
+		const object = await this.#bucket().get(
+			assertKey(key),
+			options.range ? { range: options.range } : undefined
+		);
 		if (!object) return null;
 		return {
 			...infoOf(object),
@@ -268,13 +340,6 @@ export class R2Disk extends StorageDriver {
 	public async signedUrl(key: string, options: SignedUrlOptions): Promise<string> {
 		const { s3, signing } = this.options;
 		if (s3) {
-			const { expiresIn } = options;
-			if (!Number.isInteger(expiresIn) || expiresIn < 1 || expiresIn > MAX_PRESIGN_SECONDS) {
-				throw new RangeError(
-					`An R2 presigned URL lasts from 1 to ${MAX_PRESIGN_SECONDS} whole seconds, not ${expiresIn}.`
-				);
-			}
-			const endpoint = s3.endpoint ?? `https://${s3.accountId}.r2.cloudflarestorage.com`;
 			const headers: Record<string, string> = {};
 			if (options.method === 'PUT' && options.contentType) {
 				headers['content-type'] = options.contentType;
@@ -282,18 +347,193 @@ export class R2Disk extends StorageDriver {
 			if (options.method === 'PUT' && options.contentLength !== undefined) {
 				headers['content-length'] = String(options.contentLength);
 			}
-			return presignS3Url({
-				method: options.method,
-				url: joinUrl(`${endpoint}/${encodeURIComponent(s3.bucket)}`, assertKey(key)),
-				accessKeyId: await read(s3.accessKeyId),
-				secretAccessKey: await read(s3.secretAccessKey),
-				region: 'auto',
-				expiresIn: options.expiresIn,
-				headers
-			});
+			return this.#presign(s3, options.method, this.#s3Url(s3, key), options.expiresIn, headers);
 		}
 		if (!signing) throw new DiskCannotSignError('r2');
 		return signServedUrl(signing, assertKey(key), options);
+	}
+
+	/**
+	 * Uploads in parts, through the binding: part URLs are presigned on the S3 API with `s3`, so
+	 * parts go straight to the bucket, or served by `PithosModule` with `signing`, through the
+	 * Worker. With `signing`, a receipt of each part is kept under `.multipart/` until the upload
+	 * ends, since the binding cannot list parts; deployed, give the disk `s3`.
+	 */
+	public override get multipart(): MultipartStorage | undefined {
+		const { s3, signing } = this.options;
+		if (!s3 && !signing) return undefined;
+		const upload = (key: string, uploadId: string): R2MultipartUploadLike => {
+			const bucket = this.#bucket();
+			if (!bucket.resumeMultipartUpload) throw new DiskCannotMultipartError('r2');
+			return bucket.resumeMultipartUpload(assertKey(key), uploadId);
+		};
+		const dropReceipts = async (uploadId: string) => {
+			if (s3) return;
+			const bucket = this.#bucket();
+			let cursor: string | undefined;
+			do {
+				const page = await bucket.list({ prefix: receiptsOf(uploadId), cursor });
+				if (page.objects.length > 0) await bucket.delete(page.objects.map((o) => o.key));
+				cursor = page.truncated ? page.cursor : undefined;
+			} while (cursor);
+		};
+		return {
+			create: async (key: string, options: PutOptions = {}) => {
+				const bucket = this.#bucket();
+				if (!bucket.createMultipartUpload) throw new DiskCannotMultipartError('r2');
+				const created = await bucket.createMultipartUpload(assertKey(key), {
+					httpMetadata: {
+						...(options.contentType ? { contentType: options.contentType } : {}),
+						...(options.cacheControl ? { cacheControl: options.cacheControl } : {})
+					},
+					customMetadata: { ...options.metadata }
+				});
+				if (!s3) await bucket.put(anchorKey(created.uploadId), key);
+				return created.uploadId;
+			},
+			signPart: async (key: string, uploadId: string, part: number, options: SignPartOptions) => {
+				if (s3) {
+					const url = new URL(this.#s3Url(s3, key));
+					url.searchParams.set('partNumber', String(part));
+					url.searchParams.set('uploadId', uploadId);
+					return this.#presign(s3, 'PUT', url.toString(), options.expiresIn, {
+						'content-length': String(options.contentLength)
+					});
+				}
+				return signServedPartUrl(signing!, assertKey(key), uploadId, part, options);
+			},
+			putPart: async (key: string, uploadId: string, part: number, body: Uint8Array) => {
+				const bucket = this.#bucket();
+				if (!s3 && !(await bucket.head(anchorKey(uploadId)))) {
+					throw new MultipartUploadNotFoundError(uploadId);
+				}
+				let uploaded: { partNumber: number; etag: string };
+				try {
+					uploaded = await upload(key, uploadId).uploadPart(part, body);
+				} catch (error) {
+					throw multipartError(error, uploadId);
+				}
+				const etag = unquote(uploaded.etag);
+				if (!s3) {
+					await bucket.put(receiptKey(uploadId, part), '', {
+						customMetadata: { etag, size: String(body.byteLength) }
+					});
+				}
+				return { number: part, size: body.byteLength, etag };
+			},
+			listParts: async (key: string, uploadId: string) =>
+				s3 ? this.#listS3Parts(s3, key, uploadId) : this.#listReceipts(uploadId),
+			complete: async (key: string, uploadId: string, parts: readonly UploadedPart[]) => {
+				let object: R2ObjectLike;
+				try {
+					object = await upload(key, uploadId).complete(
+						parts.map((part) => ({ partNumber: part.number, etag: part.etag }))
+					);
+				} catch (error) {
+					throw multipartError(error, uploadId);
+				}
+				await dropReceipts(uploadId);
+				return infoOf(object);
+			},
+			abort: async (key: string, uploadId: string) => {
+				try {
+					await upload(key, uploadId).abort();
+				} catch (error) {
+					if (!(multipartError(error, uploadId) instanceof MultipartUploadNotFoundError)) {
+						throw error;
+					}
+				}
+				await dropReceipts(uploadId);
+			}
+		};
+	}
+
+	/** The parts of an upload, read with S3 `ListParts`, or `null` when it is not in progress. */
+	async #listS3Parts(
+		s3: R2S3Options,
+		key: string,
+		uploadId: string
+	): Promise<UploadedPart[] | null> {
+		const parts: UploadedPart[] = [];
+		let marker: string | undefined;
+		do {
+			const url = new URL(this.#s3Url(s3, key));
+			url.searchParams.set('uploadId', uploadId);
+			url.searchParams.set('max-parts', '1000');
+			if (marker) url.searchParams.set('part-number-marker', marker);
+			const response = await fetch(await this.#presign(s3, 'GET', url.toString(), 60, {}));
+			if (response.status === 404) {
+				await response.body?.cancel();
+				return null;
+			}
+			const xml = await response.text();
+			if (!response.ok) {
+				throw new Error(`R2 ListParts failed with ${response.status}: ${tag(xml, 'Code') ?? xml}`);
+			}
+			for (const [, part] of xml.matchAll(/<Part>([\s\S]*?)<\/Part>/g)) {
+				parts.push({
+					number: Number(tag(part!, 'PartNumber')),
+					size: Number(tag(part!, 'Size')),
+					etag: unquote(tag(part!, 'ETag') ?? '')
+				});
+			}
+			marker = tag(xml, 'IsTruncated') === 'true' ? tag(xml, 'NextPartNumberMarker') : undefined;
+		} while (marker);
+		return parts.sort((a, b) => a.number - b.number);
+	}
+
+	/** The parts of an upload from their receipts, or `null` when it is not in progress. */
+	async #listReceipts(uploadId: string): Promise<UploadedPart[] | null> {
+		const bucket = this.#bucket();
+		if (!(await bucket.head(anchorKey(uploadId)))) return null;
+		const parts: UploadedPart[] = [];
+		let cursor: string | undefined;
+		do {
+			const page = await bucket.list({
+				prefix: receiptsOf(uploadId),
+				cursor,
+				include: ['customMetadata']
+			});
+			for (const object of page.objects) {
+				const number = Number(object.key.slice(receiptsOf(uploadId).length));
+				if (!Number.isInteger(number) || number < 1) continue;
+				parts.push({
+					number,
+					size: Number(object.customMetadata?.size),
+					etag: object.customMetadata?.etag ?? ''
+				});
+			}
+			cursor = page.truncated ? page.cursor : undefined;
+		} while (cursor);
+		return parts.sort((a, b) => a.number - b.number);
+	}
+
+	#s3Url(s3: R2S3Options, key: string): string {
+		const endpoint = s3.endpoint ?? `https://${s3.accountId}.r2.cloudflarestorage.com`;
+		return joinUrl(`${endpoint}/${encodeURIComponent(s3.bucket)}`, assertKey(key));
+	}
+
+	async #presign(
+		s3: R2S3Options,
+		method: 'GET' | 'PUT',
+		url: string,
+		expiresIn: number,
+		headers: Record<string, string>
+	): Promise<string> {
+		if (!Number.isInteger(expiresIn) || expiresIn < 1 || expiresIn > MAX_PRESIGN_SECONDS) {
+			throw new RangeError(
+				`An R2 presigned URL lasts from 1 to ${MAX_PRESIGN_SECONDS} whole seconds, not ${expiresIn}.`
+			);
+		}
+		return presignS3Url({
+			method,
+			url,
+			accessKeyId: await read(s3.accessKeyId),
+			secretAccessKey: await read(s3.secretAccessKey),
+			region: 'auto',
+			expiresIn,
+			headers
+		});
 	}
 
 	#bucket(): R2BucketLike {

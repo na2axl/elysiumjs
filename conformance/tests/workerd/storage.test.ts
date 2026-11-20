@@ -69,3 +69,46 @@ diskContract(
 	() => new R2Disk({ binding: scoped(`${crypto.randomUUID()}/`), ...contractUrls('r2') }),
 	{ InvalidObjectKeyError, ObjectNotFoundError }
 );
+
+describe('r2 (workerd) uploads in parts', () => {
+	const MiB = 1024 * 1024;
+
+	it('joins parts sent through the binding, keeps receipts until then, and reads a range', async () => {
+		const disk = new R2Disk({ binding: bucket, ...contractUrls('r2') });
+		const multipart = disk.multipart!;
+		const key = `multipart/${crypto.randomUUID()}`;
+		const uploadId = await multipart.create(key, { contentType: 'video/mp4' });
+		expect(await multipart.listParts(key, uploadId)).toEqual([]);
+
+		// R2 needs every part but the last to be at least 5 MiB, and all of the same size.
+		const first = new Uint8Array(5 * MiB).fill(1);
+		const last = new TextEncoder().encode('tail');
+		const two = await multipart.putPart(key, uploadId, 2, last);
+		const one = await multipart.putPart(key, uploadId, 1, first);
+		const listed = await multipart.listParts(key, uploadId);
+		expect(listed).toEqual([one, two]);
+
+		const object = await multipart.complete(key, uploadId, listed!);
+		expect(object.size).toBe(5 * MiB + 4);
+		expect(object.contentType).toBe('video/mp4');
+		expect(await multipart.listParts(key, uploadId)).toBeNull();
+		const head = await disk.get(key, { range: { offset: 5 * MiB, length: 4 } });
+		expect(await head?.text()).toBe('tail');
+		const receipts = await bucket.list({ prefix: '.multipart/' });
+		expect(receipts.objects.filter((o) => o.key.includes(encodeURIComponent(uploadId)))).toEqual(
+			[]
+		);
+	});
+
+	it('aborts an upload, and answers a part of an upload no longer in progress', async () => {
+		const disk = new R2Disk({ binding: bucket, ...contractUrls('r2') });
+		const multipart = disk.multipart!;
+		const key = `multipart/${crypto.randomUUID()}`;
+		const uploadId = await multipart.create(key);
+		await multipart.putPart(key, uploadId, 1, new Uint8Array(16));
+		await multipart.abort(key, uploadId);
+		await multipart.abort(key, uploadId);
+		expect(await multipart.listParts(key, uploadId)).toBeNull();
+		await expect(multipart.putPart(key, uploadId, 1, new Uint8Array(1))).rejects.toThrow();
+	});
+});

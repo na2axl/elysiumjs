@@ -50,7 +50,8 @@ describe('filesTable', () => {
 			'expires_at',
 			'deleted_at',
 			'rejection',
-			'metadata'
+			'metadata',
+			'multipart'
 		]);
 		expect(config.indexes.map((i) => i.config.name)).toEqual([
 			'pg_pithos_files_owner_idx',

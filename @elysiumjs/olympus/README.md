@@ -933,7 +933,7 @@ if (profile.pictureId)
 
 `Files.ready(id, expect)` makes the same checks without claiming: ready, not past its time and, when given, of the purpose and the owner. `Files.release(id, { grace, purpose, owner })` lets the file be deleted after `grace` seconds (0 by default) unless it is claimed again, and `Files.remove(id, { purpose, owner })` deletes a ready file now; both do nothing to a file of another purpose or owner than given. A file has one keeper: a feature that shares a file with another keeps track of it itself. `Files.remove()` deletes the object at once, so inside a unit of work call it once the work has committed. `Files.describe(id, metadata, expect)` adds keys to the metadata of a ready file, for what is only known later, such as the length a video service reports once it has processed the file. `Files.url(file)` and `Files.signedUrl(file, expiresIn)` answer its URLs. Every change is a transition that applies only while the record still meets its condition, so two requests racing on a file cannot both win.
 
-`Files.prune(limit?)` deletes the files whose time is over: uploads never finished (their staged object) and ready files nothing claims (their object). A file claimed in the meantime is kept. It then deletes the staged objects whose upload URL has expired, such as bytes sent again through a URL after its upload finished. Register a subclass of `FilesPruner`, from `@elysiumjs/olympus/pithos/heracles`, on a schedule to run it:
+`Files.prune(limit?)` deletes the files whose time is over: uploads never finished (their staged object, or their multipart upload) and ready files nothing claims (their object). A file claimed in the meantime is kept. It then deletes the staged objects whose upload URL has expired, such as bytes sent again through a URL after its upload finished. Register a subclass of `FilesPruner`, from `@elysiumjs/olympus/pithos/heracles`, on a schedule to run it:
 
 ```ts
 import { Job, Scheduler } from '@elysiumjs/olympus/heracles';
@@ -963,7 +963,7 @@ PithosModule.with({
 
 Uploads are sent to `staging/<id>` keys, on the disk of the file unless `staging` names another. Staged objects are not checked yet, so on a public disk they can be read by their URL until they are finished or pruned: give a public disk a private staging disk. No purpose may be named `staging`.
 
-The `elysium:pithos:ready`, `elysium:pithos:rejected` and `elysium:pithos:deleted` lifecycle events carry the file.
+The `elysium:pithos:ready`, `elysium:pithos:rejected`, `elysium:pithos:expired` (an upload given up or never finished) and `elysium:pithos:deleted` lifecycle events carry the file.
 
 ### Uploads
 
@@ -1007,6 +1007,7 @@ The client asks to upload, sends the bytes straight to the disk, then asks the s
 async open(@Http.body(StartUpload) body: StartUpload, @Auth.user() user: AuthUser) {
 	const ticket = await Uploads.open({ ...body, owner: { type: 'user', id: user.id }, user: user.id });
 	if (!ticket.check()) return ticket.error;
+	if (ticket.result.mode !== 'single') throw new Error('this route serves single uploads');
 	const { file, url, method, headers, expiresAt } = ticket.result;
 	return { id: file.id, url, method, headers, expiresAt }; // PUT the bytes to url with headers
 }
@@ -1017,11 +1018,64 @@ async finish(@Http.param('id') id: string, @Auth.user() user: AuthUser) {
 }
 ```
 
-`Uploads.open()` checks the request against its purpose (`UPLOAD_PURPOSE_UNKNOWN`, `UPLOAD_TYPE_NOT_ALLOWED` with `types`, `UPLOAD_TOO_LARGE` with `maxBytes`, `FORBIDDEN`, and `UPLOAD_TOO_MANY_PENDING` past `maxPending`; a size below 1 byte answers `BAD_REQUEST`), records a `pending` file, and answers a signed `PUT` URL for a staging key, signed for the declared content type and size. The URL never targets the key the file is served from, since a signed URL cannot be taken back.
+`Uploads.open()` answers a ticket whose `mode` tells how to upload: `'single'` for one `PUT`, or `'multipart'` for a purpose that uploads in parts (see below). It checks the request against its purpose (`UPLOAD_PURPOSE_UNKNOWN`, `UPLOAD_TYPE_NOT_ALLOWED` with `types`, `UPLOAD_TOO_LARGE` with `maxBytes`, `FORBIDDEN`, and `UPLOAD_TOO_MANY_PENDING` past `maxPending`; a size below 1 byte answers `BAD_REQUEST`), records a `pending` file, and answers a signed `PUT` URL for a staging key, signed for the declared content type and size. The URL never targets the key the file is served from, since a signed URL cannot be taken back.
 
 `Uploads.finish()` reads the staged object once, and refuses it for good (`UPLOAD_REJECTED`) unless its size, its stored content type and its first bytes, read with `file-type`, all match what was declared. Only then are those same bytes written to the file's key, the file made `ready`, and the staged object deleted, so an upload racing through the still valid URL cannot swap the bytes in between. Nothing uploaded yet answers `UPLOAD_MISSING`, and the client may upload and finish again; a finished upload, or one another call is finishing, answers `UPLOAD_NOT_PENDING` and an expired one `UPLOAD_EXPIRED`. A purpose whose types have no signature, such as `text/plain` or `image/svg+xml`, turns the content check off with `get sniff() { return false; }`. A purpose's `metadata(file, bytes)` method answers what to keep about a checked file, kept in its `metadata` when it is made ready, and typed by `Upload<TMetadata>`; throwing refuses the file. A purpose's `cacheControl` getter sets the `Cache-Control` header of its ready files; with the default `<purpose>/<id>` key, `public, max-age=31536000, immutable` is safe on a public disk.
 
-A ready file is served from `<purpose>/<id>` by default, so a new file is a new key and a served file can be cached for good. A purpose may override `key(file)`, as long as the key holds the id of the file, so two files never share an object, and does not start with `staging/`. `finish()` holds the file in memory while it checks it, so keep `maxBytes` to what a request may hold.
+A ready file is served from `<purpose>/<id>` by default, so a new file is a new key and a served file can be cached for good. A purpose may override `key(file)`, as long as the key holds the id of the file, so two files never share an object, and does not start with `staging/`. `finish()` holds a file uploaded in one request in memory while it checks it, so keep `maxBytes` to what a request may hold, or upload large files in parts.
+
+A purpose may also refuse an upload once its type, size and owner are checked, with `admit(request)`, such as against a quota. The request's `declared` field carries what the client declares about the file, such as the length of a video. A refusal is answered as it is, so an application can answer its own problem; what `admit()` passes is kept in the metadata of the pending file, and `metadata()` adds to it when the file is ready:
+
+```ts
+admit(request: UploadRequest) {
+	const seconds = Number(request.declared?.seconds);
+	if (!(seconds > 0) || seconds > this.quota.remainingSeconds(request.owner)) {
+		return Result.fail(new QuotaExceededError());
+	}
+	return Result.pass({ declaredSeconds: seconds });
+}
+```
+
+`Uploads.open()` writes the file record through the file store, which joins a transaction open around the call, such as the one of an action, so a rolled back action leaves no pending file. `uploadTtl` on a purpose sets how long its uploads may take, in seconds, in place of the one of `PithosModule`.
+
+#### Uploads in parts
+
+Large files, such as videos, are uploaded in parts: the client sends each part to its own signed URL, in any order and again if it fails, and can resume an upload after a crash or from another device by asking which parts the disk holds. Nothing goes through the application, and the file is never held in memory. A purpose opts in with `multipart`:
+
+```ts
+@Upload.purpose('video')
+export class VideoUpload extends Upload {
+	get disk() {
+		return 'private'; // a disk that is not public
+	}
+	get types() {
+		return ['video/mp4', 'video/quicktime', 'video/webm'];
+	}
+	get maxBytes() {
+		return 8 * 1024 ** 3;
+	}
+	get multipart() {
+		return { partBytes: 16 * 1024 ** 2 }; // at least 5 MiB
+	}
+	get uploadTtl() {
+		return 24 * 3600; // the deadline, moved ahead again each time parts are signed...
+	}
+	get uploadTtlMax() {
+		return 72 * 3600; // ...up to this long from the start
+	}
+}
+```
+
+`Uploads.open()` then answers `{ mode: 'multipart', file, partBytes, partCount, expiresAt }`: `partCount` parts of `partBytes` bytes, the last one holding the rest. Then:
+
+- `Uploads.signParts(id, numbers, { user })` answers the URLs of up to 100 parts, each a `PUT` of exactly its part's size, signed for it, working for an hour. A number outside `1..partCount` answers `UPLOAD_PART_INVALID` with `partCount`. Each call moves the deadline of the upload `uploadTtl` ahead again, up to `uploadTtlMax` from its start, so an upload on a slow link lasts as long as parts keep coming.
+- `Uploads.listParts(id, { user })` answers `{ parts, partBytes, partCount, expiresAt }`, the parts the disk holds by number, size and etag, so the client sends only the others.
+- `Uploads.finish(id, { user })` checks that every part is there with its size, and answers `UPLOAD_MISSING` otherwise, so the client sends the missing ones and finishes again. It joins the parts, checks the size of the object, reads only its first `sniffBytes` (4,100 by default) to check its type, and makes the file `ready`. The detected type must be one of the purpose's types, and is kept as the file's content type, so a QuickTime video declared as MP4 is not refused after a long upload. `metadata(file, bytes)` receives those first bytes only. A finish that stopped after the parts were joined can be called again: it carries on from the joined object.
+- `Uploads.abort(id, { user })` gives up a pending upload: the file expires and its parts are dropped.
+
+The parts are written straight to the file's key, not to a staging key, so a large object is never copied. That key must not be served before the file is checked: `Uploads.open()` throws for a purpose in parts on a public disk, on a disk without multipart support, or with parts under 5 MiB or so small that a file of `maxBytes` would have more than 10,000 parts. Pruning aborts the multipart upload of a file never finished. `OPEN_UPLOAD_ERRORS`, `UPLOAD_PARTS_ERRORS`, `FINISH_UPLOAD_ERRORS` and `ABORT_UPLOAD_ERRORS` list the problems of each step for the `errors` of a route.
+
+A disk supports parts through its `multipart` getter, a `MultipartStorage` (`create`, `signPart`, `putPart`, `listParts`, `complete`, `abort`), or `undefined` when it has none. `memory` supports them, and serves its part URLs on `/storage/:disk/*` like its other signed URLs; those requests go through the application, so its `bodyLimit` must be at least the part size. `get(key, { range: { offset, length } })` reads part of an object; a disk that cannot read ranges answers the whole object.
 
 ## Abilities
 
